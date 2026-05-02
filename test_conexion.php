@@ -3,6 +3,15 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
+// Start session BEFORE any output
+session_start();
+
+// Load DB constants from config/database.php
+$configFile = __DIR__ . '/config/database.php';
+if (file_exists($configFile)) {
+    require_once $configFile;
+}
+
 $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
 $host     = $_SERVER['HTTP_HOST'] ?? 'localhost';
 $scriptDir = dirname($_SERVER['SCRIPT_NAME'] ?? '/');
@@ -53,7 +62,7 @@ function warn(string $msg): string { return "<span style='color:#F59E0B'>⚠️ 
     <tr><td>Versión PHP</td><td><?= phpversion() >= '7.4' ? ok(phpversion()) : fail(phpversion() . ' (mínimo 7.4)') ?></td></tr>
     <tr><td>PDO</td><td><?= extension_loaded('pdo') ? ok('Disponible') : fail('No disponible') ?></td></tr>
     <tr><td>PDO MySQL</td><td><?= extension_loaded('pdo_mysql') ? ok('Disponible') : fail('No disponible') ?></td></tr>
-    <tr><td>Session</td><td><?= session_start() ? ok('OK') : fail('Error') ?></td></tr>
+    <tr><td>Session</td><td><?= session_status() === PHP_SESSION_ACTIVE ? ok('OK') : fail('Error') ?></td></tr>
     <tr><td>GD (imágenes)</td><td><?= extension_loaded('gd') ? ok('Disponible') : warn('No disponible') ?></td></tr>
     <tr><td>file_get_contents URL</td><td><?= ini_get('allow_url_fopen') ? ok('Habilitado') : warn('Deshabilitado (servicios API no funcionarán)') ?></td></tr>
     <tr><td>memory_limit</td><td><?= ini_get('memory_limit') ?></td></tr>
@@ -65,7 +74,12 @@ function warn(string $msg): string { return "<span style='color:#F59E0B'>⚠️ 
 <div class="card">
   <h2>🗄️ Base de datos MySQL</h2>
   <?php
-  $dbConfig = ['host' => 'localhost', 'db' => 'carnihub', 'user' => 'root', 'pass' => ''];
+  $dbConfig = [
+    'host' => defined('DB_HOST') ? DB_HOST : 'localhost',
+    'db'   => defined('DB_NAME') ? DB_NAME : 'carnihub',
+    'user' => defined('DB_USER') ? DB_USER : 'root',
+    'pass' => defined('DB_PASS') ? DB_PASS : '',
+  ];
   try {
     $pdo = new PDO(
       "mysql:host={$dbConfig['host']};dbname={$dbConfig['db']};charset=utf8mb4",
@@ -74,6 +88,9 @@ function warn(string $msg): string { return "<span style='color:#F59E0B'>⚠️ 
     );
     $version = $pdo->query('SELECT VERSION()')->fetchColumn();
     echo '<table>';
+    echo '<tr><td>Host</td><td>' . htmlspecialchars($dbConfig['host']) . '</td></tr>';
+    echo '<tr><td>Base de datos</td><td>' . htmlspecialchars($dbConfig['db']) . '</td></tr>';
+    echo '<tr><td>Usuario</td><td>' . htmlspecialchars($dbConfig['user']) . '</td></tr>';
     echo '<tr><td>Conexión</td><td>' . ok('Exitosa') . '</td></tr>';
     echo '<tr><td>Versión MySQL</td><td>' . htmlspecialchars($version) . '</td></tr>';
 
@@ -83,7 +100,7 @@ function warn(string $msg): string { return "<span style='color:#F59E0B'>⚠️ 
                'rutas','ruta_detalle','evidencias_entrega','pagos','facturas','global_settings',
                'action_logs','error_logs','dispositivos_hikvision','dispositivos_shelly'];
 
-    $stmt = $pdo->query("SHOW TABLES FROM `{$dbConfig['db']}`");
+    $stmt = $pdo->query("SHOW TABLES FROM `" . $dbConfig['db'] . "`");
     $existingTables = $stmt->fetchAll(PDO::FETCH_COLUMN);
 
     $missing = array_diff($tables, $existingTables);

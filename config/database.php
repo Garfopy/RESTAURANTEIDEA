@@ -7,14 +7,15 @@
  */
 
 define('DB_HOST',    'localhost');
-define('DB_NAME',    'carnihub');
-define('DB_USER',    'root');
-define('DB_PASS',    '');
+define('DB_NAME',    'idactivo_carnihubdb');
+define('DB_USER',    'carnihubdb_admin');
+define('DB_PASS',    'mi_contraseña');
 define('DB_CHARSET', 'utf8mb4');
 
 class Database
 {
-    private static ?PDO $instance = null;
+    /** @var PDO|null */
+    private static $instance = null;
 
     public static function getInstance(): PDO
     {
