@@ -10,12 +10,20 @@ $flash = $this->getFlash() ?? null;
   <?php endif; ?>
 
   <!-- Avatar -->
+  <?php
+    $repNombreCompleto = trim(($usuario['nombre'] ?? '') . ' ' . ($usuario['apellido_paterno'] ?? ''));
+    $repInicial = strtoupper(mb_substr($usuario['nombre'] ?? 'R', 0, 1, 'UTF-8'));
+  ?>
   <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px">
-    <div style="width:56px;height:56px;border-radius:50%;background:#C8102E;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:1.4rem">
-      <?= strtoupper(substr($usuario['nombre'],0,1)) ?>
+    <div style="width:56px;height:56px;border-radius:50%;background:#C8102E;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:1.4rem;overflow:hidden">
+      <?php if (!empty($usuario['avatar'])): ?>
+      <img src="<?= BASE_URL . htmlspecialchars($usuario['avatar']) ?>" style="width:100%;height:100%;object-fit:cover" alt="">
+      <?php else: ?>
+      <?= $repInicial ?>
+      <?php endif; ?>
     </div>
     <div>
-      <div style="font-weight:700"><?= htmlspecialchars($usuario['nombre']) ?></div>
+      <div style="font-weight:700"><?= htmlspecialchars($repNombreCompleto) ?></div>
       <div style="font-size:.75rem;color:#94A3B8"><?= htmlspecialchars($usuario['email']) ?></div>
       <?php if (!empty($chofer['placa'])): ?>
       <div style="font-size:.75rem;color:#64748B">🚛 <?= htmlspecialchars($chofer['marca'] . ' ' . $chofer['modelo'] . ' · ' . $chofer['placa']) ?></div>
@@ -29,9 +37,19 @@ $flash = $this->getFlash() ?? null;
     <form method="POST" action="<?= BASE_URL ?>repartidor/perfil">
       <div style="display:flex;flex-direction:column;gap:10px">
         <div>
-          <label style="font-size:.75rem;color:#94A3B8;display:block;margin-bottom:4px">Nombre</label>
-          <input type="text" name="nombre" value="<?= htmlspecialchars($usuario['nombre']) ?>"
+          <label style="font-size:.75rem;color:#94A3B8;display:block;margin-bottom:4px">Nombre(s)</label>
+          <input type="text" name="nombre" value="<?= htmlspecialchars($usuario['nombre'] ?? '') ?>"
                  style="width:100%;background:#2D3348;border:1px solid #374151;color:#F1F5F9;padding:10px;border-radius:8px;font-size:.875rem;box-sizing:border-box" required>
+        </div>
+        <div>
+          <label style="font-size:.75rem;color:#94A3B8;display:block;margin-bottom:4px">Apellido paterno</label>
+          <input type="text" name="apellido_paterno" value="<?= htmlspecialchars($usuario['apellido_paterno'] ?? '') ?>"
+                 style="width:100%;background:#2D3348;border:1px solid #374151;color:#F1F5F9;padding:10px;border-radius:8px;font-size:.875rem;box-sizing:border-box" required>
+        </div>
+        <div>
+          <label style="font-size:.75rem;color:#94A3B8;display:block;margin-bottom:4px">Apellido materno</label>
+          <input type="text" name="apellido_materno" value="<?= htmlspecialchars($usuario['apellido_materno'] ?? '') ?>"
+                 style="width:100%;background:#2D3348;border:1px solid #374151;color:#F1F5F9;padding:10px;border-radius:8px;font-size:.875rem;box-sizing:border-box">
         </div>
         <div>
           <label style="font-size:.75rem;color:#94A3B8;display:block;margin-bottom:4px">Email</label>

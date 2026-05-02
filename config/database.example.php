@@ -1,15 +1,15 @@
 <?php
 /**
- * CarniHub — Database Configuration
- * PDO Singleton for MySQL 5.7
+ * CarniHub — Database Configuration (EXAMPLE)
  *
- * EDIT these credentials before deploying.
+ * Copia este archivo a config/database.php y llena tus credenciales.
+ * NUNCA subas config/database.php al repositorio.
  */
 
 define('DB_HOST',    'localhost');
-define('DB_NAME',    'idactivo_carnihubdb');
-define('DB_USER',    'carnihubdb_admin');
-define('DB_PASS',    'mi_contraseña');
+define('DB_NAME',    'nombre_de_tu_base_de_datos');
+define('DB_USER',    'usuario_mysql');
+define('DB_PASS',    'contraseña_mysql');
 define('DB_CHARSET', 'utf8mb4');
 
 class Database
@@ -32,7 +32,6 @@ class Database
             try {
                 self::$instance = new PDO($dsn, DB_USER, DB_PASS, $options);
             } catch (PDOException $e) {
-                // Log and display a friendly error
                 error_log('[CarniHub DB] ' . $e->getMessage());
                 http_response_code(500);
                 die(json_encode(['error' => 'Database connection failed. Check config/database.php']));
@@ -41,7 +40,6 @@ class Database
         return self::$instance;
     }
 
-    // Prevent external instantiation / cloning
     private function __construct() {}
     private function __clone()     {}
 }

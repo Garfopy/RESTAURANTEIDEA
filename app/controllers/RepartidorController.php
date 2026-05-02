@@ -126,10 +126,16 @@ class RepartidorController extends BaseController {
         $chofer = $this->getChoferActual();
 
         if ($this->isPost()) {
-            $nombre = $this->post('nombre','');
-            $email  = $this->post('email','');
-            $usuMod->update($_SESSION['usuario']['id'], ['nombre'=>$nombre,'email'=>$email]);
-            $_SESSION['usuario']['nombre'] = $nombre;
+            $nombre           = trim($this->post('nombre', ''));
+            $apellido_paterno = trim($this->post('apellido_paterno', ''));
+            $apellido_materno = trim($this->post('apellido_materno', '')) ?: null;
+            $email            = trim($this->post('email', ''));
+            $updateData = ['nombre' => $nombre, 'apellido_paterno' => $apellido_paterno,
+                           'apellido_materno' => $apellido_materno, 'email' => $email];
+            $usuMod->update($_SESSION['usuario']['id'], $updateData);
+            $_SESSION['usuario']['nombre']           = $nombre;
+            $_SESSION['usuario']['apellido_paterno'] = $apellido_paterno;
+            $_SESSION['usuario']['apellido_materno'] = $apellido_materno;
             $this->flash('Perfil actualizado', 'success');
             $this->redirect('repartidor/perfil');
             return;

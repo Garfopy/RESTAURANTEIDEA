@@ -86,11 +86,24 @@
     <button onclick="toggleSidebar()" class="hide-desktop p-2">
       <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
     </button>
-    <div class="flex items-center gap-2">
-      <span class="text-sm font-medium text-gray-600"><?= htmlspecialchars($_SESSION['usuario']['nombre'] ?? '') ?></span>
-      <div class="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-content-center text-xs font-bold" style="display:flex;align-items:center;justify-content:center;background:#C8102E;color:#fff;border-radius:50%">
-        <?= strtoupper(substr($_SESSION['usuario']['nombre'] ?? 'A', 0, 1)) ?>
-      </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <?php
+        $su = $_SESSION['usuario'] ?? [];
+        $suNombreCompleto = trim(
+            ($su['nombre'] ?? '') . ' ' . ($su['apellido_paterno'] ?? '')
+        );
+        if (!empty($su['apellido_materno'])) $suNombreCompleto .= ' ' . $su['apellido_materno'];
+        $suInicial = strtoupper(mb_substr($su['nombre'] ?? 'A', 0, 1, 'UTF-8'));
+      ?>
+      <span style="font-size:.875rem;font-weight:500;color:#374151"><?= htmlspecialchars($suNombreCompleto) ?></span>
+      <a href="<?= BASE_URL ?>usuario/editar/<?= $su['id'] ?? '' ?>"
+         style="width:36px;height:36px;border-radius:50%;background:#C8102E;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:.875rem;overflow:hidden;text-decoration:none;flex-shrink:0">
+        <?php if (!empty($su['avatar'])): ?>
+        <img src="<?= BASE_URL . htmlspecialchars($su['avatar']) ?>" style="width:100%;height:100%;object-fit:cover" alt="">
+        <?php else: ?>
+        <?= $suInicial ?>
+        <?php endif; ?>
+      </a>
     </div>
   </div>
   <div class="page-content">

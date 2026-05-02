@@ -8,12 +8,6 @@ SET NAMES utf8mb4;
 SET time_zone = '-06:00';
 SET foreign_key_checks = 0;
 
-CREATE DATABASE IF NOT EXISTS `carnihub`
-  CHARACTER SET utf8mb4
-  COLLATE utf8mb4_unicode_ci;
-
-USE `carnihub`;
-
 -- ─────────────────────────────────────────
 -- 1. roles
 -- ─────────────────────────────────────────
@@ -36,31 +30,33 @@ INSERT INTO `roles` (`id`, `nombre`, `slug`) VALUES
 -- 2. usuarios
 -- ─────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS `usuarios` (
-  `id`          INT UNSIGNED  NOT NULL AUTO_INCREMENT,
-  `nombre`      VARCHAR(100)  NOT NULL,
-  `email`       VARCHAR(150)  NOT NULL,
-  `password`    VARCHAR(255)  NOT NULL,
-  `rol_id`      TINYINT UNSIGNED NOT NULL,
-  `empresa_id`  INT UNSIGNED  NULL DEFAULT NULL,
-  `activo`      TINYINT(1)    NOT NULL DEFAULT 1,
-  `avatar`      VARCHAR(255)  NULL DEFAULT NULL,
-  `created_at`  TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `id`               INT UNSIGNED     NOT NULL AUTO_INCREMENT,
+  `nombre`           VARCHAR(100)     NOT NULL,
+  `apellido_paterno` VARCHAR(100)     NOT NULL DEFAULT '',
+  `apellido_materno` VARCHAR(100)     NULL DEFAULT NULL,
+  `email`            VARCHAR(150)     NOT NULL,
+  `password`         VARCHAR(255)     NOT NULL,
+  `rol_id`           TINYINT UNSIGNED NOT NULL,
+  `empresa_id`       INT UNSIGNED     NULL DEFAULT NULL,
+  `activo`           TINYINT(1)       NOT NULL DEFAULT 1,
+  `avatar`           VARCHAR(255)     NULL DEFAULT NULL,
+  `created_at`       TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_email` (`email`),
   KEY `fk_usuario_rol` (`rol_id`),
   CONSTRAINT `fk_usuario_rol` FOREIGN KEY (`rol_id`) REFERENCES `roles` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Passwords: admin123 for all test accounts
-INSERT INTO `usuarios` (`id`, `nombre`, `email`, `password`, `rol_id`, `empresa_id`, `activo`) VALUES
-(1,  'Super Admin',       'admin@carnihub.mx',         '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 1, NULL, 1),
-(2,  'Ana Martínez',      'ana.martinez@carnihub.mx',  '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 2, NULL, 1),
-(3,  'Juan Pérez',        'juan.perez@carnihub.mx',    '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 3, 1,    1),
-(4,  'María González',    'maria.gonzalez@carnihub.mx','$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 4, 1,    1),
-(5,  'Luis Martínez',     'luis.martinez@carnihub.mx', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 5, NULL, 1),
-(6,  'Pedro Ramírez',     'pedro.ramirez@carnihub.mx', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 5, NULL, 1),
-(7,  'Carlos Mendoza',    'carlos@bsabor.mx',          '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 3, 2,    1);
--- Note: password hash above is for 'password' (Laravel default) — replaced at runtime with admin123
+-- Passwords: admin123 para todas las cuentas de prueba
+-- Hash generado con: password_hash('admin123', PASSWORD_DEFAULT)
+INSERT INTO `usuarios` (`id`, `nombre`, `apellido_paterno`, `apellido_materno`, `email`, `password`, `rol_id`, `empresa_id`, `activo`) VALUES
+(1, 'Super',  'Admin',    NULL,        'admin@carnihub.mx',          '$2y$10$KSAVxGMNNFsqvR6XTjQaAOg1p1y6q3.vcglZc.VUSbEAty3nd7Iqy', 1, NULL, 1),
+(2, 'Ana',    'Martínez', NULL,        'ana.martinez@carnihub.mx',   '$2y$10$KSAVxGMNNFsqvR6XTjQaAOg1p1y6q3.vcglZc.VUSbEAty3nd7Iqy', 2, NULL, 1),
+(3, 'Juan',   'Pérez',    NULL,        'juan.perez@carnihub.mx',     '$2y$10$KSAVxGMNNFsqvR6XTjQaAOg1p1y6q3.vcglZc.VUSbEAty3nd7Iqy', 3, 1,   1),
+(4, 'María',  'González', NULL,        'maria.gonzalez@carnihub.mx', '$2y$10$KSAVxGMNNFsqvR6XTjQaAOg1p1y6q3.vcglZc.VUSbEAty3nd7Iqy', 4, 1,   1),
+(5, 'Luis',   'Martínez', NULL,        'luis.martinez@carnihub.mx',  '$2y$10$KSAVxGMNNFsqvR6XTjQaAOg1p1y6q3.vcglZc.VUSbEAty3nd7Iqy', 5, NULL, 1),
+(6, 'Pedro',  'Ramírez',  NULL,        'pedro.ramirez@carnihub.mx',  '$2y$10$KSAVxGMNNFsqvR6XTjQaAOg1p1y6q3.vcglZc.VUSbEAty3nd7Iqy', 5, NULL, 1),
+(7, 'Carlos', 'Mendoza',  NULL,        'carlos@bsabor.mx',           '$2y$10$KSAVxGMNNFsqvR6XTjQaAOg1p1y6q3.vcglZc.VUSbEAty3nd7Iqy', 3, 2,   1);
 
 -- ─────────────────────────────────────────
 -- 3. empresas
@@ -642,9 +638,11 @@ CREATE TABLE IF NOT EXISTS `dispositivos_shelly` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ─────────────────────────────────────────
--- UPDATE passwords to real hash of "admin123"
+-- ALTER para instalaciones existentes (MySQL 5.7)
+-- Ejecutar solo si la BD ya existía antes de esta versión
 -- ─────────────────────────────────────────
-UPDATE `usuarios` SET `password` = '$2y$10$YKIhj5KjCRdgaoBLp5yRpOv5ckN/RhsGCKWm0mFJdq3MIVQxCIrPK' WHERE id IN (1,2,3,4,5,6,7);
+-- ALTER TABLE `usuarios` ADD COLUMN `apellido_paterno` VARCHAR(100) NOT NULL DEFAULT '' AFTER `nombre`;
+-- ALTER TABLE `usuarios` ADD COLUMN `apellido_materno` VARCHAR(100) NULL DEFAULT NULL AFTER `apellido_paterno`;
 
 SET foreign_key_checks = 1;
 

@@ -43,6 +43,7 @@ $routes = [
     'config'      => 'ConfigController',
     'repartidor'  => 'RepartidorController',
     'api'         => 'ApiController',
+    'cuenta'      => 'CuentaController',
 ];
 
 // ── Auth guard ────────────────────────────────────────────────────────────────

@@ -7,10 +7,15 @@ include ROOT_PATH . '/app/views/components/header_repartidor.php';
   <div class="rep-topbar">
     <div>
       <div class="rep-greeting">Buenos días,</div>
-      <div class="rep-name"><?= htmlspecialchars($_SESSION['usuario']['nombre']) ?></div>
+      <div class="rep-name"><?= htmlspecialchars(trim(($_SESSION['usuario']['nombre'] ?? '') . ' ' . ($_SESSION['usuario']['apellido_paterno'] ?? ''))) ?></div>
     </div>
-    <div style="width:40px;height:40px;border-radius:50%;background:#C8102E;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff">
-      <?= strtoupper(substr($_SESSION['usuario']['nombre'],0,1)) ?>
+    <?php $repInicial = strtoupper(mb_substr($_SESSION['usuario']['nombre'] ?? 'R', 0, 1, 'UTF-8')); ?>
+    <div style="width:40px;height:40px;border-radius:50%;background:#C8102E;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;overflow:hidden">
+      <?php if (!empty($_SESSION['usuario']['avatar'])): ?>
+      <img src="<?= BASE_URL . htmlspecialchars($_SESSION['usuario']['avatar']) ?>" style="width:100%;height:100%;object-fit:cover" alt="">
+      <?php else: ?>
+      <?= $repInicial ?>
+      <?php endif; ?>
     </div>
   </div>
 

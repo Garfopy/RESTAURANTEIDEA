@@ -1,6 +1,6 @@
 Options -Indexes
 RewriteEngine On
-RewriteBase /
+RewriteBase /carnihub/
 
 # Uncomment in production to force HTTPS
 # RewriteCond %{HTTPS} off

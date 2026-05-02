@@ -9,12 +9,21 @@ include ROOT_PATH . '/app/views/components/sidebar_cliente.php';
 <?php endif; ?>
 
 <!-- Avatar + nombre -->
+<?php
+  $cliNombreCompleto = trim(($usuario['nombre'] ?? '') . ' ' . ($usuario['apellido_paterno'] ?? '') .
+                            (!empty($usuario['apellido_materno']) ? ' ' . $usuario['apellido_materno'] : ''));
+  $cliInicial = strtoupper(mb_substr($usuario['nombre'] ?? 'U', 0, 1, 'UTF-8'));
+?>
 <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px">
-  <div style="width:56px;height:56px;border-radius:50%;background:#C8102E;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:1.4rem">
-    <?= strtoupper(substr($usuario['nombre'],0,1)) ?>
+  <div style="width:56px;height:56px;border-radius:50%;background:#C8102E;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:1.4rem;overflow:hidden">
+    <?php if (!empty($usuario['avatar'])): ?>
+    <img src="<?= BASE_URL . htmlspecialchars($usuario['avatar']) ?>" style="width:100%;height:100%;object-fit:cover" alt="">
+    <?php else: ?>
+    <?= $cliInicial ?>
+    <?php endif; ?>
   </div>
   <div>
-    <div style="font-weight:700;font-size:1rem"><?= htmlspecialchars($usuario['nombre']) ?></div>
+    <div style="font-weight:700;font-size:1rem"><?= htmlspecialchars($cliNombreCompleto) ?></div>
     <div style="font-size:.75rem;color:#6B7280"><?= htmlspecialchars($usuario['email']) ?></div>
     <div style="font-size:.75rem;color:#9CA3AF"><?= htmlspecialchars($empresa['razon_social'] ?? '') ?></div>
   </div>
@@ -49,8 +58,18 @@ include ROOT_PATH . '/app/views/components/sidebar_cliente.php';
   <form method="POST" action="<?= BASE_URL ?>cuenta/guardarPerfil">
     <div style="display:flex;flex-direction:column;gap:12px">
       <div>
-        <label class="form-label">Nombre completo</label>
-        <input type="text" name="nombre" class="form-control" value="<?= htmlspecialchars($usuario['nombre']) ?>" required>
+        <label class="form-label">Nombre(s)</label>
+        <input type="text" name="nombre" class="form-control" value="<?= htmlspecialchars($usuario['nombre'] ?? '') ?>" required>
+      </div>
+      <div style="display:flex;gap:10px">
+        <div style="flex:1">
+          <label class="form-label">Apellido paterno</label>
+          <input type="text" name="apellido_paterno" class="form-control" value="<?= htmlspecialchars($usuario['apellido_paterno'] ?? '') ?>" required>
+        </div>
+        <div style="flex:1">
+          <label class="form-label">Apellido materno</label>
+          <input type="text" name="apellido_materno" class="form-control" value="<?= htmlspecialchars($usuario['apellido_materno'] ?? '') ?>">
+        </div>
       </div>
       <div>
         <label class="form-label">Email</label>
@@ -91,7 +110,7 @@ include ROOT_PATH . '/app/views/components/sidebar_cliente.php';
   <a href="<?= BASE_URL ?>producto/catalogo" class="bottom-nav-item">📦 <span>Catálogo</span></a>
   <a href="<?= BASE_URL ?>pedido/index" class="bottom-nav-item">📋 <span>Pedidos</span></a>
   <a href="<?= BASE_URL ?>carrito/index" class="bottom-nav-item">🛒 <span>Carrito</span></a>
-  <a href="<?= BASE_URL ?>auth/logout" class="bottom-nav-item active">👤 <span>Cuenta</span></a>
+  <a href="<?= BASE_URL ?>cuenta/perfil" class="bottom-nav-item active">👤 <span>Cuenta</span></a>
 </nav>
 
 <?php include ROOT_PATH . '/app/views/components/footer.php'; ?>
