@@ -33,3 +33,7 @@ define('UPLOAD_URL',    BASE_URL  . 'public/uploads/');
 
 // Pagination
 define('PER_PAGE', 20);
+
+// Google Maps Places API key (agregar en cPanel o aquí directamente)
+// Obtener en: https://console.cloud.google.com → APIs → Maps JavaScript API + Places API
+define('GOOGLE_MAPS_KEY', getenv('GOOGLE_MAPS_KEY') ?: '');

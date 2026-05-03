@@ -42,12 +42,19 @@ $routes = [
     'repartidor'  => 'RepartidorController',
     'api'         => 'ApiController',
     'cuenta'      => 'CuentaController',
+    'registro'    => 'RegistroController',
 ];
 
 // ── Auth guard ────────────────────────────────────────────────────────────────
 $publicPaths = [
     'auth/login',
-    'auth/dologin',   // case-insensitive
+    'auth/dologin',
+    'registro/index',
+    'registro/comprador',
+    'registro/repartidor',
+    'registro/guardar',
+    'registro/verificar',
+    'registro/pendiente',
 ];
 
 $currentPath = strtolower($ctrlSlug . '/' . $action);

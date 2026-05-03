@@ -889,8 +889,13 @@ uploads/avatars/  (755)
 ```
 Semana 1 — Que el sistema sea navegable
   [x] Fix .htaccess (DONE)
+  [x] Seguridad login: brute force + cuentas de prueba eliminadas
+  [x] Módulo registro público (comprador y repartidor)
+  [ ] Ejecutar migration 001 en cPanel phpMyAdmin
+  [ ] Configurar Google Maps API key en config.php
+  [ ] Verificar mail() funcionando en servidor
   [ ] Revisar y corregir cada página de admin una a una
-  [ ] Crear carpetas uploads en servidor
+  [ ] Crear carpetas uploads en servidor (si faltan)
   [ ] Probar login con cada rol
 
 Semana 2 — Flujo de pedido completo
@@ -944,3 +949,106 @@ Semana 5 — Reportes y pulido
 ---
 
 *Última actualización: 2026-05-03 | Servidor: idactivos.digital/carnihub/*
+
+---
+
+## MÓDULO 1.5 — REGISTRO PÚBLICO (`registro/`)
+
+> Flujo de auto-registro para compradores y repartidores, con verificación de correo.
+
+### URLs (todas son públicas — no requieren sesión)
+| URL | Método | Descripción |
+|-----|--------|-------------|
+| `registro/index` | GET | Elegir tipo: Comprador o Repartidor |
+| `registro/comprador` | GET | Formulario de registro tipo comprador |
+| `registro/repartidor` | GET | Formulario de registro tipo repartidor |
+| `registro/guardar` | POST | Procesar el formulario y crear usuario |
+| `registro/verificar/{token}` | GET | Activar cuenta con token de correo |
+| `registro/pendiente` | GET | Página "revisa tu correo" post-registro |
+
+### Flujo completo
+```
+1. Login page → botones "Soy Comprador" / "Soy Repartidor"
+2. registro/index → cards visuales para elegir tipo
+3. registro/{tipo} → formulario con campos personales + negocio/zona
+4. POST registro/guardar →
+   a. Validar campos (nombres, email, password ≥8, teléfono, ubicación)
+   b. Verificar email único en usuarios
+   c. Rate limit: máx 5 registros/IP por hora
+   d. INSERT usuarios con activo=0
+   e. Si comprador: INSERT empresas + UPDATE usuarios.empresa_id
+   f. Generar token 64 chars, INSERT verificacion_tokens (expira 24h)
+   g. Enviar correo con mail() via cPanel sendmail
+   h. redirect registro/pendiente
+5. Usuario clic en enlace del correo → registro/verificar/{token}
+   a. Verificar token válido, no usado, no expirado
+   b. UPDATE usuarios SET activo=1
+   c. Marcar token como usado
+   d. redirect auth/login con flash éxito
+```
+
+### Campos del formulario
+**Ambos tipos:**
+- nombre, apellido_paterno, apellido_materno (opt), email, teléfono
+- password (min 8 chars), confirmar_password
+- ubicacion (Google Maps Places autocomplete → guarda lat/lng)
+
+**Solo comprador:**
+- nombre_empresa (requerido), tipo_negocio (select)
+
+### Configuración Google Maps
+- Constante `GOOGLE_MAPS_KEY` en `config/config.php`
+- Leer de variable de entorno o hardcodear
+- Activar en Google Cloud Console: **Maps JavaScript API** + **Places API**
+- Si no hay key: el campo funciona como texto libre
+
+### Correo de verificación (cPanel)
+- Usa `mail()` nativo de PHP (cPanel configura sendmail automáticamente)
+- Asunto: *"Verifica tu cuenta en CarniHub"*
+- Remitente: `noreply@{dominio}`
+- Mejora futura: PHPMailer con SMTP de cuenta cPanel para mayor entregabilidad
+
+### Checklist Módulo 1.5
+- [x] Migración SQL: tablas `login_intentos`, `verificacion_tokens`, `registro_intentos`
+- [x] Migración SQL: columnas `telefono`, `ubicacion_*` en `usuarios`
+- [x] Migración SQL: columna `tipo_negocio` en `empresas`
+- [x] `RegistroController.php` completo (index / comprador / repartidor / guardar / verificar / pendiente)
+- [x] Vista `registro.php` (selección de tipo)
+- [x] Vista `registro_form.php` (formulario adaptable comprador/repartidor)
+- [x] Vista `verificar_pendiente.php` (página post-registro)
+- [x] `login.php` — cuentas de prueba eliminadas + botones de registro
+- [x] `index.php` — rutas `registro/*` agregadas como públicas
+- [x] `config.php` — constante `GOOGLE_MAPS_KEY`
+- [ ] **Ejecutar migration 001 en cPanel phpMyAdmin**
+- [ ] Configurar `GOOGLE_MAPS_KEY` con key real (Google Cloud Console)
+- [ ] Verificar que `mail()` funciona en el servidor (enviar prueba)
+- [ ] Probar flujo completo: registro → correo → verificar → login
+
+---
+
+## MÓDULO 1 — AUTENTICACIÓN (`auth/`) — ACTUALIZADO
+
+### Páginas
+| URL | Método | Descripción |
+|-----|--------|-------------|
+| `auth/login` | GET | Formulario de login |
+| `auth/doLogin` | POST | Procesar credenciales |
+| `auth/logout` | GET | Cerrar sesión |
+
+### Seguridad — Protección brute force
+- Tabla `login_intentos`: registra IP + email + timestamp de cada fallo
+- Antes de verificar credenciales: contar intentos de esa IP en los últimos **2 minutos**
+- Si ≥ 5 intentos: bloquear con mensaje, **no procesar credenciales**
+- Login exitoso: eliminar todos los intentos de esa IP
+- Cuenta inactiva (`activo=0`): mensaje específico "Verifica tu correo"
+- Mensaje progresivo: indica cuántos intentos restan antes del bloqueo
+
+### Checklist Módulo 1
+- [x] Protección brute force (5 intentos → bloqueo 2 min)
+- [x] Detección de cuenta inactiva / sin verificar
+- [x] Cuentas de prueba eliminadas de la vista login
+- [x] Botones "Soy Comprador" / "Soy Repartidor" en login
+- [ ] Probar login con cada rol en servidor real
+- [ ] Verificar que el bloqueo funciona correctamente
+
+---

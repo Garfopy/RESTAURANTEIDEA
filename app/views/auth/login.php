@@ -66,15 +66,22 @@
         </button>
       </form>
 
-      <div style="text-align:center;margin-top:24px;font-size:.8rem;color:#9CA3AF">
-        ¿No tienes cuenta? <a href="mailto:contacto@carnihub.mx" style="color:#C8102E;font-weight:600">Contáctanos</a>
-      </div>
-
-      <div style="margin-top:32px;padding-top:20px;border-top:1px solid #F3F4F6;font-size:.75rem;color:#9CA3AF;text-align:center">
-        <strong>Cuentas de prueba:</strong><br>
-        admin@carnihub.mx | admin123<br>
-        juan.perez@carnihub.mx | admin123 (Comprador)<br>
-        luis.martinez@carnihub.mx | admin123 (Repartidor)
+      <div style="margin-top:24px;padding-top:20px;border-top:1px solid #F3F4F6">
+        <p style="text-align:center;font-size:.8rem;color:#6B7280;margin-bottom:12px">¿No tienes cuenta? Únete a CarniHub:</p>
+        <div style="display:flex;gap:10px">
+          <a href="<?= BASE_URL ?>registro/comprador"
+             style="flex:1;text-align:center;padding:10px 8px;border-radius:8px;border:2px solid #C8102E;color:#C8102E;font-weight:600;font-size:.8rem;text-decoration:none;transition:all .2s"
+             onmouseover="this.style.background='#C8102E';this.style.color='#fff'"
+             onmouseout="this.style.background='transparent';this.style.color='#C8102E'">
+            🛒 Soy Comprador
+          </a>
+          <a href="<?= BASE_URL ?>registro/repartidor"
+             style="flex:1;text-align:center;padding:10px 8px;border-radius:8px;border:2px solid #374151;color:#374151;font-weight:600;font-size:.8rem;text-decoration:none;transition:all .2s"
+             onmouseover="this.style.background='#374151';this.style.color='#fff'"
+             onmouseout="this.style.background='transparent';this.style.color='#374151'">
+            🏍️ Soy Repartidor
+          </a>
+        </div>
       </div>
     </div>
   </div>
