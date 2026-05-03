@@ -17,9 +17,7 @@ session_name(SESSION_NAME);
 session_start();
 
 // ── Parse URL ─────────────────────────────────────────────────────────────────
-$uri      = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
-$base     = rtrim(BASE_URL_PATH, '/');
-$path     = ltrim(substr($uri, strlen($base)), '/');
+$path     = trim($_GET['url'] ?? '', '/');
 $segments = array_values(array_filter(explode('/', $path)));
 
 $ctrlSlug = strtolower($segments[0] ?? 'dashboard');

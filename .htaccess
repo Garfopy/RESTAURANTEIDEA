@@ -2,10 +2,6 @@ Options -Indexes
 RewriteEngine On
 RewriteBase /carnihub/
 
-# Uncomment in production to force HTTPS
-# RewriteCond %{HTTPS} off
-# RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
-
 # Block sensitive directories
 RewriteRule ^(config|app)/.*$ - [F,L]
 
@@ -14,5 +10,5 @@ RewriteCond %{REQUEST_FILENAME} -f [OR]
 RewriteCond %{REQUEST_FILENAME} -d
 RewriteRule ^ - [L]
 
-# Route everything else to index.php
-RewriteRule ^ index.php [L]
+# Route everything else to index.php via query string
+RewriteRule ^(.*)$ index.php?url=$1 [QSA,L]

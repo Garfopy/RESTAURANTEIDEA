@@ -8,14 +8,9 @@
 $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
 $host     = $_SERVER['HTTP_HOST'] ?? 'localhost';
 
-// Detect base path: directory where index.php lives
-$scriptDir = dirname($_SERVER['SCRIPT_NAME'] ?? '/');
-$basePath  = rtrim($scriptDir, '/') . '/';
-
-// If installed at root, basePath is just '/'
-if ($basePath === '//') {
-    $basePath = '/';
-}
+// Detect base path from actual script location
+$scriptDir = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/'));
+$basePath  = ($scriptDir === '/') ? '/' : rtrim($scriptDir, '/') . '/';
 
 define('BASE_URL',      $protocol . $host . $basePath);
 define('BASE_URL_PATH', $basePath);
