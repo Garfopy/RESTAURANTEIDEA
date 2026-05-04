@@ -45,4 +45,11 @@ class EmpresaModel extends BaseModel
             [$id]
         );
     }
+
+    public function listadoSimple(): array
+    {
+        return $this->query(
+            'SELECT id, razon_social FROM empresas WHERE activo = 1 ORDER BY razon_social'
+        );
+    }
 }

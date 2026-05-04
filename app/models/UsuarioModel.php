@@ -93,4 +93,32 @@ class UsuarioModel extends BaseModel
         $data['password'] = password_hash($password, PASSWORD_BCRYPT);
         return $this->insert($data);
     }
+
+    public function getConRol(int $id): ?array
+    {
+        return $this->queryOne(
+            'SELECT u.*, r.slug AS rol_slug, r.nombre AS rol_nombre
+               FROM usuarios u
+               JOIN roles r ON r.id = u.rol_id
+              WHERE u.id = ?',
+            [$id]
+        );
+    }
+
+    public function getRolPorSlug(string $slug): ?array
+    {
+        return $this->queryOne('SELECT id, slug, nombre FROM roles WHERE slug = ?', [$slug]);
+    }
+
+    public function getRepartidoresGlobal(): array
+    {
+        return $this->query(
+            "SELECT u.id, u.nombre, u.apellido_paterno, e.razon_social AS empresa_nombre
+               FROM usuarios u
+               JOIN roles r ON r.id = u.rol_id
+               JOIN empresas e ON e.id = u.empresa_id
+              WHERE r.slug = 'repartidor' AND u.activo = 1
+              ORDER BY e.razon_social, u.nombre"
+        );
+    }
 }

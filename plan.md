@@ -191,11 +191,11 @@ Login exitoso redirige:
 | CuentaController | ✅ Funcional | Perfil, guardar datos, cambiar contraseña |
 | CarritoController | ✅ Funcional | 4 pasos: productos → sucursales → resumen → confirmar |
 | PedidoController | ✅ Funcional | Historial, detalle, aprobación supervisor, tracking GPS, cancelar |
-| PanelUsuarioController | 🔧 Stub | Pendiente de implementar |
-| PanelProductoController | 🔧 Stub | Pendiente de implementar |
-| PanelInventarioController | 🔧 Stub | Pendiente de implementar |
-| PanelPedidoController | 🔧 Stub | Pendiente de implementar |
-| PanelLogisticaController | 🔧 Stub | Pendiente de implementar |
+| PanelUsuarioController | ✅ Completo | CRUD usuarios plataforma (admin, admin_empresa) + toggle |
+| PanelProductoController | ✅ Completo | CRUD productos + precios escalonados + upload imagen |
+| PanelInventarioController | ✅ Completo | Stock + alertas + ajuste (modal) |
+| PanelPedidoController | ✅ Completo | Todos los pedidos + detalle + cambiar estado AJAX |
+| PanelLogisticaController | ✅ Completo | Rutas + mapa Leaflet global + crear ruta |
 | PanelReporteController | 🔧 Stub | Pendiente de implementar |
 | ConfigController | 🔧 Stub | Pendiente de implementar |
 | RecurrenteController | 🔧 Stub | Pendiente |
@@ -318,13 +318,18 @@ Login exitoso redirige:
 - [x] `CuentaController::subirAvatar()` — foto de perfil para todos los roles (avatars/)
 - [x] Vista `empresa/cuenta/perfil.php` — sección de avatar con preview circular o iniciales
 
-### Sprint 4B — Panel de Plataforma (admin)
-- [ ] `PanelProductoController` — CRUD productos + precios escalonados
-- [ ] `PanelInventarioController` — stock + alertas + movimientos
-- [ ] `PanelPedidoController` — todos los pedidos + cambiar estado
-- [ ] `PanelLogisticaController` — rutas + mapa Leaflet global
-- [ ] `PanelUsuarioController` — CRUD usuarios plataforma
-- [ ] Vistas correspondientes en `/panel/`
+### Sprint 4B — Panel de Plataforma (admin) ✅ COMPLETADO
+- [x] `PanelProductoController` — CRUD productos (crear, editar, desactivar) + precios escalonados + upload imagen
+- [x] `PanelInventarioController` — listado stock + alertas + modal ajuste (entrada/salida/directo)
+- [x] `PanelPedidoController` — todos los pedidos globales + detalle + cambiar estado (AJAX)
+- [x] `PanelLogisticaController` — mapa Leaflet global, listado rutas activas, crear ruta + asignar repartidor
+- [x] `PanelUsuarioController` — CRUD usuarios plataforma (admin, admin_empresa) + toggle activar/desactivar
+- [x] Vistas en `/panel/`: productos/index, productos/form, inventario/index, pedidos/index, pedidos/detalle, logistica/index, logistica/form_ruta, usuarios/index, usuarios/form
+- [x] `ProductoModel` — nuevos métodos: getCategorias, listadoAdmin, listadoInventario, ajustarStock, actualizarEscalonados, inicializarInventario, actualizarInventario
+- [x] `PedidoModel` — nuevos métodos: listadoGlobal, cambiarEstado, crearRuta, listadoConfirmadosPorEmpresa; conDetalle actualizado con empresa_nombre
+- [x] `EmpresaModel` — nuevo método: listadoSimple
+- [x] `UsuarioModel` — nuevos métodos: getConRol, getRolPorSlug, getRepartidoresGlobal
+- [x] `ApiController` — nuevo endpoint: GET /api/pedidosConfirmados?empresa_id=X
 
 ### Sprint 5 — Configuración Global extendida (solo superadmin)
 - [ ] CSS variables dinámicas (`--color-primary`) — ya funcional via ConfigModel en layouts
@@ -420,4 +425,4 @@ Todos se configuran desde `/config/general` (solo visible para superadmin).
 
 ---
 
-*Última actualización: 2026-05-04 — v2.2.0 (Sprint 4A completado)*
+*Última actualización: 2026-05-04 — v2.3.0 (Sprint 4B completado)*
