@@ -77,8 +77,11 @@ abstract class BaseModel
     protected function paginate(string $sql, array $params, int $page, int $perPage = PER_PAGE): array
     {
         $offset = ($page - 1) * $perPage;
-        $countSql = preg_replace('/SELECT .+? FROM/is', 'SELECT COUNT(*) FROM', $sql);
-        $countSql = preg_replace('/ORDER BY.+$/i', '', $countSql);
+
+        // Wrap in subquery for COUNT — handles subqueries inside SELECT
+        $sqlNoOrder = preg_replace('/\s+ORDER\s+BY\s+.+$/is', '', $sql);
+        $countSql   = "SELECT COUNT(*) FROM ({$sqlNoOrder}) AS _total";
+
         $stmt = $this->db->prepare($countSql);
         $stmt->execute($params);
         $total = (int) $stmt->fetchColumn();
