@@ -149,7 +149,7 @@ $tieneMapa     = !empty($mapsKey);
 
       <?php if (!$esComprador): ?>
       <p style="font-size:.8rem;color:#6B7280;margin-bottom:12px">
-        Indica la colonia o zona donde operas. Se mostrará un círculo en el mapa con tu área de cobertura aproximada.
+        Selecciona el municipio de México donde realizas tus entregas.
       </p>
       <?php else: ?>
       <p style="font-size:.8rem;color:#6B7280;margin-bottom:12px">
@@ -157,41 +157,106 @@ $tieneMapa     = !empty($mapsKey);
       </p>
       <?php endif; ?>
 
+      <?php if (!$esComprador): ?>
+      <!-- Repartidor: selección de municipio -->
+      <div style="margin-bottom:16px">
+        <label class="form-label">Municipio donde operas <span style="color:#C8102E">*</span></label>
+        <select name="ubicacion" id="ubicacionInput" class="form-control" required>
+          <option value="">Selecciona un municipio…</option>
+          <optgroup label="Querétaro">
+            <option value="Querétaro, QRO">Querétaro</option>
+            <option value="San Juan del Río, QRO">San Juan del Río</option>
+            <option value="Corregidora, QRO">Corregidora</option>
+            <option value="El Marqués, QRO">El Marqués</option>
+            <option value="Cadereyta de Montes, QRO">Cadereyta de Montes</option>
+            <option value="Tequisquiapan, QRO">Tequisquiapan</option>
+            <option value="Pedro Escobedo, QRO">Pedro Escobedo</option>
+            <option value="Huimilpan, QRO">Huimilpan</option>
+            <option value="Colón, QRO">Colón</option>
+            <option value="Amealco de Bonfil, QRO">Amealco de Bonfil</option>
+            <option value="Ezequiel Montes, QRO">Ezequiel Montes</option>
+            <option value="Tolimán, QRO">Tolimán</option>
+            <option value="San Joaquín, QRO">San Joaquín</option>
+            <option value="Peñamiller, QRO">Peñamiller</option>
+            <option value="Jalpan de Serra, QRO">Jalpan de Serra</option>
+            <option value="Landa de Matamoros, QRO">Landa de Matamoros</option>
+            <option value="Arroyo Seco, QRO">Arroyo Seco</option>
+            <option value="Pinal de Amoles, QRO">Pinal de Amoles</option>
+          </optgroup>
+          <optgroup label="Guanajuato">
+            <option value="León, GTO">León</option>
+            <option value="Irapuato, GTO">Irapuato</option>
+            <option value="Celaya, GTO">Celaya</option>
+            <option value="Salamanca, GTO">Salamanca</option>
+            <option value="San Miguel de Allende, GTO">San Miguel de Allende</option>
+            <option value="Guanajuato, GTO">Guanajuato</option>
+            <option value="Silao de la Victoria, GTO">Silao de la Victoria</option>
+            <option value="Pénjamo, GTO">Pénjamo</option>
+          </optgroup>
+          <optgroup label="Hidalgo">
+            <option value="Pachuca de Soto, HGO">Pachuca de Soto</option>
+            <option value="Tulancingo, HGO">Tulancingo</option>
+            <option value="Tula de Allende, HGO">Tula de Allende</option>
+          </optgroup>
+          <optgroup label="Estado de México">
+            <option value="Toluca, MEX">Toluca</option>
+            <option value="Ecatepec de Morelos, MEX">Ecatepec de Morelos</option>
+            <option value="Naucalpan de Juárez, MEX">Naucalpan de Juárez</option>
+          </optgroup>
+          <optgroup label="Ciudad de México">
+            <option value="Benito Juárez, CDMX">Benito Juárez</option>
+            <option value="Cuauhtémoc, CDMX">Cuauhtémoc</option>
+            <option value="Iztapalapa, CDMX">Iztapalapa</option>
+            <option value="Gustavo A. Madero, CDMX">Gustavo A. Madero</option>
+            <option value="Álvaro Obregón, CDMX">Álvaro Obregón</option>
+          </optgroup>
+          <optgroup label="Jalisco">
+            <option value="Guadalajara, JAL">Guadalajara</option>
+            <option value="Zapopan, JAL">Zapopan</option>
+            <option value="Tlaquepaque, JAL">Tlaquepaque</option>
+            <option value="Tonalá, JAL">Tonalá</option>
+          </optgroup>
+          <optgroup label="Nuevo León">
+            <option value="Monterrey, NL">Monterrey</option>
+            <option value="San Nicolás de los Garza, NL">San Nicolás de los Garza</option>
+            <option value="Guadalupe, NL">Guadalupe</option>
+          </optgroup>
+          <optgroup label="Otro estado">
+            <option value="Otro">Otro municipio</option>
+          </optgroup>
+        </select>
+        <input type="hidden" name="ubicacion_lat" id="ubicacionLat">
+        <input type="hidden" name="ubicacion_lng" id="ubicacionLng">
+      </div>
+      <?php else: ?>
+      <!-- Comprador: dirección con mapa -->
       <div style="margin-bottom:8px">
-        <label class="form-label">
-          <?= $esComprador ? 'Dirección del negocio' : 'Colonia / zona donde operas' ?>
-          <span style="color:#C8102E">*</span>
-        </label>
+        <label class="form-label">Dirección del negocio <span style="color:#C8102E">*</span></label>
         <input
           type="text"
           id="ubicacionInput"
           name="ubicacion"
           class="form-control"
-          placeholder="<?= $esComprador ? 'Ej: Av. Juárez 123, Centro, Querétaro' : 'Ej: Colonia Centro, Querétaro, QRO' ?>"
+          placeholder="Ej: Av. Juárez 123, Centro, Querétaro, QRO"
           required
           autocomplete="off">
         <input type="hidden" name="ubicacion_lat" id="ubicacionLat">
         <input type="hidden" name="ubicacion_lng" id="ubicacionLng">
         <?php if ($tieneMapa): ?>
         <p style="font-size:.75rem;color:#6B7280;margin-top:4px">
-          Escribe y selecciona una opción de la lista para fijar las coordenadas.
+          Escribe y selecciona una opción de la lista para centrar el mapa.
         </p>
         <?php endif; ?>
       </div>
+      <?php endif; ?>
 
-      <!-- Mapa interactivo (visible tras seleccionar ubicación) -->
-      <?php if ($tieneMapa): ?>
-      <div id="mapaDiv" style="display:none;margin-bottom:16px;border-radius:12px;overflow:hidden;border:1px solid #E5E7EB">
+      <!-- Mapa interactivo (solo comprador) -->
+      <?php if ($tieneMapa && $esComprador): ?>
+      <div id="mapaDiv" style="margin-bottom:16px;border-radius:12px;overflow:hidden;border:1px solid #E5E7EB">
         <div id="mapa" style="height:260px;width:100%"></div>
-        <?php if (!$esComprador): ?>
-        <div style="background:#FEF3C7;padding:8px 12px;font-size:.75rem;color:#92400E">
-          🔴 El círculo muestra tu zona de cobertura aproximada (radio 8 km). Puedes hacer clic en el mapa para mover el centro.
-        </div>
-        <?php else: ?>
         <div style="background:#EFF6FF;padding:8px 12px;font-size:.75rem;color:#1E40AF">
-          📍 Arrastra el marcador para afinar la ubicación exacta de tu negocio.
+          📍 Busca tu dirección arriba para centrar el mapa. Arrastra el marcador para afinar la ubicación exacta.
         </div>
-        <?php endif; ?>
       </div>
       <?php endif; ?>
 
@@ -275,12 +340,10 @@ document.getElementById('formRegistro').addEventListener('submit', function(e) {
 });
 </script>
 
-<?php if ($tieneMapa): ?>
+<?php if ($tieneMapa && $esComprador): ?>
 <script>
-let map, marker, circle, autocomplete;
-const MAPS_KEY = '<?= htmlspecialchars($mapsKey, ENT_QUOTES) ?>';
-const esComprador = <?= $esComprador ? 'true' : 'false' ?>;
-const DEFAULT_CENTER = { lat: 20.5881, lng: -100.3895 }; // Querétaro
+let map, marker, autocomplete;
+const DEFAULT_CENTER = { lat: 20.5881, lng: -100.3895 };
 
 function initMap() {
   map = new google.maps.Map(document.getElementById('mapa'), {
@@ -291,83 +354,44 @@ function initMap() {
     fullscreenControl: false,
   });
 
-  if (esComprador) {
-    // Marcador draggable para confirmar ubicación
-    marker = new google.maps.Marker({
-      position: DEFAULT_CENTER,
-      map: map,
-      draggable: true,
-      animation: google.maps.Animation.DROP,
-      title: 'Arrastra para ajustar la ubicación',
-    });
-    marker.addListener('dragend', function() {
-      const pos = marker.getPosition();
-      document.getElementById('ubicacionLat').value = pos.lat();
-      document.getElementById('ubicacionLng').value = pos.lng();
-    });
-    // Clic en mapa mueve marcador
-    map.addListener('click', function(e) {
-      marker.setPosition(e.latLng);
-      document.getElementById('ubicacionLat').value = e.latLng.lat();
-      document.getElementById('ubicacionLng').value = e.latLng.lng();
-    });
-  } else {
-    // Círculo para zona repartidor
-    circle = new google.maps.Circle({
-      strokeColor: '#C8102E',
-      strokeOpacity: 0.85,
-      strokeWeight: 2,
-      fillColor: '#C8102E',
-      fillOpacity: 0.12,
-      map: map,
-      center: DEFAULT_CENTER,
-      radius: 8000,
-    });
-    // Clic en mapa mueve centro del círculo
-    map.addListener('click', function(e) {
-      circle.setCenter(e.latLng);
-      document.getElementById('ubicacionLat').value = e.latLng.lat();
-      document.getElementById('ubicacionLng').value = e.latLng.lng();
-    });
-  }
+  marker = new google.maps.Marker({
+    position: DEFAULT_CENTER,
+    map: map,
+    draggable: true,
+    animation: google.maps.Animation.DROP,
+    title: 'Arrastra para ajustar la ubicación',
+  });
+  marker.addListener('dragend', function() {
+    const pos = marker.getPosition();
+    document.getElementById('ubicacionLat').value = pos.lat();
+    document.getElementById('ubicacionLng').value = pos.lng();
+  });
+  map.addListener('click', function(e) {
+    marker.setPosition(e.latLng);
+    document.getElementById('ubicacionLat').value = e.latLng.lat();
+    document.getElementById('ubicacionLng').value = e.latLng.lng();
+  });
 
-  // Autocomplete
   autocomplete = new google.maps.places.Autocomplete(
     document.getElementById('ubicacionInput'),
     { types: ['geocode', 'establishment'], componentRestrictions: { country: 'mx' } }
   );
-  autocomplete.addListener('place_changed', onPlaceChanged);
-}
-
-function onPlaceChanged() {
-  const place = autocomplete.getPlace();
-  if (!place.geometry) return;
-
-  const lat = place.geometry.location.lat();
-  const lng = place.geometry.location.lng();
-  document.getElementById('ubicacionLat').value = lat;
-  document.getElementById('ubicacionLng').value = lng;
-
-  document.getElementById('mapaDiv').style.display = 'block';
-  map.setCenter({ lat, lng });
-
-  if (esComprador) {
+  autocomplete.addListener('place_changed', function() {
+    const place = autocomplete.getPlace();
+    if (!place.geometry) return;
+    const lat = place.geometry.location.lat();
+    const lng = place.geometry.location.lng();
+    document.getElementById('ubicacionLat').value = lat;
+    document.getElementById('ubicacionLng').value = lng;
+    map.setCenter({ lat, lng });
     marker.setPosition({ lat, lng });
     map.setZoom(17);
-  } else {
-    circle.setCenter({ lat, lng });
-    map.fitBounds(circle.getBounds());
-  }
+  });
 }
 </script>
 <script
   src="https://maps.googleapis.com/maps/api/js?key=<?= htmlspecialchars($mapsKey, ENT_QUOTES) ?>&libraries=places&callback=initMap"
   async defer></script>
-<?php else: ?>
-<script>
-  document.getElementById('ubicacionInput').placeholder =
-    <?= $esComprador ? "'Ej: Av. Juárez 123, Centro, Querétaro, QRO'" : "'Ej: Col. Centro, Querétaro, QRO'" ?>;
-</script>
 <?php endif; ?>
 </body>
 </html>

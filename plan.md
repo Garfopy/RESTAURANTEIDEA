@@ -1,5 +1,5 @@
 # CarniHub — Plan de Implementación y Estado del Sistema
-**Versión:** 1.2.0 | **Fecha:** 2026-05-03 | **Stack:** PHP 8.3 · MySQL 5.7 · Tailwind CDN · MVC sin framework
+**Versión:** 1.3.0 | **Fecha:** 2026-05-04 | **Stack:** PHP 8.3 · MySQL 5.7 · Tailwind CDN · MVC sin framework
 
 ---
 
@@ -21,10 +21,11 @@
 - Separación nombre en campos (nombre, apellido_paterno, apellido_materno)
 - Avatares de usuario con upload al servidor
 - Logo del sistema: upload PNG/JPG/WebP/SVG desde config admin, dinámico en sidebars
-- Google Maps interactivo en formulario de registro (círculo zona / marcador draggable)
+- Google Maps interactivo en formulario de registro (marcador draggable para comprador)
 - APIs e integraciones: campo Google Maps key en config
 - Módulo Cuenta cliente (perfil, cambiar contraseña)
 - Migraciones 001 y 002 para nuevas tablas y campos
+- **v1.3 (2026-05-04):** Mapa comprador visible desde inicio (sin esperar autocomplete); zona repartidor cambiada de "colonia/círculo" a dropdown de municipios de México (QRO, GTO, HGO, MEX, CDMX, JAL, NL)
 
 ---
 
@@ -1005,7 +1006,110 @@ Semana 5 — Reportes y pulido
 
 ---
 
-*Última actualización: 2026-05-03 v1.2 | Servidor: idactivos.digital/carnihub/*
+---
+
+## CHECKLIST GENERAL DE AVANCE — v1.3 (2026-05-04)
+
+### ✅ COMPLETADO
+
+#### Infraestructura y autenticación
+- [x] `.htaccess` con RewriteBase correcto (`/carnihub/`)
+- [x] `config.php` con constantes globales (BASE_URL, UPLOAD_PATH, etc.)
+- [x] `Database.php` — PDO singleton
+- [x] `index.php` — Front Controller con rutas públicas/protegidas
+- [x] `auth/login` con protección brute force (5 intentos / 2 min)
+- [x] `auth/doLogin` con detección cuenta inactiva y mensaje específico
+- [x] `auth/logout`
+
+#### Registro público
+- [x] Página de selección comprador/repartidor (`registro/index`)
+- [x] Formulario comprador: datos personales + negocio + ubicación con mapa Google Maps visible inmediatamente
+- [x] Formulario repartidor: datos personales + dropdown de municipios de México (sin mapa impreciso)
+- [x] Validación email único, rate limit IP, hash contraseña
+- [x] Creación de empresa automática para compradores
+- [x] Verificación de correo con token de 24h
+- [x] Página "revisa tu correo" post-registro
+- [x] Email HTML con enlace de verificación
+
+#### Módulo Cuenta cliente
+- [x] `cuenta/perfil` — ver y editar datos personales
+- [x] `cuenta/guardarPerfil` — actualizar nombre, email, teléfono, avatar
+- [x] `cuenta/cambiarPassword` — con validación password actual
+
+#### Configuración admin
+- [x] `config/general` — nombre app, logo, zona horaria
+- [x] Logo upload (PNG/JPG/WebP/SVG, máx 2MB) con preview y borrar
+- [x] Logo dinámico en sidebars y formulario de registro
+- [x] `config/apis` — campo Google Maps API key
+- [x] `ConfigModel::get()` y `ConfigModel::set()` funcionando
+
+#### Base de datos
+- [x] Schema completo 27 tablas + datos dummy Querétaro
+- [x] Migration 001: `login_intentos`, `verificacion_tokens`, `registro_intentos`, campos `telefono`/`ubicacion_*` en usuarios, `tipo_negocio` en empresas
+- [x] Migration 002: claves `api_google_maps_key` y `app_logo` en `global_settings`
+
+---
+
+### 🔴 NECESARIO PARA QUE EL SISTEMA FUNCIONE EN SERVIDOR
+
+| # | Tarea | Dónde hacerlo |
+|---|-------|---------------|
+| 1 | **Ejecutar migration 001** en BD de producción | cPanel → phpMyAdmin → `idactivo_carnihubdb` |
+| 2 | **Ejecutar migration 002** en BD de producción | cPanel → phpMyAdmin |
+| 3 | **Crear carpetas uploads** con permisos 755 | cPanel → File Manager → `public_html/carnihub/public/uploads/{productos,evidencias,avatars,logos}` |
+| 4 | **Verificar `mail()`** con correo de prueba | Crear usuario en registro y ver si llega el email |
+| 5 | **Google Maps API key** — obtener y configurar | Google Cloud Console → habilitar Maps JS API + Places API → pegar en Config → APIs |
+| 6 | **Probar login con cada rol** en producción | Usar credenciales dummy del plan |
+
+---
+
+### 🟡 PRÓXIMOS MÓDULOS A DESARROLLAR
+
+#### Semana 2 — Flujo de pedido completo (PRIORIDAD ALTA)
+- [ ] Catálogo de productos con filtros por categoría
+- [ ] Precios escalonados en tiempo real (AJAX `api/precioEscalonado`)
+- [ ] Carrito: agregar productos por sucursal
+- [ ] Paso 2: selección de fecha y ventana de entrega por sucursal
+- [ ] Paso 3: resumen y selección método de pago
+- [ ] Paso 4: confirmar pedido → INSERT en BD con folio CHB-YYYY-NNNN
+- [ ] Vista de pedido desde admin y desde cliente
+
+#### Semana 3 — Logística y repartidor
+- [ ] Crear ruta desde admin con asignación de chofer
+- [ ] App repartidor: ver entregas del día (UI oscura)
+- [ ] Completar entrega: firma en canvas + foto con cámara
+- [ ] Evidencia guardada en BD + actualizar estado pedido
+
+#### Semana 4 — Módulos admin pendientes
+- [ ] `cliente/index` y `cliente/detalle` (gestión empresas B2B)
+- [ ] `producto/crear` y `producto/editar` con upload de imagen
+- [ ] `inventario/index` con alertas de stock bajo
+- [ ] `config/dispositivos` — CRUD HikVision y Shelly
+- [ ] `config/bitacora` — visor de logs
+
+#### Semana 5 — Reportes y servicios externos
+- [ ] `reporte/ventas` con gráficas Chart.js y filtros por fecha/empresa
+- [ ] Pedidos recurrentes (plantillas + generación)
+- [ ] WhatsApp: notificación al confirmar pedido y al entregar
+- [ ] Facturación CFDI con Factura-lo (opcional)
+- [ ] Traccar: posición en tiempo real de vehículos en mapa logística
+
+---
+
+### ⚙️ LO QUE SE NECESITA (EXTERNOS) PARA AVANZAR
+
+| Servicio | Para qué | Dónde obtener |
+|----------|----------|---------------|
+| **Google Maps API Key** | Mapa en registro comprador y autocompletado de direcciones | console.cloud.google.com → Maps JS API + Places API |
+| **Cuenta de email SMTP** (opcional) | Mayor entregabilidad que `mail()` nativo | cPanel → Email Accounts o usar SendGrid/Mailgun |
+| **WhatsApp Business API token** | Notificaciones de pedido al comprador | Meta for Developers o proveedor (Twilio, MessageBird) |
+| **Traccar server** | Rastreo GPS de repartidores en mapa | traccar.org (autohosting) o servidor propio |
+| **Shelly Cloud auth key** | Control de enchufes/dispositivos IoT | app.shelly.cloud → Account → API |
+| **Factura-lo API key** | Generación de CFDI | factura.com o factura-lo.mx |
+
+---
+
+*Última actualización: 2026-05-04 v1.3 | Servidor: idactivos.digital/carnihub/*
 
 ---
 
@@ -1060,13 +1164,12 @@ Semana 5 — Reportes y pulido
 - Para activar: ir a **Configuración → APIs** y pegar la key de Google Cloud Console
   - Habilitar: **Maps JavaScript API** + **Places API**
 
-### Mapa interactivo en registro_form.php — IMPLEMENTADO
-- **Repartidor:** círculo rojo (radio 8km) que indica zona de cobertura; clic en mapa mueve el centro
-- **Comprador:** marcador draggable para confirmar ubicación del negocio
-- Autocomplete con `google.maps.places.Autocomplete` restringido a México
-- Al seleccionar lugar: muestra el div del mapa, centra y coloca marcador/círculo
-- `ubicacion_lat` y `ubicacion_lng` se guardan en campos hidden y se envían al servidor
-- Si no hay Maps key: placeholder de texto alternativo, sin mapa
+### Mapa interactivo en registro_form.php — ACTUALIZADO v1.3
+- **Comprador:** mapa visible desde el inicio (sin esperar selección de autocomplete); marcador draggable en Querétaro por defecto; buscar dirección centra y mueve el marcador; zoom 17 al seleccionar lugar
+- **Repartidor:** se eliminó el mapa/círculo; ahora usa un `<select>` con municipios agrupados por estado (Querétaro, Guanajuato, Hidalgo, Estado de México, CDMX, Jalisco, Nuevo León + "Otro"); campo `ubicacion` guarda el valor "Municipio, ESTADO"
+- Autocomplete con `google.maps.places.Autocomplete` restringido a México (solo comprador)
+- `ubicacion_lat` y `ubicacion_lng` se guardan en campos hidden (solo comprador)
+- Si no hay Maps key: campo texto libre para comprador, dropdown municipios para repartidor
 
 ### Tipo de negocio libre — IMPLEMENTADO
 - Select con opciones fijas + "Otro…"
@@ -1087,7 +1190,8 @@ Semana 5 — Reportes y pulido
 - [x] `RegistroController.php` completo (index / comprador / repartidor / guardar / verificar / pendiente)
 - [x] Vista `registro.php` (selección de tipo)
 - [x] Vista `registro_form.php` (formulario adaptable comprador/repartidor)
-- [x] Google Maps interactivo en registro (círculo repartidor / marcador comprador)
+- [x] Google Maps interactivo en registro (mapa visible inmediato para comprador)
+- [x] Repartidor: dropdown de municipios de México en lugar de mapa/círculo
 - [x] Tipo de negocio con campo libre "Otro"
 - [x] Logo dinámico en registro_form.php (query directa a global_settings)
 - [x] Vista `verificar_pendiente.php` (página post-registro)
