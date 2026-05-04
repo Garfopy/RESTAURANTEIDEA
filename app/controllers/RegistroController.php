@@ -187,7 +187,7 @@ class RegistroController extends BaseController
         $db->prepare("UPDATE verificacion_tokens SET usado = 1 WHERE id = ?")->execute([$row['id']]);
 
         $nombreCompleto = htmlspecialchars($row['nombre'] . ' ' . $row['apellido_paterno']);
-        $this->flash('success', '✓ ¡Correo verificado exitosamente, ' . $nombreCompleto . '! Tu cuenta está activa. Ya puedes iniciar sesión.');
+        $this->flash('success', '¡Correo verificado exitosamente, ' . $nombreCompleto . '! Tu cuenta está activa. Ya puedes iniciar sesión.');
         $this->redirect('auth/login');
     }
 
@@ -217,22 +217,124 @@ class RegistroController extends BaseController
     {
         $url    = BASE_URL . 'registro/verificar/' . $token;
         $asunto = 'Verifica tu cuenta en CarniHub';
-        $cuerpo = "Hola $nombre,\r\n\r\n"
-                . "Gracias por registrarte en CarniHub — Abasto Inteligente de Carne.\r\n\r\n"
-                . "Haz clic en el siguiente enlace para verificar tu correo electrónico:\r\n\r\n"
-                . "$url\r\n\r\n"
-                . "Este enlace es válido por 24 horas.\r\n\r\n"
-                . "Si no solicitaste este registro, ignora este mensaje.\r\n\r\n"
-                . "— Equipo CarniHub";
+        $host   = $_SERVER['HTTP_HOST'] ?? 'carnihub.mx';
+
+        $html = '<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Verifica tu cuenta</title>
+</head>
+<body style="margin:0;padding:0;background:#F3F4F6;font-family:Arial,Helvetica,sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F3F4F6;padding:40px 16px">
+    <tr>
+      <td align="center">
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px">
+
+          <!-- Logo / Header -->
+          <tr>
+            <td align="center" style="padding-bottom:24px">
+              <div style="display:inline-block;background:#C8102E;border-radius:12px;padding:12px 28px">
+                <span style="color:#fff;font-size:22px;font-weight:800;letter-spacing:1px">CarniHub</span>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Card -->
+          <tr>
+            <td style="background:#fff;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,.07);overflow:hidden">
+
+              <!-- Red top bar -->
+              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr><td style="background:#C8102E;height:6px;font-size:0">&nbsp;</td></tr>
+              </table>
+
+              <!-- Body -->
+              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="padding:40px 40px 32px">
+
+                    <p style="margin:0 0 8px;font-size:28px;text-align:center">📧</p>
+                    <h1 style="margin:0 0 16px;font-size:22px;font-weight:800;color:#111827;text-align:center">
+                      ¡Hola, ' . htmlspecialchars($nombre) . '!
+                    </h1>
+                    <p style="margin:0 0 24px;font-size:15px;color:#4B5563;line-height:1.7;text-align:center">
+                      Gracias por registrarte en <strong>CarniHub — Abasto Inteligente de Carne</strong>.<br>
+                      Solo falta un paso: confirma tu correo electrónico.
+                    </p>
+
+                    <!-- CTA Button -->
+                    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                      <tr>
+                        <td align="center" style="padding-bottom:28px">
+                          <a href="' . $url . '"
+                             style="display:inline-block;background:#C8102E;color:#fff;font-size:15px;font-weight:700;
+                                    text-decoration:none;padding:14px 40px;border-radius:8px;letter-spacing:.3px">
+                            Verificar mi correo
+                          </a>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <!-- Info box -->
+                    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                      <tr>
+                        <td style="background:#FEF2F2;border-radius:10px;padding:16px 20px">
+                          <p style="margin:0 0 6px;font-size:13px;font-weight:700;color:#991B1B">
+                            ¿No funciona el botón?
+                          </p>
+                          <p style="margin:0;font-size:12px;color:#6B7280;word-break:break-all;line-height:1.6">
+                            Copia y pega este enlace en tu navegador:<br>
+                            <a href="' . $url . '" style="color:#C8102E">' . $url . '</a>
+                          </p>
+                        </td>
+                      </tr>
+                    </table>
+
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Footer inside card -->
+              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="background:#F9FAFB;border-top:1px solid #E5E7EB;padding:20px 40px">
+                    <p style="margin:0;font-size:12px;color:#9CA3AF;text-align:center;line-height:1.6">
+                      Este enlace es válido por <strong>24 horas</strong>.<br>
+                      Si no solicitaste este registro, puedes ignorar este mensaje.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding-top:24px;text-align:center">
+              <p style="margin:0;font-size:12px;color:#9CA3AF">
+                &copy; ' . date('Y') . ' CarniHub &mdash; Todos los derechos reservados
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>';
 
         $headers = implode("\r\n", [
-            'From: CarniHub <noreply@' . ($_SERVER['HTTP_HOST'] ?? 'carnihub.mx') . '>',
+            'From: CarniHub <noreply@' . $host . '>',
             'Reply-To: contacto@carnihub.mx',
             'MIME-Version: 1.0',
-            'Content-Type: text/plain; charset=UTF-8',
+            'Content-Type: text/html; charset=UTF-8',
             'X-Mailer: PHP/' . PHP_VERSION,
         ]);
 
-        mail($email, $asunto, $cuerpo, $headers);
+        mail($email, $asunto, $html, $headers);
     }
 }
