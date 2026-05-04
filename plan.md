@@ -1,5 +1,5 @@
 # CarniHub — Plan de Implementación y Estado del Sistema
-**Versión:** 1.0.0 | **Fecha:** 2026-05-03 | **Stack:** PHP 8.3 · MySQL 5.7 · Tailwind CDN · MVC sin framework
+**Versión:** 1.2.0 | **Fecha:** 2026-05-03 | **Stack:** PHP 8.3 · MySQL 5.7 · Tailwind CDN · MVC sin framework
 
 ---
 
@@ -7,18 +7,24 @@
 
 | Capa | Archivos | Estado |
 |------|----------|--------|
-| Infraestructura (.htaccess, index.php, config) | 4 | ✅ Funcional tras fix RewriteBase |
-| Controladores | 17 | ⚠️ Existen, revisar uno a uno |
-| Modelos | 13 | ⚠️ Existen, validar queries vs BD real |
-| Vistas | 46 | ⚠️ Existen, reportes de páginas en blanco o JSON |
+| Infraestructura (.htaccess, index.php, config) | 4 | ✅ Funcional |
+| Controladores | 18 | ✅ Auth, Registro, Config, Cuenta completados |
+| Modelos | 13 | ⚠️ Revisar queries vs BD real |
+| Vistas | 50+ | ⚠️ Admin revisado parcialmente |
 | Servicios API | 5 | 🔴 Esqueletos, no conectados a tokens reales |
-| BD (SQL) | 27 tablas | ✅ Schema completo + datos dummy |
-| CSS / JS | 9 archivos | ⚠️ Existen, posibles rutas rotas |
+| BD (SQL) | 27 tablas + migraciones | ✅ Schema completo + datos dummy |
+| CSS / JS | 9 archivos | ⚠️ Posibles rutas rotas |
 
-**Problemas reportados:**
-- Páginas que devuelven JSON en vez de HTML
-- Páginas que dan 404 (ruta no registrada o método inexistente)
-- Páginas en blanco (error PHP silenciado)
+**Completado en esta sesión:**
+- Registro público comprador/repartidor con verificación de correo
+- Seguridad login: brute force + cuentas de prueba eliminadas
+- Separación nombre en campos (nombre, apellido_paterno, apellido_materno)
+- Avatares de usuario con upload al servidor
+- Logo del sistema: upload PNG/JPG/WebP/SVG desde config admin, dinámico en sidebars
+- Google Maps interactivo en formulario de registro (círculo zona / marcador draggable)
+- APIs e integraciones: campo Google Maps key en config
+- Módulo Cuenta cliente (perfil, cambiar contraseña)
+- Migraciones 001 y 002 para nuevas tablas y campos
 
 ---
 
@@ -633,20 +639,67 @@ render('admin/configuracion/dispositivos', compact('camaras','shellys'));
   - Toggle ON/OFF en tiempo real → `ApiController::shellyToggle()`
   - Botón "Agregar Shelly" → form con device_id, auth_key, tipo, ubicación
 
-### Lógica `config/guardar` (POST)
+### Lógica `config/guardar` (POST) — IMPLEMENTADO
 ```php
 requireRole(['superadmin']);
-foreach ($_POST as $clave => $valor) {
-    if (str_starts_with($clave, 'setting_')) {
-        $key = substr($clave, 8);  // quitar prefijo 'setting_'
-        ConfigModel::set($key, $valor);
+
+// 1. Subida de logo (viene en $_FILES, no en $_POST)
+if (!empty($_FILES['app_logo']['tmp_name']) && $_FILES['app_logo']['error'] === UPLOAD_ERR_OK) {
+    $ext = strtolower(pathinfo($_FILES['app_logo']['name'], PATHINFO_EXTENSION));
+    if (in_array($ext, ['png','jpg','jpeg','webp','svg'], true) && size <= 2MB) {
+        move_uploaded_file(..., ROOT_PATH . '/public/uploads/logos/logo.' . $ext);
+        $model->set('app_logo', 'uploads/logos/logo.' . $ext);
     }
 }
-// Si hay logo nuevo → subir imagen
-LogModel::registrar($_SESSION['usuario']['id'], 'Configuración actualizada', 'config');
-flash('success', 'Configuración guardada');
-redirect('config/general');
+unset($campos['app_logo']);  // nunca guardar el campo file vacío como texto
+
+// 2. Borrar logo si se solicitó (campo oculto app_logo_borrar=1)
+if ($campos['app_logo_borrar'] === '1') {
+    $ruta = $model->get('app_logo', '');
+    if ($ruta) { @unlink(ROOT_PATH . '/public/' . $ruta); }
+    $model->set('app_logo', '');
+}
+unset($campos['app_logo_borrar']);
+
+// 3. Guardar el resto de campos de texto
+foreach ($campos as $k => $v) { $model->set($k, $v); }
+flash('success', 'Configuración guardada correctamente.');
+redirect("config/$grupo");
 ```
+
+**Por qué el logo no funcionaba antes:**
+- `$_FILES` y `$_POST` son arrays separados en PHP. El `<input type="file">` llega vacío en `$_POST`.
+- El controlador solo iteraba `$_POST`, por eso el logo nunca se guardaba.
+- Solución: leer `$_FILES['app_logo']` explícitamente antes de procesar `$_POST`.
+
+### Sidebars — Logo dinámico
+Ambos sidebars (`sidebar_admin.php`, `sidebar_cliente.php`) consultaban `global_settings` en tiempo de render:
+```php
+$_lr = Database::getInstance()->query(
+    "SELECT clave,valor FROM global_settings WHERE clave IN ('app_logo','app_nombre')"
+)->fetchAll(PDO::FETCH_KEY_PAIR);
+// Si app_logo tiene valor → <img src="...">
+// Si no → <span>Nombre del sistema</span>
+```
+
+### Vista `views/admin/configuracion/general.php` — Widget logo
+- Preview 80×50px mostrando logo actual o "Sin logo"
+- Botón "Seleccionar logo" → abre file picker oculto
+- `previewLogo(input)` → FileReader API → actualiza preview al instante sin enviar form
+- Botón "Quitar logo" (solo si hay logo) → `borrarLogo()` → pone `app_logo_borrar=1`
+- Campo oculto `app_logo_borrar` que el controlador lee para eliminar físicamente el archivo
+
+### Checklist Módulo 12
+- [x] `ConfigModel::get()` y `ConfigModel::set()` funcionando
+- [x] Logo upload: validación extensión + tamaño + move_uploaded_file
+- [x] Logo borrar: unlink() del archivo + limpiar BD
+- [x] Sidebars con logo dinámico desde global_settings
+- [x] Widget UI con preview, seleccionar y quitar logo
+- [x] Campo API Key Google Maps en `apis.php`
+- [x] Migration 002: insertar claves `api_google_maps_key` y `app_logo` en global_settings
+- [ ] Ejecutar `migrations/002_google_maps_logo.sql` en cPanel phpMyAdmin
+- [ ] Subir logo real del cliente
+- [ ] Configurar API Key de Google Maps en config/APIs
 
 ---
 
@@ -891,8 +944,12 @@ Semana 1 — Que el sistema sea navegable
   [x] Fix .htaccess (DONE)
   [x] Seguridad login: brute force + cuentas de prueba eliminadas
   [x] Módulo registro público (comprador y repartidor)
-  [ ] Ejecutar migration 001 en cPanel phpMyAdmin
-  [ ] Configurar Google Maps API key en config.php
+  [x] Google Maps interactivo en registro (círculo / marcador draggable)
+  [x] Logo del sistema: upload desde config admin, dinámico en sidebars
+  [x] Nombre separado en 3 campos, avatares de usuario
+  [x] Módulo Cuenta cliente (perfil + cambiar contraseña)
+  [ ] Ejecutar migrations 001 y 002 en cPanel phpMyAdmin
+  [ ] Configurar Google Maps API key en Configuración → APIs
   [ ] Verificar mail() funcionando en servidor
   [ ] Revisar y corregir cada página de admin una a una
   [ ] Crear carpetas uploads en servidor (si faltan)
@@ -948,7 +1005,7 @@ Semana 5 — Reportes y pulido
 
 ---
 
-*Última actualización: 2026-05-03 | Servidor: idactivos.digital/carnihub/*
+*Última actualización: 2026-05-03 v1.2 | Servidor: idactivos.digital/carnihub/*
 
 ---
 
@@ -996,31 +1053,51 @@ Semana 5 — Reportes y pulido
 **Solo comprador:**
 - nombre_empresa (requerido), tipo_negocio (select)
 
-### Configuración Google Maps
-- Constante `GOOGLE_MAPS_KEY` en `config/config.php`
-- Leer de variable de entorno o hardcodear
-- Activar en Google Cloud Console: **Maps JavaScript API** + **Places API**
-- Si no hay key: el campo funciona como texto libre
+### Configuración Google Maps — IMPLEMENTADO
+- API Key almacenada en `global_settings.api_google_maps_key` (grupo `apis`)
+- `RegistroController::getMapsKey()` lee la key desde `ConfigModel`, fallback a constante `GOOGLE_MAPS_KEY`
+- Si no hay key configurada: el campo de ubicación funciona como texto libre (degradación elegante)
+- Para activar: ir a **Configuración → APIs** y pegar la key de Google Cloud Console
+  - Habilitar: **Maps JavaScript API** + **Places API**
+
+### Mapa interactivo en registro_form.php — IMPLEMENTADO
+- **Repartidor:** círculo rojo (radio 8km) que indica zona de cobertura; clic en mapa mueve el centro
+- **Comprador:** marcador draggable para confirmar ubicación del negocio
+- Autocomplete con `google.maps.places.Autocomplete` restringido a México
+- Al seleccionar lugar: muestra el div del mapa, centra y coloca marcador/círculo
+- `ubicacion_lat` y `ubicacion_lng` se guardan en campos hidden y se envían al servidor
+- Si no hay Maps key: placeholder de texto alternativo, sin mapa
+
+### Tipo de negocio libre — IMPLEMENTADO
+- Select con opciones fijas + "Otro…"
+- Al seleccionar "Otro": aparece input libre (`tipo_negocio_otro`)
+- Controller: si `tipo_negocio === 'otro'` usa el valor del campo libre
 
 ### Correo de verificación (cPanel)
 - Usa `mail()` nativo de PHP (cPanel configura sendmail automáticamente)
 - Asunto: *"Verifica tu cuenta en CarniHub"*
 - Remitente: `noreply@{dominio}`
+- Mensaje post-verificación: "¡Correo verificado exitosamente! Tu cuenta está activa. Ya puedes iniciar sesión."
 - Mejora futura: PHPMailer con SMTP de cuenta cPanel para mayor entregabilidad
 
-### Checklist Módulo 1.5
+
 - [x] Migración SQL: tablas `login_intentos`, `verificacion_tokens`, `registro_intentos`
 - [x] Migración SQL: columnas `telefono`, `ubicacion_*` en `usuarios`
 - [x] Migración SQL: columna `tipo_negocio` en `empresas`
 - [x] `RegistroController.php` completo (index / comprador / repartidor / guardar / verificar / pendiente)
 - [x] Vista `registro.php` (selección de tipo)
 - [x] Vista `registro_form.php` (formulario adaptable comprador/repartidor)
+- [x] Google Maps interactivo en registro (círculo repartidor / marcador comprador)
+- [x] Tipo de negocio con campo libre "Otro"
+- [x] Logo dinámico en registro_form.php (query directa a global_settings)
 - [x] Vista `verificar_pendiente.php` (página post-registro)
+- [x] Mensaje de verificación mejorado: "Tu cuenta está activa. Ya puedes iniciar sesión."
 - [x] `login.php` — cuentas de prueba eliminadas + botones de registro
 - [x] `index.php` — rutas `registro/*` agregadas como públicas
 - [x] `config.php` — constante `GOOGLE_MAPS_KEY`
 - [ ] **Ejecutar migration 001 en cPanel phpMyAdmin**
-- [ ] Configurar `GOOGLE_MAPS_KEY` con key real (Google Cloud Console)
+- [ ] **Ejecutar migration 002 en cPanel phpMyAdmin** (`api_google_maps_key` + `app_logo`)
+- [ ] Configurar Google Maps API key en **Configuración → APIs**
 - [ ] Verificar que `mail()` funciona en el servidor (enviar prueba)
 - [ ] Probar flujo completo: registro → correo → verificar → login
 
