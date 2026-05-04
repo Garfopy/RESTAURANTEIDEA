@@ -94,6 +94,19 @@ class CuentaController extends BaseController
         $this->redirect('cuenta/perfil');
     }
 
+    public function quitarAvatar(?string $p = null): void
+    {
+        if (!$this->isPost()) $this->redirect('cuenta/perfil');
+
+        $model = new UsuarioModel();
+        $model->update($this->usuarioId(), ['avatar' => null]);
+        $_SESSION['usuario']['avatar'] = null;
+
+        $this->log('Quitar avatar', 'cuenta');
+        $this->flash('success', 'Foto de perfil eliminada.');
+        $this->redirect('cuenta/perfil');
+    }
+
     public function cambiarPassword(?string $p = null): void
     {
         if (!$this->isPost()) $this->redirect('cuenta/perfil');

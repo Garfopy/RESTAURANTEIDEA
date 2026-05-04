@@ -8,27 +8,68 @@ $iniciales = strtoupper(mb_substr($usuario['nombre'] ?? 'U', 0, 1) . mb_substr($
   <!-- Avatar -->
   <div style="background:#fff;border-radius:12px;border:1px solid #E5E7EB;padding:24px;margin-bottom:16px">
     <h2 style="font-size:.95rem;font-weight:700;margin-bottom:16px;color:#111827">Foto de perfil</h2>
-    <form method="POST" action="<?= BASE_URL ?>cuenta/subirAvatar" enctype="multipart/form-data"
-          style="display:flex;align-items:center;gap:20px">
-      <!-- Foto o iniciales -->
-      <?php if (!empty($usuario['avatar'])): ?>
-        <img src="<?= htmlspecialchars($usuario['avatar']) ?>" alt="Avatar"
-             style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:2px solid #E5E7EB;flex-shrink:0">
-      <?php else: ?>
-        <div style="width:72px;height:72px;border-radius:50%;background:#FEE2E2;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.3rem;color:var(--color-primary);flex-shrink:0;border:2px solid #FECACA">
-          <?= htmlspecialchars($iniciales) ?>
-        </div>
-      <?php endif; ?>
+    <div style="display:flex;align-items:flex-start;gap:20px">
 
-      <div>
-        <label for="avatar_input" style="display:inline-block;padding:8px 16px;background:#F3F4F6;border:1px solid #E5E7EB;border-radius:8px;font-size:.85rem;font-weight:600;color:#374151;cursor:pointer">
-          Cambiar foto
-        </label>
-        <input type="file" id="avatar_input" name="avatar" accept=".jpg,.jpeg,.png,.webp"
-               style="display:none" onchange="this.form.submit()">
-        <p style="font-size:.75rem;color:#9CA3AF;margin-top:6px">JPG, PNG o WebP · Máx 2 MB</p>
+      <!-- Foto circular o iniciales -->
+      <div id="avatar-preview" style="flex-shrink:0">
+        <?php if (!empty($usuario['avatar'])): ?>
+          <img src="<?= htmlspecialchars($usuario['avatar']) ?>" alt="Avatar"
+               style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:2px solid #E5E7EB">
+        <?php else: ?>
+          <div style="width:80px;height:80px;border-radius:50%;background:#FEE2E2;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.4rem;color:var(--color-primary);border:2px solid #FECACA">
+            <?= htmlspecialchars($iniciales) ?>
+          </div>
+        <?php endif; ?>
       </div>
-    </form>
+
+      <div style="flex:1">
+        <!-- Form subir -->
+        <form id="form-avatar" method="POST" action="<?= BASE_URL ?>cuenta/subirAvatar" enctype="multipart/form-data">
+          <input type="file" id="avatar_input" name="avatar" accept=".jpg,.jpeg,.png,.webp" style="display:none">
+
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <!-- Botón 1: Seleccionar -->
+            <button type="button"
+                    onclick="document.getElementById('avatar_input').click()"
+                    style="padding:8px 16px;border:1px solid #D1D5DB;border-radius:8px;background:#F9FAFB;font-size:.85rem;font-weight:600;color:#374151;cursor:pointer">
+              Seleccionar archivo
+            </button>
+
+            <!-- Botón 2: Subir -->
+            <button type="submit" id="btn-subir" disabled
+                    style="padding:8px 16px;border:none;border-radius:8px;background:var(--color-primary);color:#fff;font-size:.85rem;font-weight:600;cursor:pointer;opacity:.5">
+              Subir foto
+            </button>
+          </div>
+
+          <script>
+            document.getElementById('avatar_input').addEventListener('change', function() {
+              var btn = document.getElementById('btn-subir');
+              var lbl = document.getElementById('nombre-archivo');
+              if (this.files[0]) {
+                lbl.textContent = this.files[0].name;
+                btn.disabled = false;
+                btn.style.opacity = '1';
+              }
+            });
+          </script>
+
+          <p id="nombre-archivo" style="font-size:.78rem;color:#6B7280;margin-top:6px;min-height:1em"></p>
+          <p style="font-size:.73rem;color:#9CA3AF">JPG, PNG o WebP · Máx 2 MB</p>
+        </form>
+
+        <!-- Botón 3: Quitar foto (solo si hay avatar) -->
+        <?php if (!empty($usuario['avatar'])): ?>
+        <form method="POST" action="<?= BASE_URL ?>cuenta/quitarAvatar" style="margin-top:8px"
+              onsubmit="return confirm('¿Quitar tu foto de perfil?')">
+          <button type="submit"
+                  style="padding:6px 14px;border:1px solid #FCA5A5;border-radius:8px;background:#FEF2F2;color:#DC2626;font-size:.82rem;font-weight:600;cursor:pointer">
+            Quitar foto
+          </button>
+        </form>
+        <?php endif; ?>
+      </div>
+    </div>
   </div>
 
   <!-- Datos del perfil -->
