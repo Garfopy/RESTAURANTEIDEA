@@ -1,6 +1,6 @@
 <?php
 /**
- * CarniHub — Base Controller
+ * CarniHub — Base Controller v2.0
  */
 abstract class BaseController
 {
@@ -11,6 +11,7 @@ abstract class BaseController
         $this->session = $_SESSION;
     }
 
+    // ── Render ────────────────────────────────────────────────────
     protected function render(string $view, array $data = []): void
     {
         extract($data);
@@ -36,52 +37,110 @@ abstract class BaseController
         exit;
     }
 
-    // Redirige al portal correcto según rol (usar en cualquier controller)
+    // ── Redirección por rol ───────────────────────────────────────
     protected function redirectSegunRol(string $rol): void
     {
         match (true) {
-            $rol === 'repartidor'                                               => $this->redirect('repartidor/inicio'),
-            in_array($rol, ['comprador', 'supervisor', 'admin_empresa'], true) => $this->redirect('carrito/inicio'),
-            default                                                             => $this->redirect('dashboard/index'),
+            $rol === 'repartidor'                                                              => $this->redirect('repartidor/inicio'),
+            in_array($rol, ['comprador', 'supervisor', 'admin_empresa'], true)                => $this->redirect('empresa/dashboard'),
+            in_array($rol, ['superadmin', 'admin'], true)                                     => $this->redirect('panel/dashboard'),
+            default                                                                            => $this->redirect('auth/login'),
         };
     }
 
-    protected function requireRole(array $roles): void
-    {
-        $userRole = $_SESSION['usuario']['rol_slug'] ?? '';
-        if (!in_array($userRole, $roles, true)) {
-            $this->redirect('dashboard/index');
-        }
-    }
+    // ── Protección de acceso ──────────────────────────────────────
 
-    // Panel de plataforma — solo superadmin (y 'admin' mientras no corra migration 004)
+    /** Solo superadmin y admin de plataforma */
     protected function requireAdmin(): void
     {
         $this->requireRole(['superadmin', 'admin']);
     }
 
-    // Portal cliente con gestión — admin_empresa (RF-U02)
-    protected function requireClienteAdmin(): void
+    /** Solo superadmin (configuración global, crear admins) */
+    protected function requireSuperAdmin(): void
     {
-        $this->requireRole(['superadmin', 'admin_empresa', 'admin']);
+        $this->requireRole(['superadmin']);
     }
 
-    // Cualquier usuario del portal cliente
-    protected function requireCliente(): void
+    /** Roles del portal empresa: admin_empresa, supervisor, comprador */
+    protected function requireEmpresa(): void
     {
-        $this->requireRole(['comprador', 'supervisor', 'admin_empresa', 'admin']);
+        $this->requireRole(['admin_empresa', 'supervisor', 'comprador']);
     }
 
+    /** Puede hacer pedidos: admin_empresa y comprador */
+    protected function requireComprador(): void
+    {
+        $this->requireRole(['admin_empresa', 'comprador']);
+    }
+
+    /** Puede aprobar pedidos: admin_empresa y supervisor */
+    protected function requireSupervisor(): void
+    {
+        $this->requireRole(['admin_empresa', 'supervisor']);
+    }
+
+    /** Solo admin_empresa (gestión de su empresa) */
+    protected function requireAdminEmpresa(): void
+    {
+        $this->requireRole(['admin_empresa']);
+    }
+
+    /** Solo repartidor */
+    protected function requireRepartidor(): void
+    {
+        $this->requireRole(['repartidor']);
+    }
+
+    /** Cualquier usuario autenticado */
+    protected function requireAuth(): void
+    {
+        if (empty($_SESSION['usuario'])) {
+            $this->redirect('auth/login');
+        }
+    }
+
+    protected function requireRole(array $roles): void
+    {
+        if (empty($_SESSION['usuario'])) {
+            $this->redirect('auth/login');
+        }
+        $userRole = $_SESSION['usuario']['rol_slug'] ?? '';
+        if (!in_array($userRole, $roles, true)) {
+            // Redirigir a su portal correspondiente, no a una 403 genérica
+            $this->redirectSegunRol($userRole);
+        }
+    }
+
+    // ── Helpers de sesión ─────────────────────────────────────────
     protected function rolActual(): string
     {
         return $_SESSION['usuario']['rol_slug'] ?? '';
     }
 
-    protected function esAdminEmpresa(): bool
+    protected function usuarioId(): ?int
     {
-        return in_array($this->rolActual(), ['admin_empresa', 'admin'], true);
+        return isset($_SESSION['usuario']['id']) ? (int)$_SESSION['usuario']['id'] : null;
     }
 
+    protected function empresaId(): ?int
+    {
+        return isset($_SESSION['usuario']['empresa_id'])
+            ? (int)$_SESSION['usuario']['empresa_id']
+            : null;
+    }
+
+    protected function esSuperAdmin(): bool
+    {
+        return $this->rolActual() === 'superadmin';
+    }
+
+    protected function esAdminEmpresa(): bool
+    {
+        return $this->rolActual() === 'admin_empresa';
+    }
+
+    // ── HTTP helpers ──────────────────────────────────────────────
     protected function isPost(): bool
     {
         return $_SERVER['REQUEST_METHOD'] === 'POST';
@@ -97,6 +156,7 @@ abstract class BaseController
         return $_GET[$key] ?? $default;
     }
 
+    // ── Flash messages ────────────────────────────────────────────
     protected function flash(string $type, string $message): void
     {
         $_SESSION['flash'] = compact('type', 'message');
@@ -109,17 +169,17 @@ abstract class BaseController
         return $flash;
     }
 
-    protected function empresaIdActual(): ?int
-    {
-        return $_SESSION['usuario']['empresa_id'] ?? null;
-    }
-
+    // ── Auditoría ─────────────────────────────────────────────────
     protected function log(string $accion, string $modulo = '', string $desc = ''): void
     {
         $logModel = new LogModel();
         $logModel->registrar(
-            $_SESSION['usuario']['id'] ?? null,
-            $accion, $modulo, $desc
+            $this->usuarioId(),
+            $this->rolActual(),
+            $this->empresaId(),
+            $accion,
+            $modulo,
+            $desc
         );
     }
 }

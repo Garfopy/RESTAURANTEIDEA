@@ -7,9 +7,7 @@ class UsuarioModel extends BaseModel
     {
         return $this->queryOne(
             'SELECT u.*, r.slug AS rol_slug, r.nombre AS rol_nombre,
-                    CONCAT(u.nombre, " ", u.apellido_paterno,
-                           IF(u.apellido_materno IS NOT NULL AND u.apellido_materno != "", CONCAT(" ", u.apellido_materno), "")
-                    ) AS nombre_completo
+                    CONCAT(u.nombre, " ", u.apellido_paterno) AS nombre_completo
                FROM usuarios u
                JOIN roles r ON r.id = u.rol_id
               WHERE u.email = ? AND u.activo = 1',
@@ -17,67 +15,82 @@ class UsuarioModel extends BaseModel
         );
     }
 
-    public function getByRol(int $rolId): array
+    public function getByEmpresa(int $empresaId): array
     {
         return $this->query(
-            'SELECT *,
-                    CONCAT(nombre, " ", apellido_paterno,
-                           IF(apellido_materno IS NOT NULL AND apellido_materno != "", CONCAT(" ", apellido_materno), "")
-                    ) AS nombre_completo
-               FROM usuarios WHERE rol_id = ? AND activo = 1 ORDER BY nombre, apellido_paterno',
-            [$rolId]
-        );
-    }
-
-    public function getChoferes(): array
-    {
-        return $this->query(
-            'SELECT u.*,
-                    CONCAT(u.nombre, " ", u.apellido_paterno,
-                           IF(u.apellido_materno IS NOT NULL AND u.apellido_materno != "", CONCAT(" ", u.apellido_materno), "")
-                    ) AS nombre_completo,
-                    c.id AS chofer_id, c.calificacion, v.placa, v.marca, v.modelo
+            'SELECT u.*, r.slug AS rol_slug, r.nombre AS rol_nombre,
+                    CONCAT(u.nombre, " ", u.apellido_paterno) AS nombre_completo
                FROM usuarios u
-               JOIN roles r    ON r.id = u.rol_id AND r.slug = "repartidor"
-          LEFT JOIN choferes c ON c.usuario_id = u.id
-          LEFT JOIN vehiculos v ON v.id = c.vehiculo_id
-              WHERE u.activo = 1
-           ORDER BY u.nombre, u.apellido_paterno'
+               JOIN roles r ON r.id = u.rol_id
+              WHERE u.empresa_id = ? AND u.activo = 1
+              ORDER BY r.id, u.nombre',
+            [$empresaId]
         );
     }
 
-    public function getAll(int $page = 1): array
+    public function getByRolEmpresa(string $rolSlug, int $empresaId): array
     {
-        $sql = 'SELECT u.*,
-                       CONCAT(u.nombre, " ", u.apellido_paterno,
-                              IF(u.apellido_materno IS NOT NULL AND u.apellido_materno != "", CONCAT(" ", u.apellido_materno), "")
-                       ) AS nombre_completo,
-                       r.nombre AS rol_nombre, e.razon_social AS empresa_nombre
+        return $this->query(
+            'SELECT u.*, r.slug AS rol_slug
+               FROM usuarios u
+               JOIN roles r ON r.id = u.rol_id
+              WHERE r.slug = ? AND u.empresa_id = ? AND u.activo = 1
+              ORDER BY u.nombre',
+            [$rolSlug, $empresaId]
+        );
+    }
+
+    /** Roles que un admin_empresa puede crear para su empresa */
+    public function rolesPermitidosPorAdminEmpresa(): array
+    {
+        return $this->query(
+            "SELECT * FROM roles WHERE slug IN ('supervisor','comprador','repartidor')"
+        );
+    }
+
+    /** Roles que superadmin/admin pueden crear */
+    public function rolesPermitidosPorAdmin(): array
+    {
+        return $this->query(
+            "SELECT * FROM roles WHERE slug IN ('admin','admin_empresa')"
+        );
+    }
+
+    public function listadoConRol(array $filtros = [], int $page = 1): array
+    {
+        $where  = ['u.activo = 1'];
+        $params = [];
+
+        if (!empty($filtros['empresa_id'])) {
+            $where[]  = 'u.empresa_id = ?';
+            $params[] = $filtros['empresa_id'];
+        }
+        if (!empty($filtros['rol_slug'])) {
+            $where[]  = 'r.slug = ?';
+            $params[] = $filtros['rol_slug'];
+        }
+        if (!empty($filtros['buscar'])) {
+            $where[]  = '(u.nombre LIKE ? OR u.email LIKE ?)';
+            $params[] = '%' . $filtros['buscar'] . '%';
+            $params[] = '%' . $filtros['buscar'] . '%';
+        }
+
+        $sqlWhere = 'WHERE ' . implode(' AND ', $where);
+        $sql = "SELECT u.id, u.nombre, u.apellido_paterno, u.email, u.telefono,
+                       u.activo, u.created_at, r.slug AS rol_slug, r.nombre AS rol_nombre,
+                       e.razon_social AS empresa_nombre
                   FROM usuarios u
                   JOIN roles r ON r.id = u.rol_id
              LEFT JOIN empresas e ON e.id = u.empresa_id
-              ORDER BY u.created_at DESC';
-        return $this->paginate($sql, [], $page);
+                  $sqlWhere
+              ORDER BY u.created_at DESC";
+
+        return $this->paginate($sql, $params, $page);
     }
 
-    public function search(string $q, int $page = 1): array
+    public function crear(array $data, string $password): int
     {
-        $like = "%$q%";
-        $sql  = 'SELECT u.*,
-                        CONCAT(u.nombre, " ", u.apellido_paterno,
-                               IF(u.apellido_materno IS NOT NULL AND u.apellido_materno != "", CONCAT(" ", u.apellido_materno), "")
-                        ) AS nombre_completo,
-                        r.nombre AS rol_nombre, e.razon_social AS empresa_nombre
-                   FROM usuarios u
-                   JOIN roles r ON r.id = u.rol_id
-              LEFT JOIN empresas e ON e.id = u.empresa_id
-                  WHERE u.nombre LIKE ? OR u.apellido_paterno LIKE ? OR u.apellido_materno LIKE ? OR u.email LIKE ?
-               ORDER BY u.created_at DESC';
-        return $this->paginate($sql, [$like, $like, $like, $like], $page);
-    }
-
-    public function updatePassword(int $id, string $hash): bool
-    {
-        return $this->execute('UPDATE usuarios SET password = ? WHERE id = ?', [$hash, $id]);
+        $data['password'] = password_hash($password, PASSWORD_BCRYPT);
+        return $this->insert($data);
     }
 }

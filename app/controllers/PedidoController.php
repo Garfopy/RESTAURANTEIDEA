@@ -1,6 +1,13 @@
 <?php
 require_once ROOT_PATH . '/app/controllers/BaseController.php';
 
+/**
+ * PedidoController — Gestión de pedidos desde el portal empresa.
+ *
+ * Todos los roles empresa pueden ver pedidos.
+ * Solo comprador/admin_empresa pueden crear (via CarritoController).
+ * Solo supervisor/admin_empresa pueden aprobar.
+ */
 class PedidoController extends BaseController
 {
     private PedidoModel $model;
@@ -8,84 +15,163 @@ class PedidoController extends BaseController
     public function __construct()
     {
         parent::__construct();
+        $this->requireEmpresa();
         $this->model = new PedidoModel();
     }
 
+    // ── Historial de pedidos ──────────────────────────────────────
     public function index(?string $p = null): void
     {
-        $rol = $_SESSION['usuario']['rol_slug'] ?? '';
         $filtros = [
-            'estado'     => $this->get('estado',''),
-            'busqueda'   => $this->get('q',''),
-            'empresa_id' => $this->get('empresa_id',''),
+            'estado' => $this->get('estado', ''),
+            'buscar' => $this->get('buscar', ''),
         ];
-        $page = max(1,(int)$this->get('page',1));
+        $page = max(1, (int)$this->get('page', 1));
 
-        if (in_array($rol, ['comprador','supervisor'])) {
-            $empresaId = $this->empresaIdActual();
-            $pedidos   = $this->model->getByEmpresa($empresaId, $filtros, $page);
-            $pageTitle = 'Mis Pedidos';
-            $ctrlSlug  = 'pedido';
-            $flash     = $this->getFlash();
-            $this->render('cliente/pedidos/index', compact('pedidos','filtros','flash','pageTitle','ctrlSlug'));
-        } else {
-            $this->requireAdmin();
-            $pedidos   = $this->model->getAll($filtros, $page);
-            $pageTitle = 'Pedidos';
-            $ctrlSlug  = 'pedido';
-            $flash     = $this->getFlash();
-            $this->render('admin/pedidos/index', compact('pedidos','filtros','flash','pageTitle','ctrlSlug'));
-        }
+        $resultado  = $this->model->listadoEmpresa($this->empresaId(), $filtros, $page);
+        $pedidos    = $resultado['data'];
+        $paginacion = $resultado;
+
+        $flash      = $this->getFlash();
+        $pageTitle  = 'Mis pedidos';
+        $activeMenu = 'pedidos';
+
+        ob_start();
+        require ROOT_PATH . '/app/views/empresa/pedidos/index.php';
+        $content = ob_get_clean();
+        require ROOT_PATH . '/app/views/empresa/layouts/main.php';
     }
 
+    // ── Detalle de un pedido ──────────────────────────────────────
     public function detalle(?string $id = null): void
     {
-        $pedido = $this->model->getDetalle((int)$id);
-        if (!$pedido) { $this->redirect('pedido/index'); }
+        $pedidoId = (int)$id;
+        if (!$pedidoId || !$this->model->verificarPertenece($pedidoId, $this->empresaId())) {
+            $this->flash('error', 'Pedido no encontrado.');
+            $this->redirect('pedido/index');
+        }
 
-        $rol = $_SESSION['usuario']['rol_slug'] ?? '';
-        if (in_array($rol, ['comprador','supervisor'])) {
-            $pageTitle = 'Pedido #' . $pedido['folio'];
-            $ctrlSlug  = 'pedido';
-            $this->render('cliente/pedidos/detalle', compact('pedido','pageTitle','ctrlSlug'));
+        $pedido = $this->model->conDetalle($pedidoId);
+
+        $flash      = $this->getFlash();
+        $pageTitle  = 'Pedido ' . $pedido['folio'];
+        $activeMenu = 'pedidos';
+
+        ob_start();
+        require ROOT_PATH . '/app/views/empresa/pedidos/detalle.php';
+        $content = ob_get_clean();
+        require ROOT_PATH . '/app/views/empresa/layouts/main.php';
+    }
+
+    // ── Vista de aprobación (supervisor + admin_empresa) ──────────
+    public function aprobacion(?string $p = null): void
+    {
+        $this->requireSupervisor();
+
+        $pendientes = $this->model->pendientesAprobacion($this->empresaId());
+
+        $flash      = $this->getFlash();
+        $pageTitle  = 'Aprobaciones pendientes';
+        $activeMenu = 'aprobacion';
+
+        ob_start();
+        require ROOT_PATH . '/app/views/empresa/pedidos/aprobacion.php';
+        $content = ob_get_clean();
+        require ROOT_PATH . '/app/views/empresa/layouts/main.php';
+    }
+
+    // ── Aprobar pedido ────────────────────────────────────────────
+    public function aprobar(?string $id = null): void
+    {
+        $this->requireSupervisor();
+
+        $pedidoId = (int)$id;
+        if (!$pedidoId || !$this->model->verificarPertenece($pedidoId, $this->empresaId())) {
+            $this->flash('error', 'Pedido no encontrado.');
+            $this->redirect('pedido/aprobacion');
+        }
+
+        $ok = $this->model->aprobar($pedidoId, $this->usuarioId());
+        if ($ok) {
+            $pedido = $this->model->find($pedidoId);
+            $this->log('aprobar_pedido', 'pedidos', "Aprobado {$pedido['folio']}");
+            $this->flash('success', 'Pedido aprobado correctamente.');
         } else {
-            $this->requireAdmin();
-            $pageTitle = 'Pedido ' . $pedido['folio'];
-            $ctrlSlug  = 'pedido';
-            $this->render('admin/pedidos/detalle', compact('pedido','pageTitle','ctrlSlug'));
-        }
-    }
-
-    public function cambiarEstado(?string $id = null): void
-    {
-        $this->requireAdmin();
-        $estado = $this->post('estado','');
-        $estados = ['pendiente','confirmado','en_preparacion','en_ruta','entregado','cancelado'];
-        if (!in_array($estado, $estados)) { $this->json(['ok'=>false,'error'=>'Estado inválido']); }
-
-        $this->model->cambiarEstado((int)$id, $estado);
-        $this->log("Pedido #$id → $estado", 'pedidos');
-        $this->json(['ok' => true, 'estado' => $estado]);
-    }
-
-    public function reordenar(?string $id = null): void
-    {
-        $pedido = $this->model->getDetalle((int)$id);
-        if (!$pedido) { $this->redirect('pedido/index'); }
-
-        // Copy items to session cart
-        $_SESSION['carrito'] = [];
-        foreach ($pedido['por_sucursal'] as $item) {
-            $key = $item['producto_id'];
-            if (!isset($_SESSION['carrito'][$key])) {
-                $_SESSION['carrito'][$key] = ['producto_id' => $key, 'sucursales' => []];
-            }
-            $sId = $item['sucursal_id'];
-            $_SESSION['carrito'][$key]['sucursales'][$sId] = ($item['cantidad']);
+            $this->flash('error', 'No se pudo aprobar. Verifica que el pedido esté pendiente.');
         }
 
-        $this->log("Reorden del pedido #$id", 'pedidos');
-        $this->flash('success', 'Pedido cargado en el carrito. Revisa y confirma.');
-        $this->redirect('carrito/index');
+        $this->redirect('pedido/aprobacion');
+    }
+
+    // ── Rechazar pedido ───────────────────────────────────────────
+    public function rechazar(?string $id = null): void
+    {
+        $this->requireSupervisor();
+
+        if (!$this->isPost()) {
+            $this->redirect('pedido/aprobacion');
+        }
+
+        $pedidoId = (int)$id;
+        $motivo   = trim($this->post('motivo', ''));
+
+        if (!$pedidoId || !$this->model->verificarPertenece($pedidoId, $this->empresaId())) {
+            $this->flash('error', 'Pedido no encontrado.');
+            $this->redirect('pedido/aprobacion');
+        }
+
+        if (empty($motivo)) {
+            $this->flash('error', 'Debes indicar el motivo del rechazo.');
+            $this->redirect('pedido/aprobacion');
+        }
+
+        $ok = $this->model->rechazar($pedidoId, $this->usuarioId(), $motivo);
+        if ($ok) {
+            $pedido = $this->model->find($pedidoId);
+            $this->log('rechazar_pedido', 'pedidos', "Rechazado {$pedido['folio']}: {$motivo}");
+            $this->flash('success', 'Pedido rechazado.');
+        } else {
+            $this->flash('error', 'No se pudo rechazar el pedido.');
+        }
+
+        $this->redirect('pedido/aprobacion');
+    }
+
+    // ── Tracking GPS en tiempo real ───────────────────────────────
+    public function tracking(?string $id = null): void
+    {
+        $pedidoId = (int)$id;
+        if (!$pedidoId || !$this->model->verificarPertenece($pedidoId, $this->empresaId())) {
+            $this->flash('error', 'Pedido no encontrado.');
+            $this->redirect('pedido/index');
+        }
+
+        $pedido   = $this->model->conDetalle($pedidoId);
+        $tracking = $this->model->getTrackingActivo($pedidoId);
+
+        $flash      = $this->getFlash();
+        $pageTitle  = 'Seguimiento — ' . $pedido['folio'];
+        $activeMenu = 'pedidos';
+
+        ob_start();
+        require ROOT_PATH . '/app/views/empresa/pedidos/tracking.php';
+        $content = ob_get_clean();
+        require ROOT_PATH . '/app/views/empresa/layouts/main.php';
+    }
+
+    // ── Cancelar pedido (solo comprador, solo si está pendiente) ──
+    public function cancelar(?string $id = null): void
+    {
+        $this->requireComprador();
+
+        $pedidoId = (int)$id;
+        if (!$pedidoId || !$this->model->verificarPertenece($pedidoId, $this->empresaId())) {
+            $this->flash('error', 'Pedido no encontrado.');
+            $this->redirect('pedido/index');
+        }
+
+        $ok = $this->model->cancelar($pedidoId, $this->usuarioId());
+        $this->flash($ok ? 'success' : 'error', $ok ? 'Pedido cancelado.' : 'No se puede cancelar este pedido.');
+        $this->redirect('pedido/detalle/' . $pedidoId);
     }
 }

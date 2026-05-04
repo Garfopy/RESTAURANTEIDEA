@@ -1,82 +1,148 @@
 <?php
 require_once ROOT_PATH . '/app/controllers/BaseController.php';
 
+/**
+ * ApiController — Endpoints AJAX (sin layout HTML)
+ * Maneja: precios escalonados, GPS tracking
+ */
 class ApiController extends BaseController
 {
-    private ProductoModel $prodModel;
-
     public function __construct()
     {
         parent::__construct();
-        $this->prodModel = new ProductoModel();
     }
 
-    public function precioEscalonado(?string $p = null): void
+    // ── Precios escalonados ───────────────────────────────────────
+    /** GET /api/precios/{producto_id}?cantidad=X */
+    public function precios(?string $productoId = null): void
     {
-        $productoId = (int)$this->get('producto_id', 0);
-        $cantidad   = (float)$this->get('cantidad', 0);
+        $this->requireEmpresa();
+        $productoId = (int)$productoId;
+        $cantidad   = (float)($this->get('cantidad', 0));
+
         if (!$productoId || $cantidad <= 0) {
-            $this->json(['error' => 'Parámetros inválidos'], 400);
+            $this->json(['error' => 'Datos inválidos'], 400);
         }
-        $precio   = $this->prodModel->getPrecioParaCantidad($productoId, $cantidad);
-        $subtotal = round($precio * $cantidad, 2);
-        $this->json(compact('precio','subtotal','cantidad'));
+
+        $model  = new ProductoModel();
+        $precio = $model->getPrecioParaCantidad($productoId, $cantidad);
+        $escalonados = $model->getEscalonados($productoId);
+
+        $this->json(['precio' => $precio, 'escalonados' => $escalonados]);
     }
 
-    public function stockProducto(?string $p = null): void
-    {
-        $productoId = (int)$this->get('producto_id', 0);
-        $invModel   = new InventarioModel();
-        $inv        = $invModel->getByProducto($productoId);
-        $this->json($inv ?? ['disponible' => 0]);
-    }
+    // ── GPS Tracking ──────────────────────────────────────────────
 
-    public function sucursalesEmpresa(?string $p = null): void
+    /** GET /api/tracking/{pedido_id} — posición actual del repartidor */
+    public function tracking(?string $pedidoId = null): void
     {
-        $empresaId = $this->empresaIdActual() ?? (int)$this->get('empresa_id', 0);
-        $sucModel  = new SucursalModel();
-        $sucursales = $sucModel->getActivasByEmpresa($empresaId);
-        $this->json($sucursales);
-    }
+        $this->requireAuth();
+        $pedidoId = (int)$pedidoId;
+        if (!$pedidoId) $this->json(['error' => 'Pedido inválido'], 400);
 
-    public function estadoPedido(?string $p = null): void
-    {
-        $folio     = $this->get('folio', '');
-        $db        = Database::getInstance();
-        $stmt      = $db->prepare('SELECT folio, estado, fecha_entrega FROM pedidos WHERE folio = ?');
-        $stmt->execute([$folio]);
+        $db = Database::getInstance();
+        $stmt = $db->prepare(
+            'SELECT rd.lat_actual, rd.lng_actual, rd.eta_minutos,
+                    rd.estado, rd.tracking_activo,
+                    s.lat AS dest_lat, s.lng AS dest_lng, s.nombre AS sucursal,
+                    p.estado AS pedido_estado
+               FROM ruta_detalle rd
+               JOIN sucursales s ON s.id = rd.sucursal_id
+               JOIN pedidos p ON p.id = rd.pedido_id
+              WHERE rd.pedido_id = ? AND rd.tracking_activo = 1
+           ORDER BY rd.orden LIMIT 1'
+        );
+        $stmt->execute([$pedidoId]);
         $row = $stmt->fetch();
-        $this->json($row ?: ['error' => 'No encontrado']);
+
+        if (!$row) {
+            // Sin tracking activo, devolver estado del pedido
+            $stmt2 = $db->prepare('SELECT estado FROM pedidos WHERE id = ?');
+            $stmt2->execute([$pedidoId]);
+            $ped = $stmt2->fetch();
+            $this->json(['tracking_activo' => false, 'estado' => $ped['estado'] ?? 'desconocido']);
+        }
+
+        $this->json([
+            'tracking_activo' => (bool)$row['tracking_activo'],
+            'lat'             => $row['lat_actual'],
+            'lng'             => $row['lng_actual'],
+            'eta_minutos'     => $row['eta_minutos'],
+            'estado'          => $row['estado'],
+            'pedido_estado'   => $row['pedido_estado'],
+            'destino'         => ['lat' => $row['dest_lat'], 'lng' => $row['dest_lng'], 'nombre' => $row['sucursal']],
+        ]);
     }
 
-    public function shellyStatus(?string $id = null): void
+    /** POST /api/tracking/actualizar — repartidor envía su posición */
+    public function actualizarTracking(?string $p = null): void
     {
-        $this->requireAdmin();
-        require_once ROOT_PATH . '/app/services/ShellyService.php';
-        try {
-            $svc    = new ShellyService((int)$id);
-            $status = $svc->getStatus();
-            $this->json($status);
-        } catch (Exception $e) {
-            $this->json(['error' => $e->getMessage()], 500);
+        $this->requireRepartidor();
+
+        $body = json_decode(file_get_contents('php://input'), true) ?? [];
+        $paradaId = (int)($body['ruta_detalle_id'] ?? 0);
+        $lat      = (float)($body['lat'] ?? 0);
+        $lng      = (float)($body['lng'] ?? 0);
+
+        if (!$paradaId || !$lat || !$lng) {
+            $this->json(['ok' => false, 'error' => 'Datos incompletos'], 400);
         }
+
+        $db = Database::getInstance();
+
+        // Calcular ETA aproximado (distancia Haversine a la sucursal)
+        $stmt = $db->prepare('SELECT s.lat, s.lng FROM ruta_detalle rd JOIN sucursales s ON s.id = rd.sucursal_id WHERE rd.id = ?');
+        $stmt->execute([$paradaId]);
+        $dest = $stmt->fetch();
+
+        $etaMinutos = null;
+        if ($dest && $dest['lat'] && $dest['lng']) {
+            $distKm = $this->haversine($lat, $lng, (float)$dest['lat'], (float)$dest['lng']);
+            $etaMinutos = (int)round(($distKm / 30) * 60); // ~30 km/h promedio urbano
+        }
+
+        $db->prepare(
+            'UPDATE ruta_detalle SET lat_actual = ?, lng_actual = ?, eta_minutos = ?, tracking_activo = 1 WHERE id = ?'
+        )->execute([$lat, $lng, $etaMinutos, $paradaId]);
+
+        $this->json(['ok' => true, 'eta_minutos' => $etaMinutos]);
     }
 
-    public function shellyToggle(?string $id = null): void
+    /** POST /api/tracking/iniciar */
+    public function iniciarTracking(?string $paradaId = null): void
     {
-        $this->requireAdmin();
-        require_once ROOT_PATH . '/app/services/ShellyService.php';
-        $action = $this->post('action', 'toggle');
-        try {
-            $svc = new ShellyService((int)$id);
-            $ok  = match($action) {
-                'on'  => $svc->turnOn(),
-                'off' => $svc->turnOff(),
-                default => $svc->toggle(),
-            };
-            $this->json(['ok' => $ok]);
-        } catch (Exception $e) {
-            $this->json(['error' => $e->getMessage()], 500);
-        }
+        $this->requireRepartidor();
+        $paradaId = (int)$paradaId;
+        if (!$paradaId) $this->json(['ok' => false], 400);
+
+        Database::getInstance()
+            ->prepare('UPDATE ruta_detalle SET tracking_activo = 1 WHERE id = ?')
+            ->execute([$paradaId]);
+
+        $this->json(['ok' => true]);
+    }
+
+    /** POST /api/tracking/finalizar/{paradaId} */
+    public function finalizarTracking(?string $paradaId = null): void
+    {
+        $this->requireRepartidor();
+        $paradaId = (int)$paradaId;
+        if (!$paradaId) $this->json(['ok' => false], 400);
+
+        Database::getInstance()
+            ->prepare('UPDATE ruta_detalle SET tracking_activo = 0 WHERE id = ?')
+            ->execute([$paradaId]);
+
+        $this->json(['ok' => true]);
+    }
+
+    // ── Fórmula Haversine (distancia entre dos coordenadas en km) ─
+    private function haversine(float $lat1, float $lng1, float $lat2, float $lng2): float
+    {
+        $R   = 6371;
+        $dLat = deg2rad($lat2 - $lat1);
+        $dLng = deg2rad($lng2 - $lng1);
+        $a = sin($dLat/2)**2 + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLng/2)**2;
+        return $R * 2 * atan2(sqrt($a), sqrt(1 - $a));
     }
 }

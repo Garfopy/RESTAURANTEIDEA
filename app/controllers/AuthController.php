@@ -14,7 +14,7 @@ class AuthController extends BaseController
     public function login(?string $p = null): void
     {
         if (isset($_SESSION['usuario'])) {
-            $this->redirectPorRol($_SESSION['usuario']['rol_slug'] ?? '');
+            $this->redirectSegunRol($_SESSION['usuario']['rol_slug'] ?? '');
         }
         $pageTitle = 'Iniciar Sesión';
         $flash     = $this->getFlash();

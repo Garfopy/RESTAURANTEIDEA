@@ -3,58 +3,46 @@ class EmpresaModel extends BaseModel
 {
     protected string $table = 'empresas';
 
-    public function getAll(int $page = 1, array $filtros = []): array
+    public function listado(array $filtros = [], int $page = 1): array
     {
-        $where  = [];
+        $where  = ['1=1'];
         $params = [];
 
-        if (!empty($filtros['busqueda'])) {
-            $where[]  = '(e.razon_social LIKE ? OR e.rfc LIKE ? OR e.email LIKE ?)';
-            $like     = '%' . $filtros['busqueda'] . '%';
-            $params   = array_merge($params, [$like, $like, $like]);
-        }
-        if (isset($filtros['activo']) && $filtros['activo'] !== '') {
+        if (isset($filtros['activo'])) {
             $where[]  = 'e.activo = ?';
-            $params[] = $filtros['activo'];
+            $params[] = (int)$filtros['activo'];
+        }
+        if (!empty($filtros['buscar'])) {
+            $where[]  = '(e.razon_social LIKE ? OR e.rfc LIKE ? OR e.email LIKE ?)';
+            $t = '%' . $filtros['buscar'] . '%';
+            $params = array_merge($params, [$t, $t, $t]);
         }
 
-        $sqlWhere = $where ? 'WHERE ' . implode(' AND ', $where) : '';
+        $sqlWhere = 'WHERE ' . implode(' AND ', $where);
         $sql = "SELECT e.*,
-                       u.nombre AS vendedor_nombre,
-                       (SELECT COUNT(*) FROM sucursales s WHERE s.empresa_id = e.id AND s.activo=1) AS total_sucursales,
-                       (SELECT COUNT(*) FROM pedidos p WHERE p.empresa_id = e.id) AS total_pedidos
+                       COUNT(DISTINCT u.id) AS total_usuarios,
+                       COUNT(DISTINCT s.id) AS total_sucursales
                   FROM empresas e
-             LEFT JOIN usuarios u ON u.id = e.vendedor_asignado
+             LEFT JOIN usuarios u  ON u.empresa_id = e.id AND u.activo = 1
+             LEFT JOIN sucursales s ON s.empresa_id = e.id AND s.activo = 1
                   $sqlWhere
+              GROUP BY e.id
               ORDER BY e.created_at DESC";
+
         return $this->paginate($sql, $params, $page);
     }
 
-    public function getConSucursales(int $id): ?array
-    {
-        $empresa = $this->find($id);
-        if (!$empresa) return null;
-        $empresa['sucursales'] = $this->query(
-            'SELECT * FROM sucursales WHERE empresa_id = ? ORDER BY nombre',
-            [$id]
-        );
-        return $empresa;
-    }
-
-    public function toggleCredito(int $id, int $estado): bool
-    {
-        return $this->execute('UPDATE empresas SET credito_activo = ? WHERE id = ?', [$estado, $id]);
-    }
-
-    public function getEstadisticas(): array
+    public function conEstadisticas(int $id): ?array
     {
         return $this->queryOne(
-            'SELECT
-               COUNT(*) AS total,
-               SUM(activo = 1) AS activos,
-               SUM(activo = 0) AS inactivos,
-               SUM(credito_activo = 1) AS con_credito
-             FROM empresas'
-        ) ?? [];
+            'SELECT e.*,
+                    COUNT(DISTINCT p.id) AS total_pedidos,
+                    COALESCE(SUM(p.total),0) AS venta_total
+               FROM empresas e
+          LEFT JOIN pedidos p ON p.empresa_id = e.id AND p.estado != "cancelado"
+              WHERE e.id = ?
+           GROUP BY e.id',
+            [$id]
+        );
     }
 }

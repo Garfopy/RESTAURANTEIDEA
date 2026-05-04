@@ -4,26 +4,27 @@ class LogModel extends BaseModel
     protected string $table = 'action_logs';
 
     public function registrar(
-        ?int $usuarioId,
-        string $accion,
-        string $modulo = '',
-        string $descripcion = ''
+        ?int    $usuarioId,
+        string  $rol        = '',
+        ?int    $empresaId  = null,
+        string  $accion     = '',
+        string  $modulo     = '',
+        string  $descripcion = ''
     ): void {
         $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
-        $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
         $this->execute(
-            'INSERT INTO action_logs (usuario_id, accion, modulo, descripcion, ip, user_agent)
-             VALUES (?, ?, ?, ?, ?, ?)',
-            [$usuarioId, $accion, $modulo, $descripcion, $ip, substr($ua, 0, 255)]
+            'INSERT INTO action_logs (usuario_id, rol, empresa_id, accion, modulo, descripcion, ip)
+             VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [$usuarioId, $rol, $empresaId, $accion, $modulo, $descripcion, $ip]
         );
     }
 
-    public function registrarError(string $nivel, string $mensaje, string $archivo = '', int $linea = 0, string $trace = ''): void
+    public function registrarError(string $nivel, string $mensaje, string $archivo = '', int $linea = 0, ?array $contexto = null): void
     {
         $this->execute(
-            'INSERT INTO error_logs (nivel, mensaje, archivo, linea, trace)
+            'INSERT INTO error_logs (nivel, mensaje, archivo, linea, contexto)
              VALUES (?, ?, ?, ?, ?)',
-            [$nivel, $mensaje, $archivo, $linea, $trace]
+            [$nivel, $mensaje, $archivo, $linea, $contexto ? json_encode($contexto) : null]
         );
     }
 

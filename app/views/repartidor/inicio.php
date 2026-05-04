@@ -1,85 +1,120 @@
-<?php
-// Repartidor views use a dark layout — include a dark header
-include ROOT_PATH . '/app/views/components/header_repartidor.php';
-?>
-<div class="rep-page">
-  <!-- Top bar -->
-  <div class="rep-topbar">
-    <div>
-      <div class="rep-greeting">Buenos días,</div>
-      <div class="rep-name"><?= htmlspecialchars(trim(($_SESSION['usuario']['nombre'] ?? '') . ' ' . ($_SESSION['usuario']['apellido_paterno'] ?? ''))) ?></div>
-    </div>
-    <?php $repInicial = strtoupper(mb_substr($_SESSION['usuario']['nombre'] ?? 'R', 0, 1, 'UTF-8')); ?>
-    <div style="width:40px;height:40px;border-radius:50%;background:#C8102E;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;overflow:hidden">
-      <?php if (!empty($_SESSION['usuario']['avatar'])): ?>
-      <img src="<?= BASE_URL . htmlspecialchars($_SESSION['usuario']['avatar']) ?>" style="width:100%;height:100%;object-fit:cover" alt="">
-      <?php else: ?>
-      <?= $repInicial ?>
-      <?php endif; ?>
-    </div>
-  </div>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Mis entregas — CarniHub</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    body { background: #111827; color: #F9FAFB; font-family: 'Inter', sans-serif; min-height: 100vh; margin: 0; }
+    .header { background: #1F2937; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #374151; }
+    .card { background: #1F2937; border-radius: 12px; margin-bottom: 12px; overflow: hidden; }
+    .card-parada { padding: 16px; border-left: 4px solid #374151; }
+    .card-parada.pendiente { border-left-color: #F59E0B; }
+    .card-parada.entregado { border-left-color: #10B981; }
+    .card-parada.fallido   { border-left-color: #EF4444; }
+    .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: .75rem; font-weight: 600; }
+    .badge-p { background: #78350F; color: #FCD34D; }
+    .badge-e { background: #064E3B; color: #6EE7B7; }
+    .badge-f { background: #7F1D1D; color: #FCA5A5; }
+    .btn-primary { background: #C8102E; color: #fff; padding: 14px; border: none; border-radius: 10px; font-size: 1rem; font-weight: 700; cursor: pointer; width: 100%; text-decoration: none; display: block; text-align: center; }
+    .btn-secondary { background: #374151; color: #F9FAFB; padding: 12px; border: none; border-radius: 10px; font-size: .9rem; font-weight: 600; cursor: pointer; width: 100%; text-decoration: none; display: block; text-align: center; }
+  </style>
+</head>
+<body>
 
-  <!-- Vehículo asignado -->
-  <?php if (!empty($chofer['placa'])): ?>
-  <div class="rep-card" style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
-    <div style="font-size:1.5rem">🚛</div>
-    <div>
-      <div style="font-size:.75rem;color:#94A3B8">Vehículo asignado</div>
-      <div style="font-weight:700"><?= htmlspecialchars($chofer['marca'] . ' ' . $chofer['modelo']) ?></div>
-      <div style="font-size:.8rem;color:#94A3B8"><?= htmlspecialchars($chofer['placa']) ?></div>
-    </div>
+<div class="header">
+  <div>
+    <div style="font-weight:800;font-size:1rem">CarniHub Repartidor</div>
+    <div style="font-size:.75rem;color:#9CA3AF"><?= htmlspecialchars($_SESSION['usuario']['nombre'] ?? '') ?></div>
   </div>
-  <?php endif; ?>
-
-  <!-- KPIs -->
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
-    <div class="rep-card" style="text-align:center">
-      <div style="font-size:2rem;font-weight:800;color:#C8102E"><?= $pendientes ?></div>
-      <div style="font-size:.75rem;color:#94A3B8">Pendientes</div>
-    </div>
-    <div class="rep-card" style="text-align:center">
-      <div style="font-size:2rem;font-weight:800;color:#10B981"><?= $entregados ?></div>
-      <div style="font-size:.75rem;color:#94A3B8">Entregados</div>
-    </div>
-  </div>
-
-  <?php if ($rutaHoy): ?>
-  <!-- Ruta activa -->
-  <div class="rep-card" style="margin-bottom:12px">
-    <div style="font-size:.75rem;color:#94A3B8;margin-bottom:4px">Ruta de hoy</div>
-    <div style="font-weight:700"><?= htmlspecialchars($rutaHoy['nombre']) ?></div>
-    <div style="font-size:.8rem;color:#94A3B8"><?= $rutaHoy['total_entregas'] ?> entregas · <?= $rutaHoy['km_estimados'] ?? '—' ?> km est.</div>
-    <a href="<?= BASE_URL ?>repartidor/entregas" class="rep-btn-primary" style="display:block;text-align:center;margin-top:10px;text-decoration:none;padding:10px;border-radius:8px">
-      Ver mis entregas →
-    </a>
-  </div>
-  <?php else: ?>
-  <div class="rep-card" style="text-align:center;padding:32px;margin-bottom:12px">
-    <div style="font-size:2rem;margin-bottom:8px">📭</div>
-    <div style="color:#64748B">Sin ruta asignada para hoy</div>
-  </div>
-  <?php endif; ?>
-
-  <!-- Nav rápido -->
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-    <a href="<?= BASE_URL ?>repartidor/mapa" class="rep-card" style="text-align:center;text-decoration:none;padding:16px">
-      <div style="font-size:1.5rem">🗺️</div>
-      <div style="font-size:.8rem;color:#94A3B8;margin-top:4px">Mapa</div>
-    </a>
-    <a href="<?= BASE_URL ?>repartidor/historial" class="rep-card" style="text-align:center;text-decoration:none;padding:16px">
-      <div style="font-size:1.5rem">📋</div>
-      <div style="font-size:.8rem;color:#94A3B8;margin-top:4px">Historial</div>
-    </a>
-  </div>
+  <a href="<?= BASE_URL ?>auth/logout" style="font-size:.8rem;color:#9CA3AF;text-decoration:none">Salir</a>
 </div>
 
-<!-- Bottom nav repartidor -->
-<nav class="rep-bottom-nav">
-  <a href="<?= BASE_URL ?>repartidor/inicio" class="rep-nav-item active">🏠<span>Inicio</span></a>
-  <a href="<?= BASE_URL ?>repartidor/entregas" class="rep-nav-item">📦<span>Entregas</span></a>
-  <a href="<?= BASE_URL ?>repartidor/mapa" class="rep-nav-item">🗺️<span>Mapa</span></a>
-  <a href="<?= BASE_URL ?>repartidor/historial" class="rep-nav-item">📋<span>Historial</span></a>
-  <a href="<?= BASE_URL ?>repartidor/perfil" class="rep-nav-item">👤<span>Perfil</span></a>
-</nav>
+<div style="padding:16px">
+  <?php if (!empty($flash)): ?>
+  <div style="padding:12px;border-radius:8px;margin-bottom:12px;<?= $flash['type']==='error' ? 'background:#7F1D1D;color:#FCA5A5' : 'background:#064E3B;color:#6EE7B7' ?>">
+    <?= htmlspecialchars($flash['message']) ?>
+  </div>
+  <?php endif; ?>
 
-<?php include ROOT_PATH . '/app/views/components/footer_repartidor.php'; ?>
+  <h1 style="font-size:1.1rem;font-weight:800;margin-bottom:4px">Entregas de hoy</h1>
+  <p style="font-size:.8rem;color:#9CA3AF;margin-bottom:16px"><?= date('d \d\e F \d\e Y') ?></p>
+
+  <?php if (!$rutaHoy): ?>
+    <div style="text-align:center;padding:40px 20px;color:#6B7280">
+      <div style="font-size:2.5rem;margin-bottom:12px">📦</div>
+      <p style="font-weight:600">No tienes entregas asignadas para hoy.</p>
+      <p style="font-size:.85rem;margin-top:4px">Contacta a tu empresa para más información.</p>
+      <a href="<?= BASE_URL ?>repartidor/historial" class="btn-secondary" style="margin-top:20px;display:inline-block;width:auto;padding:10px 24px">Ver historial</a>
+    </div>
+
+  <?php else: ?>
+    <!-- Resumen de ruta -->
+    <div class="card" style="padding:14px 16px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-size:.75rem;color:#9CA3AF;margin-bottom:2px">Progreso de ruta</div>
+        <div style="font-weight:800;font-size:1rem"><?= (int)$rutaHoy['entregadas'] ?> / <?= (int)$rutaHoy['total_paradas'] ?> entregas</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:.75rem;color:#9CA3AF;margin-bottom:2px">Estado</div>
+        <?php
+        $eBg = $rutaHoy['estado'] === 'en_curso' ? '#064E3B' : '#1E3A5F';
+        $eC  = $rutaHoy['estado'] === 'en_curso' ? '#6EE7B7' : '#93C5FD';
+        ?>
+        <span class="badge" style="background:<?= $eBg ?>;color:<?= $eC ?>"><?= htmlspecialchars($rutaHoy['estado']) ?></span>
+      </div>
+    </div>
+
+    <!-- Lista de paradas -->
+    <?php foreach ($paradas as $i => $parada): ?>
+    <div class="card">
+      <div class="card-parada <?= $parada['estado'] ?>">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+          <div>
+            <div style="font-weight:700;font-size:.95rem"><?= $i+1 ?>. <?= htmlspecialchars($parada['sucursal_nombre']) ?></div>
+            <div style="font-size:.8rem;color:#9CA3AF;margin-top:2px"><?= htmlspecialchars($parada['empresa_nombre']) ?></div>
+          </div>
+          <?php
+          $bClass = match($parada['estado']) {
+            'entregado' => 'badge-e',
+            'fallido'   => 'badge-f',
+            default     => 'badge-p',
+          };
+          $bLabel = match($parada['estado']) {
+            'entregado' => 'Entregado',
+            'fallido'   => 'Fallido',
+            default     => 'Pendiente',
+          };
+          ?>
+          <span class="badge <?= $bClass ?>"><?= $bLabel ?></span>
+        </div>
+        <div style="font-size:.8rem;color:#D1D5DB;margin-bottom:10px">
+          <span>📍 </span><?= htmlspecialchars($parada['direccion']) ?>
+        </div>
+        <div style="font-size:.8rem;color:#9CA3AF;margin-bottom:10px">
+          Pedido: <span style="color:#F9FAFB;font-weight:600"><?= htmlspecialchars($parada['pedido_folio']) ?></span>
+        </div>
+        <?php if ($parada['estado'] === 'pendiente'): ?>
+        <a href="<?= BASE_URL ?>repartidor/entrega/<?= $parada['id'] ?>" class="btn-primary">
+          Registrar entrega
+        </a>
+        <?php elseif ($parada['hora_entrega']): ?>
+        <div style="font-size:.75rem;color:#6EE7B7;text-align:center;margin-top:4px">
+          Entregado a las <?= date('H:i', strtotime($parada['hora_entrega'])) ?>
+        </div>
+        <?php endif; ?>
+      </div>
+    </div>
+    <?php endforeach; ?>
+
+    <a href="<?= BASE_URL ?>repartidor/historial" class="btn-secondary" style="margin-top:8px">
+      Ver historial de entregas
+    </a>
+  <?php endif; ?>
+</div>
+
+</body>
+</html>

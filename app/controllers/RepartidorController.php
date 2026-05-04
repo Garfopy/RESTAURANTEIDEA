@@ -1,158 +1,205 @@
 <?php
-require_once BASE_PATH . '/app/controllers/BaseController.php';
-require_once BASE_PATH . '/app/models/UsuarioModel.php';
-require_once BASE_PATH . '/app/models/PedidoModel.php';
-require_once BASE_PATH . '/app/models/EntregaModel.php';
-require_once BASE_PATH . '/app/models/RutaModel.php';
-require_once BASE_PATH . '/app/models/LogModel.php';
+require_once ROOT_PATH . '/app/controllers/BaseController.php';
 
-class RepartidorController extends BaseController {
+class RepartidorController extends BaseController
+{
+    private string $colorPrimary = '#111827';
 
-    public function __construct() {
-        $this->requireRole(['repartidor', 'superadmin']);
+    public function __construct()
+    {
+        parent::__construct();
+        $this->requireRepartidor();
     }
 
-    public function inicio($param = null) {
-        $chofer = $this->getChoferActual();
-        $modelo = new RutaModel();
-        $rutaHoy = $modelo->getRutaHoyChofer($chofer['id'] ?? 0);
-        $pendientes = 0;
-        $entregados = 0;
+    public function index(?string $p = null): void
+    {
+        $this->redirect('repartidor/inicio');
+    }
+
+    public function inicio(?string $p = null): void
+    {
+        $repartidorId = $this->usuarioId();
+        $db = Database::getInstance();
+
+        // Ruta del día asignada a este repartidor
+        $stmt = $db->prepare(
+            "SELECT r.*, COUNT(rd.id) AS total_paradas,
+                    SUM(CASE WHEN rd.estado = 'entregado' THEN 1 ELSE 0 END) AS entregadas
+               FROM rutas r
+               JOIN ruta_detalle rd ON rd.ruta_id = r.id
+              WHERE r.repartidor_id = ? AND r.fecha = CURDATE() AND r.estado IN ('planificada','en_curso')
+           GROUP BY r.id
+           ORDER BY r.estado DESC LIMIT 1"
+        );
+        $stmt->execute([$repartidorId]);
+        $rutaHoy = $stmt->fetch() ?: null;
+
+        $paradas = [];
         if ($rutaHoy) {
-            $detalle = $modelo->getDetalle($rutaHoy['id']);
-            foreach ($detalle as $d) {
-                if ($d['estado'] === 'entregado') $entregados++;
-                else $pendientes++;
+            $stmt = $db->prepare(
+                "SELECT rd.*, s.nombre AS sucursal_nombre, s.direccion, s.lat, s.lng,
+                        p.folio AS pedido_folio, e.razon_social AS empresa_nombre
+                   FROM ruta_detalle rd
+                   JOIN sucursales s ON s.id = rd.sucursal_id
+                   JOIN pedidos p ON p.id = rd.pedido_id
+                   JOIN empresas e ON e.id = p.empresa_id
+                  WHERE rd.ruta_id = ?
+               ORDER BY rd.orden"
+            );
+            $stmt->execute([$rutaHoy['id']]);
+            $paradas = $stmt->fetchAll();
+        }
+
+        $flash     = $this->getFlash();
+        $pageTitle = 'Mis entregas de hoy';
+
+        require ROOT_PATH . '/app/views/repartidor/inicio.php';
+    }
+
+    public function entrega(?string $paradaId = null): void
+    {
+        if (!$paradaId) {
+            $this->redirect('repartidor/inicio');
+        }
+
+        $repartidorId = $this->usuarioId();
+        $db = Database::getInstance();
+
+        $stmt = $db->prepare(
+            "SELECT rd.*, s.nombre AS sucursal_nombre, s.direccion, s.lat, s.lng,
+                    p.folio, p.notas, e.razon_social AS empresa_nombre
+               FROM ruta_detalle rd
+               JOIN rutas r ON r.id = rd.ruta_id
+               JOIN sucursales s ON s.id = rd.sucursal_id
+               JOIN pedidos p ON p.id = rd.pedido_id
+               JOIN empresas e ON e.id = p.empresa_id
+              WHERE rd.id = ? AND r.repartidor_id = ?"
+        );
+        $stmt->execute([$paradaId, $repartidorId]);
+        $parada = $stmt->fetch();
+
+        if (!$parada) {
+            $this->redirect('repartidor/inicio');
+        }
+
+        $flash     = $this->getFlash();
+        $pageTitle = 'Detalle de entrega';
+
+        require ROOT_PATH . '/app/views/repartidor/entrega.php';
+    }
+
+    public function confirmarEntrega(?string $paradaId = null): void
+    {
+        if (!$this->isPost() || !$paradaId) {
+            $this->redirect('repartidor/inicio');
+        }
+
+        $repartidorId = $this->usuarioId();
+        $db = Database::getInstance();
+
+        // Verificar que la parada pertenece a este repartidor
+        $stmt = $db->prepare(
+            'SELECT rd.id FROM ruta_detalle rd
+               JOIN rutas r ON r.id = rd.ruta_id
+              WHERE rd.id = ? AND r.repartidor_id = ?'
+        );
+        $stmt->execute([$paradaId, $repartidorId]);
+        if (!$stmt->fetch()) {
+            $this->redirect('repartidor/inicio');
+        }
+
+        // Procesar firma (base64 → archivo)
+        $firmaPath = null;
+        if (!empty($_POST['firma_data'])) {
+            $firmaPath = $this->guardarFirma($_POST['firma_data'], $paradaId);
+        }
+
+        // Procesar foto (upload)
+        $fotoPath = null;
+        if (!empty($_FILES['foto']['tmp_name'])) {
+            $fotoPath = $this->guardarFoto($_FILES['foto'], $paradaId);
+        }
+
+        // Guardar evidencia
+        $db->prepare(
+            'INSERT INTO evidencias_entrega (ruta_detalle_id, nombre_receptor, firma_path, foto_path)
+             VALUES (?, ?, ?, ?)'
+        )->execute([$paradaId, $this->post('nombre_receptor'), $firmaPath, $fotoPath]);
+
+        // Actualizar estado de parada
+        $db->prepare(
+            "UPDATE ruta_detalle SET estado = 'entregado', hora_entrega = NOW(), tracking_activo = 0 WHERE id = ?"
+        )->execute([$paradaId]);
+
+        // Actualizar estado del pedido si todas las paradas están entregadas
+        $stmt = $db->prepare(
+            'SELECT pedido_id FROM ruta_detalle WHERE id = ?'
+        );
+        $stmt->execute([$paradaId]);
+        $pedidoId = (int)($stmt->fetch()['pedido_id'] ?? 0);
+
+        if ($pedidoId) {
+            $stmt2 = $db->prepare(
+                "SELECT COUNT(*) FROM ruta_detalle WHERE pedido_id = ? AND estado != 'entregado'"
+            );
+            $stmt2->execute([$pedidoId]);
+            if ((int)$stmt2->fetchColumn() === 0) {
+                $db->prepare("UPDATE pedidos SET estado = 'entregado' WHERE id = ?")
+                   ->execute([$pedidoId]);
             }
         }
-        $this->render('repartidor/inicio', [
-            'chofer'     => $chofer,
-            'rutaHoy'    => $rutaHoy,
-            'pendientes' => $pendientes,
-            'entregados' => $entregados,
-        ]);
+
+        $this->log('Entrega confirmada', 'repartidor', "Parada ID: $paradaId");
+        $this->flash('success', 'Entrega registrada correctamente.');
+        $this->redirect('repartidor/inicio');
     }
 
-    public function entregas($param = null) {
-        $chofer = $this->getChoferActual();
-        $modelo = new RutaModel();
-        $rutaHoy = $modelo->getRutaHoyChofer($chofer['id'] ?? 0);
-        $entregas = $rutaHoy ? $modelo->getDetalle($rutaHoy['id']) : [];
-        $this->render('repartidor/entregas', [
-            'chofer'   => $chofer,
-            'ruta'     => $rutaHoy,
-            'entregas' => $entregas,
-        ]);
+    public function historial(?string $p = null): void
+    {
+        $repartidorId = $this->usuarioId();
+        $db = Database::getInstance();
+
+        $stmt = $db->prepare(
+            "SELECT rd.*, s.nombre AS sucursal_nombre, p.folio,
+                    r.fecha, e.razon_social AS empresa_nombre
+               FROM ruta_detalle rd
+               JOIN rutas r ON r.id = rd.ruta_id
+               JOIN sucursales s ON s.id = rd.sucursal_id
+               JOIN pedidos p ON p.id = rd.pedido_id
+               JOIN empresas e ON e.id = p.empresa_id
+              WHERE r.repartidor_id = ? AND rd.estado = 'entregado'
+           ORDER BY rd.hora_entrega DESC LIMIT 50"
+        );
+        $stmt->execute([$repartidorId]);
+        $historial = $stmt->fetchAll();
+
+        $flash     = $this->getFlash();
+        $pageTitle = 'Historial de entregas';
+
+        require ROOT_PATH . '/app/views/repartidor/historial.php';
     }
 
-    public function detalle($id = null) {
-        $modelo = new RutaModel();
-        $entrega = $modelo->getDetalleItem($id);
-        if (!$entrega) { $this->redirect('repartidor/entregas'); return; }
-
-        $pedidoMod = new PedidoModel();
-        $pedido = $pedidoMod->getDetalle($entrega['pedido_id']);
-        $this->render('repartidor/detalle_entrega', [
-            'entrega' => $entrega,
-            'pedido'  => $pedido,
-        ]);
+    private function guardarFirma(string $base64, string $paradaId): ?string
+    {
+        if (!str_starts_with($base64, 'data:image/')) return null;
+        $data   = explode(',', $base64)[1] ?? '';
+        $bytes  = base64_decode($data);
+        $nombre = 'firma_' . $paradaId . '_' . time() . '.png';
+        $ruta   = UPLOAD_PATH . 'firmas/';
+        if (!is_dir($ruta)) mkdir($ruta, 0755, true);
+        file_put_contents($ruta . $nombre, $bytes);
+        return UPLOAD_URL . 'firmas/' . $nombre;
     }
 
-    public function iniciarEntrega($id = null) {
-        $this->json(['ok' => false, 'error' => 'No implemented']);
-        $modelo = new RutaModel();
-        $resultado = $modelo->cambiarEstadoDetalle($id, 'en_ruta');
-        $this->log('iniciar_entrega', 'repartidor', "Entrega #$id iniciada");
-        $this->json(['ok' => (bool)$resultado]);
-    }
-
-    public function completarEntrega($param = null) {
-        if (!$this->isPost()) { $this->redirect('repartidor/entregas'); return; }
-
-        $detalleId    = $this->post('detalle_id');
-        $receptorNombre = $this->post('receptor_nombre','');
-        $firmaData    = $this->post('firma_data','');
-        $fotoData     = $this->post('foto_data','');
-
-        $modelo = new RutaModel();
-
-        $archivos = [];
-        $uploadDir = BASE_PATH . '/public/uploads/evidencias/';
-        if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
-
-        if ($firmaData) {
-            $firmaFile = 'firma_' . $detalleId . '_' . time() . '.png';
-            $firmaBase64 = preg_replace('/^data:image\/\w+;base64,/', '', $firmaData);
-            file_put_contents($uploadDir . $firmaFile, base64_decode($firmaBase64));
-            $archivos['firma'] = $firmaFile;
-        }
-
-        if ($fotoData) {
-            $fotoFile = 'foto_' . $detalleId . '_' . time() . '.jpg';
-            $fotoBase64 = preg_replace('/^data:image\/\w+;base64,/', '', $fotoData);
-            file_put_contents($uploadDir . $fotoFile, base64_decode($fotoBase64));
-            $archivos['foto'] = $fotoFile;
-        }
-
-        $modelo->completarEntrega($detalleId, $receptorNombre, $archivos);
-        $this->log('completar_entrega', 'repartidor', "Entrega #$detalleId completada por $receptorNombre");
-        $this->json(['ok' => true]);
-    }
-
-    public function mapa($param = null) {
-        $chofer = $this->getChoferActual();
-        $modelo = new RutaModel();
-        $rutaHoy = $modelo->getRutaHoyChofer($chofer['id'] ?? 0);
-        $entregas = $rutaHoy ? $modelo->getDetalle($rutaHoy['id']) : [];
-        $this->render('repartidor/mapa', [
-            'ruta'     => $rutaHoy,
-            'entregas' => $entregas,
-        ]);
-    }
-
-    public function historial($param = null) {
-        $chofer = $this->getChoferActual();
-        $modelo = new RutaModel();
-        $rutas = $modelo->getRutasPorChofer($chofer['id'] ?? 0, 30);
-        $this->render('repartidor/historial', [
-            'chofer' => $chofer,
-            'rutas'  => $rutas,
-        ]);
-    }
-
-    public function perfil($param = null) {
-        $usuMod = new UsuarioModel();
-        $usuario = $usuMod->find($_SESSION['usuario']['id']);
-        $chofer = $this->getChoferActual();
-
-        if ($this->isPost()) {
-            $nombre           = trim($this->post('nombre', ''));
-            $apellido_paterno = trim($this->post('apellido_paterno', ''));
-            $apellido_materno = trim($this->post('apellido_materno', '')) ?: null;
-            $email            = trim($this->post('email', ''));
-            $updateData = ['nombre' => $nombre, 'apellido_paterno' => $apellido_paterno,
-                           'apellido_materno' => $apellido_materno, 'email' => $email];
-            $usuMod->update($_SESSION['usuario']['id'], $updateData);
-            $_SESSION['usuario']['nombre']           = $nombre;
-            $_SESSION['usuario']['apellido_paterno'] = $apellido_paterno;
-            $_SESSION['usuario']['apellido_materno'] = $apellido_materno;
-            $this->flash('Perfil actualizado', 'success');
-            $this->redirect('repartidor/perfil');
-            return;
-        }
-
-        $this->render('repartidor/perfil', [
-            'usuario' => $usuario,
-            'chofer'  => $chofer,
-        ]);
-    }
-
-    // ── helpers ──
-
-    private function getChoferActual() {
-        $db = \Database::getInstance();
-        $stmt = $db->prepare('SELECT c.*, v.placa, v.modelo, v.marca FROM choferes c LEFT JOIN vehiculos v ON v.id = c.vehiculo_id WHERE c.usuario_id = ? LIMIT 1');
-        $stmt->execute([$_SESSION['usuario']['id']]);
-        return $stmt->fetch(\PDO::FETCH_ASSOC) ?: [];
+    private function guardarFoto(array $file, string $paradaId): ?string
+    {
+        $ext    = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        $allow  = ['jpg','jpeg','png','webp'];
+        if (!in_array($ext, $allow, true)) return null;
+        $nombre = 'foto_' . $paradaId . '_' . time() . '.' . $ext;
+        $ruta   = UPLOAD_PATH . 'entregas/';
+        if (!is_dir($ruta)) mkdir($ruta, 0755, true);
+        move_uploaded_file($file['tmp_name'], $ruta . $nombre);
+        return UPLOAD_URL . 'entregas/' . $nombre;
     }
 }

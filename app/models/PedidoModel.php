@@ -5,48 +5,58 @@ class PedidoModel extends BaseModel
 
     public function generarFolio(): string
     {
-        $year  = date('Y');
-        $row   = $this->queryOne(
+        $anio = date('Y');
+        $row  = $this->queryOne(
             "SELECT MAX(CAST(SUBSTRING_INDEX(folio, '-', -1) AS UNSIGNED)) AS ultimo
-               FROM pedidos WHERE folio LIKE 'CHB-$year-%'"
+               FROM pedidos WHERE folio LIKE ?",
+            ["CHB-{$anio}-%"]
         );
-        $next = ($row && $row['ultimo']) ? (int)$row['ultimo'] + 1 : 1;
-        return sprintf('CHB-%s-%04d', $year, $next);
+        $num = (int)($row['ultimo'] ?? 0) + 1;
+        return sprintf('CHB-%s-%04d', $anio, $num);
     }
 
-    public function crearConDetalle(array $pedido, array $detalles, array $porSucursal): int
+    /**
+     * Crea pedido + detalle + pedido_sucursal en una transacción.
+     *
+     * $pedidoData: campos directos para la tabla pedidos (sin folio, subtotal, total).
+     * $items: [['producto_id'=>, 'cantidad'=>, 'precio_unit'=>, 'subtotal'=>], ...]
+     * $sucursalesIds: [sucursal_id, ...] — sucursales involucradas
+     */
+    public function crear(array $pedidoData, array $items, array $sucursalesIds): int
     {
         $this->db->beginTransaction();
         try {
-            $pedido['folio'] = $this->generarFolio();
-            $pedidoId = $this->insert($pedido);
+            $subtotal = array_sum(array_column($items, 'subtotal'));
+            $pedidoData['folio']    = $this->generarFolio();
+            $pedidoData['subtotal'] = $subtotal;
+            $pedidoData['total']    = $subtotal;
 
-            foreach ($detalles as $d) {
-                $d['pedido_id'] = $pedidoId;
-                $stmtD = $this->db->prepare(
-                    'INSERT INTO pedido_detalle (pedido_id, producto_id, cantidad, precio_unitario, subtotal)
-                     VALUES (?, ?, ?, ?, ?)'
+            $pedidoId = $this->insert($pedidoData);
+
+            foreach ($items as $item) {
+                $this->execute(
+                    'INSERT INTO pedido_detalle (pedido_id, producto_id, cantidad, precio_unit, subtotal)
+                     VALUES (?, ?, ?, ?, ?)',
+                    [$pedidoId, $item['producto_id'], $item['cantidad'], $item['precio_unit'], $item['subtotal']]
                 );
-                $stmtD->execute([$pedidoId, $d['producto_id'], $d['cantidad'], $d['precio_unitario'], $d['subtotal']]);
             }
 
-            foreach ($porSucursal as $ps) {
-                $stmtS = $this->db->prepare(
-                    'INSERT INTO pedido_sucursal (pedido_id, sucursal_id, producto_id, cantidad, precio_unitario, subtotal)
-                     VALUES (?, ?, ?, ?, ?, ?)'
+            foreach (array_unique($sucursalesIds) as $sucursalId) {
+                $this->execute(
+                    'INSERT INTO pedido_sucursal (pedido_id, sucursal_id) VALUES (?, ?)',
+                    [$pedidoId, $sucursalId]
                 );
-                $stmtS->execute([$pedidoId, $ps['sucursal_id'], $ps['producto_id'], $ps['cantidad'], $ps['precio_unitario'], $ps['subtotal']]);
             }
 
             $this->db->commit();
             return $pedidoId;
-        } catch (Exception $e) {
+        } catch (\Throwable $e) {
             $this->db->rollBack();
             throw $e;
         }
     }
 
-    public function getByEmpresa(int $empresaId, array $filtros = [], int $page = 1): array
+    public function listadoEmpresa(int $empresaId, array $filtros = [], int $page = 1): array
     {
         $where  = ['p.empresa_id = ?'];
         $params = [$empresaId];
@@ -55,132 +65,119 @@ class PedidoModel extends BaseModel
             $where[]  = 'p.estado = ?';
             $params[] = $filtros['estado'];
         }
-        if (!empty($filtros['fecha_desde'])) {
-            $where[]  = 'p.fecha_pedido >= ?';
-            $params[] = $filtros['fecha_desde'];
-        }
-        if (!empty($filtros['fecha_hasta'])) {
-            $where[]  = 'p.fecha_pedido <= ?';
-            $params[] = $filtros['fecha_hasta'] . ' 23:59:59';
+        if (!empty($filtros['buscar'])) {
+            $where[]  = '(p.folio LIKE ? OR u.nombre LIKE ? OR u.apellido_paterno LIKE ?)';
+            $t = '%' . $filtros['buscar'] . '%';
+            array_push($params, $t, $t, $t);
         }
 
-        $sqlWhere = 'WHERE ' . implode(' AND ', $where);
-        $sql = "SELECT p.*, e.razon_social AS empresa_nombre
+        $sql = 'SELECT p.*, u.nombre AS comprador_nombre, u.apellido_paterno AS comprador_apellido
                   FROM pedidos p
-                  JOIN empresas e ON e.id = p.empresa_id
-                  $sqlWhere
-              ORDER BY p.created_at DESC";
+                  JOIN usuarios u ON u.id = p.comprador_id
+                 WHERE ' . implode(' AND ', $where) . '
+              ORDER BY p.created_at DESC';
+
         return $this->paginate($sql, $params, $page);
     }
 
-    public function getAll(array $filtros = [], int $page = 1): array
+    public function pendientesAprobacion(int $empresaId): array
     {
-        $where  = ['1=1'];
-        $params = [];
-
-        if (!empty($filtros['estado'])) {
-            $where[]  = 'p.estado = ?';
-            $params[] = $filtros['estado'];
-        }
-        if (!empty($filtros['empresa_id'])) {
-            $where[]  = 'p.empresa_id = ?';
-            $params[] = $filtros['empresa_id'];
-        }
-        if (!empty($filtros['busqueda'])) {
-            $where[]  = '(p.folio LIKE ? OR e.razon_social LIKE ?)';
-            $like     = '%' . $filtros['busqueda'] . '%';
-            $params   = array_merge($params, [$like, $like]);
-        }
-
-        $sqlWhere = 'WHERE ' . implode(' AND ', $where);
-        $sql = "SELECT p.*, e.razon_social AS empresa_nombre, u.nombre AS usuario_nombre
-                  FROM pedidos p
-                  JOIN empresas e ON e.id = p.empresa_id
-                  JOIN usuarios u ON u.id = p.usuario_id
-                  $sqlWhere
-              ORDER BY p.created_at DESC";
-        return $this->paginate($sql, $params, $page);
+        return $this->query(
+            "SELECT p.*, u.nombre AS comprador_nombre, u.apellido_paterno AS comprador_apellido
+               FROM pedidos p
+               JOIN usuarios u ON u.id = p.comprador_id
+              WHERE p.empresa_id = ? AND p.requiere_aprobacion = 1 AND p.estado = 'pendiente'
+              ORDER BY p.created_at DESC",
+            [$empresaId]
+        );
     }
 
-    public function getDetalle(int $id): ?array
+    public function conDetalle(int $id): ?array
     {
         $pedido = $this->queryOne(
-            'SELECT p.*, e.razon_social, e.rfc, e.telefono AS empresa_tel,
-                    u.nombre AS comprador_nombre
+            "SELECT p.*,
+                    u.nombre AS comprador_nombre, u.apellido_paterno AS comprador_apellido,
+                    ap.nombre AS aprobador_nombre
                FROM pedidos p
-               JOIN empresas e ON e.id = p.empresa_id
-               JOIN usuarios u ON u.id = p.usuario_id
-              WHERE p.id = ?',
+               JOIN usuarios u ON u.id = p.comprador_id
+          LEFT JOIN usuarios ap ON ap.id = p.aprobado_por
+              WHERE p.id = ?",
             [$id]
         );
         if (!$pedido) return null;
 
-        $pedido['detalle'] = $this->query(
-            'SELECT pd.*, pr.nombre AS producto_nombre, pr.imagen
+        $pedido['items'] = $this->query(
+            'SELECT pd.*, pr.nombre AS producto_nombre, pr.presentacion
                FROM pedido_detalle pd
                JOIN productos pr ON pr.id = pd.producto_id
               WHERE pd.pedido_id = ?',
             [$id]
         );
 
-        $pedido['por_sucursal'] = $this->query(
-            'SELECT ps.*, s.nombre AS sucursal_nombre, s.direccion AS sucursal_dir,
-                    pr.nombre AS producto_nombre
+        $pedido['sucursales'] = $this->query(
+            'SELECT ps.*, s.nombre AS sucursal_nombre, s.direccion
                FROM pedido_sucursal ps
                JOIN sucursales s ON s.id = ps.sucursal_id
-               JOIN productos pr ON pr.id = ps.producto_id
-              WHERE ps.pedido_id = ?
-           ORDER BY s.nombre, pr.nombre',
+              WHERE ps.pedido_id = ?',
             [$id]
         );
 
         return $pedido;
     }
 
-    public function cambiarEstado(int $id, string $estado): bool
+    public function aprobar(int $id, int $aprobadoPor): bool
     {
-        return $this->execute('UPDATE pedidos SET estado = ? WHERE id = ?', [$estado, $id]);
+        return $this->execute(
+            "UPDATE pedidos
+                SET estado = 'confirmado', aprobado_por = ?, aprobado_at = NOW()
+              WHERE id = ? AND estado = 'pendiente' AND requiere_aprobacion = 1",
+            [$aprobadoPor, $id]
+        );
     }
 
-    public function getEstadisticasDashboard(?int $empresaId = null): array
+    public function rechazar(int $id, int $rechazadoPor, string $motivo): bool
     {
-        $where  = $empresaId ? 'WHERE empresa_id = ?' : '';
-        $params = $empresaId ? [$empresaId] : [];
-
-        $stats = $this->queryOne(
-            "SELECT COUNT(*) AS total,
-                    SUM(total) AS ventas_total,
-                    SUM(estado='pendiente') AS pendientes,
-                    SUM(estado='en_ruta') AS en_ruta,
-                    SUM(estado='entregado') AS entregados,
-                    SUM(IF(MONTH(fecha_pedido)=MONTH(NOW()) AND YEAR(fecha_pedido)=YEAR(NOW()),1,0)) AS mes_actual
-               FROM pedidos $where",
-            $params
+        return $this->execute(
+            "UPDATE pedidos
+                SET estado = 'cancelado', aprobado_por = ?, aprobado_at = NOW(),
+                    notas = CONCAT(COALESCE(notas,''), IF(notas IS NULL OR notas='','','\n'), 'Rechazado: ', ?)
+              WHERE id = ? AND estado = 'pendiente'",
+            [$rechazadoPor, $motivo, $id]
         );
-
-        $ventasPorDia = $this->query(
-            "SELECT DATE(fecha_pedido) AS dia, SUM(total) AS total, COUNT(*) AS cantidad
-               FROM pedidos
-              WHERE fecha_pedido >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-              " . ($empresaId ? 'AND empresa_id = ?' : '') . "
-              GROUP BY dia ORDER BY dia",
-            $empresaId ? [$empresaId] : []
-        );
-
-        return ['stats' => $stats, 'ventas_por_dia' => $ventasPorDia];
     }
 
-    public function getVentasPorCategoria(int $dias = 30): array
+    public function getTrackingActivo(int $pedidoId): ?array
     {
-        return $this->query(
-            "SELECT cat.nombre, SUM(pd.cantidad) AS kg, SUM(pd.subtotal) AS ventas
-               FROM pedido_detalle pd
-               JOIN pedidos p ON p.id = pd.pedido_id
-               JOIN productos pr ON pr.id = pd.producto_id
-               JOIN categorias cat ON cat.id = pr.categoria_id
-              WHERE p.fecha_pedido >= DATE_SUB(NOW(), INTERVAL ? DAY)
-              GROUP BY cat.id ORDER BY kg DESC",
-            [$dias]
+        return $this->queryOne(
+            "SELECT rd.lat_actual, rd.lng_actual, rd.eta_minutos, rd.estado,
+                    s.nombre AS sucursal_nombre, s.lat AS sucursal_lat, s.lng AS sucursal_lng,
+                    u.nombre AS repartidor_nombre, p.estado AS pedido_estado
+               FROM ruta_detalle rd
+               JOIN rutas r        ON r.id = rd.ruta_id
+               JOIN sucursales s   ON s.id = rd.sucursal_id
+               JOIN usuarios u     ON u.id = r.repartidor_id
+               JOIN pedidos p      ON p.id = rd.pedido_id
+              WHERE rd.pedido_id = ? AND rd.tracking_activo = 1
+              LIMIT 1",
+            [$pedidoId]
+        );
+    }
+
+    public function verificarPertenece(int $id, int $empresaId): bool
+    {
+        return $this->queryOne(
+            'SELECT id FROM pedidos WHERE id = ? AND empresa_id = ?',
+            [$id, $empresaId]
+        ) !== null;
+    }
+
+    public function cancelar(int $id, int $usuarioId): bool
+    {
+        return $this->execute(
+            "UPDATE pedidos
+                SET estado = 'cancelado'
+              WHERE id = ? AND comprador_id = ? AND estado IN ('pendiente')",
+            [$id, $usuarioId]
         );
     }
 }
