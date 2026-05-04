@@ -112,6 +112,8 @@ class RegistroController extends BaseController
         }
 
         // Insertar usuario (activo = 0 hasta verificar correo)
+        $userId = 0;
+        $token  = '';
         try {
             $hash = password_hash($password, PASSWORD_DEFAULT);
             $stmt = $db->prepare("
@@ -135,8 +137,9 @@ class RegistroController extends BaseController
             $userId = (int)$db->lastInsertId();
 
             // Si es comprador, crear empresa y asociarla
+            // rfc se deja NULL — el UNIQUE KEY en rfc rechaza '' duplicados
             if ($tipo === 'comprador') {
-                $stmt = $db->prepare("INSERT INTO empresas (razon_social, tipo_negocio, rfc, activo, created_at) VALUES (?, ?, '', 0, NOW())");
+                $stmt = $db->prepare("INSERT INTO empresas (razon_social, tipo_negocio, activo, created_at) VALUES (?, ?, 0, NOW())");
                 $stmt->execute([$nombre_empresa, $tipo_negocio ?: null]);
                 $empresaId = (int)$db->lastInsertId();
                 $db->prepare("UPDATE usuarios SET empresa_id = ? WHERE id = ?")->execute([$empresaId, $userId]);
@@ -150,6 +153,10 @@ class RegistroController extends BaseController
             // Registrar intento
             $db->prepare("INSERT INTO registro_intentos (ip, email) VALUES (?, ?)")->execute([$ip, $email]);
         } catch (\PDOException $e) {
+            // Limpiar usuario huérfano si ya fue insertado
+            if ($userId > 0) {
+                $db->prepare("DELETE FROM usuarios WHERE id = ? AND activo = 0")->execute([$userId]);
+            }
             error_log('[CarniHub Registro] ' . $e->getMessage());
             $this->flash('error', 'Error al crear la cuenta. Por favor intenta de nuevo.');
             $this->redirect('registro/' . $tipo);
