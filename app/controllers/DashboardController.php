@@ -11,7 +11,7 @@ class DashboardController extends BaseController
             $this->redirect('repartidor/inicio');
         }
 
-        if (in_array($rol, ['comprador', 'supervisor'])) {
+        if (in_array($rol, ['comprador', 'supervisor', 'admin_empresa'], true)) {
             $this->redirect('carrito/inicio');
         }
 

@@ -6,14 +6,14 @@ class RegistroController extends BaseController
     // GET /registro/index
     public function index(?string $p = null): void
     {
-        if (isset($_SESSION['usuario'])) { $this->redirect('dashboard/index'); }
+        if (isset($_SESSION['usuario'])) { $this->redirectSegunRol($_SESSION['usuario']['rol_slug'] ?? ''); }
         $this->render('auth/registro', ['pageTitle' => 'Crear cuenta — CarniHub']);
     }
 
     // GET /registro/comprador
     public function comprador(?string $p = null): void
     {
-        if (isset($_SESSION['usuario'])) { $this->redirect('dashboard/index'); }
+        if (isset($_SESSION['usuario'])) { $this->redirectSegunRol($_SESSION['usuario']['rol_slug'] ?? ''); }
         $flash = $this->getFlash();
         $this->render('auth/registro_form', [
             'pageTitle' => 'Registro Comprador',
@@ -26,7 +26,7 @@ class RegistroController extends BaseController
     // GET /registro/repartidor
     public function repartidor(?string $p = null): void
     {
-        if (isset($_SESSION['usuario'])) { $this->redirect('dashboard/index'); }
+        if (isset($_SESSION['usuario'])) { $this->redirectSegunRol($_SESSION['usuario']['rol_slug'] ?? ''); }
         $flash = $this->getFlash();
         $this->render('auth/registro_form', [
             'pageTitle' => 'Registro Repartidor',
@@ -103,8 +103,14 @@ class RegistroController extends BaseController
         }
 
         // Obtener rol_id
+        // Quien crea una empresa al registrarse es el Administrador Empresa (RF-U02)
+        // Los repartidores siempre obtienen el rol repartidor
+        $rolSlug = match($tipo) {
+            'repartidor' => 'repartidor',
+            default      => 'admin_empresa',  // el que crea la empresa es su admin
+        };
         $stmt = $db->prepare("SELECT id FROM roles WHERE slug = ? LIMIT 1");
-        $stmt->execute([$tipo === 'repartidor' ? 'repartidor' : 'comprador']);
+        $stmt->execute([$rolSlug]);
         $rol = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$rol) {
             $this->flash('error', 'Error interno. Intenta de nuevo.');

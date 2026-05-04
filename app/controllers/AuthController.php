@@ -14,7 +14,7 @@ class AuthController extends BaseController
     public function login(?string $p = null): void
     {
         if (isset($_SESSION['usuario'])) {
-            $this->redirect('dashboard/index');
+            $this->redirectPorRol($_SESSION['usuario']['rol_slug'] ?? '');
         }
         $pageTitle = 'Iniciar Sesión';
         $flash     = $this->getFlash();
@@ -86,12 +86,7 @@ class AuthController extends BaseController
 
         $this->log('Login exitoso', 'auth');
 
-        $rol = $usuario['rol_slug'];
-        match (true) {
-            $rol === 'repartidor'                          => $this->redirect('repartidor/inicio'),
-            in_array($rol, ['comprador', 'supervisor'])   => $this->redirect('carrito/inicio'),
-            default                                        => $this->redirect('dashboard/index'),
-        };
+        $this->redirectSegunRol($usuario['rol_slug']);
     }
 
     public function logout(?string $p = null): void

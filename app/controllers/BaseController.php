@@ -36,6 +36,16 @@ abstract class BaseController
         exit;
     }
 
+    // Redirige al portal correcto según rol (usar en cualquier controller)
+    protected function redirectSegunRol(string $rol): void
+    {
+        match (true) {
+            $rol === 'repartidor'                                               => $this->redirect('repartidor/inicio'),
+            in_array($rol, ['comprador', 'supervisor', 'admin_empresa'], true) => $this->redirect('carrito/inicio'),
+            default                                                             => $this->redirect('dashboard/index'),
+        };
+    }
+
     protected function requireRole(array $roles): void
     {
         $userRole = $_SESSION['usuario']['rol_slug'] ?? '';
@@ -44,9 +54,32 @@ abstract class BaseController
         }
     }
 
+    // Panel de plataforma — solo superadmin (y 'admin' mientras no corra migration 004)
     protected function requireAdmin(): void
     {
         $this->requireRole(['superadmin', 'admin']);
+    }
+
+    // Portal cliente con gestión — admin_empresa (RF-U02)
+    protected function requireClienteAdmin(): void
+    {
+        $this->requireRole(['superadmin', 'admin_empresa', 'admin']);
+    }
+
+    // Cualquier usuario del portal cliente
+    protected function requireCliente(): void
+    {
+        $this->requireRole(['comprador', 'supervisor', 'admin_empresa', 'admin']);
+    }
+
+    protected function rolActual(): string
+    {
+        return $_SESSION['usuario']['rol_slug'] ?? '';
+    }
+
+    protected function esAdminEmpresa(): bool
+    {
+        return in_array($this->rolActual(), ['admin_empresa', 'admin'], true);
     }
 
     protected function isPost(): bool

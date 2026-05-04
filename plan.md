@@ -1,5 +1,5 @@
 # CarniHub — Plan de Implementación y Estado del Sistema
-**Versión:** 1.3.0 | **Fecha:** 2026-05-04 | **Stack:** PHP 8.3 · MySQL 5.7 · Tailwind CDN · MVC sin framework
+**Versión:** 1.5.0 | **Fecha:** 2026-05-04 | **Stack:** PHP 8.3 · MySQL 5.7 · Tailwind CDN · MVC sin framework
 
 ---
 
@@ -25,7 +25,9 @@
 - APIs e integraciones: campo Google Maps key en config
 - Módulo Cuenta cliente (perfil, cambiar contraseña)
 - Migraciones 001 y 002 para nuevas tablas y campos
-- **v1.3 (2026-05-04):** Mapa comprador visible desde inicio (sin esperar autocomplete); zona repartidor cambiada de "colonia/círculo" a dropdown de municipios de México (QRO, GTO, HGO, MEX, CDMX, JAL, NL)
+- **v1.3 (2026-05-04):** Mapa comprador visible desde inicio; zona repartidor → dropdown municipios de México
+- **v1.4 (2026-05-04):** Corrección de roles — `admin_empresa` separado del `admin` de plataforma; `redirectSegunRol()` en BaseController; sidebar cliente con ítem Usuarios para admin_empresa
+- **v1.5 (2026-05-04):** Migration 004 correcta (INSERT admin_empresa, no renombrar admin); RegistroController asigna `admin_empresa` a quien crea empresa; redirects corregidos en RegistroController
 
 ---
 
@@ -51,13 +53,171 @@ Navegador
 ```
 
 ### Roles del sistema
-| Rol slug | Nombre | Acceso |
-|----------|--------|--------|
-| `superadmin` | SuperAdmin | Todo |
-| `admin` | Admin Empresa | Panel admin excepto config global |
-| `comprador` | Comprador | Portal cliente completo |
-| `supervisor` | Supervisor | Portal cliente (solo lectura en algunos) |
-| `repartidor` | Repartidor | App repartidor oscura |
+> RF-U02 — 6 roles en total: 2 de plataforma CarniHub + 3 de empresa cliente + 1 operativo
+
+| Rol slug | Nombre | Tipo | Quién lo crea |
+|----------|--------|------|---------------|
+| `superadmin` | SuperAdmin (CarniHub) | Plataforma | Instalación inicial (seeded en BD) |
+| `admin` | Administrador (CarniHub) | Plataforma | El superadmin desde `/usuario/index` |
+| `admin_empresa` | Administrador Empresa | **Cliente** | Auto-registro público → o superadmin/admin lo crea manualmente |
+| `comprador` | Comprador | **Cliente** | El `admin_empresa` desde su portal |
+| `supervisor` | Supervisor | **Cliente** | El `admin_empresa` desde su portal |
+| `repartidor` | Repartidor | Operativo | Auto-registro público → superadmin/admin aprueba |
+
+---
+
+## GUÍA DE ROLES — QUÉ HACE CADA UNO Y CÓMO ENTRA AL SISTEMA
+
+### 🔴 SUPERADMIN — Dueño de CarniHub
+**Entra a:** `/auth/login` → redirige a `/dashboard/index`
+**Ve:** Panel administrativo completo de la plataforma
+
+**Lo que puede hacer:**
+- Ver KPIs globales: ventas totales, pedidos del mes, clientes activos, kg vendidos
+- **Gestionar empresas B2B** (`/cliente/index`): dar de alta, dar de baja, ver detalle
+- **Activar crédito** de cualquier empresa (`/cliente/detalle/{id}` → tab Crédito) — RF-P02
+- **Gestionar catálogo** (`/producto/index`): crear/editar productos, precios escalonados
+- **Ver todos los pedidos** (`/pedido/index`): cambiar estados (pendiente → confirmado → en ruta → entregado)
+- **Controlar inventario** (`/inventario/index`): ajustar stock, ver alertas de bajo stock
+- **Crear rutas logísticas** (`/logistica/rutas`): asignar pedidos a choferes y vehículos
+- **Ver reportes globales** (`/reporte/index`): ventas, productos, empresas
+- **Gestionar usuarios** (`/usuario/index`): crear admin_empresa, comprador, supervisor, repartidor
+- **Configuración global** (`/config/general`): nombre, logo, colores, APIs, IoT, bitácora — SOLO superadmin
+
+---
+
+### 🟠 ADMIN (empleado de CarniHub)
+**Entra a:** `/auth/login` → redirige a `/dashboard/index`
+**Ve:** Mismo panel que superadmin EXCEPTO Configuración global
+
+**Lo que puede hacer:** Todo igual que superadmin EXCEPTO:
+- ❌ NO puede acceder a `/config/general` (configuración global)
+- ❌ NO puede activar/desactivar crédito de empresas
+- ✅ Todo lo demás: clientes, productos, pedidos, inventario, logística, reportes, usuarios
+
+---
+
+### 🟡 ADMIN EMPRESA — Gerente / Dueño del negocio B2B (RF-U02)
+**Entra a:** `/auth/login` → redirige a `/carrito/inicio` (portal cliente)
+**Ve:** Portal cliente con opciones extras de gestión de su empresa
+
+**Cómo llega a este rol:**
+1. Se registra públicamente en `/registro/comprador` → llena datos personales + nombre del negocio
+2. Verifica su correo → cuenta activa
+3. **Ya tiene rol `admin_empresa` automáticamente** (el sistema lo asigna al crear empresa)
+4. — O — el superadmin/admin lo crea directamente desde `/usuario/index`
+
+**Lo que puede hacer:**
+- Todo lo que puede un comprador (hacer pedidos, ver historial, etc.)
+- **Gestionar sus sucursales** (`/sucursal/index`): crear, editar, activar/desactivar — RF-S01, RF-S02
+- **Crear usuarios para su empresa** (`/usuario/miEmpresa`): puede crear compradores y supervisores DENTRO de su empresa únicamente
+- **Ver crédito disponible** de su empresa (solo ver, NO activar — eso es exclusivo del superadmin)
+- **Ver reportes completos de su empresa** (`/reporte/cliente`): consumo por sucursal, gastos, historial
+
+**Lo que NO puede hacer:**
+- ❌ Acceder al panel admin de plataforma (`/dashboard/index`, `/cliente/index`, etc.)
+- ❌ Ver datos de otras empresas
+- ❌ Activar o desactivar crédito (solo superadmin)
+- ❌ Crear otro admin_empresa (solo superadmin puede hacerlo)
+
+---
+
+### 🟢 COMPRADOR — Empleado que hace los pedidos (RF-U02)
+**Entra a:** `/auth/login` → redirige a `/carrito/inicio`
+**Ve:** Portal cliente estándar
+
+**Cómo llega a este rol:**
+- El **admin_empresa** lo crea desde su portal en `/usuario/miEmpresa`
+- NO puede auto-registrarse (no hay formulario público para comprador de empresa existente)
+
+**Lo que puede hacer:**
+- **Ver catálogo** con precios escalonados en tiempo real
+- **Hacer pedidos** (4 pasos): catálogo → carrito → entrega por sucursal → confirmar — RF-O01 a RF-O04
+- **Reordenar** pedidos anteriores en 1 clic — RF-O06
+- **Gestionar pedidos recurrentes**: ver plantillas, confirmar con 1 clic — RF-R01 a RF-R04
+- **Ver historial de pedidos** y su estado actual — RF-A04
+- **Ver reportes de su empresa** — RF-A01, RF-A02
+- **Editar su perfil y contraseña** — RF-U03
+
+**Lo que NO puede hacer:**
+- ❌ Gestionar sucursales (crear, editar)
+- ❌ Crear o gestionar otros usuarios
+- ❌ Ver el crédito de la empresa
+
+---
+
+### 🔵 SUPERVISOR — Aprueba y supervisa (RF-U02)
+**Entra a:** `/auth/login` → redirige a `/carrito/inicio`
+**Ve:** Portal cliente en modo solo lectura en áreas clave
+
+**Cómo llega a este rol:**
+- El **admin_empresa** lo crea desde su portal en `/usuario/miEmpresa`
+
+**Lo que puede hacer:**
+- **Ver catálogo** (sin agregar al carrito directamente)
+- **Ver pedidos** de la empresa en tiempo real con estados
+- **Aprobar o confirmar pedidos recurrentes** antes de que se generen
+- **Ver reportes** completos de la empresa
+- **Ver sucursales** (solo lectura)
+
+**Lo que NO puede hacer:**
+- ❌ Hacer pedidos (solo ver y aprobar)
+- ❌ Gestionar sucursales ni usuarios
+- ❌ Confirmar pagos
+
+---
+
+### ⚫ REPARTIDOR — Operador de entrega
+**Entra a:** `/auth/login` → redirige a `/repartidor/inicio` (app oscura)
+**Ve:** UI oscura específica para operación en campo
+
+**Cómo llega a este rol:**
+1. Se registra públicamente en `/registro/repartidor` → llena datos personales + zona de cobertura
+2. Verifica su correo → cuenta activa
+3. El superadmin/admin lo asigna a rutas desde `/logistica/rutas`
+
+**Lo que puede hacer:**
+- **Ver su ruta del día**: lista de entregas asignadas ordenadas por parada
+- **Ver detalle de cada entrega**: dirección, productos a entregar, mapa con enlace a Google Maps
+- **Marcar entrega completa** con: nombre del receptor + firma digital en canvas + foto con cámara
+- **Ver historial** de sus entregas anteriores
+- **Ver su mapa de ruta** actual
+
+**Lo que NO puede hacer:**
+- ❌ Ver pedidos de otras rutas o repartidores
+- ❌ Crear ni modificar nada del sistema
+- ❌ Acceder al portal cliente ni admin
+
+---
+
+## FLUJO DE CREACIÓN DE CUENTAS (quién crea a quién)
+
+```
+INSTALACIÓN INICIAL
+  → BD seeded: superadmin@carnihub.mx (rol: superadmin)
+
+SUPERADMIN puede crear:
+  → admin (empleado CarniHub)
+  → admin_empresa (para una empresa específica)
+  → cualquier otro rol
+
+ADMIN (CarniHub) puede crear:
+  → admin_empresa
+  → comprador, supervisor, repartidor
+
+ADMIN_EMPRESA puede crear (solo dentro de SU empresa):
+  → comprador
+  → supervisor
+  ❌ NO puede crear admin_empresa ni superadmin
+
+REGISTRO PÚBLICO (sin login):
+  → /registro/comprador → crea admin_empresa + empresa nueva → verificar email
+  → /registro/repartidor → crea repartidor → verificar email
+  ❌ NO existe registro público para comprador de empresa existente
+  ❌ NO existe registro público para supervisor
+```
+
+---
 
 ### Flujo de autenticación
 1. Cualquier URL sin sesión → redirect `auth/login`
@@ -139,9 +299,9 @@ $_GET['url'] = "producto/editar/5"
    $_SESSION['usuario'] = $row_completo   (incluye rol_slug, empresa_id, nombre, avatar)
    $_SESSION['empresa'] = EmpresaModel::find($usuario['empresa_id'])  (si aplica)
 6. Redirigir según rol_slug:
-   - 'repartidor'              → repartidor/inicio
-   - 'comprador','supervisor'  → carrito/inicio
-   - 'superadmin','admin'      → dashboard/index
+   - 'repartidor'                                    → repartidor/inicio
+   - 'comprador','supervisor','admin_empresa'         → carrito/inicio    (portal cliente)
+   - 'superadmin'                                    → dashboard/index   (panel plataforma CarniHub)
 ```
 
 ### Vista `views/auth/login.php`
@@ -158,10 +318,10 @@ $_GET['url'] = "producto/editar/5"
 ### URL: `dashboard/index`
 
 ### Lógica
-1. `requireRole(['superadmin','admin','comprador','supervisor'])`
+1. `requireRole(['superadmin'])` — el dashboard de plataforma es exclusivo del superadmin
 2. Según `rol_slug` del usuario:
-   - `superadmin`/`admin` → cargar métricas de admin
-   - `comprador`/`supervisor` → cargar métricas de cliente
+   - `superadmin` → cargar métricas globales de toda la plataforma
+   - `admin_empresa`/`comprador`/`supervisor` → son redirigidos a `carrito/inicio` (portal cliente)
 
 ### Datos que carga (admin)
 ```php
@@ -362,11 +522,13 @@ $pagos     = PagoModel::getByPedido($id);
 
 ---
 
-## MÓDULO 7 — PORTAL CLIENTE (comprador/supervisor)
+## MÓDULO 7 — PORTAL CLIENTE (admin_empresa / comprador / supervisor)
+
+> RF-U02: Los tres roles cliente usan el mismo portal. `admin_empresa` tiene capacidades adicionales de gestión.
 
 ### 7.1 Inicio (`carrito/inicio`)
 ```php
-requireRole(['comprador','supervisor']);
+requireRole(['comprador','supervisor','admin_empresa']);
 $empresa  = $_SESSION['empresa'];
 $ultimosPedidos = PedidoModel::getByEmpresa($empresa['id'], ['limit'=>5]);
 $recurrentes    = RecurrenteModel::getActivos($empresa['id']);
@@ -383,7 +545,7 @@ render('cliente/inicio', compact(...));
 
 ### 7.2 Catálogo (`producto/catalogo`)
 ```php
-requireRole(['comprador','supervisor']);
+requireRole(['comprador','supervisor','admin_empresa']);
 $empresa    = $_SESSION['empresa'];
 $sucursales = SucursalModel::getByEmpresa($empresa['id']);
 $categorias = CategoriaModel::all();
@@ -475,9 +637,36 @@ Vista confirmación: views/cliente/carrito/paso4_confirmacion.php
 - Resumen breve
 - Botones: Ver Pedido | Hacer otro pedido
 
+### 7.6 Capacidades exclusivas de `admin_empresa` (RF-U02, RF-S01, RF-S02)
+
+> El `admin_empresa` accede al mismo portal cliente que `comprador`/`supervisor` pero con las siguientes capacidades adicionales:
+
+| Capacidad | admin_empresa | comprador | supervisor |
+|-----------|:---:|:---:|:---:|
+| Ver catálogo y hacer pedidos | ✅ | ✅ | 👁️ |
+| Ver historial de pedidos | ✅ | ✅ | ✅ |
+| Gestionar sucursales (CRUD) | ✅ | ❌ | ❌ |
+| Crear/editar usuarios de su empresa | ✅ | ❌ | ❌ |
+| Ver reportes de la empresa | ✅ | ✅ | ✅ |
+| Ver estado de crédito | ✅ (solo ver) | ❌ | ❌ |
+| **Activar crédito** | ❌ solo superadmin | ❌ | ❌ |
+| Gestionar pedidos recurrentes | ✅ | ✅ | 👁️ |
+
+> ⚠️ RF-P02: La activación del crédito es EXCLUSIVA del `superadmin` desde el panel admin.
+
+#### URLs adicionales del admin_empresa (dentro del portal cliente)
+| URL | Descripción |
+|-----|-------------|
+| `sucursal/index` | Lista de sucursales de SU empresa |
+| `sucursal/crear` | Alta de nueva sucursal |
+| `sucursal/editar/{id}` | Editar sucursal |
+| `sucursal/toggleActivo/{id}` | Activar/desactivar |
+| `usuario/miEmpresa` | Lista usuarios de SU empresa |
+| `usuario/crearEnEmpresa` | Crear comprador/supervisor en su empresa |
+
 ---
 
-## MÓDULO 8 — PEDIDOS RECURRENTES (`recurrente/`)
+
 
 ### URLs
 | URL | Método | Vista |
@@ -589,12 +778,18 @@ $porCategoria = PedidoModel::agruparPorCategoria($filtros);
 
 ### Lógica `usuario/guardar`
 ```php
-requireAdmin();
+// superadmin: puede crear cualquier rol en cualquier empresa
+// admin_empresa: solo puede crear comprador/supervisor en SU empresa
+requireRole(['superadmin', 'admin_empresa']);
+if ($_SESSION['usuario']['rol_slug'] === 'admin_empresa') {
+    $data['empresa_id'] = $_SESSION['empresa']['id'];  // forzar su empresa
+    $rolesPermitidos = ['comprador', 'supervisor'];     // no puede crear superadmin ni admin_empresa
+    if (!in_array($data['rol_slug'], $rolesPermitidos)) abort(403);
+}
 // Validar: email único, rol válido
 // Si es nuevo: password_hash($password, PASSWORD_DEFAULT)
 // Si edita: solo hash si viene password no vacío
 // Subir avatar si se incluye archivo
-// Asociar empresa_id según rol
 // INSERT o UPDATE
 // redirect usuario/index
 ```
@@ -881,15 +1076,15 @@ exit;
 ```
 
 ### `views/components/sidebar_admin.php`
-- Items de menú según rol:
-  - SuperAdmin: Dashboard | Clientes | Productos | Pedidos | Logística | Inventario | Reportes | Usuarios | Configuración
-  - Admin: mismos excepto Configuración global
+- **Solo accesible para `superadmin`** (panel plataforma CarniHub)
+- Items: Dashboard | Clientes | Productos | Pedidos | Logística | Inventario | Reportes | Usuarios | Configuración Global
 - Item activo resaltado con borde rojo izquierdo
 - Badge con número en Pedidos (pendientes) e Inventario (alertas)
 - Collapsable en móvil (hamburger)
 
 ### `views/components/sidebar_cliente.php`
-- Items: Inicio | Catálogo | Mis Pedidos | Pedidos Recurrentes | Sucursales | Reportes | Mi Cuenta
+- **Para `comprador` / `supervisor`:** Inicio | Catálogo | Mis Pedidos | Pedidos Recurrentes | Reportes | Mi Cuenta
+- **Para `admin_empresa`** (mismos ítems + extras): Inicio | Catálogo | Mis Pedidos | Pedidos Recurrentes | **Sucursales** | **Usuarios** | Reportes | Mi Cuenta
 - Badge en catálogo con items en carrito
 - Bottom nav en móvil (5 ítems principales)
 
@@ -897,99 +1092,137 @@ exit;
 
 ## PLAN DE CORRECCIÓN POR PRIORIDAD
 
-### 🔴 PRIORIDAD 1 — Lo que impide usar el sistema (bugs bloqueantes)
+### ✅ RESUELTO — Infraestructura y autenticación (v1.0 – v1.5)
+- [x] `.htaccess` con RewriteBase correcto
+- [x] `config.php` con BASE_URL autodetectado
+- [x] Login con brute force (5 intentos / 2 min)
+- [x] Registro público comprador → crea empresa → rol `admin_empresa`
+- [x] Registro público repartidor → rol `repartidor`
+- [x] Verificación de correo con token 24h
+- [x] Redirect según rol en login (`redirectSegunRol()` en BaseController)
+- [x] Dashboard admin con KPIs y Chart.js
+- [x] Portal cliente - home con acciones rápidas
+- [x] Sidebars con logo dinámico + ítem Usuarios para admin_empresa
+- [x] Módulo Cuenta (perfil + cambiar contraseña)
+- [x] Configuración global (logo, APIs)
+- [x] Migration 001 (login_intentos, verificacion_tokens, registro_intentos)
+- [x] Migration 002 (api_google_maps_key, app_logo)
+- [x] Migration 003 (rfc nullable en empresas)
+- [x] Migration 004 (INSERT rol admin_empresa — ejecutar en cPanel)
 
-| # | Síntoma | Causa probable | Archivo a revisar |
-|---|---------|----------------|-------------------|
-| 1 | Página en blanco al entrar a dashboard | Error PHP sin mostrar (variables undefined) | `DashboardController.php`, `dashboard.php` |
-| 2 | JSON en vez de HTML en alguna vista | `header('Content-Type: application/json')` no removido | Controlador del módulo afectado |
-| 3 | 404 en rutas existentes | Método en controller con nombre diferente al esperado | `index.php` routes array vs método real |
-| 4 | Error al subir imagen | Carpeta `public/uploads/` no existe en servidor | Crear manualmente con permisos 755 |
-| 5 | Error al crear pedido | Transacción SQL falla por FK o campo faltante | `PedidoModel::crearConDetalle()` |
+### 🔴 PRIORIDAD ALTA — Flujo de pedido completo (Semana 2)
+**Objetivo: que un admin_empresa o comprador pueda hacer un pedido de principio a fin**
 
-**Acción inmediata — crear carpetas uploads:**
-En cPanel → File Manager → `public_html/carnihub/public/` → crear:
-```
-uploads/          (755)
-uploads/productos/ (755)
-uploads/evidencias/(755)
-uploads/avatars/  (755)
-```
+| # | Tarea | Archivo |
+|---|-------|---------|
+| 1 | `api/precioEscalonado` — precio en tiempo real (AJAX) | `ApiController.php` |
+| 2 | `carrito/agregar` — guardar item en `$_SESSION['carrito']` | `CarritoController.php` |
+| 3 | `carrito/index` — paso 1: ver carrito + distribución por sucursal | `CarritoController.php` |
+| 4 | `carrito/entrega` — paso 2: fecha y ventana horaria por sucursal | `CarritoController.php` |
+| 5 | `carrito/resumen` — paso 3: resumen + método de pago | `CarritoController.php` |
+| 6 | `carrito/confirmar` — paso 4: INSERT en BD con folio CHB-YYYY-NNNN | `CarritoController.php` |
+| 7 | `pedido/detalle` — ver pedido confirmado (vista cliente) | `PedidoController.php` |
+| 8 | `producto/catalogo` — cargar productos con precios escalonados | `ProductoController.php` |
 
-### 🟡 PRIORIDAD 2 — Funcionalidad incompleta
+### 🟡 PRIORIDAD MEDIA — Gestión de pedidos y admin (Semana 3)
 
-| # | Módulo | Qué falta |
-|---|--------|-----------|
-| 6 | Carrito | Validar que precio escalonado se recalcula correctamente |
-| 7 | Pedidos | Generar folio CHB-YYYY-NNNN único |
-| 8 | Repartidor | Firma canvas + upload foto en `completarEntrega` |
-| 9 | Config | Verificar que `ConfigModel::set()` persiste correctamente |
-| 10 | Reportes | Queries de agregación con fechas |
+| # | Tarea | Archivo |
+|---|-------|---------|
+| 9 | `pedido/index` — lista pedidos con filtros (admin y cliente) | `PedidoController.php` |
+| 10 | `pedido/cambiarEstado` — workflow de estados | `PedidoController.php` |
+| 11 | `pedido/reordenar` — copiar pedido al carrito | `PedidoController.php` |
+| 12 | `cliente/index` — lista empresas B2B para admin | `ClienteController.php` |
+| 13 | `cliente/detalle` — ficha empresa con tabs (info, sucursales, crédito, historial) | `ClienteController.php` |
+| 14 | `cliente/activarCredito` — toggle crédito (solo superadmin) | `ClienteController.php` |
+| 15 | `inventario/actualizar` — ajuste manual de stock | `InventarioController.php` |
+| 16 | `usuario/miEmpresa` — gestión de usuarios por admin_empresa | `UsuarioController.php` |
+| 17 | `sucursal/crear` y `sucursal/editar` — CRUD completo | `SucursalController.php` |
 
-### 🟢 PRIORIDAD 3 — Mejoras y servicios externos
+### 🟢 PRIORIDAD MEDIA-BAJA — Logística y repartidor (Semana 4)
 
-| # | Módulo | Qué implementar |
-|---|--------|-----------------|
-| 11 | WhatsApp | Conectar token real y plantillas |
-| 12 | Traccar | URL y token, mostrar mapa real |
-| 13 | HikVision | Snapshot desde IP de cámara |
-| 14 | Shelly | Toggle con auth key real |
-| 15 | Facturación | CFDI con Factura-lo |
+| # | Tarea | Archivo |
+|---|-------|---------|
+| 18 | `logistica/crearRuta` — asignar pedidos a chofer + vehículo | `LogisticaController.php` |
+| 19 | `logistica/detalle` — ver ruta con mapa Leaflet | `LogisticaController.php` |
+| 20 | `repartidor/entregas` — lista de paradas del día | `RepartidorController.php` |
+| 21 | `repartidor/completarEntrega` — firma canvas + foto cámara | `RepartidorController.php` |
+| 22 | `repartidor/mapa` — ver ruta en mapa | `RepartidorController.php` |
+
+### 🔵 PRIORIDAD BAJA — Módulos avanzados (Semanas 5-6)
+
+| # | Tarea | Archivo |
+|---|-------|---------|
+| 23 | `recurrente/guardar` — crear plantilla de pedido recurrente | `RecurrenteController.php` |
+| 24 | `recurrente/confirmarAhora` — generar pedido desde plantilla | `RecurrenteController.php` |
+| 25 | `reporte/ventas` — gráficas Chart.js con filtros fecha/empresa | `ReporteController.php` |
+| 26 | `reporte/cliente` — reportes propios para portal cliente | `ReporteController.php` |
+| 27 | WhatsApp notificaciones — confirmar pedido, salida a ruta, entrega | `WhatsAppService.php` |
+| 28 | Facturación CFDI — integrar Factura-lo | `FacturaloService.php` |
+| 29 | Traccar GPS — posición en tiempo real en mapa logística | `TraccarService.php` |
+| 30 | Config IoT — CRUD dispositivos HikVision y Shelly | `ConfigController.php` |
 
 ---
 
 ## ORDEN DE REVISIÓN/CORRECCIÓN SUGERIDO
 
 ```
-Semana 1 — Que el sistema sea navegable
-  [x] Fix .htaccess (DONE)
-  [x] Seguridad login: brute force + cuentas de prueba eliminadas
-  [x] Módulo registro público (comprador y repartidor)
-  [x] Google Maps interactivo en registro (círculo / marcador draggable)
-  [x] Logo del sistema: upload desde config admin, dinámico en sidebars
-  [x] Nombre separado en 3 campos, avatares de usuario
-  [x] Módulo Cuenta cliente (perfil + cambiar contraseña)
-  [ ] Ejecutar migrations 001 y 002 en cPanel phpMyAdmin
-  [ ] Configurar Google Maps API key en Configuración → APIs
-  [ ] Verificar mail() funcionando en servidor
-  [ ] Revisar y corregir cada página de admin una a una
-  [ ] Crear carpetas uploads en servidor (si faltan)
-  [ ] Probar login con cada rol
+✅ COMPLETADO (v1.0 – v1.5)
+  [x] .htaccess + config.php + index.php (router)
+  [x] Login con brute force + cuentas de prueba eliminadas
+  [x] Registro público (comprador → admin_empresa + empresa; repartidor)
+  [x] Verificación de correo con token 24h
+  [x] Redirect por rol (redirectSegunRol en BaseController)
+  [x] Google Maps interactivo en registro comprador
+  [x] Dropdown municipios para repartidor
+  [x] Dashboard admin con KPIs + Chart.js
+  [x] Portal cliente - home con acciones rápidas
+  [x] Sidebars con logo dinámico
+  [x] Módulo Cuenta cliente (perfil + contraseña)
+  [x] Configuración global (logo, APIs, colores)
+  [x] Migrations 001, 002, 003 (ejecutar en cPanel)
+  [x] Migration 004 — INSERT rol admin_empresa (ejecutar en cPanel)
 
-Semana 2 — Flujo de pedido completo
-  [ ] Catálogo → precio escalonado en tiempo real
-  [ ] Carrito → paso 1 al 4
-  [ ] Confirmar pedido → registro en BD
-  [ ] Ver pedido desde admin y desde cliente
+⏳ SEMANA 2 — Flujo de pedido (PRIORIDAD INMEDIATA)
+  [ ] Ejecutar migration 004 en cPanel phpMyAdmin
+  [ ] Crear carpetas uploads/ en servidor si faltan
+  [ ] Configurar Google Maps API key en Config → APIs
+  [ ] ProductoController::catalogo — cargar catálogo con precios
+  [ ] ApiController::precioEscalonado — AJAX precio en tiempo real
+  [ ] CarritoController — pasos 1 al 4 + confirmar (INSERT pedido)
+  [ ] PedidoController::detalle — vista cliente
 
-Semana 3 — Logística y repartidor
-  [ ] Crear ruta desde admin
-  [ ] App repartidor: ver entregas del día
-  [ ] Completar entrega con firma + foto
-  [ ] Evidencia guardada en BD
+⏳ SEMANA 3 — Gestión de pedidos y empresa
+  [ ] PedidoController::index + cambiarEstado + reordenar
+  [ ] ClienteController::index + detalle + activarCredito
+  [ ] UsuarioController::miEmpresa — admin_empresa gestiona su equipo
+  [ ] SucursalController — CRUD completo
 
-Semana 4 — Configuración y servicios
-  [ ] Guardar settings en global_settings
-  [ ] CRUD dispositivos HikVision
-  [ ] CRUD dispositivos Shelly
-  [ ] Bitácora de logs
+⏳ SEMANA 4 — Logística y repartidor
+  [ ] LogisticaController::crearRuta + detalle con mapa Leaflet
+  [ ] RepartidorController::completarEntrega (firma + foto)
 
-Semana 5 — Reportes y pulido
-  [ ] Reportes con gráficas Chart.js
-  [ ] Pedidos recurrentes
-  [ ] Facturación CFDI
-  [ ] Notificaciones WhatsApp
+⏳ SEMANA 5-6 — Módulos avanzados
+  [ ] RecurrenteController — plantillas + confirmarAhora
+  [ ] ReporteController — ventas con Chart.js, reportes cliente
+  [ ] WhatsApp notificaciones
+  [ ] Facturación CFDI con Factura-lo
+  [ ] Traccar GPS
+  [ ] IoT HikVision + Shelly
 ```
 
 ---
 
 ## CREDENCIALES DE PRUEBA (datos dummy Querétaro)
 
-| Rol | Email | Password | Empresa |
-|-----|-------|----------|---------|
-| SuperAdmin | admin@carnihub.mx | admin123 | — |
-| Comprador | juan.perez@carnihub.mx | admin123 | Taquería El Buen Sabor |
-| Repartidor | luis.martinez@carnihub.mx | admin123 | — |
+| Rol | Email | Password | Empresa | Nota |
+|-----|-------|----------|---------|------|
+| SuperAdmin | admin@carnihub.mx | admin123 | — | Accede a panel plataforma |
+| Admin (CarniHub) | ana.martinez@carnihub.mx | admin123 | — | Accede a panel plataforma |
+| Admin Empresa | juan.perez@carnihub.mx | admin123 | Taquería El Buen Sabor | Accede a portal cliente (tras migration 004) |
+| Supervisor | maria.gonzalez@carnihub.mx | admin123 | Taquería El Buen Sabor | Accede a portal cliente |
+| Repartidor | luis.martinez@carnihub.mx | admin123 | — | Accede a app repartidor |
+
+> ⚠️ Después de ejecutar migration 004, `juan.perez@carnihub.mx` tendrá rol `admin_empresa` y será redirigido al portal cliente.
 
 ---
 
