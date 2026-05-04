@@ -40,9 +40,9 @@ $esSuperAdmin  = ($usuario['rol_slug'] ?? '') === 'superadmin';
 <aside class="sidebar">
   <div style="padding:20px;border-bottom:1px solid rgba(255,255,255,.1);display:flex;align-items:center;gap:10px">
     <?php if ($appLogo): ?>
-      <img src="<?= htmlspecialchars($appLogo) ?>" alt="Logo" style="height:32px;filter:brightness(0) invert(1)">
+      <img src="<?= htmlspecialchars($appLogo) ?>" alt="Logo" style="height:44px;max-width:160px;object-fit:contain;filter:brightness(0) invert(1)">
     <?php else: ?>
-      <img src="<?= BASE_URL ?>public/img/logo.svg" alt="<?= htmlspecialchars($appName) ?>" style="height:32px;filter:brightness(0) invert(1)">
+      <img src="<?= BASE_URL ?>public/img/logo.svg" alt="<?= htmlspecialchars($appName) ?>" style="height:44px;max-width:160px;object-fit:contain;filter:brightness(0) invert(1)">
     <?php endif; ?>
     <span style="font-weight:800;font-size:.95rem"><?= htmlspecialchars($appName) ?></span>
   </div>

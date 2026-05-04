@@ -1,10 +1,15 @@
-<?php $pageTitle = 'Iniciar Sesión'; ?>
+<?php
+$pageTitle = 'Iniciar Sesión';
+$_cfgLogin = new ConfigModel();
+$_appLogo  = $_cfgLogin->get('app_logo', '');
+$_appName  = $_cfgLogin->get('app_name', APP_NAME);
+?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title><?= APP_NAME ?> — Iniciar Sesión</title>
+  <title><?= htmlspecialchars($_appName) ?> — Iniciar Sesión</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="<?= BASE_URL ?>public/css/carnihub.css">
@@ -15,7 +20,13 @@
 
   <!-- Panel izquierdo — branding -->
   <div style="flex:1;background:linear-gradient(135deg,#1A1D23 0%,#2D3139 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px;color:#fff" class="hide-mobile">
-    <img src="<?= BASE_URL ?>public/img/logo.svg" alt="<?= APP_NAME ?>" style="height:56px;margin-bottom:24px;filter:brightness(0) invert(1)">
+    <?php if ($_appLogo): ?>
+      <img src="<?= htmlspecialchars($_appLogo) ?>" alt="<?= htmlspecialchars($_appName) ?>"
+           style="height:64px;margin-bottom:24px;object-fit:contain;filter:brightness(0) invert(1)">
+    <?php else: ?>
+      <img src="<?= BASE_URL ?>public/img/logo.svg" alt="<?= htmlspecialchars($_appName) ?>"
+           style="height:64px;margin-bottom:24px;filter:brightness(0) invert(1)">
+    <?php endif; ?>
     <h2 style="font-size:1.5rem;font-weight:800;margin-bottom:8px;text-align:center">Abasto Inteligente de Carne</h2>
     <p style="color:#9CA3AF;text-align:center;font-size:.9rem;line-height:1.6">
       La plataforma B2B que conecta tu negocio con el mejor abasto de carne.
@@ -36,9 +47,15 @@
   <div style="flex:1;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 40px">
     <div style="width:100%;max-width:360px">
       <div style="text-align:center;margin-bottom:32px">
-        <img src="<?= BASE_URL ?>public/img/logo.svg" alt="<?= APP_NAME ?>" style="height:40px;margin-bottom:16px" class="hide-desktop">
+        <?php if ($_appLogo): ?>
+          <img src="<?= htmlspecialchars($_appLogo) ?>" alt="<?= htmlspecialchars($_appName) ?>"
+               style="height:48px;margin-bottom:16px;object-fit:contain" class="hide-desktop">
+        <?php else: ?>
+          <img src="<?= BASE_URL ?>public/img/logo.svg" alt="<?= htmlspecialchars($_appName) ?>"
+               style="height:48px;margin-bottom:16px" class="hide-desktop">
+        <?php endif; ?>
         <h1 style="font-size:1.5rem;font-weight:800;color:#111827;margin-bottom:6px">Iniciar sesión</h1>
-        <p style="color:#6B7280;font-size:.875rem">Accede a tu cuenta de <?= APP_NAME ?></p>
+        <p style="color:#6B7280;font-size:.875rem">Accede a tu cuenta de <?= htmlspecialchars($_appName) ?></p>
       </div>
 
       <?php if (!empty($flash)): ?>

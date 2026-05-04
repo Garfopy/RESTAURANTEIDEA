@@ -44,9 +44,9 @@ $esSupervisor = in_array($rol, ['admin_empresa', 'supervisor'], true);
 <aside class="sidebar">
   <div style="padding:16px;border-bottom:1px solid #E5E7EB">
     <?php if ($appLogo): ?>
-      <img src="<?= htmlspecialchars($appLogo) ?>" alt="Logo" style="height:28px">
+      <img src="<?= htmlspecialchars($appLogo) ?>" alt="Logo" style="height:44px;max-width:180px;object-fit:contain">
     <?php else: ?>
-      <img src="<?= BASE_URL ?>public/img/logo.svg" alt="<?= htmlspecialchars($appName) ?>" style="height:28px">
+      <img src="<?= BASE_URL ?>public/img/logo.svg" alt="<?= htmlspecialchars($appName) ?>" style="height:44px;max-width:180px;object-fit:contain">
     <?php endif; ?>
     <?php if (!empty($empresa)): ?>
     <p style="font-size:.75rem;color:#6B7280;margin-top:6px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="<?= htmlspecialchars($empresa['razon_social']) ?>">
