@@ -1,20 +1,49 @@
 -- ============================================================
 -- Migration 001 — Registro público y seguridad de login
--- Ejecutar en cPanel → phpMyAdmin sobre idactivo_carnihubdb
+-- Compatible MySQL 5.7 · Ejecutar en cPanel → phpMyAdmin
 -- ============================================================
 
--- 1. Columnas extra en usuarios (perfil de registro)
-ALTER TABLE `usuarios`
-  ADD COLUMN `telefono`        VARCHAR(20)    NULL DEFAULT NULL AFTER `activo`,
-  ADD COLUMN `ubicacion_texto` VARCHAR(255)   NULL DEFAULT NULL AFTER `telefono`,
-  ADD COLUMN `ubicacion_lat`   DECIMAL(10,7)  NULL DEFAULT NULL AFTER `ubicacion_texto`,
-  ADD COLUMN `ubicacion_lng`   DECIMAL(10,7)  NULL DEFAULT NULL AFTER `ubicacion_lat`;
+DROP PROCEDURE IF EXISTS _m001;
+DELIMITER $$
+CREATE PROCEDURE _m001()
+BEGIN
 
--- 2. Tipo de negocio en empresas
-ALTER TABLE `empresas`
-  ADD COLUMN `tipo_negocio` VARCHAR(100) NULL DEFAULT NULL AFTER `razon_social`;
+  -- usuarios: telefono
+  IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='usuarios' AND COLUMN_NAME='telefono') THEN
+    ALTER TABLE `usuarios` ADD COLUMN `telefono` VARCHAR(20) NULL DEFAULT NULL;
+  END IF;
 
--- 3. Tabla para bloqueo por intentos fallidos de login
+  -- usuarios: ubicacion_texto
+  IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='usuarios' AND COLUMN_NAME='ubicacion_texto') THEN
+    ALTER TABLE `usuarios` ADD COLUMN `ubicacion_texto` VARCHAR(255) NULL DEFAULT NULL;
+  END IF;
+
+  -- usuarios: ubicacion_lat
+  IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='usuarios' AND COLUMN_NAME='ubicacion_lat') THEN
+    ALTER TABLE `usuarios` ADD COLUMN `ubicacion_lat` DECIMAL(10,7) NULL DEFAULT NULL;
+  END IF;
+
+  -- usuarios: ubicacion_lng
+  IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='usuarios' AND COLUMN_NAME='ubicacion_lng') THEN
+    ALTER TABLE `usuarios` ADD COLUMN `ubicacion_lng` DECIMAL(10,7) NULL DEFAULT NULL;
+  END IF;
+
+  -- empresas: tipo_negocio
+  IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='empresas' AND COLUMN_NAME='tipo_negocio') THEN
+    ALTER TABLE `empresas` ADD COLUMN `tipo_negocio` VARCHAR(100) NULL DEFAULT NULL;
+  END IF;
+
+END$$
+DELIMITER ;
+CALL _m001();
+DROP PROCEDURE IF EXISTS _m001;
+
+-- Tablas nuevas (IF NOT EXISTS es seguro en CREATE TABLE para MySQL 5.7)
 CREATE TABLE IF NOT EXISTS `login_intentos` (
   `id`         INT UNSIGNED  NOT NULL AUTO_INCREMENT,
   `ip`         VARCHAR(45)   NOT NULL,
@@ -25,7 +54,6 @@ CREATE TABLE IF NOT EXISTS `login_intentos` (
   KEY `idx_email_fecha` (`email`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 4. Tabla para tokens de verificación de correo
 CREATE TABLE IF NOT EXISTS `verificacion_tokens` (
   `id`          INT UNSIGNED  NOT NULL AUTO_INCREMENT,
   `usuario_id`  INT UNSIGNED  NOT NULL,
@@ -40,7 +68,6 @@ CREATE TABLE IF NOT EXISTS `verificacion_tokens` (
   CONSTRAINT `fk_vtoken_usuario` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 5. Tabla para registrar intentos de auto-registro (rate limiting)
 CREATE TABLE IF NOT EXISTS `registro_intentos` (
   `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
   `ip`         VARCHAR(45)  NOT NULL,
