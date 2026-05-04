@@ -5,7 +5,18 @@
 <aside class="sidebar" id="sidebar">
   <div class="sidebar-logo">
     <a href="<?= BASE_URL ?>dashboard/index">
-      <img src="<?= BASE_URL ?>public/img/logo.svg" alt="CarniHub" style="height:36px">
+      <?php
+        try {
+          $_lr = Database::getInstance()->query("SELECT clave,valor FROM global_settings WHERE clave IN ('app_logo','app_nombre')")->fetchAll(PDO::FETCH_KEY_PAIR);
+        } catch(Exception $e){ $_lr=[]; }
+        $_lp = $_lr['app_logo'] ?? '';
+        $_ln = $_lr['app_nombre'] ?? 'CarniHub';
+      ?>
+      <?php if(!empty($_lp)): ?>
+      <img src="<?= BASE_URL . htmlspecialchars($_lp) ?>" alt="<?= htmlspecialchars($_ln) ?>" style="height:36px;max-width:160px;object-fit:contain">
+      <?php else: ?>
+      <span style="font-size:1.2rem;font-weight:800;color:#C8102E;letter-spacing:-1px"><?= htmlspecialchars($_ln) ?></span>
+      <?php endif; ?>
     </a>
     <div style="font-size:.7rem;color:#6B7280;margin-top:4px">
       <?= htmlspecialchars($_SESSION['usuario']['rol_nombre'] ?? '') ?>

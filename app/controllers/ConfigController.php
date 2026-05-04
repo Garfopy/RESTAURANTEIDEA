@@ -48,6 +48,32 @@ class ConfigController extends BaseController
         $campos = $_POST;
         unset($campos['grupo']);
 
+        // Manejar subida de logo
+        if (!empty($_FILES['app_logo']['tmp_name']) && $_FILES['app_logo']['error'] === UPLOAD_ERR_OK) {
+            $allowedExts = ['png', 'jpg', 'jpeg', 'webp', 'svg'];
+            $ext = strtolower(pathinfo($_FILES['app_logo']['name'], PATHINFO_EXTENSION));
+            if (in_array($ext, $allowedExts, true) && $_FILES['app_logo']['size'] <= 2097152) {
+                $dir = ROOT_PATH . '/public/uploads/logos/';
+                if (!is_dir($dir)) mkdir($dir, 0755, true);
+                $filename = 'logo.' . $ext;
+                if (move_uploaded_file($_FILES['app_logo']['tmp_name'], $dir . $filename)) {
+                    $this->model->set('app_logo', 'uploads/logos/' . $filename);
+                }
+            }
+        }
+        unset($campos['app_logo']); // nunca guardar el campo file vacío
+
+        // Borrar logo si se solicitó
+        if (!empty($campos['app_logo_borrar']) && $campos['app_logo_borrar'] === '1') {
+            $currentLogo = $this->model->get('app_logo', '');
+            if ($currentLogo) {
+                $logoFile = ROOT_PATH . '/public/' . $currentLogo;
+                if (file_exists($logoFile)) @unlink($logoFile);
+                $this->model->set('app_logo', '');
+            }
+        }
+        unset($campos['app_logo_borrar']);
+
         foreach ($campos as $k => $v) {
             $this->model->set($k, (string)$v);
         }

@@ -23,6 +23,23 @@ foreach ($config as $row) { $settingsMap[$row['clave']] = $row['valor']; }
 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 
   <div class="card">
+    <div class="card-title" style="margin-bottom:14px">🗺️ Google Maps</div>
+    <div style="display:grid;gap:10px">
+      <div>
+        <label class="form-label">API Key</label>
+        <input type="text" name="api_google_maps_key" class="form-control"
+               placeholder="AIzaSy..."
+               value="<?= htmlspecialchars($settingsMap['api_google_maps_key'] ?? '') ?>">
+      </div>
+    </div>
+    <p style="font-size:.75rem;color:#6B7280;margin-top:8px">
+      Obtén tu clave en <strong>Google Cloud Console</strong> → APIs →
+      habilita <em>Maps JavaScript API</em> + <em>Places API</em>.
+      Requerida para el mapa interactivo en el registro de compradores y repartidores.
+    </p>
+  </div>
+
+  <div class="card">
     <div class="card-title" style="margin-bottom:14px">💳 PayPal</div>
     <div style="display:grid;gap:10px">
       <div><label class="form-label">Client ID</label>

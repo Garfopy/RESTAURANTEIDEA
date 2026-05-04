@@ -55,13 +55,37 @@ foreach ($config as $row) { $settingsMap[$row['clave']] = $row['valor']; }
             <input type="text" id="colorHex" class="form-control" style="flex:1" value="<?= $settingsMap['estilo_color'] ?? '#C8102E' ?>" oninput="document.querySelector('[name=estilo_color]').value=this.value">
           </div>
         </div>
+
+        <!-- Logo upload widget -->
         <div>
-          <label class="form-label">Logotipo actual</label>
-          <?php if (!empty($settingsMap['app_logo'])): ?>
-          <img src="<?= BASE_URL . $settingsMap['app_logo'] ?>" style="height:40px;margin-bottom:8px;display:block">
-          <?php endif; ?>
-          <input type="file" name="app_logo" class="form-control" accept="image/*">
+          <label class="form-label">Logotipo del sistema</label>
+          <div style="display:flex;align-items:center;gap:14px;padding:12px;border:1px solid #E5E7EB;border-radius:10px;background:#F9FAFB">
+            <!-- Preview -->
+            <div id="logoPreview" style="width:80px;height:50px;display:flex;align-items:center;justify-content:center;background:#fff;border:1px solid #E5E7EB;border-radius:8px;overflow:hidden;flex-shrink:0">
+              <?php if (!empty($settingsMap['app_logo'])): ?>
+              <img id="logoImg" src="<?= BASE_URL . htmlspecialchars($settingsMap['app_logo']) ?>" style="max-width:100%;max-height:100%;object-fit:contain" alt="Logo">
+              <?php else: ?>
+              <span id="logoPlaceholder" style="font-size:.7rem;color:#9CA3AF;text-align:center;padding:4px">Sin logo</span>
+              <?php endif; ?>
+            </div>
+            <div style="flex:1">
+              <input type="file" id="logoInput" name="app_logo" accept="image/png,image/jpeg,image/webp,image/svg+xml" style="display:none" onchange="previewLogo(this)">
+              <p style="font-size:.75rem;color:#6B7280;margin:0 0 8px">PNG, JPG, WebP o SVG · máx. 2 MB</p>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button type="button" onclick="document.getElementById('logoInput').click()" class="btn btn-secondary btn-sm">
+                  Seleccionar logo
+                </button>
+                <?php if (!empty($settingsMap['app_logo'])): ?>
+                <button type="button" onclick="borrarLogo()" class="btn btn-sm" style="background:#FEE2E2;color:#991B1B;border:1px solid #FECACA">
+                  Quitar logo
+                </button>
+                <?php endif; ?>
+              </div>
+            </div>
+          </div>
+          <input type="hidden" name="app_logo_borrar" id="appLogoBorrar" value="0">
         </div>
+
       </div>
     </div>
   </div>
@@ -71,4 +95,30 @@ foreach ($config as $row) { $settingsMap[$row['clave']] = $row['valor']; }
   </div>
 </form>
 
+<script>
+document.querySelector('[name=estilo_color]').addEventListener('input', function(){
+  document.getElementById('colorHex').value = this.value;
+});
+document.getElementById('colorHex').addEventListener('input', function(){
+  document.querySelector('[name=estilo_color]').value = this.value;
+});
+
+function previewLogo(input) {
+  if (!input.files || !input.files[0]) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const preview = document.getElementById('logoPreview');
+    preview.innerHTML = '<img id="logoImg" src="' + e.target.result + '" style="max-width:100%;max-height:100%;object-fit:contain" alt="Logo">';
+  };
+  reader.readAsDataURL(input.files[0]);
+  document.getElementById('appLogoBorrar').value = '0';
+}
+
+function borrarLogo() {
+  document.getElementById('appLogoBorrar').value = '1';
+  document.getElementById('logoInput').value = '';
+  const preview = document.getElementById('logoPreview');
+  preview.innerHTML = '<span style="font-size:.7rem;color:#9CA3AF;text-align:center;padding:4px">Sin logo</span>';
+}
+</script>
 <?php include ROOT_PATH . '/app/views/components/footer.php'; ?>

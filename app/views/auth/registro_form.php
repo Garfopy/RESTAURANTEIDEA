@@ -3,6 +3,7 @@ $esComprador   = ($tipo === 'comprador');
 $tituloTipo    = $esComprador ? 'Comprador' : 'Repartidor';
 $iconoTipo     = $esComprador ? '🛒' : '🏍️';
 $colorBoton    = $esComprador ? '#C8102E' : '#1F2937';
+$tieneMapa     = !empty($mapsKey);
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -21,7 +22,21 @@ $colorBoton    = $esComprador ? '#C8102E' : '#1F2937';
   <!-- Header -->
   <div style="text-align:center;margin-bottom:28px">
     <a href="<?= BASE_URL ?>registro/index">
-      <img src="<?= BASE_URL ?>public/img/logo.svg" alt="CarniHub" style="height:40px;margin-bottom:12px">
+      <?php
+        // Logo dinámico
+        try {
+            $stmt = Database::getInstance()->prepare("SELECT clave, valor FROM global_settings WHERE clave IN ('app_logo','app_nombre')");
+            $stmt->execute();
+            $rows = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+        } catch (Exception $e) { $rows = []; }
+        $_logo   = $rows['app_logo'] ?? '';
+        $_nombre = $rows['app_nombre'] ?? APP_NAME;
+      ?>
+      <?php if (!empty($_logo)): ?>
+      <img src="<?= BASE_URL . htmlspecialchars($_logo) ?>" alt="<?= htmlspecialchars($_nombre) ?>" style="height:44px;margin-bottom:12px;object-fit:contain">
+      <?php else: ?>
+      <div style="font-size:1.75rem;font-weight:800;color:#C8102E;margin-bottom:12px;letter-spacing:-1px"><?= htmlspecialchars($_nombre) ?></div>
+      <?php endif; ?>
     </a>
     <h1 style="font-size:1.5rem;font-weight:800;color:#111827">
       <?= $iconoTipo ?> Registro de <?= $tituloTipo ?>
@@ -96,7 +111,7 @@ $colorBoton    = $esComprador ? '#C8102E' : '#1F2937';
       </div>
 
       <?php if ($esComprador): ?>
-      <!-- Datos del negocio (solo comprador) -->
+      <!-- Datos del negocio -->
       <h3 style="font-size:1rem;font-weight:700;color:#111827;margin-bottom:16px;padding-bottom:8px;border-bottom:2px solid #F3F4F6">
         Datos del negocio
       </h3>
@@ -108,7 +123,7 @@ $colorBoton    = $esComprador ? '#C8102E' : '#1F2937';
         </div>
         <div>
           <label class="form-label">Tipo de negocio</label>
-          <select name="tipo_negocio" class="form-control">
+          <select name="tipo_negocio" id="tipoNegocio" class="form-control" onchange="mostrarOtroTipo(this.value)">
             <option value="">Seleccionar…</option>
             <option value="taqueria">Taquería</option>
             <option value="restaurant">Restaurant</option>
@@ -116,16 +131,31 @@ $colorBoton    = $esComprador ? '#C8102E' : '#1F2937';
             <option value="cocina_economica">Cocina económica</option>
             <option value="supermercado">Supermercado / Tienda</option>
             <option value="hotel">Hotel / Catering</option>
-            <option value="otro">Otro</option>
+            <option value="otro">Otro…</option>
           </select>
         </div>
+      </div>
+      <!-- Campo libre para "Otro" tipo de negocio -->
+      <div id="otroTipoDiv" style="display:none;margin-bottom:16px">
+        <label class="form-label">Especifica el tipo de negocio <span style="color:#C8102E">*</span></label>
+        <input type="text" name="tipo_negocio_otro" id="tipoNegocioOtro" class="form-control" placeholder="Ej: Asadero, Lonchería, Fonda…" maxlength="100">
       </div>
       <?php endif; ?>
 
       <!-- Ubicación -->
-      <h3 style="font-size:1rem;font-weight:700;color:#111827;margin-bottom:16px;padding-bottom:8px;border-bottom:2px solid #F3F4F6">
+      <h3 style="font-size:1rem;font-weight:700;color:#111827;margin-bottom:8px;padding-bottom:8px;border-bottom:2px solid #F3F4F6">
         <?= $esComprador ? 'Ubicación del negocio' : 'Tu zona de trabajo' ?>
       </h3>
+
+      <?php if (!$esComprador): ?>
+      <p style="font-size:.8rem;color:#6B7280;margin-bottom:12px">
+        Indica la colonia o zona donde operas. Se mostrará un círculo en el mapa con tu área de cobertura aproximada.
+      </p>
+      <?php else: ?>
+      <p style="font-size:.8rem;color:#6B7280;margin-bottom:12px">
+        Busca la dirección de tu negocio. Puedes mover el marcador en el mapa para afinar la ubicación exacta.
+      </p>
+      <?php endif; ?>
 
       <div style="margin-bottom:8px">
         <label class="form-label">
@@ -137,20 +167,33 @@ $colorBoton    = $esComprador ? '#C8102E' : '#1F2937';
           id="ubicacionInput"
           name="ubicacion"
           class="form-control"
-          placeholder="Escribe la dirección o colonia…"
+          placeholder="<?= $esComprador ? 'Ej: Av. Juárez 123, Centro, Querétaro' : 'Ej: Colonia Centro, Querétaro, QRO' ?>"
           required
           autocomplete="off">
         <input type="hidden" name="ubicacion_lat" id="ubicacionLat">
         <input type="hidden" name="ubicacion_lng" id="ubicacionLng">
+        <?php if ($tieneMapa): ?>
         <p style="font-size:.75rem;color:#6B7280;margin-top:4px">
-          Selecciona una opción de la lista para capturar las coordenadas exactas.
+          Escribe y selecciona una opción de la lista para fijar las coordenadas.
         </p>
+        <?php endif; ?>
       </div>
 
-      <!-- Mini mapa de confirmación -->
-      <div id="mapaPreview" style="display:none;height:180px;border-radius:10px;overflow:hidden;margin-bottom:16px;border:1px solid #E5E7EB">
-        <iframe id="mapaFrame" width="100%" height="180" frameborder="0" style="border:0" allowfullscreen></iframe>
+      <!-- Mapa interactivo (visible tras seleccionar ubicación) -->
+      <?php if ($tieneMapa): ?>
+      <div id="mapaDiv" style="display:none;margin-bottom:16px;border-radius:12px;overflow:hidden;border:1px solid #E5E7EB">
+        <div id="mapa" style="height:260px;width:100%"></div>
+        <?php if (!$esComprador): ?>
+        <div style="background:#FEF3C7;padding:8px 12px;font-size:.75rem;color:#92400E">
+          🔴 El círculo muestra tu zona de cobertura aproximada (radio 8 km). Puedes hacer clic en el mapa para mover el centro.
+        </div>
+        <?php else: ?>
+        <div style="background:#EFF6FF;padding:8px 12px;font-size:.75rem;color:#1E40AF">
+          📍 Arrastra el marcador para afinar la ubicación exacta de tu negocio.
+        </div>
+        <?php endif; ?>
       </div>
+      <?php endif; ?>
 
       <!-- Submit -->
       <div style="margin-top:24px">
@@ -176,54 +219,29 @@ $colorBoton    = $esComprador ? '#C8102E' : '#1F2937';
 
 </div>
 
-<!-- Google Maps Places Autocomplete -->
-<?php if (defined('GOOGLE_MAPS_KEY') && GOOGLE_MAPS_KEY): ?>
-<script>
-  let autocomplete;
-
-  function initAutocomplete() {
-    autocomplete = new google.maps.places.Autocomplete(
-      document.getElementById('ubicacionInput'),
-      { types: ['geocode', 'establishment'], componentRestrictions: { country: 'mx' } }
-    );
-    autocomplete.addListener('place_changed', onPlaceChanged);
-  }
-
-  function onPlaceChanged() {
-    const place = autocomplete.getPlace();
-    if (!place.geometry) return;
-    const lat = place.geometry.location.lat();
-    const lng = place.geometry.location.lng();
-    document.getElementById('ubicacionLat').value = lat;
-    document.getElementById('ubicacionLng').value = lng;
-
-    // Mini mapa embed
-    const frame  = document.getElementById('mapaFrame');
-    const key    = '<?= GOOGLE_MAPS_KEY ?>';
-    frame.src    = `https://www.google.com/maps/embed/v1/place?key=${key}&q=${lat},${lng}&zoom=16`;
-    document.getElementById('mapaPreview').style.display = 'block';
-  }
-</script>
-<script
-  src="https://maps.googleapis.com/maps/api/js?key=<?= GOOGLE_MAPS_KEY ?>&libraries=places&callback=initAutocomplete"
-  async defer></script>
-<?php else: ?>
-<script>
-  // Sin API key de Google Maps: el campo de texto funciona como campo libre
-  document.getElementById('ubicacionInput').placeholder = 'Ej: Colonia Centro, Querétaro, QRO';
-</script>
-<?php endif; ?>
-
+<!-- Scripts -->
 <script>
 function togglePass(id) {
   const el = document.getElementById(id);
   el.type = el.type === 'password' ? 'text' : 'password';
 }
 
-// Validación visual contraseñas coinciden
+function mostrarOtroTipo(val) {
+  const div  = document.getElementById('otroTipoDiv');
+  const inp  = document.getElementById('tipoNegocioOtro');
+  if (val === 'otro') {
+    div.style.display = 'block';
+    inp.required = true;
+  } else {
+    div.style.display = 'none';
+    inp.required = false;
+    inp.value = '';
+  }
+}
+
 document.getElementById('passConfirm').addEventListener('input', function() {
-  const pass  = document.getElementById('passInput').value;
-  const msg   = document.getElementById('passMsg');
+  const pass = document.getElementById('passInput').value;
+  const msg  = document.getElementById('passMsg');
   if (!this.value) { msg.textContent = ''; return; }
   if (this.value === pass) {
     msg.textContent = '✓ Las contraseñas coinciden';
@@ -234,7 +252,6 @@ document.getElementById('passConfirm').addEventListener('input', function() {
   }
 });
 
-// Prevenir submit con contraseñas distintas
 document.getElementById('formRegistro').addEventListener('submit', function(e) {
   const p1 = document.getElementById('passInput').value;
   const p2 = document.getElementById('passConfirm').value;
@@ -243,8 +260,114 @@ document.getElementById('formRegistro').addEventListener('submit', function(e) {
     document.getElementById('passMsg').textContent = '✗ Las contraseñas no coinciden';
     document.getElementById('passMsg').style.color = '#DC2626';
     document.getElementById('passConfirm').focus();
+    return;
+  }
+  // Validar tipo_negocio_otro si aplica
+  const tipoSelect = document.getElementById('tipoNegocio');
+  if (tipoSelect && tipoSelect.value === 'otro') {
+    const otroVal = document.getElementById('tipoNegocioOtro').value.trim();
+    if (!otroVal) {
+      e.preventDefault();
+      document.getElementById('tipoNegocioOtro').focus();
+      return;
+    }
   }
 });
 </script>
+
+<?php if ($tieneMapa): ?>
+<script>
+let map, marker, circle, autocomplete;
+const MAPS_KEY = '<?= htmlspecialchars($mapsKey, ENT_QUOTES) ?>';
+const esComprador = <?= $esComprador ? 'true' : 'false' ?>;
+const DEFAULT_CENTER = { lat: 20.5881, lng: -100.3895 }; // Querétaro
+
+function initMap() {
+  map = new google.maps.Map(document.getElementById('mapa'), {
+    center: DEFAULT_CENTER,
+    zoom: 12,
+    mapTypeControl: false,
+    streetViewControl: false,
+    fullscreenControl: false,
+  });
+
+  if (esComprador) {
+    // Marcador draggable para confirmar ubicación
+    marker = new google.maps.Marker({
+      position: DEFAULT_CENTER,
+      map: map,
+      draggable: true,
+      animation: google.maps.Animation.DROP,
+      title: 'Arrastra para ajustar la ubicación',
+    });
+    marker.addListener('dragend', function() {
+      const pos = marker.getPosition();
+      document.getElementById('ubicacionLat').value = pos.lat();
+      document.getElementById('ubicacionLng').value = pos.lng();
+    });
+    // Clic en mapa mueve marcador
+    map.addListener('click', function(e) {
+      marker.setPosition(e.latLng);
+      document.getElementById('ubicacionLat').value = e.latLng.lat();
+      document.getElementById('ubicacionLng').value = e.latLng.lng();
+    });
+  } else {
+    // Círculo para zona repartidor
+    circle = new google.maps.Circle({
+      strokeColor: '#C8102E',
+      strokeOpacity: 0.85,
+      strokeWeight: 2,
+      fillColor: '#C8102E',
+      fillOpacity: 0.12,
+      map: map,
+      center: DEFAULT_CENTER,
+      radius: 8000,
+    });
+    // Clic en mapa mueve centro del círculo
+    map.addListener('click', function(e) {
+      circle.setCenter(e.latLng);
+      document.getElementById('ubicacionLat').value = e.latLng.lat();
+      document.getElementById('ubicacionLng').value = e.latLng.lng();
+    });
+  }
+
+  // Autocomplete
+  autocomplete = new google.maps.places.Autocomplete(
+    document.getElementById('ubicacionInput'),
+    { types: ['geocode', 'establishment'], componentRestrictions: { country: 'mx' } }
+  );
+  autocomplete.addListener('place_changed', onPlaceChanged);
+}
+
+function onPlaceChanged() {
+  const place = autocomplete.getPlace();
+  if (!place.geometry) return;
+
+  const lat = place.geometry.location.lat();
+  const lng = place.geometry.location.lng();
+  document.getElementById('ubicacionLat').value = lat;
+  document.getElementById('ubicacionLng').value = lng;
+
+  document.getElementById('mapaDiv').style.display = 'block';
+  map.setCenter({ lat, lng });
+
+  if (esComprador) {
+    marker.setPosition({ lat, lng });
+    map.setZoom(17);
+  } else {
+    circle.setCenter({ lat, lng });
+    map.fitBounds(circle.getBounds());
+  }
+}
+</script>
+<script
+  src="https://maps.googleapis.com/maps/api/js?key=<?= htmlspecialchars($mapsKey, ENT_QUOTES) ?>&libraries=places&callback=initMap"
+  async defer></script>
+<?php else: ?>
+<script>
+  document.getElementById('ubicacionInput').placeholder =
+    <?= $esComprador ? "'Ej: Av. Juárez 123, Centro, Querétaro, QRO'" : "'Ej: Col. Centro, Querétaro, QRO'" ?>;
+</script>
+<?php endif; ?>
 </body>
 </html>
