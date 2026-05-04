@@ -125,9 +125,14 @@ $esSupervisor = in_array($rol, ['admin_empresa', 'supervisor'], true);
 
   <div style="position:sticky;bottom:0;padding:12px 16px;border-top:1px solid #E5E7EB;background:#fff">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-      <div style="width:32px;height:32px;border-radius:50%;background:#FEE2E2;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.85rem;color:var(--color-primary)">
-        <?= strtoupper(mb_substr($usuario['nombre'] ?? 'U', 0, 1)) ?>
-      </div>
+      <?php if (!empty($usuario['avatar'])): ?>
+        <img src="<?= htmlspecialchars($usuario['avatar']) ?>" alt="Avatar"
+             style="width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0;border:1px solid #E5E7EB">
+      <?php else: ?>
+        <div style="width:32px;height:32px;border-radius:50%;background:#FEE2E2;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.85rem;color:var(--color-primary);flex-shrink:0">
+          <?= strtoupper(mb_substr($usuario['nombre'] ?? 'U', 0, 1)) ?>
+        </div>
+      <?php endif; ?>
       <div style="overflow:hidden">
         <div style="font-size:.8rem;font-weight:600;color:#111827;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><?= htmlspecialchars($usuario['nombre'] ?? '') ?></div>
         <span class="badge-rol"><?= htmlspecialchars($usuario['rol_nombre'] ?? '') ?></span>

@@ -100,9 +100,14 @@ $esSuperAdmin  = ($usuario['rol_slug'] ?? '') === 'superadmin';
   <!-- Pie del sidebar -->
   <div style="position:sticky;bottom:0;padding:12px 20px;border-top:1px solid rgba(255,255,255,.1);background:var(--color-secondary)">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-      <div style="width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.85rem">
-        <?= strtoupper(mb_substr($usuario['nombre'] ?? 'U', 0, 1)) ?>
-      </div>
+      <?php if (!empty($usuario['avatar'])): ?>
+        <img src="<?= htmlspecialchars($usuario['avatar']) ?>" alt="Avatar"
+             style="width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0;border:1px solid rgba(255,255,255,.2)">
+      <?php else: ?>
+        <div style="width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.85rem;flex-shrink:0">
+          <?= strtoupper(mb_substr($usuario['nombre'] ?? 'U', 0, 1)) ?>
+        </div>
+      <?php endif; ?>
       <div>
         <div style="font-size:.8rem;font-weight:600"><?= htmlspecialchars($usuario['nombre'] ?? '') ?></div>
         <span class="badge-rol"><?= htmlspecialchars($usuario['rol_nombre'] ?? '') ?></span>
