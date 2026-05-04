@@ -309,7 +309,16 @@ Login exitoso redirige:
 - [x] Vista catálogo/detalle.php
 - [x] `PedidoModel` — generarFolio, crear con transacción, pendientesAprobacion, aprobar, rechazar
 
-### Sprint 4 — Panel de Plataforma (admin)
+### Sprint 4A — Configuración Global + Foto de Perfil ✅ COMPLETADO
+- [x] `ConfigController` completo — general, apis, correo, subirLogo (solo superadmin)
+- [x] Vista `config/general.php` — nombre app, colores, upload de logo
+- [x] Vista `config/apis.php` — todas las claves de API con toggle show/hide
+- [x] Vista `config/correo.php` — configuración SMTP
+- [x] Logo dinámico ya funcional en ambos layouts (panel y empresa) — ya estaba implementado
+- [x] `CuentaController::subirAvatar()` — foto de perfil para todos los roles (avatars/)
+- [x] Vista `empresa/cuenta/perfil.php` — sección de avatar con preview circular o iniciales
+
+### Sprint 4B — Panel de Plataforma (admin)
 - [ ] `PanelProductoController` — CRUD productos + precios escalonados
 - [ ] `PanelInventarioController` — stock + alertas + movimientos
 - [ ] `PanelPedidoController` — todos los pedidos + cambiar estado
@@ -317,11 +326,8 @@ Login exitoso redirige:
 - [ ] `PanelUsuarioController` — CRUD usuarios plataforma
 - [ ] Vistas correspondientes en `/panel/`
 
-### Sprint 5 — Configuración Global (solo superadmin)
-- [ ] `ConfigController` completo (reemplazar stub)
-- [ ] Secciones: General, Correo, Estilos, Pagos, APIs, Notificaciones, GPS, Facturación, IoT
-- [ ] CSS variables dinámicas (`--color-primary`) desde `global_settings`
-- [ ] Upload de logo desde panel de configuración
+### Sprint 5 — Configuración Global extendida (solo superadmin)
+- [ ] CSS variables dinámicas (`--color-primary`) — ya funcional via ConfigModel en layouts
 
 ### Sprint 6 — Pagos y Facturación
 - [ ] `PagoController` — transferencia (subir comprobante), PayPal SDK, crédito
@@ -414,4 +420,4 @@ Todos se configuran desde `/config/general` (solo visible para superadmin).
 
 ---
 
-*Última actualización: 2026-05-04 — v2.1.0 (Sprint 3 completado)*
+*Última actualización: 2026-05-04 — v2.2.0 (Sprint 4A completado)*

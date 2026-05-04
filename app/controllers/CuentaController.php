@@ -52,6 +52,48 @@ class CuentaController extends BaseController
         $this->redirect('cuenta/perfil');
     }
 
+    public function subirAvatar(?string $p = null): void
+    {
+        if (!$this->isPost() || empty($_FILES['avatar']['name'])) {
+            $this->redirect('cuenta/perfil');
+        }
+
+        $file = $_FILES['avatar'];
+        if ($file['error'] !== UPLOAD_ERR_OK) {
+            $this->flash('error', 'Error al subir el archivo.');
+            $this->redirect('cuenta/perfil');
+        }
+        if ($file['size'] > 2 * 1024 * 1024) {
+            $this->flash('error', 'La imagen no debe superar 2 MB.');
+            $this->redirect('cuenta/perfil');
+        }
+
+        $ext   = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        $allow = ['jpg', 'jpeg', 'png', 'webp'];
+        if (!in_array($ext, $allow, true)) {
+            $this->flash('error', 'Solo se permiten imágenes JPG, PNG o WebP.');
+            $this->redirect('cuenta/perfil');
+        }
+
+        $dir = UPLOAD_PATH . 'avatars/';
+        if (!is_dir($dir)) mkdir($dir, 0755, true);
+
+        $nombre = 'avatar_' . $this->usuarioId() . '_' . time() . '.' . $ext;
+        if (!move_uploaded_file($file['tmp_name'], $dir . $nombre)) {
+            $this->flash('error', 'No se pudo guardar la imagen. Verifica permisos de la carpeta.');
+            $this->redirect('cuenta/perfil');
+        }
+
+        $url   = UPLOAD_URL . 'avatars/' . $nombre;
+        $model = new UsuarioModel();
+        $model->update($this->usuarioId(), ['avatar' => $url]);
+        $_SESSION['usuario']['avatar'] = $url;
+
+        $this->log('Subir avatar', 'cuenta');
+        $this->flash('success', 'Foto de perfil actualizada.');
+        $this->redirect('cuenta/perfil');
+    }
+
     public function cambiarPassword(?string $p = null): void
     {
         if (!$this->isPost()) $this->redirect('cuenta/perfil');

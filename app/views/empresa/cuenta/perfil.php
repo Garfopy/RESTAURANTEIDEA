@@ -1,8 +1,36 @@
 <?php
 // Vista: Perfil de usuario (todos los roles)
 $usuario = $usuario ?? $_SESSION['usuario'];
+$iniciales = strtoupper(mb_substr($usuario['nombre'] ?? 'U', 0, 1) . mb_substr($usuario['apellido_paterno'] ?? '', 0, 1));
 ?>
 <div style="max-width:560px">
+
+  <!-- Avatar -->
+  <div style="background:#fff;border-radius:12px;border:1px solid #E5E7EB;padding:24px;margin-bottom:16px">
+    <h2 style="font-size:.95rem;font-weight:700;margin-bottom:16px;color:#111827">Foto de perfil</h2>
+    <form method="POST" action="<?= BASE_URL ?>cuenta/subirAvatar" enctype="multipart/form-data"
+          style="display:flex;align-items:center;gap:20px">
+      <!-- Foto o iniciales -->
+      <?php if (!empty($usuario['avatar'])): ?>
+        <img src="<?= htmlspecialchars($usuario['avatar']) ?>" alt="Avatar"
+             style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:2px solid #E5E7EB;flex-shrink:0">
+      <?php else: ?>
+        <div style="width:72px;height:72px;border-radius:50%;background:#FEE2E2;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.3rem;color:var(--color-primary);flex-shrink:0;border:2px solid #FECACA">
+          <?= htmlspecialchars($iniciales) ?>
+        </div>
+      <?php endif; ?>
+
+      <div>
+        <label for="avatar_input" style="display:inline-block;padding:8px 16px;background:#F3F4F6;border:1px solid #E5E7EB;border-radius:8px;font-size:.85rem;font-weight:600;color:#374151;cursor:pointer">
+          Cambiar foto
+        </label>
+        <input type="file" id="avatar_input" name="avatar" accept=".jpg,.jpeg,.png,.webp"
+               style="display:none" onchange="this.form.submit()">
+        <p style="font-size:.75rem;color:#9CA3AF;margin-top:6px">JPG, PNG o WebP · Máx 2 MB</p>
+      </div>
+    </form>
+  </div>
+
   <!-- Datos del perfil -->
   <div style="background:#fff;border-radius:12px;border:1px solid #E5E7EB;padding:24px;margin-bottom:16px">
     <h2 style="font-size:.95rem;font-weight:700;margin-bottom:16px;color:#111827">Información personal</h2>
