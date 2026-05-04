@@ -1,12 +1,14 @@
 <?php
 /**
- * CarniHub — Front Controller / Router v2.0
+ * CarniHub — Front Controller / Router v2.1
  *
  * URL pattern: /{controller}/{action}/{param}
  * Portales:
- *   /panel/     → SuperAdmin + Admin (plataforma)
- *   /empresa/   → Admin Empresa + Supervisor + Comprador
- *   /repartidor/→ Repartidor
+ *   /panel/      → SuperAdmin + Admin (solo métricas y gestión de plataforma)
+ *   /empresa/    → Admin Empresa (control total de su empresa)
+ *   /supervisor/ → Supervisor (aprobaciones y supervisión)
+ *   /comprador/  → Comprador (tienda y pedidos)
+ *   /repartidor/ → Repartidor (app GPS de entregas)
  */
 
 define('ROOT_PATH', __DIR__);
@@ -29,34 +31,39 @@ $param    = $segments[2] ?? null;
 // ── Route map: URL slug → Controller class ────────────────────────────────────
 $routes = [
     // Auth (público)
-    'auth'              => 'AuthController',
+    'auth'                => 'AuthController',
     // API (AJAX)
-    'api'               => 'ApiController',
-    // Panel de plataforma (superadmin + admin)
-    'panel'             => 'PanelController',
-    'panel-empresa'     => 'EmpresaController',
-    'panel-usuario'     => 'PanelUsuarioController',
-    'panel-producto'    => 'PanelProductoController',
-    'panel-inventario'  => 'PanelInventarioController',
-    'panel-pedido'      => 'PanelPedidoController',
-    'panel-logistica'   => 'PanelLogisticaController',
-    'panel-reporte'     => 'PanelReporteController',
-    'config'            => 'ConfigController',
-    // Portal empresa (admin_empresa + supervisor + comprador)
-    'empresa'           => 'EmpresaDashboardController',
-    'empresa-usuario'   => 'EmpresaUsuarioController',
-    'empresa-sucursal'  => 'EmpresaSucursalController',
-    'empresa-vehiculo'  => 'EmpresaVehiculoController',
-    'catalogo'          => 'CatalogoController',
-    'carrito'           => 'CarritoController',
-    'pedido'            => 'PedidoController',
-    'recurrente'        => 'RecurrenteController',
-    'limite'            => 'LimiteController',
-    'empresa-reporte'   => 'EmpresaReporteController',
-    'pago'              => 'PagoController',
-    'cuenta'            => 'CuentaController',
+    'api'                 => 'ApiController',
+    // Panel de plataforma — solo superadmin + admin (métricas, empresas, usuarios, pedidos globales)
+    'panel'               => 'PanelController',
+    'panel-empresa'       => 'EmpresaController',
+    'panel-usuario'       => 'PanelUsuarioController',
+    'panel-pedido'        => 'PanelPedidoController',
+    'panel-reporte'       => 'PanelReporteController',
+    'config'              => 'ConfigController',
+    // Portal empresa — solo admin_empresa (gestión de su empresa)
+    'empresa'             => 'EmpresaDashboardController',
+    'empresa-usuario'     => 'EmpresaUsuarioController',
+    'empresa-producto'    => 'EmpresaProductoController',
+    'empresa-inventario'  => 'EmpresaInventarioController',
+    'empresa-logistica'   => 'EmpresaLogisticaController',
+    'empresa-sucursal'    => 'EmpresaSucursalController',
+    'empresa-vehiculo'    => 'EmpresaVehiculoController',
+    'empresa-reporte'     => 'EmpresaReporteController',
+    // Portal supervisor — solo supervisor
+    'supervisor'          => 'SupervisorController',
+    // Portal comprador — solo comprador
+    'comprador'           => 'CompradorController',
+    // Módulos compartidos (acceso según rol validado en cada controller)
+    'catalogo'            => 'CatalogoController',
+    'carrito'             => 'CarritoController',
+    'pedido'              => 'PedidoController',
+    'recurrente'          => 'RecurrenteController',
+    'limite'              => 'LimiteController',
+    'pago'                => 'PagoController',
+    'cuenta'              => 'CuentaController',
     // App repartidor
-    'repartidor'        => 'RepartidorController',
+    'repartidor'          => 'RepartidorController',
 ];
 
 // ── Auth guard ────────────────────────────────────────────────────────────────
@@ -75,10 +82,19 @@ if ($ctrlSlug === 'auth' && $action === 'index' && isset($_SESSION['usuario'])) 
     if (in_array($rol, ['superadmin', 'admin'], true)) {
         header('Location: ' . BASE_URL . 'panel/dashboard'); exit;
     }
+    if ($rol === 'admin_empresa') {
+        header('Location: ' . BASE_URL . 'empresa/dashboard'); exit;
+    }
+    if ($rol === 'supervisor') {
+        header('Location: ' . BASE_URL . 'supervisor/dashboard'); exit;
+    }
+    if ($rol === 'comprador') {
+        header('Location: ' . BASE_URL . 'comprador/inicio'); exit;
+    }
     if ($rol === 'repartidor') {
         header('Location: ' . BASE_URL . 'repartidor/inicio'); exit;
     }
-    header('Location: ' . BASE_URL . 'empresa/dashboard'); exit;
+    header('Location: ' . BASE_URL . 'auth/login'); exit;
 }
 
 // ── Dispatch ──────────────────────────────────────────────────────────────────
