@@ -134,7 +134,7 @@ class RegistroController extends BaseController
 
         // Si es comprador, crear empresa y asociarla
         if ($tipo === 'comprador') {
-            $stmt = $db->prepare("INSERT INTO empresas (razon_social, tipo_negocio, activo, created_at) VALUES (?, ?, 0, NOW())");
+            $stmt = $db->prepare("INSERT INTO empresas (razon_social, tipo_negocio, rfc, activo, created_at) VALUES (?, ?, '', 0, NOW())");
             $stmt->execute([$nombre_empresa, $tipo_negocio ?: null]);
             $empresaId = (int)$db->lastInsertId();
             $db->prepare("UPDATE usuarios SET empresa_id = ? WHERE id = ?")->execute([$empresaId, $userId]);
