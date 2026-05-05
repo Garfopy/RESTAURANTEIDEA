@@ -31,20 +31,11 @@ class EmpresaPedidoController extends BaseController
         $paginacion = $resultado;
 
         // Contar pendientes para badge de alerta
-        $countPendientes = $this->pedidoModel->queryOne(
-            "SELECT COUNT(*) AS n FROM pedidos WHERE empresa_id = ? AND estado = 'pendiente'",
-            [$empresaId]
-        )['n'] ?? 0;
+        $countPendientes = $this->pedidoModel->countPendientes($empresaId);
 
         // Repartidores disponibles (para modal de asignación)
         $usuarioModel = new UsuarioModel();
-        $repartidores = $usuarioModel->query(
-            "SELECT u.id, u.nombre, u.apellido_paterno FROM usuarios u
-               JOIN roles r ON r.id = u.rol_id
-              WHERE u.empresa_id = ? AND r.slug = 'repartidor' AND u.activo = 1
-           ORDER BY u.nombre",
-            [$empresaId]
-        );
+        $repartidores = $usuarioModel->getByRolEmpresa('repartidor', $empresaId);
 
         $flash      = $this->getFlash();
         $pageTitle  = 'Pedidos';
@@ -199,14 +190,7 @@ class EmpresaPedidoController extends BaseController
         $productoModel = new ProductoModel();
         $usuarioModel  = new UsuarioModel();
 
-        $compradores = $usuarioModel->query(
-            "SELECT u.id, u.nombre, u.apellido_paterno, u.email
-               FROM usuarios u
-               JOIN roles r ON r.id = u.rol_id
-              WHERE u.empresa_id = ? AND r.slug = 'comprador' AND u.activo = 1
-           ORDER BY u.nombre",
-            [$empresaId]
-        );
+        $compradores = $usuarioModel->getByRolEmpresa('comprador', $empresaId);
         $productos  = $productoModel->listadoAdmin(['empresa_id' => $empresaId], 1)['data'] ?? [];
         $flash      = $this->getFlash();
         $pageTitle  = 'Pedido Personalizado';

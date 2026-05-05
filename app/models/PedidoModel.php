@@ -127,8 +127,7 @@ class PedidoModel extends BaseModel
             array_push($params, $t, $t, $t);
         }
 
-        $sql = 'SELECT p.*, u.nombre AS comprador_nombre, u.apellido_paterno AS comprador_apellido,
-                       COALESCE(p.tipo, "normal") AS tipo
+        $sql = 'SELECT p.*, u.nombre AS comprador_nombre, u.apellido_paterno AS comprador_apellido
                   FROM pedidos p
                   JOIN usuarios u ON u.id = p.comprador_id
                  WHERE ' . implode(' AND ', $where) . '
@@ -160,6 +159,15 @@ class PedidoModel extends BaseModel
             $this->db->rollBack();
             throw $e;
         }
+    }
+
+    public function countPendientes(int $empresaId): int
+    {
+        $row = $this->queryOne(
+            "SELECT COUNT(*) AS n FROM pedidos WHERE empresa_id = ? AND estado = 'pendiente'",
+            [$empresaId]
+        );
+        return (int)($row['n'] ?? 0);
     }
 
     public function pendientesAprobacion(int $empresaId): array

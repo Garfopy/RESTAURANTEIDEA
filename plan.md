@@ -1,5 +1,5 @@
-# CarniHub — Plan v2.6.1
-**Versión:** 2.6.1 | **Fecha:** 2026-05-05 | **Stack:** PHP 8.3 · MySQL · Tailwind CDN · MVC sin framework
+# CarniHub — Plan v2.6.2
+**Versión:** 2.6.2 | **Fecha:** 2026-05-05 | **Stack:** PHP 8.3 · MySQL · Tailwind CDN · MVC sin framework
 
 ---
 
@@ -674,12 +674,18 @@ Empresa/Repartidor → "En camino" → en_ruta → sube foto entrega → entrega
 - `ruta_detalle.lat_actual` + `lng_actual` ya existen en schema
 - Comprador: iframe con posición del repartidor en tiempo real
 
-**G — UI Productos mejorada (pendiente)**
-- [ ] Lista de productos: añadir columna "Stock actual" con badge de semáforo
-- [ ] Lista de productos: badge de precio base + indicador "tiene precios especiales"
-- [ ] Formulario producto: sección "Precios escalonados" con UI visual (filas add/remove dinámicas)
-- [ ] Preview de imagen antes de subir en formulario
-- [ ] Filtro rápido por categoría + botón "Stock crítico" en la barra superior
+**G — UI Productos mejorada ✅ COMPLETADO (2026-05-05)**
+- [x] Formulario producto rediseñado con 3 secciones guiadas: Información básica · Precios y rangos · Stock inicial
+- [x] Preview en tiempo real del precio al configurar
+- [x] Precios escalonados con filas add/remove dinámicas y leyenda explicativa
+- [x] Helper text en cada campo explicando su propósito
+- [x] Nota clara: "Los compradores NO ven el stock"
+
+**Bugs corregidos en producción (2026-05-05):**
+- [x] `PedidoModel::listadoEmpresa()` — eliminado `COALESCE(p.tipo,"normal") AS tipo` (duplicaba columna de `p.*` → MySQL 5.7 error en paginate COUNT subquery)
+- [x] `EmpresaPedidoController` — reemplazados 3 usos de métodos `protected` (query/queryOne) por llamadas públicas correctas: `getByRolEmpresa()` y nuevo `countPendientes()`
+- [x] `CarritoController.php` — eliminado código duplicado fuera de la clase (causaba error de sintaxis PHP)
+- [x] `paso1.php` — eliminada versión antigua con columna Stock visible al comprador; sin stock en vista del comprador
 
 **F — Email Service (movido de prioridad — hacer cuando SMTP esté configurado en cPanel)**
 > El admin puede seguir viendo la contraseña generada como fallback mientras no haya SMTP activo.
@@ -887,4 +893,4 @@ Todos se configuran desde `/config/apis` y `/config/correo` (solo visible para s
 
 ---
 
-*Última actualización: 2026-05-05 — v2.6.1 (Sprint 4C-1 revisado: sucursal=comprador · sin stock en catálogo/carrito · flujo pedido completo: solicitud→revisión empresa→tipo entrega→costo envío→aprobación→comprobante comprador→foto entrega · Migration 008 · GPS planeado para Sprint 4D)*
+*Última actualización: 2026-05-05 — v2.6.2 (Sprint 4C-1 completado: bugs corregidos — tipo duplicado en paginate, query() protegido en EmpresaPedidoController, código duplicado en CarritoController · Stock invisible al comprador · Formulario de producto rediseñado con UI guiada por secciones · Flujo pedido: comprador solicita → empresa revisa/aprueba/rechaza)*
