@@ -1,5 +1,5 @@
 # CarniHub — Plan v2.1
-**Versión:** 2.2.0 | **Fecha:** 2026-05-04 | **Stack:** PHP 8.3 · MySQL · Tailwind CDN · MVC sin framework
+**Versión:** 2.3.0 | **Fecha:** 2026-05-05 | **Stack:** PHP 8.3 · MySQL · Tailwind CDN · MVC sin framework
 
 ---
 
@@ -279,6 +279,9 @@ Login exitoso redirige según rol:
 | RecurrenteController | ❌ Pendiente | comprador, admin_empresa | Plantillas de pedido automático |
 | LimiteController | ❌ Pendiente | supervisor, admin_empresa | Límites de compra |
 | EmpresaReporteController | ❌ Pendiente | admin_empresa | Reportes de su empresa |
+| SuscripcionController | ✅ Completo | superadmin, admin | Gestión suscripciones + webhook PayPal |
+| EmpresaSuscripcionController | ✅ Completo | admin_empresa | Portal pago con PayPal |
+| PublicController | ✅ Completo | Público | Página de precios pública |
 | PagoController | ❌ Pendiente | comprador, admin_empresa | Comprobantes, PayPal, crédito |
 | EmpresaSucursalController | ❌ Pendiente | admin_empresa | CRUD sucursales con mapa |
 | EmpresaVehiculoController | ❌ Pendiente | admin_empresa | Vehículos + asignación repartidores |
@@ -293,6 +296,7 @@ Login exitoso redirige según rol:
 | ProductoModel | ✅ listadoConPrecio, getPrecioParaCantidad, getEscalonados, getCategorias, listadoAdmin, listadoInventario (fix: usa presentacion no unidad), ajustarStock, actualizarEscalonados, inicializarInventario, actualizarInventario |
 | PedidoModel | ✅ generarFolio, crear (transacción), listadoEmpresa, pendientesAprobacion, conDetalle, aprobar, rechazar, tracking, listadoGlobal, cambiarEstado, crearRuta, listadoConfirmadosPorEmpresa, getRutasActivas, getPosicionesActivas |
 | ConfigModel | ✅ get, set, getGrupo, getAll, guardarGrupo |
+| SuscripcionModel | ✅ getPlanesActivos, getPlanPorSlug, getByEmpresa, getByPaypalId, listado, crear, cambiarPlan, cambiarEstado, guardarPaypalId, activarDesdePaypal, renovar, verificarLimite |
 | LogModel | ✅ registrar, registrarError, getBitacora |
 
 ### Vistas (en `app/views/`)
@@ -338,7 +342,8 @@ Login exitoso redirige según rol:
 | Archivo | Estado |
 |---------|--------|
 | `migrations/001_schema_completo.sql` | ✅ Schema completo + seed demo (superadmin + admin_empresa) |
-| `migrations/002_seed_usuarios_prueba.sql` | ✅ Supervisor, comprador, repartidor para empresa 1 (todos: Admin2024!) |
+| `migrations/002_seed_usuarios_prueba.sql` | ✅ Supervisor, comprador, repartidor para empresa 1 |
+| `migrations/003_saas_suscripciones.sql` | ✅ Tablas `planes_saas` y `suscripciones` + ALTER empresas + seed 3 planes |
 
 ---
 
@@ -459,6 +464,31 @@ Login exitoso redirige según rol:
 
 **Migración de datos de prueba:**
 - [x] `migrations/002_seed_usuarios_prueba.sql` — supervisor, comprador, repartidor para empresa 1
+
+### Sprint 4S — SaaS: Planes, Suscripciones y PayPal ✅ COMPLETADO
+
+**Planes definitivos:**
+| Plan | Precio/mes | Usuarios | Productos | Pedidos/mes | Sucursales |
+|------|-----------|---------|---------|------------|----------|
+| Básico | $2,600 MXN | 5 | 100 | 200 | 3 |
+| Pro | $3,200 MXN | 20 | Ilimitado | Ilimitado | 10 |
+| Empresa | $4,000 MXN | Ilimitado | Ilimitado | Ilimitado | Ilimitado |
+
+- [x] `migrations/003_saas_suscripciones.sql` — tablas `planes_saas` y `suscripciones`, ALTER `empresas`
+- [x] `SuscripcionModel` — CRUD + límites + sync estado empresa
+- [x] `PayPalSuscripcionService` — wrapper PayPal Subscriptions API (sandbox/live)
+- [x] `BaseController` — `requireSuscripcionActiva()`, `getPlanActual()`
+- [x] `SuscripcionController` — panel admin: listado, cambiar plan, suspender/activar, webhook PayPal
+- [x] `EmpresaSuscripcionController` — portal empresa: mi plan, ver planes, checkout PayPal, retorno, suspendida
+- [x] `EmpresaController` — asigna plan al crear empresa
+- [x] `EmpresaModel` — listado ahora incluye plan_slug y plan_nombre via LEFT JOIN
+- [x] `PublicController` — página pública de planes sin login
+- [x] Vistas panel: `suscripciones/index.php`, `suscripciones/configurar.php`
+- [x] Vistas panel: `empresas/index.php` (columna Plan), `empresas/form.php` (cards de plan)
+- [x] Sidebar panel: enlace "Suscripciones" bajo sección Clientes
+- [x] Vistas empresa: `suscripcion/planes.php`, `confirmacion.php`, `suspendida.php`, `mi_plan.php`
+- [x] `public/planes.php` — pricing público standalone
+- [x] `index.php` — rutas `suscripcion/*`, `empresa-suscripcion/*`, `planes/*`; autoload services
 
 ### Sprint 4C-1 — Dashboard Empresa funcional (admin_empresa) 🔄 SIGUIENTE
 > Prioridad: que el admin_empresa pueda trabajar completamente sin errores.
@@ -585,4 +615,4 @@ Todos se configuran desde `/config/apis` y `/config/correo` (solo visible para s
 
 ---
 
-*Última actualización: 2026-05-04 — v2.2.0 (Fixes de errores 500: p.unidad, query() protected, estado rutas)*
+*Última actualización: 2026-05-05 — v2.3.0 (Sprint 4S: SaaS Suscripciones + PayPal — planes $2,600/$3,200/$4,000 MXN/mes)*
