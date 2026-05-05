@@ -121,7 +121,7 @@ class ProductoModel extends BaseModel
         }
 
         $sqlWhere = 'WHERE ' . implode(' AND ', $where);
-        $sql = "SELECT p.id, p.nombre, p.unidad, p.presentacion, c.nombre AS categoria_nombre,
+        $sql = "SELECT p.id, p.nombre, p.presentacion, c.nombre AS categoria_nombre,
                        COALESCE(inv.stock, 0) AS stock,
                        COALESCE(inv.umbral_minimo, 10) AS umbral_minimo,
                        inv.id AS inventario_id

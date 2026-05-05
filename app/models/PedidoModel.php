@@ -268,4 +268,62 @@ class PedidoModel extends BaseModel
             throw $e;
         }
     }
+
+    public function getRutasActivas(int $empresaId = 0): array
+    {
+        $filtroEmpresa = $empresaId > 0 ? 'AND r.empresa_id = ?' : '';
+        $params = $empresaId > 0 ? [$empresaId] : [];
+
+        return $this->query(
+            "SELECT r.id, r.fecha, r.estado,
+                    u.nombre AS repartidor_nombre, u.apellido_paterno AS repartidor_apellido,
+                    e.razon_social AS empresa_nombre,
+                    COUNT(rd.id) AS total_paradas,
+                    SUM(rd.estado = 'entregado') AS entregadas
+               FROM rutas r
+               JOIN usuarios u ON u.id = r.repartidor_id
+               JOIN empresas e ON e.id = r.empresa_id
+               JOIN ruta_detalle rd ON rd.ruta_id = r.id
+              WHERE r.estado IN ('planificada', 'en_curso')
+                    $filtroEmpresa
+              GROUP BY r.id
+              ORDER BY r.fecha DESC
+              LIMIT 50",
+            $params
+        );
+    }
+
+    public function getPosicionesActivas(int $empresaId = 0): array
+    {
+        $filtroEmpresa = $empresaId > 0 ? 'AND r.empresa_id = ?' : '';
+        $params = $empresaId > 0 ? [$empresaId] : [];
+
+        return $this->query(
+            "SELECT DISTINCT rd.lat_actual, rd.lng_actual,
+                    u.nombre AS repartidor_nombre,
+                    r.id AS ruta_id
+               FROM ruta_detalle rd
+               JOIN rutas r ON r.id = rd.ruta_id
+               JOIN usuarios u ON u.id = r.repartidor_id
+              WHERE rd.tracking_activo = 1
+                AND rd.lat_actual IS NOT NULL
+                    $filtroEmpresa",
+            $params
+        );
+    }
+
+    public function listadoConfirmadosPorEmpresa(int $empresaId): array
+    {
+        return $this->query(
+            "SELECT p.id, p.folio, p.total, p.created_at,
+                    u.nombre AS comprador_nombre, u.apellido_paterno AS comprador_apellido
+               FROM pedidos p
+               JOIN usuarios u ON u.id = p.usuario_id
+              WHERE p.empresa_id = ?
+                AND p.estado IN ('confirmado','aprobado')
+              ORDER BY p.created_at DESC
+              LIMIT 100",
+            [$empresaId]
+        );
+    }
 }

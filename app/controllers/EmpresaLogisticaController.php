@@ -14,34 +14,9 @@ class EmpresaLogisticaController extends BaseController
         $empresaId   = $_SESSION['usuario']['empresa_id'] ?? 0;
         $pedidoModel = new PedidoModel();
 
-        $rutasActivas = $pedidoModel->query(
-            "SELECT r.id, r.fecha, r.estado,
-                    u.nombre AS repartidor_nombre, u.apellido_paterno AS repartidor_apellido,
-                    COUNT(rd.id) AS total_paradas,
-                    SUM(rd.estado = 'entregado') AS entregadas
-               FROM rutas r
-               JOIN usuarios u ON u.id = r.repartidor_id
-               JOIN ruta_detalle rd ON rd.ruta_id = r.id
-              WHERE r.empresa_id = ?
-                AND r.estado IN ('pendiente', 'en_ruta')
-              GROUP BY r.id
-              ORDER BY r.fecha DESC
-              LIMIT 50",
-            [$empresaId]
-        );
+        $rutasActivas = $pedidoModel->getRutasActivas($empresaId);
 
-        $posiciones = $pedidoModel->query(
-            "SELECT DISTINCT rd.lat_actual, rd.lng_actual,
-                    u.nombre AS repartidor_nombre,
-                    r.id AS ruta_id
-               FROM ruta_detalle rd
-               JOIN rutas r ON r.id = rd.ruta_id
-               JOIN usuarios u ON u.id = r.repartidor_id
-              WHERE r.empresa_id = ?
-                AND rd.tracking_activo = 1
-                AND rd.lat_actual IS NOT NULL",
-            [$empresaId]
-        );
+        $posiciones = $pedidoModel->getPosicionesActivas($empresaId);
 
         $flash      = $this->getFlash();
         $pageTitle  = 'Logística — Mis Rutas';

@@ -14,33 +14,10 @@ class PanelLogisticaController extends BaseController
         $pedidoModel = new PedidoModel();
 
         // Rutas activas (en ruta o en preparación)
-        $rutasActivas = $pedidoModel->query(
-            "SELECT r.id, r.fecha, r.estado,
-                    u.nombre AS repartidor_nombre, u.apellido_paterno AS repartidor_apellido,
-                    e.razon_social AS empresa_nombre,
-                    COUNT(rd.id) AS total_paradas,
-                    SUM(rd.estado = 'entregado') AS entregadas
-               FROM rutas r
-               JOIN usuarios u ON u.id = r.repartidor_id
-               JOIN empresas e ON e.id = r.empresa_id
-               JOIN ruta_detalle rd ON rd.ruta_id = r.id
-              WHERE r.estado IN ('pendiente', 'en_ruta')
-              GROUP BY r.id
-              ORDER BY r.fecha DESC
-              LIMIT 50"
-        );
+        $rutasActivas = $pedidoModel->getRutasActivas();
 
         // Posiciones actuales de repartidores activos
-        $posiciones = $pedidoModel->query(
-            "SELECT DISTINCT rd.lat_actual, rd.lng_actual,
-                    u.nombre AS repartidor_nombre,
-                    r.id AS ruta_id
-               FROM ruta_detalle rd
-               JOIN rutas r ON r.id = rd.ruta_id
-               JOIN usuarios u ON u.id = r.repartidor_id
-              WHERE rd.tracking_activo = 1
-                AND rd.lat_actual IS NOT NULL"
-        );
+        $posiciones = $pedidoModel->getPosicionesActivas();
 
         $flash      = $this->getFlash();
         $pageTitle  = 'Logística — Mapa Global';

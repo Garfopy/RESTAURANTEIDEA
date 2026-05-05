@@ -1,5 +1,5 @@
 # CarniHub — Plan v2.1
-**Versión:** 2.1.0 | **Fecha:** 2026-05-04 | **Stack:** PHP 8.3 · MySQL · Tailwind CDN · MVC sin framework
+**Versión:** 2.2.0 | **Fecha:** 2026-05-04 | **Stack:** PHP 8.3 · MySQL · Tailwind CDN · MVC sin framework
 
 ---
 
@@ -99,8 +99,11 @@ global_settings · action_logs · error_logs · login_intentos
 |-----|-------|-----------|
 | Super Admin | admin@carnihub.mx | Admin2024! |
 | Admin Empresa | juan@buensabor.mx | Admin2024! |
+| Supervisor | supervisor@buensabor.mx | Admin2024! |
+| Comprador | comprador@buensabor.mx | Admin2024! |
+| Repartidor | repartidor@buensabor.mx | Admin2024! |
 
-> ⚠️ Cambia las contraseñas antes de pasar a producción real.
+> ⚠️ Para los 3 usuarios de rol empresa, importa también `migrations/002_seed_usuarios_prueba.sql` después del schema base.
 
 ---
 
@@ -265,15 +268,12 @@ Login exitoso redirige según rol:
 | PedidoController | ✅ Funcional | comprador, supervisor, admin_empresa | Historial, detalle, aprobación, tracking GPS, cancelar |
 | ConfigController | ✅ Completo | superadmin | general (logo+colores), apis (claves), correo (SMTP) |
 | PanelUsuarioController | ✅ Completo | superadmin, admin | CRUD usuarios de plataforma (admin, admin_empresa) + toggle |
-| PanelLogisticaController | ⚠️ Reasignar | superadmin → admin_empresa | Actualmente en /panel/ pero debe ser de admin_empresa |
-| PanelProductoController | ⚠️ Reasignar | admin_empresa | Actualmente en /panel/ → renombrar a EmpresaProductoController |
-| PanelInventarioController | ⚠️ Reasignar | admin_empresa | Actualmente en /panel/ → renombrar a EmpresaInventarioController |
-| PanelPedidoController | ⚠️ Ajustar | superadmin (solo lectura) | Vista global de todos los pedidos para monitoreo |
-| SupervisorController | ❌ Pendiente | supervisor | Panel dedicado de supervisor |
-| CompradorController | ❌ Pendiente | comprador | Portal de compras del cliente |
-| EmpresaProductoController | ❌ Pendiente | admin_empresa | CRUD catálogo de la empresa (migrar desde PanelProductoController) |
-| EmpresaInventarioController | ❌ Pendiente | admin_empresa | Stock de la empresa (migrar desde PanelInventarioController) |
-| EmpresaLogisticaController | ❌ Pendiente | admin_empresa | Rutas y logística de su empresa |
+| PanelLogisticaController | ✅ Funcional | superadmin, admin | Mapa global de rutas (solo monitoreo) |
+| EmpresaProductoController | ✅ Funcional | admin_empresa | CRUD catálogo de la empresa |
+| EmpresaInventarioController | ✅ Funcional | admin_empresa | Stock de la empresa — fix p.unidad aplicado |
+| EmpresaLogisticaController | ✅ Funcional | admin_empresa | Rutas de la empresa — fix query() protected aplicado |
+| SupervisorController | ⚠️ Esqueleto | supervisor | Panel dedicado — vistas pendientes |
+| CompradorController | ⚠️ Esqueleto | comprador | Portal de compras — vistas pendientes |
 | EmpresaPedidoController | ❌ Pendiente | admin_empresa | Pedidos de su empresa (consolidar) |
 | PanelReporteController | ❌ Pendiente | superadmin, admin | Reportes globales de plataforma (solo lectura) |
 | RecurrenteController | ❌ Pendiente | comprador, admin_empresa | Plantillas de pedido automático |
@@ -287,11 +287,11 @@ Login exitoso redirige según rol:
 
 | Model | Estado |
 |-------|--------|
-| BaseModel | ✅ CRUD + paginate |
-| UsuarioModel | ✅ getByEmail, getByEmpresa, rolesPermitidos, crear, getConRol, getRolPorSlug, getRepartidoresGlobal |
+| BaseModel | ✅ CRUD + paginate (query/queryOne/execute son protected — llamar solo desde models) |
+| UsuarioModel | ✅ getByEmail, getByEmpresa, rolesPermitidos, crear, getConRol, getRolPorSlug, getRolPorId, getRepartidoresGlobal, getRepartidoresPorEmpresa |
 | EmpresaModel | ✅ listado con filtros, estadísticas, listadoSimple |
-| ProductoModel | ✅ listadoConPrecio, getPrecioParaCantidad, getEscalonados, getCategorias, listadoAdmin, listadoInventario, ajustarStock, actualizarEscalonados, inicializarInventario, actualizarInventario |
-| PedidoModel | ✅ generarFolio, crear (transacción), listadoEmpresa, pendientesAprobacion, conDetalle, aprobar, rechazar, tracking, listadoGlobal, cambiarEstado, crearRuta, listadoConfirmadosPorEmpresa |
+| ProductoModel | ✅ listadoConPrecio, getPrecioParaCantidad, getEscalonados, getCategorias, listadoAdmin, listadoInventario (fix: usa presentacion no unidad), ajustarStock, actualizarEscalonados, inicializarInventario, actualizarInventario |
+| PedidoModel | ✅ generarFolio, crear (transacción), listadoEmpresa, pendientesAprobacion, conDetalle, aprobar, rechazar, tracking, listadoGlobal, cambiarEstado, crearRuta, listadoConfirmadosPorEmpresa, getRutasActivas, getPosicionesActivas |
 | ConfigModel | ✅ get, set, getGrupo, getAll, guardarGrupo |
 | LogModel | ✅ registrar, registrarError, getBitacora |
 
@@ -337,7 +337,8 @@ Login exitoso redirige según rol:
 ### Migración
 | Archivo | Estado |
 |---------|--------|
-| `migrations/001_schema_completo.sql` | ✅ Schema completo + seed demo |
+| `migrations/001_schema_completo.sql` | ✅ Schema completo + seed demo (superadmin + admin_empresa) |
+| `migrations/002_seed_usuarios_prueba.sql` | ✅ Supervisor, comprador, repartidor para empresa 1 (todos: Admin2024!) |
 
 ---
 
@@ -433,60 +434,79 @@ Login exitoso redirige según rol:
 - [x] Logo dinámico ya funcional en ambos layouts (panel y empresa)
 - [x] `CuentaController::subirAvatar()` — foto de perfil para todos los roles
 
-### Sprint 4B — Panel de Plataforma (superadmin/admin) ✅ PARCIALMENTE COMPLETADO
-> ⚠️ Algunos controllers se construyeron correctamente, otros fueron asignados al rol incorrecto y deben migrar.
+### Sprint 4B — Portales por rol + Corrección de arquitectura ✅ COMPLETADO
+> Arquitectura de roles corregida: admin_empresa es VENDEDOR (no comprador).
 
-- [x] `PanelUsuarioController` — CRUD usuarios plataforma (admin, admin_empresa) + toggle ✅ CORRECTO
-- [x] `PanelPedidoController` — vista global de pedidos (solo lectura para superadmin) ✅ CORRECTO
-- [x] Vistas panel/usuarios/ y panel/pedidos/ ✅ CORRECTAS
-- [⚠️] `PanelProductoController` — construido, pero debe ser `EmpresaProductoController` (admin_empresa)
-- [⚠️] `PanelInventarioController` — construido, debe ser `EmpresaInventarioController` (admin_empresa)
-- [⚠️] `PanelLogisticaController` — construido, debe ser `EmpresaLogisticaController` (admin_empresa)
-- [⚠️] Vistas panel/productos/, panel/inventario/, panel/logistica/ — construidas, deben migrar a empresa/
+**Correcciones aplicadas:**
+- [x] Sidebar empresa: `$esComprador` restringido a solo rol `comprador` (admin_empresa ya no ve menú de compras)
+- [x] Sidebar panel (superadmin): eliminado "Pedidos global" — superadmin solo ve métricas
+- [x] Form alta usuario empresa: selector de rol en cards + campos específicos por rol
+  - Comprador → datos del negocio y dirección de entrega
+  - Repartidor → tipo vehículo, placas, modelo, licencia
+- [x] `EmpresaUsuarioController::guardar()` — auto-crea sucursal al crear comprador
+- [x] `EmpresaProductoController`, `EmpresaInventarioController`, `EmpresaLogisticaController` — controllers del admin_empresa
+- [x] `SupervisorController`, `CompradorController` — portales dedicados por rol
+- [x] `UsuarioModel` — consolidado: getConRol, getRolPorSlug, getRolPorId, getRepartidoresGlobal, getRepartidoresPorEmpresa
 
-### Sprint 4C — Portales dedicados por rol + Migración de controllers
-> Corrección de la arquitectura de roles para que cada rol tenga su portal propio.
+**Fixes de errores (producción):**
+- [x] `ProductoModel::listadoInventario()` — eliminado `p.unidad` (columna inexistente; usar `p.presentacion`)
+- [x] `BaseModel::query()` es protected — movidas queries de logística a métodos públicos en `PedidoModel`
+  - `PedidoModel::getRutasActivas(int $empresaId = 0)` — global o filtrada por empresa
+  - `PedidoModel::getPosicionesActivas(int $empresaId = 0)` — GPS activos global o por empresa
+  - `PedidoModel::listadoConfirmadosPorEmpresa(int $empresaId)` — pedidos disponibles para asignar ruta
+- [x] `rutas.estado` — corregidos valores a `planificada/en_curso` (schema DB usa estos, no `pendiente/en_ruta`)
+- [x] `EmpresaLogisticaController::nuevaRuta()` — corregido a `getRepartidoresPorEmpresa()` (un solo argumento)
 
-- [ ] **SupervisorController** — portal dedicado para supervisor
-  - [ ] `supervisor/dashboard` — cola de aprobación + resumen operativo
-  - [ ] Mueve lógica de aprobación desde PedidoController
-  - [ ] Vista `supervisor/dashboard.php`
-- [ ] **CompradorController** — portal de compras dedicado para comprador
-  - [ ] `comprador/inicio` — bienvenida con últimos pedidos y acceso rápido al catálogo
-  - [ ] Vista `comprador/inicio.php`
-- [ ] **EmpresaProductoController** — migrar desde PanelProductoController
-  - [ ] CRUD catálogo: crear, editar, desactivar producto
-  - [ ] Precios escalonados + upload de imagen
-  - [ ] Ruta: `empresa-producto/*`
-- [ ] **EmpresaInventarioController** — migrar desde PanelInventarioController
-  - [ ] Stock por empresa + alertas + modal ajuste
-  - [ ] Ruta: `empresa-inventario/*`
-- [ ] **EmpresaLogisticaController** — migrar desde PanelLogisticaController
-  - [ ] Rutas de la empresa + mapa Leaflet + crear ruta + asignar repartidor
-  - [ ] Ruta: `empresa-logistica/*`
-- [ ] **EmpresaPedidoController** — gestión de pedidos para admin_empresa
-  - [ ] Todos los pedidos de su empresa + detalle + cambiar estado AJAX
+**Migración de datos de prueba:**
+- [x] `migrations/002_seed_usuarios_prueba.sql` — supervisor, comprador, repartidor para empresa 1
+
+### Sprint 4C-1 — Dashboard Empresa funcional (admin_empresa) 🔄 SIGUIENTE
+> Prioridad: que el admin_empresa pueda trabajar completamente sin errores.
+
+- [ ] Verificar que inventario (`/empresa-inventario/index`) carga sin errores tras fix `p.unidad`
+- [ ] Verificar que logística (`/empresa-logistica/index`) carga sin errores tras fix `query()` protected
+- [ ] `EmpresaPedidoController` — ver todos los pedidos de su empresa + cambiar estado
+  - [ ] Vista `empresa/pedidos/index.php` (existe en panel/ — migrar)
   - [ ] Ruta: `empresa-pedido/*`
-- [ ] Actualizar Router en `index.php` con las nuevas rutas
-- [ ] Actualizar sidebar de `/empresa/` para admin_empresa con los nuevos menús
-- [ ] Quitar del sidebar de `/panel/` las secciones de productos/inventario/logística (no corresponden a superadmin)
+- [ ] Sidebar empresa: agregar enlace "Pedidos" para admin_empresa (falta en `empresa/layouts/main.php`)
 
-### Sprint 5 — Sucursales y Vehículos del Admin Empresa
-- [ ] `EmpresaSucursalController` — CRUD sucursales con mapa Leaflet
-- [ ] `EmpresaVehiculoController` — vehículos + asignación de repartidores
+### Sprint 4C-2 — Portal Supervisor funcional 🔄 SIGUIENTE
+- [ ] `SupervisorController::dashboard()` — cola de pedidos + KPIs del día
+  - [ ] Pedidos pendientes de aprobación (lista + modal aprobar/rechazar)
+  - [ ] Resumen operativo: pedidos hoy, entregados, en ruta
+  - [ ] Vista `supervisor/dashboard.php`
+- [ ] Sidebar supervisor: verificar que las rutas de aprobación y límites funcionan
 
-### Sprint 6 — Pagos y Facturación
+### Sprint 4C-3 — Portal Comprador funcional 🔄 SIGUIENTE
+- [ ] `CompradorController::inicio()` — bienvenida + últimos pedidos + acceso rápido al catálogo
+  - [ ] Vista `comprador/inicio.php`
+- [ ] Verificar flujo completo: inicio → catálogo → carrito → confirmar pedido
+- [ ] Verificar que límites de compra bloquean correctamente cuando están activos
+
+### Sprint 4D — Sucursales y Vehículos del Admin Empresa
+- [ ] `EmpresaSucursalController` — CRUD sucursales con Leaflet.js
+  - [ ] index: listado de sucursales con mapa
+  - [ ] form: crear/editar con picker de coordenadas en mapa
+  - [ ] Ruta: `empresa-sucursal/*`
+- [ ] `EmpresaVehiculoController` — vehículos y asignación a repartidores
+  - [ ] index: listado de vehículos con estado y repartidor asignado
+  - [ ] form: alta de vehículo (placa, modelo, capacidad)
+  - [ ] Asignación en tabla `repartidor_vehiculo`
+  - [ ] Ruta: `empresa-vehiculo/*`
+- [ ] Al crear repartidor: guardar datos de vehículo en `repartidor_vehiculo` + `vehiculos` (en lugar de solo loguear a action_logs)
+
+### Sprint 5 — Pagos y Facturación
 - [ ] `PagoController` — transferencia (subir comprobante), PayPal SDK, crédito
 - [ ] `FacturaloService` — CFDI automático al confirmar pago
 - [ ] Vista de facturas descargables para el cliente
 
-### Sprint 7 — Notificaciones y Pedidos avanzados
+### Sprint 6 — Notificaciones y Pedidos avanzados
 - [ ] `NotificacionService` — PHPMailer SMTP + WhatsApp Cloud API
 - [ ] Eventos: pedido confirmado, en ruta, próximo (<1km), entregado
 - [ ] `RecurrenteController` — plantillas + generación automática
 - [ ] `LimiteController` — supervisor configura límites por sucursal/producto
 
-### Sprint 8 — Reportes y Analítica
+### Sprint 7 — Reportes y Analítica
 - [ ] `EmpresaReporteController` — consumo mensual, gasto por sucursal, top productos
 - [ ] `PanelReporteController` — ventas globales con gráficas Chart.js (solo lectura para superadmin)
 - [ ] Exportar Excel (PhpSpreadsheet) y PDF (Dompdf)
@@ -565,4 +585,4 @@ Todos se configuran desde `/config/apis` y `/config/correo` (solo visible para s
 
 ---
 
-*Última actualización: 2026-05-04 — v2.1.0 (Arquitectura de roles corregida)*
+*Última actualización: 2026-05-04 — v2.2.0 (Fixes de errores 500: p.unidad, query() protected, estado rutas)*
