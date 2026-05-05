@@ -233,7 +233,7 @@ class PedidoModel extends BaseModel
                     u.nombre AS comprador_nombre, u.apellido_paterno AS comprador_apellido
                FROM pedidos p
                JOIN usuarios u ON u.id = p.comprador_id
-              WHERE p.empresa_id = ? AND p.estado = 'confirmado'
+              WHERE p.empresa_id = ? AND p.estado IN ('confirmado', 'aprobado')
               ORDER BY p.created_at DESC",
             [$empresaId]
         );
@@ -309,21 +309,6 @@ class PedidoModel extends BaseModel
                 AND rd.lat_actual IS NOT NULL
                     $filtroEmpresa",
             $params
-        );
-    }
-
-    public function listadoConfirmadosPorEmpresa(int $empresaId): array
-    {
-        return $this->query(
-            "SELECT p.id, p.folio, p.total, p.created_at,
-                    u.nombre AS comprador_nombre, u.apellido_paterno AS comprador_apellido
-               FROM pedidos p
-               JOIN usuarios u ON u.id = p.usuario_id
-              WHERE p.empresa_id = ?
-                AND p.estado IN ('confirmado','aprobado')
-              ORDER BY p.created_at DESC
-              LIMIT 100",
-            [$empresaId]
         );
     }
 }
