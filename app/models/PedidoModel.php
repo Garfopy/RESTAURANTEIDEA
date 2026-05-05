@@ -65,19 +65,57 @@ class PedidoModel extends BaseModel
             $where[]  = 'p.estado = ?';
             $params[] = $filtros['estado'];
         }
+        if (!empty($filtros['tipo'])) {
+            $where[]  = 'p.tipo = ?';
+            $params[] = $filtros['tipo'];
+        }
+        if (!empty($filtros['fecha_desde'])) {
+            $where[]  = 'DATE(p.created_at) >= ?';
+            $params[] = $filtros['fecha_desde'];
+        }
+        if (!empty($filtros['fecha_hasta'])) {
+            $where[]  = 'DATE(p.created_at) <= ?';
+            $params[] = $filtros['fecha_hasta'];
+        }
         if (!empty($filtros['buscar'])) {
             $where[]  = '(p.folio LIKE ? OR u.nombre LIKE ? OR u.apellido_paterno LIKE ?)';
             $t = '%' . $filtros['buscar'] . '%';
             array_push($params, $t, $t, $t);
         }
 
-        $sql = 'SELECT p.*, u.nombre AS comprador_nombre, u.apellido_paterno AS comprador_apellido
+        $sql = 'SELECT p.*, u.nombre AS comprador_nombre, u.apellido_paterno AS comprador_apellido,
+                       COALESCE(p.tipo, "normal") AS tipo
                   FROM pedidos p
                   JOIN usuarios u ON u.id = p.comprador_id
                  WHERE ' . implode(' AND ', $where) . '
               ORDER BY p.created_at DESC';
 
         return $this->paginate($sql, $params, $page);
+    }
+
+    public function crearPersonalizado(int $empresaId, int $compradorId, string $folio, string $nota, ?string $fechaEntrega, array $lineas, float $total, int $creadoPorId): int
+    {
+        $this->db->beginTransaction();
+        try {
+            $this->execute(
+                'INSERT INTO pedidos (folio, empresa_id, comprador_id, estado, fecha_entrega, subtotal, total, notas, tipo, creado_por_id)
+                 VALUES (?, ?, ?, "confirmado", ?, ?, ?, ?, "personalizado", ?)',
+                [$folio, $empresaId, $compradorId, $fechaEntrega, $total, $total, $nota ?: null, $creadoPorId]
+            );
+            $pedidoId = (int)$this->db->lastInsertId();
+
+            foreach ($lineas as $l) {
+                $this->execute(
+                    'INSERT INTO pedido_detalle (pedido_id, producto_id, cantidad, precio_unit, subtotal) VALUES (?, ?, ?, ?, ?)',
+                    [$pedidoId, $l['producto_id'], $l['cantidad'], $l['precio_unit'], $l['subtotal']]
+                );
+            }
+            $this->db->commit();
+            return $pedidoId;
+        } catch (\Throwable $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
     }
 
     public function pendientesAprobacion(int $empresaId): array

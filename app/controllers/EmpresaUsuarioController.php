@@ -196,4 +196,57 @@ class EmpresaUsuarioController extends BaseController
         $this->model->update($userId, ['activo' => $nuevo]);
         $this->json(['ok' => true, 'activo' => $nuevo]);
     }
+
+    // Precios especiales para un comprador
+    public function precios(?string $compradorId = null): void
+    {
+        $empresaId = $this->empresaId();
+        $cId       = (int)$compradorId;
+
+        $comprador = $this->model->queryOne(
+            "SELECT u.id, u.nombre, u.apellido_paterno, u.email
+               FROM usuarios u JOIN roles r ON r.id = u.rol_id
+              WHERE u.id = ? AND u.empresa_id = ? AND r.slug = 'comprador'",
+            [$cId, $empresaId]
+        );
+        if (!$comprador) {
+            $this->redirect('empresa-usuario');
+        }
+
+        $productoModel = new ProductoModel();
+
+        if ($this->isPost()) {
+            // Guardar precios especiales
+            $productosIds = (array)$this->post('producto_id', []);
+            $precios      = (array)$this->post('precio', []);
+            $activos      = (array)$this->post('activo', []);
+
+            foreach ($productosIds as $i => $pid) {
+                $pid    = (int)$pid;
+                $precio = (float)($precios[$i] ?? 0);
+                $activo = isset($activos[$i]) ? 1 : 0;
+
+                if ($pid <= 0) continue;
+
+                if ($activo && $precio > 0) {
+                    $productoModel->guardarPrecioEspecial($empresaId, $cId, $pid, $precio);
+                } elseif (!$activo) {
+                    $productoModel->eliminarPrecioEspecial($cId, $pid);
+                }
+            }
+
+            $this->flash('success', 'Precios especiales guardados correctamente.');
+            $this->redirect('empresa-usuario/precios/' . $cId);
+        }
+
+        $productos  = $productoModel->listadoParaPreciosEspeciales($empresaId, $cId);
+        $flash      = $this->getFlash();
+        $pageTitle  = 'Precios especiales — ' . $comprador['nombre'];
+        $activeMenu = 'usuarios';
+
+        ob_start();
+        require ROOT_PATH . '/app/views/empresa/usuarios/precios_comprador.php';
+        $content = ob_get_clean();
+        require ROOT_PATH . '/app/views/empresa/layouts/main.php';
+    }
 }

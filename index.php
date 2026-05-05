@@ -46,6 +46,7 @@ $routes = [
     'empresa-usuario'     => 'EmpresaUsuarioController',
     'empresa-producto'    => 'EmpresaProductoController',
     'empresa-inventario'  => 'EmpresaInventarioController',
+    'empresa-pedido'      => 'EmpresaPedidoController',
     'empresa-logistica'   => 'EmpresaLogisticaController',
     'empresa-sucursal'    => 'EmpresaSucursalController',
     'empresa-vehiculo'    => 'EmpresaVehiculoController',

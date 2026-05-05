@@ -1,5 +1,5 @@
 # CarniHub — Plan v2.4
-**Versión:** 2.5.1 | **Fecha:** 2026-05-05 | **Stack:** PHP 8.3 · MySQL · Tailwind CDN · MVC sin framework
+**Versión:** 2.6.0 | **Fecha:** 2026-05-05 | **Stack:** PHP 8.3 · MySQL · Tailwind CDN · MVC sin framework
 
 ---
 
@@ -564,77 +564,121 @@ Login exitoso redirige según rol:
   - Tasa de errores del sistema (errores/día últimos 30 días)
 - [ ] Ruta: `panel-reporte/*` (superadmin, admin — solo lectura)
 
-### Sprint 4C-1 — Email Service + Dashboard Empresa + EmpresaPedidoController 🔄 SIGUIENTE
-> Hacer después de 4C-0 hotfixes. Incluye el email service (adelantado desde Sprint 6).
+### Sprint 4C-1 — Stock Inteligente + Productos + Precios Especiales + Pedido Personalizado ✅ COMPLETADO
+> Email service movido a Sprint 4C-Email (no prioritario). El foco ahora es hacer que el catálogo, inventario y precios sean sólidos y usables antes de seguir con pedidos.
 
-**A — Email Service: credenciales al crear usuario**
-> El admin NO debe ver la contraseña del usuario que crea. El usuario la recibe por email directamente.
-- [ ] Instalar PHPMailer: `composer require phpmailer/phpmailer`
-- [ ] `app/services/EmailService.php` — wrapper PHPMailer:
-  - Lee `smtp_host`, `smtp_port`, `smtp_user`, `smtp_pass`, `smtp_from`, `smtp_from_name` desde `global_settings`
-  - Método: `enviarBienvenida(string $emailDest, string $nombre, string $password, string $urlLogin): bool`
-  - Template HTML mínimo: logo de la empresa, nombre del usuario, email, contraseña, botón "Iniciar sesión"
-  - Si SMTP no está configurado: lanza excepción silenciosa y devuelve `false`
-- [ ] `EmpresaUsuarioController::guardar()` — cambiar flujo de contraseña:
-  1. Generar `$passwordTemporal` (no cambia)
-  2. Llamar `EmailService::enviarBienvenida($email, $nombre, $passwordTemporal, BASE_URL . 'auth/login')`
-  3. Si envío OK → flash: `"Usuario creado. Se envió un correo con sus credenciales a $email."`
-  4. Si fallo SMTP → flash con contraseña como fallback: `"Usuario creado. (Email no pudo enviarse) Contraseña: <strong>$pass</strong>"`
-- [ ] `PanelUsuarioController::guardar()` — mismo patrón para Admin Empresa creado por superadmin
-- [ ] Prerrequisito: superadmin debe configurar SMTP en `/config/correo` antes de crear usuarios
+#### Modelo de Sucursales (definitivo — aclarado 2026-05-05)
+> Las sucursales NO son almacenes del productor. Son puntos de entrega de los compradores.
 
-**B — Anti-spam: configuración de servidor (DNS)**
-> El sistema puede enviar correos pero sin estas configuraciones DNS llegarán a spam. El superadmin/hosting debe aplicarlas.
+```
+Empresa (productor de carne) — UN solo inventario global
+    │
+    ├── Comprador A (Taquería Centro) → Sucursal Centro, Sucursal Norte
+    ├── Comprador B (Restaurante Las Flores) → Sucursal Única
+    └── Comprador C (Carnicería del Valle) → Sucursal 1, Sucursal 2, Sucursal 3
+```
 
-| Registro DNS | Para qué | Cómo configurar |
-|---|---|---|
-| **SPF** | Autoriza al servidor de email a enviar en nombre del dominio | En cPanel → Zona DNS → TXT: `"v=spf1 include:tu-servidor mx ~all"` |
-| **DKIM** | Firma digital de cada correo (evita spoofing) | En cPanel → Email → Autenticación de Correo → Activar DKIM |
-| **DMARC** | Política que dice qué hacer si SPF/DKIM fallan | TXT `_dmarc.tudominio.com`: `"v=DMARC1; p=none; rua=mailto:admin@tudominio.com"` |
-| **PTR / rDNS** | El IP del servidor debe resolver al dominio | Configurar en el panel de hosting (soporte técnico) |
+- El productor envía desde su bodega → a los puntos del comprador
+- El repartidor sigue ruta con múltiples paradas (ya implementado)
+- **No hay envíos entre sucursales** en el MVP
+- **Futuro Sprint 4D+**: `almacenes_empresa` con stock por almacén y transferencias internas
 
-> ℹ️ Si usas un hosting compartido (ej: cPanel), SPF y DKIM ya están preconfigurados para el dominio. Solo verifica en cPanel → Email → Autenticación de Correo.
+**A — Movimientos de Inventario (prioridad máxima)**
+> El sistema actual solo tiene un número de stock. El supervisor y admin necesitan registrar entradas/salidas con historial.
 
-**C — Dashboard admin_empresa refactorizado**
-- [ ] **Quitar "+ Nuevo pedido"** del dashboard (el dashboard es vista, no punto de acción)
-- [ ] **Panel de estado general** con cards de:
-  - Ventas del día y del mes (suma de pedidos entregados/pagados)
-  - Cobros pendientes (pedidos confirmados sin pago registrado)
-  - Stock crítico: productos bajo mínimo (alerta roja)
-  - Últimos 5 movimientos (pedidos recientes, pagos recibidos)
-  - Pedidos en ruta ahora (enlace a logística)
-  - Equipo activo hoy (repartidores con ruta asignada)
+- [x] `migrations/006_movimientos_inventario.sql` — nueva tabla:
+- [x] `EmpresaInventarioController` — reescrito completo:
+  - [x] `index()` — dashboard de stock: tarjetas con semáforo (verde/amarillo/rojo), resumen rápido
+  - [x] `movimiento()` — formulario rápido entrada/salida/merma con cálculo de stock resultante
+  - [x] `guardarMovimiento()` — registra movimiento + actualiza inventario
+  - [x] `historial($productoId)` — historial de movimientos por producto con paginación
+  - [x] `log_movimientos()` — log global con filtros por tipo, producto, fecha
+  - [x] `ajuste($productoId)` — corrección manual de stock (solo admin_empresa)
+- [x] `ProductoModel::ajustarStock()` — ahora retorna {stock_antes, stock_despues}
+- [x] `MovimientoInventarioModel` — registrar, historialProducto, historialEmpresa, resumenStock, ultimosMovimientos, stockActual
+- [x] **Delegación al supervisor**: supervisor puede hacer entradas/salidas; ajustes solo admin_empresa
+- [x] Sidebar empresa: "Control de Stock" visible para admin_empresa Y supervisor
+- [x] Vista `empresa/inventario/index.php` — nueva UI con cards semáforo + botones rápidos + últimos movimientos
+- [x] Vista `empresa/inventario/movimiento_form.php` — formulario unificado entrada/salida/merma con preview de stock resultante
+- [x] Vista `empresa/inventario/historial.php` — log de movimientos de un producto
+- [x] Vista `empresa/inventario/log.php` — log global con filtros
+- [x] Vista `empresa/inventario/ajuste_form.php` — ajuste directo de stock
 
-**D — EmpresaPedidoController**
-- [ ] `EmpresaPedidoController` — ver todos los pedidos de su empresa + cambiar estado
-  - [ ] Vista `empresa/pedidos/empresa_index.php` (listado con filtros por estado, fecha, comprador)
-  - [ ] Ruta: `empresa-pedido/*`
-- [ ] Sidebar empresa: verificar enlace "Pedidos" para admin_empresa
+**B — Precios Especiales por Comprador**
+> Cada comprador puede tener un precio acordado diferente al catálogo general. Esto es común en ventas B2B de carne.
+
+- [x] `migrations/007_precios_especiales.sql` — tabla `precios_especiales` + columnas `tipo` y `creado_por_id` en `pedidos`
+- [x] `ProductoModel::getPrecioEspecial()` — retorna precio especial si existe
+- [x] `ProductoModel::getPrecioFinal()` — aplica: primero precio especial, sino precio escalonado por volumen
+- [x] `ProductoModel::guardarPrecioEspecial()`, `eliminarPrecioEspecial()`, `listadoParaPreciosEspeciales()`
+- [x] `EmpresaUsuarioController::precios()` — GET muestra tabla de productos + precios, POST guarda
+- [x] Vista `empresa/usuarios/precios_comprador.php` — tabla inline con toggle y cálculo de diferencia
+- [x] Lista de usuarios: link "Precios especiales" visible solo para compradores
+
+**C — Pedido Personalizado**
+> El admin_empresa o supervisor puede crear un pedido especial para un comprador con precios negociados ad-hoc, fuera del flujo estándar del carrito.
+
+- [x] `PedidoModel::crearPersonalizado()` — transacción: crea pedido + detalle con tipo='personalizado'
+- [x] `PedidoModel::listadoEmpresa()` — añadidos filtros: tipo, fecha_desde, fecha_hasta
+- [x] `EmpresaPedidoController` — creado completo:
+  - [x] `index()` — lista pedidos empresa con filtros + badge "Personalizado"
+  - [x] `cambiarEstado()` — modal de cambio de estado
+  - [x] `personalizado()` — formulario dinámico con líneas add/remove
+  - [x] `guardarPersonalizado()` — valida y crea pedido personalizado
+- [x] Vista `empresa/pedidos/empresa_index.php` — tabla con modal de estado
+- [x] Vista `empresa/pedidos/personalizado.php` — formulario dinámico con JS + cálculo de total
+- [x] Sidebar empresa: "Pedidos" → empresa-pedido, "Pedido personalizado" como ítem separado
+
+**D — EmpresaPedidoController — Vista general pedidos** ✅ (incluido en C)
+
+**E — UI Productos mejorada**
+- [ ] Lista de productos: añadir columna "Stock actual" con badge de semáforo
+- [ ] Lista de productos: badge de precio base + indicador "tiene precios especiales"
+- [ ] Formulario producto: sección "Precios escalonados" con UI visual (filas add/remove dinámicas)
+- [ ] Preview de imagen antes de subir en formulario
+- [ ] Filtro rápido por categoría + botón "Stock crítico" en la barra superior
+
+**F — Email Service (movido de prioridad — hacer cuando SMTP esté configurado en cPanel)**
+> El admin puede seguir viendo la contraseña generada como fallback mientras no haya SMTP activo.
+- [ ] `app/services/EmailService.php` con PHPMailer
+- [ ] Template HTML: bienvenida con credenciales
+- [ ] Prerrequisito: superadmin configura SMTP en `/config/correo`
 
 ### Sprint 4C-2 — Portal Supervisor funcional 🔄 SIGUIENTE
 - [ ] `SupervisorController::dashboard()` — cola de pedidos + KPIs del día
   - [ ] Pedidos pendientes de aprobación (lista + modal aprobar/rechazar)
   - [ ] Resumen operativo: pedidos hoy, entregados, en ruta
+  - [ ] Acceso a movimientos de inventario (entradas/salidas delegadas desde admin)
   - [ ] Vista `supervisor/dashboard.php`
-- [ ] Sidebar supervisor: verificar que las rutas de aprobación y límites funcionan
+- [ ] Sidebar supervisor: verificar rutas de aprobación, límites e inventario
 
 ### Sprint 4C-3 — Portal Comprador funcional 🔄 SIGUIENTE
 - [ ] `CompradorController::inicio()` — bienvenida + últimos pedidos + acceso rápido al catálogo
   - [ ] Vista `comprador/inicio.php`
-- [ ] Verificar flujo completo: inicio → catálogo → carrito → confirmar pedido
+- [ ] Verificar flujo completo: inicio → catálogo (con precios especiales si aplica) → carrito → confirmar pedido
 - [ ] Verificar que límites de compra bloquean correctamente cuando están activos
 
-### Sprint 4D — Sucursales y Vehículos del Admin Empresa
-- [ ] `EmpresaSucursalController` — CRUD sucursales con Leaflet.js
-  - [ ] index: listado de sucursales con mapa
-  - [ ] form: crear/editar con picker de coordenadas en mapa
+### Sprint 4D — Sucursales del Comprador (CRUD) + Vehículos
+> Las sucursales son los PUNTOS DE ENTREGA del comprador (no almacenes del productor).
+
+- [ ] `EmpresaSucursalController` — gestión de sucursales (puntos de entrega de compradores)
+  - [ ] index: listado de sucursales de todos los compradores de la empresa
+  - [ ] form: crear/editar con picker de coordenadas en mapa Leaflet
+  - [ ] toggle activo/inactivo
   - [ ] Ruta: `empresa-sucursal/*`
 - [ ] `EmpresaVehiculoController` — vehículos y asignación a repartidores
   - [ ] index: listado de vehículos con estado y repartidor asignado
   - [ ] form: alta de vehículo (placa, modelo, capacidad)
   - [ ] Asignación en tabla `repartidor_vehiculo`
   - [ ] Ruta: `empresa-vehiculo/*`
-- [ ] Al crear repartidor: guardar datos de vehículo en `repartidor_vehiculo` + `vehiculos` (en lugar de solo loguear a action_logs)
+- [ ] Al crear repartidor: guardar datos de vehículo en `repartidor_vehiculo` + `vehiculos`
+
+### Sprint 4D+ — Almacenes del Productor (futuro, no MVP)
+> Si el productor tiene múltiples bodegas/centros de distribución propios con stock independiente.
+- [ ] Nueva tabla `almacenes_empresa` (diferente a `sucursales` que son del comprador)
+- [ ] Stock por almacén en `inventario` + columna `almacen_id`
+- [ ] Transferencias internas entre almacenes (`transferencias_almacen`)
+- [ ] Interfaz para mover stock entre almacenes
 
 ### Sprint 5P — Pagos empresa→comprador (simulados / mock)
 > El Admin Empresa necesita recibir pagos de sus compradores. Se simula la pasarela para que el flujo se vea completo; la integración real con PayPal/Stripe va después.
@@ -800,4 +844,4 @@ Todos se configuran desde `/config/apis` y `/config/correo` (solo visible para s
 
 ---
 
-*Última actualización: 2026-05-05 — v2.5.0 (Hotfixes 4C-0: inventario stock/imagen/empresa_id · Sprint 4C-1: email service + credenciales por correo · PayPal Subscriptions guía completa · anti-spam DNS)*
+*Última actualización: 2026-05-05 — v2.6.0 (Sprint 4C-1 completo: inventario inteligente con movimientos + delegación supervisor · precios especiales por comprador · pedido personalizado con líneas dinámicas · EmpresaPedidoController · sidebar actualizado)*

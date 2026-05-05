@@ -3,28 +3,31 @@ require_once ROOT_PATH . '/app/controllers/BaseController.php';
 
 class EmpresaInventarioController extends BaseController
 {
+    private ProductoModel $productoModel;
+    private MovimientoInventarioModel $movModel;
+
     public function __construct()
     {
         parent::__construct();
-        $this->requireAdminEmpresa();
+        $this->requireSupervisor(); // admin_empresa y supervisor (no comprador)
+        $this->productoModel = new ProductoModel();
+        $this->movModel      = new MovimientoInventarioModel();
     }
 
+    // Dashboard principal de stock
     public function index(?string $p = null): void
     {
-        $filtros = [
-            'empresa_id' => $this->empresaId(),
-            'buscar'     => $this->get('buscar', ''),
-            'stock_bajo' => $this->get('stock_bajo', ''),
-        ];
-        $page = max(1, (int)$this->get('page', 1));
+        $empresaId = $this->empresaId();
+        $resumen   = $this->movModel->resumenStock($empresaId);
+        $ultimos   = $this->movModel->ultimosMovimientos($empresaId, 8);
 
-        $productoModel = new ProductoModel();
-        $resultado     = $productoModel->listadoInventario($filtros, $page);
-        $items         = $resultado['data'];
-        $paginacion    = $resultado;
-        $flash         = $this->getFlash();
-        $pageTitle     = 'Inventario';
-        $activeMenu    = 'inventario';
+        $criticos = array_filter($resumen, fn($r) => in_array($r['estado_stock'], ['critico', 'agotado']));
+        $bajos    = array_filter($resumen, fn($r) => $r['estado_stock'] === 'bajo');
+        $ok       = array_filter($resumen, fn($r) => $r['estado_stock'] === 'ok');
+
+        $flash      = $this->getFlash();
+        $pageTitle  = 'Control de Stock';
+        $activeMenu = 'inventario';
 
         ob_start();
         require ROOT_PATH . '/app/views/empresa/inventario/index.php';
@@ -32,27 +35,200 @@ class EmpresaInventarioController extends BaseController
         require ROOT_PATH . '/app/views/empresa/layouts/main.php';
     }
 
-    public function ajustar(?string $p = null): void
+    // Formulario de entrada/salida rápida
+    public function movimiento(?string $tipo = null): void
+    {
+        $tipo = in_array($tipo, ['entrada', 'salida', 'merma']) ? $tipo : 'entrada';
+
+        $empresaId = $this->empresaId();
+        $productos = $this->productoModel->listadoInventario(['empresa_id' => $empresaId], 1)['data'] ?? [];
+
+        $flash     = $this->getFlash();
+        $pageTitle = match ($tipo) {
+            'entrada' => 'Registrar Entrada de Stock',
+            'salida'  => 'Registrar Salida de Stock',
+            'merma'   => 'Registrar Merma',
+        };
+        $activeMenu = 'inventario';
+
+        ob_start();
+        require ROOT_PATH . '/app/views/empresa/inventario/movimiento_form.php';
+        $content = ob_get_clean();
+        require ROOT_PATH . '/app/views/empresa/layouts/main.php';
+    }
+
+    // Procesar el movimiento
+    public function guardarMovimiento(?string $p = null): void
     {
         if (!$this->isPost()) {
-            $this->redirect('empresa-inventario/index');
+            $this->redirect('empresa-inventario');
         }
 
+        $empresaId  = $this->empresaId();
         $productoId = (int)$this->post('producto_id');
         $tipo       = $this->post('tipo');
         $cantidad   = (float)$this->post('cantidad');
-        $notas      = trim($this->post('notas', ''));
+        $motivo     = trim($this->post('motivo', ''));
+        $referencia = trim($this->post('referencia', ''));
 
-        if ($productoId <= 0 || $cantidad <= 0) {
-            $this->flash('error', 'Datos inválidos para el ajuste.');
-            $this->redirect('empresa-inventario/index');
+        if ($productoId <= 0 || $cantidad <= 0 || !in_array($tipo, ['entrada', 'salida', 'merma', 'ajuste'])) {
+            $this->flash('error', 'Datos inválidos. Verifica la cantidad y el tipo de movimiento.');
+            $this->redirect('empresa-inventario/movimiento/' . $tipo);
         }
 
-        $productoModel = new ProductoModel();
-        $productoModel->ajustarStock($productoId, $tipo, $cantidad);
+        // Verificar que el producto pertenece a la empresa
+        $producto = $this->productoModel->queryOne(
+            'SELECT id FROM productos WHERE id = ? AND empresa_id = ?',
+            [$productoId, $empresaId]
+        );
+        if (!$producto) {
+            $this->flash('error', 'Producto no válido.');
+            $this->redirect('empresa-inventario');
+        }
 
-        $this->log('Ajuste inventario', 'inventario', "$tipo $cantidad uds — producto $productoId — $notas");
-        $this->flash('success', 'Inventario actualizado correctamente.');
-        $this->redirect('empresa-inventario/index');
+        $result = $this->productoModel->ajustarStock($productoId, $tipo, $cantidad);
+
+        $this->movModel->registrar([
+            'empresa_id'   => $empresaId,
+            'producto_id'  => $productoId,
+            'tipo'         => $tipo,
+            'cantidad'     => $cantidad,
+            'stock_antes'  => $result['stock_antes'],
+            'stock_despues'=> $result['stock_despues'],
+            'motivo'       => $motivo ?: null,
+            'referencia'   => $referencia ?: null,
+            'usuario_id'   => $this->userId(),
+        ]);
+
+        $etiqueta = match ($tipo) {
+            'entrada' => 'Entrada',
+            'salida'  => 'Salida',
+            'merma'   => 'Merma',
+            default   => 'Ajuste',
+        };
+        $this->log("$etiqueta inventario", 'inventario', "$tipo $cantidad uds — producto $productoId — $motivo");
+        $this->flash('success', "$etiqueta registrada correctamente. Stock actual: {$result['stock_despues']}");
+        $this->redirect('empresa-inventario');
+    }
+
+    // Ajuste directo (solo admin_empresa)
+    public function ajuste(?string $productoId = null): void
+    {
+        $this->requireAdminEmpresa();
+        $id = (int)$productoId;
+
+        if (!$this->isPost()) {
+            $empresaId = $this->empresaId();
+            $producto  = $this->productoModel->queryOne(
+                'SELECT p.*, COALESCE(inv.stock, 0) AS stock_actual, COALESCE(inv.umbral_minimo, 10) AS umbral_minimo
+                   FROM productos p
+              LEFT JOIN inventario inv ON inv.producto_id = p.id
+                  WHERE p.id = ? AND p.empresa_id = ?',
+                [$id, $empresaId]
+            );
+            if (!$producto) {
+                $this->redirect('empresa-inventario');
+            }
+            $flash     = $this->getFlash();
+            $pageTitle = 'Ajuste de Stock — ' . $producto['nombre'];
+            $activeMenu = 'inventario';
+            ob_start();
+            require ROOT_PATH . '/app/views/empresa/inventario/ajuste_form.php';
+            $content = ob_get_clean();
+            require ROOT_PATH . '/app/views/empresa/layouts/main.php';
+            return;
+        }
+
+        $empresaId   = $this->empresaId();
+        $stockNuevo  = (float)$this->post('stock_nuevo');
+        $umbral      = (float)$this->post('umbral_minimo');
+        $motivo      = trim($this->post('motivo', ''));
+
+        $producto = $this->productoModel->queryOne(
+            'SELECT id FROM productos WHERE id = ? AND empresa_id = ?',
+            [$id, $empresaId]
+        );
+        if (!$producto) {
+            $this->redirect('empresa-inventario');
+        }
+
+        $stockAntes = $this->movModel->stockActual($id);
+
+        $this->productoModel->execute(
+            'UPDATE inventario SET stock = ?, umbral_minimo = ? WHERE producto_id = ?',
+            [$stockNuevo, $umbral, $id]
+        );
+
+        $this->movModel->registrar([
+            'empresa_id'    => $empresaId,
+            'producto_id'   => $id,
+            'tipo'          => 'ajuste',
+            'cantidad'      => abs($stockNuevo - $stockAntes),
+            'stock_antes'   => $stockAntes,
+            'stock_despues' => $stockNuevo,
+            'motivo'        => $motivo ?: 'Ajuste manual',
+            'referencia'    => null,
+            'usuario_id'    => $this->userId(),
+        ]);
+
+        $this->flash('success', 'Stock ajustado correctamente.');
+        $this->redirect('empresa-inventario');
+    }
+
+    // Historial de movimientos de un producto
+    public function historial(?string $productoId = null): void
+    {
+        $empresaId = $this->empresaId();
+        $id        = (int)$productoId;
+        $page      = max(1, (int)$this->get('page', 1));
+
+        $producto = $this->productoModel->queryOne(
+            'SELECT p.*, COALESCE(inv.stock, 0) AS stock_actual
+               FROM productos p
+          LEFT JOIN inventario inv ON inv.producto_id = p.id
+              WHERE p.id = ? AND p.empresa_id = ?',
+            [$id, $empresaId]
+        );
+        if (!$producto) {
+            $this->redirect('empresa-inventario');
+        }
+
+        $resultado  = $this->movModel->historialProducto($id, $empresaId, $page);
+        $items      = $resultado['data'];
+        $paginacion = $resultado;
+        $flash      = $this->getFlash();
+        $pageTitle  = 'Historial — ' . $producto['nombre'];
+        $activeMenu = 'inventario';
+
+        ob_start();
+        require ROOT_PATH . '/app/views/empresa/inventario/historial.php';
+        $content = ob_get_clean();
+        require ROOT_PATH . '/app/views/empresa/layouts/main.php';
+    }
+
+    // Log global de todos los movimientos de la empresa
+    public function log_movimientos(?string $p = null): void
+    {
+        $empresaId = $this->empresaId();
+        $page      = max(1, (int)$this->get('page', 1));
+        $filtros   = [
+            'tipo'        => $this->get('tipo', ''),
+            'producto_id' => (int)$this->get('producto_id', 0),
+            'fecha_desde' => $this->get('fecha_desde', ''),
+            'fecha_hasta' => $this->get('fecha_hasta', ''),
+        ];
+
+        $resultado  = $this->movModel->historialEmpresa($empresaId, $filtros, $page);
+        $items      = $resultado['data'];
+        $paginacion = $resultado;
+        $productos  = $this->productoModel->listadoInventario(['empresa_id' => $empresaId], 1)['data'] ?? [];
+        $flash      = $this->getFlash();
+        $pageTitle  = 'Log de Movimientos';
+        $activeMenu = 'inventario';
+
+        ob_start();
+        require ROOT_PATH . '/app/views/empresa/inventario/log.php';
+        $content = ob_get_clean();
+        require ROOT_PATH . '/app/views/empresa/layouts/main.php';
     }
 }
