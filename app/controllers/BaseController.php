@@ -169,6 +169,32 @@ abstract class BaseController
         return $flash;
     }
 
+    // ── Suscripción ───────────────────────────────────────────────
+
+    protected function requireSuscripcionActiva(): void
+    {
+        $empresaId = $this->empresaId();
+        if (!$empresaId) return;
+
+        $stmt = Database::getInstance()->prepare(
+            'SELECT suscripcion_estado FROM empresas WHERE id = ?'
+        );
+        $stmt->execute([$empresaId]);
+        $estado = $stmt->fetchColumn();
+
+        if ($estado !== 'activo') {
+            $this->redirect('empresa-suscripcion/suspendida');
+        }
+    }
+
+    protected function getPlanActual(): ?array
+    {
+        $empresaId = $this->empresaId();
+        if (!$empresaId) return null;
+        $model = new SuscripcionModel();
+        return $model->getByEmpresa($empresaId);
+    }
+
     // ── Auditoría ─────────────────────────────────────────────────
     protected function log(string $accion, string $modulo = '', string $desc = ''): void
     {

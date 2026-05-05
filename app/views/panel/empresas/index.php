@@ -28,6 +28,7 @@
         <th style="padding:12px;text-align:center;color:#6B7280;font-weight:600">Usuarios</th>
         <th style="padding:12px;text-align:center;color:#6B7280;font-weight:600">Sucursales</th>
         <th style="padding:12px;text-align:left;color:#6B7280;font-weight:600">Crédito</th>
+        <th style="padding:12px;text-align:left;color:#6B7280;font-weight:600">Plan</th>
         <th style="padding:12px;text-align:left;color:#6B7280;font-weight:600">Estado</th>
       </tr>
     </thead>
@@ -48,6 +49,17 @@
           <?php else: ?>
           <span style="background:#F3F4F6;color:#6B7280;padding:2px 8px;border-radius:999px;font-size:.75rem">—</span>
           <?php endif; ?>
+        </td>
+        <td style="padding:12px">
+          <?php
+          $planSlug   = $e['plan_slug'] ?? '';
+          $planNombre = $e['plan_nombre'] ?? '';
+          $planColores = ['basico'=>'background:#F3F4F6;color:#374151','pro'=>'background:#DBEAFE;color:#1D4ED8','empresa'=>'background:#EDE9FE;color:#6D28D9'];
+          $planEstilo  = $planColores[$planSlug] ?? 'background:#FEE2E2;color:#991B1B';
+          echo $planNombre
+            ? "<span style=\"{$planEstilo};padding:2px 10px;border-radius:999px;font-size:.75rem;font-weight:600\">{$planNombre}</span>"
+            : '<span style="background:#FEE2E2;color:#991B1B;padding:2px 8px;border-radius:999px;font-size:.75rem">Sin plan</span>';
+          ?>
         </td>
         <td style="padding:12px">
           <?php if ($e['activo']): ?>

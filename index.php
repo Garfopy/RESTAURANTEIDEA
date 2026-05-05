@@ -64,10 +64,15 @@ $routes = [
     'cuenta'              => 'CuentaController',
     // App repartidor
     'repartidor'          => 'RepartidorController',
+    // SaaS — Suscripciones
+    'suscripcion'         => 'SuscripcionController',
+    'empresa-suscripcion' => 'EmpresaSuscripcionController',
+    // Página pública de planes
+    'planes'              => 'PublicController',
 ];
 
 // ── Auth guard ────────────────────────────────────────────────────────────────
-$publicPaths = ['auth/login', 'auth/dologin', 'auth/index'];
+$publicPaths = ['auth/login', 'auth/dologin', 'auth/index', 'planes/index', 'suscripcion/webhook'];
 
 $currentPath = strtolower($ctrlSlug . '/' . $action);
 
@@ -116,6 +121,9 @@ if (!file_exists($controllerFile)) {
 // ── Autoload models ───────────────────────────────────────────────────────────
 foreach (glob(ROOT_PATH . '/app/models/*.php') as $model) {
     require_once $model;
+}
+foreach (glob(ROOT_PATH . '/app/services/*.php') as $service) {
+    require_once $service;
 }
 
 require_once ROOT_PATH . '/app/controllers/BaseController.php';

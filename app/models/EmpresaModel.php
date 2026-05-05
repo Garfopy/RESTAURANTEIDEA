@@ -20,11 +20,16 @@ class EmpresaModel extends BaseModel
 
         $sqlWhere = 'WHERE ' . implode(' AND ', $where);
         $sql = "SELECT e.*,
-                       COUNT(DISTINCT u.id) AS total_usuarios,
-                       COUNT(DISTINCT s.id) AS total_sucursales
+                       COUNT(DISTINCT u.id)  AS total_usuarios,
+                       COUNT(DISTINCT sc.id) AS total_sucursales,
+                       sus.estado            AS sus_estado,
+                       pl.slug               AS plan_slug,
+                       pl.nombre             AS plan_nombre
                   FROM empresas e
-             LEFT JOIN usuarios u  ON u.empresa_id = e.id AND u.activo = 1
-             LEFT JOIN sucursales s ON s.empresa_id = e.id AND s.activo = 1
+             LEFT JOIN usuarios u    ON u.empresa_id  = e.id AND u.activo = 1
+             LEFT JOIN sucursales sc ON sc.empresa_id = e.id AND sc.activo = 1
+             LEFT JOIN suscripciones sus ON sus.empresa_id = e.id
+             LEFT JOIN planes_saas pl    ON pl.id = sus.plan_id
                   $sqlWhere
               GROUP BY e.id
               ORDER BY e.created_at DESC";
