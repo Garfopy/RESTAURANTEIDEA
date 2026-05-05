@@ -87,7 +87,7 @@ class EmpresaUsuarioController extends BaseController
         $rolInfo = $this->model->getRolPorId($rolId);
         $rolSlug = $rolInfo['slug'] ?? '';
 
-        // Si es comprador: crear su sucursal de entrega automáticamente
+        // Si es comprador: guardar dirección en usuario + crear sucursal de entrega
         if ($rolSlug === 'comprador') {
             $nombreNegocio  = trim($this->post('nombre_negocio', ''));
             $direccion      = trim($this->post('direccion_entrega', ''));
@@ -95,6 +95,15 @@ class EmpresaUsuarioController extends BaseController
             $cp             = trim($this->post('codigo_postal', ''));
             $responsable    = trim($this->post('responsable_entrega', ''));
             $horario        = trim($this->post('horario_entrega', ''));
+
+            // Guardar dirección de entrega en la columna del usuario (migration 008)
+            if ($direccion) {
+                $db = Database::getInstance();
+                $referencia = $horario ? "Horario: $horario" : null;
+                if ($responsable) $referencia = ($referencia ? $referencia . ' | ' : '') . "Recibe: $responsable";
+                $db->prepare("UPDATE usuarios SET direccion_entrega = ?, referencia_entrega = ? WHERE id = ?")
+                   ->execute([$direccion, $referencia, $usuarioId]);
+            }
 
             if ($nombreNegocio && $direccion) {
                 $dirCompleta = $direccion;

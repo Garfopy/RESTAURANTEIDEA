@@ -1,5 +1,5 @@
-# CarniHub — Plan v2.4
-**Versión:** 2.6.0 | **Fecha:** 2026-05-05 | **Stack:** PHP 8.3 · MySQL · Tailwind CDN · MVC sin framework
+# CarniHub — Plan v2.6.1
+**Versión:** 2.6.1 | **Fecha:** 2026-05-05 | **Stack:** PHP 8.3 · MySQL · Tailwind CDN · MVC sin framework
 
 ---
 
@@ -631,7 +631,50 @@ Empresa (productor de carne) — UN solo inventario global
 
 **D — EmpresaPedidoController — Vista general pedidos** ✅ (incluido en C)
 
-**E — UI Productos mejorada**
+**E — Flujo de Pedido Completo (revisión 2026-05-05)**
+> Corrección de lógica de negocio: sucursal=comprador, sin stock visible al comprador, flujo con revisión empresa.
+
+- [x] `migrations/008_flujo_pedido_entrega.sql` — pedidos: tipo_entrega, repartidor_asignado_id, costo_envio, nota_empresa, foto_comprobante_path, foto_entrega_path · usuarios: direccion_entrega, referencia_entrega, lat_entrega, lng_entrega
+- [x] `PedidoModel::asignarEntrega()` — empresa asigna tipo y repartidor
+- [x] `PedidoModel::aprobarPedido()` — confirmar + recalcular total con envío
+- [x] `PedidoModel::rechazarPedido()` — cancelar con nota
+- [x] `PedidoModel::subirComprobante()` — comprador sube comprobante → en_preparacion
+- [x] `PedidoModel::subirFotoEntrega()` — empresa/repartidor sube foto → entregado
+- [x] `EmpresaPedidoController::asignarEntrega()` — modal de asignación
+- [x] `EmpresaPedidoController::aprobar()` / `rechazar()` / `subirFotoEntrega()` — acciones inline
+- [x] `PedidoController::subirComprobante()` — comprador sube comprobante desde detalle
+- [x] `CarritoController` simplificado — 3 pasos (sin paso2 sucursales), usa `getPrecioFinal()`
+- [x] Catálogo y carrito sin stock visible para compradores
+- [x] Vista `empresa_index.php` — modal revisar (asignar+aprobar+rechazar), badge pendientes, badge comprobante
+- [x] Vista `detalle.php` — comprobante upload para comprador en estado confirmado, foto entrega, costo envío desglosado
+- [x] `EmpresaUsuarioController::guardar()` — guarda `direccion_entrega` en usuarios al crear comprador
+
+**Modelo Sucursal = Comprador (definitivo 2026-05-05)**
+```
+Empresa (productor) — UN solo inventario
+├── Comprador "Taquería El Buen Sabor — Norte"  ← usuario comprador, 1 punto de entrega
+├── Comprador "Taquería El Buen Sabor — Sur"    ← usuario comprador, 1 punto de entrega
+└── Comprador "Restaurante Las Flores"           ← usuario comprador, 1 punto de entrega
+```
+- La empresa crea un comprador por cada punto de entrega de su cliente
+- Tabla `sucursales` se mantiene para Sprint 4D (rutas con múltiples paradas)
+- No hay distribución multi-sucursal en el carrito del MVP
+
+**Flujo de pedido completo (post-revisión)**
+```
+Comprador → solicita (pendiente)
+Empresa → asigna tipo_entrega + costo_envio → aprueba (confirmado) o rechaza (cancelado)
+Comprador → ve total final → sube comprobante de pago → en_preparacion
+Empresa/Repartidor → "En camino" → en_ruta → sube foto entrega → entregado
+```
+
+**F — GPS — Sprint 4D (plan, no implementar ahora)**
+- Google Maps JS API: mapa con marcador origen (empresa) → destino (lat_entrega del comprador)
+- Repartidor móvil: `navigator.geolocation.watchPosition()` → POST `/api/posicion` cada 30s
+- `ruta_detalle.lat_actual` + `lng_actual` ya existen en schema
+- Comprador: iframe con posición del repartidor en tiempo real
+
+**G — UI Productos mejorada (pendiente)**
 - [ ] Lista de productos: añadir columna "Stock actual" con badge de semáforo
 - [ ] Lista de productos: badge de precio base + indicador "tiene precios especiales"
 - [ ] Formulario producto: sección "Precios escalonados" con UI visual (filas add/remove dinámicas)
@@ -844,4 +887,4 @@ Todos se configuran desde `/config/apis` y `/config/correo` (solo visible para s
 
 ---
 
-*Última actualización: 2026-05-05 — v2.6.0 (Sprint 4C-1 completo: inventario inteligente con movimientos + delegación supervisor · precios especiales por comprador · pedido personalizado con líneas dinámicas · EmpresaPedidoController · sidebar actualizado)*
+*Última actualización: 2026-05-05 — v2.6.1 (Sprint 4C-1 revisado: sucursal=comprador · sin stock en catálogo/carrito · flujo pedido completo: solicitud→revisión empresa→tipo entrega→costo envío→aprobación→comprobante comprador→foto entrega · Migration 008 · GPS planeado para Sprint 4D)*

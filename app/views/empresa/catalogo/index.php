@@ -59,15 +59,6 @@
       <div style="font-size:1.1rem;font-weight:800;color:var(--color-primary)">
         $<?= number_format($prod['precio_base'],2) ?> / <?= $prod['presentacion'] ?>
       </div>
-      <!-- Stock -->
-      <?php if ($prod['stock'] !== null): ?>
-      <div style="font-size:.75rem;color:<?= $prod['stock'] <= $prod['umbral_minimo'] ? '#EF4444' : '#6B7280' ?>;margin-top:4px">
-        Stock: <?= number_format($prod['stock'],1) ?> <?= $prod['presentacion'] ?>
-        <?php if ($prod['stock'] <= $prod['umbral_minimo']): ?>
-          <span style="font-weight:600"> — Bajo</span>
-        <?php endif; ?>
-      </div>
-      <?php endif; ?>
     </div>
     <!-- Acción -->
     <div style="padding:12px 14px;border-top:1px solid #F3F4F6">

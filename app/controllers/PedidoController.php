@@ -174,4 +174,53 @@ class PedidoController extends BaseController
         $this->flash($ok ? 'success' : 'error', $ok ? 'Pedido cancelado.' : 'No se puede cancelar este pedido.');
         $this->redirect('pedido/detalle/' . $pedidoId);
     }
+
+    // ── Subir comprobante de pago (comprador) ─────────────────────
+    public function subirComprobante(?string $id = null): void
+    {
+        $this->requireComprador();
+
+        if (!$this->isPost()) {
+            $this->redirect('pedido/index');
+        }
+
+        $pedidoId = (int)$id;
+        if (!$pedidoId || !$this->model->verificarPertenece($pedidoId, $this->empresaId())) {
+            $this->flash('error', 'Pedido no encontrado.');
+            $this->redirect('pedido/index');
+        }
+
+        $pedido = $this->model->find($pedidoId);
+        if (!$pedido || $pedido['comprador_id'] != $this->usuarioId()) {
+            $this->flash('error', 'No tienes permiso para modificar este pedido.');
+            $this->redirect('pedido/index');
+        }
+
+        if (empty($_FILES['comprobante']['tmp_name'])) {
+            $this->flash('error', 'Selecciona una imagen de comprobante.');
+            $this->redirect('pedido/detalle/' . $pedidoId);
+        }
+
+        $dir     = $_SERVER['DOCUMENT_ROOT'] . '/public/uploads/evidencias/';
+        $ext     = strtolower(pathinfo($_FILES['comprobante']['name'], PATHINFO_EXTENSION));
+        $allowed = ['jpg', 'jpeg', 'png', 'webp', 'pdf'];
+        if (!in_array($ext, $allowed, true)) {
+            $this->flash('error', 'Formato no permitido. Usa JPG, PNG, WEBP o PDF.');
+            $this->redirect('pedido/detalle/' . $pedidoId);
+        }
+        if (!is_dir($dir)) {
+            mkdir($dir, 0755, true);
+        }
+        $filename = 'comp_' . $pedidoId . '_' . time() . '.' . $ext;
+        if (!move_uploaded_file($_FILES['comprobante']['tmp_name'], $dir . $filename)) {
+            $this->flash('error', 'Error al guardar el archivo. Contacta al administrador.');
+            $this->redirect('pedido/detalle/' . $pedidoId);
+        }
+
+        $path = '/public/uploads/evidencias/' . $filename;
+        $this->model->subirComprobante($pedidoId, $path);
+        $this->log('subir_comprobante', 'pedidos', "Pedido $pedidoId — comprobante subido");
+        $this->flash('success', 'Comprobante enviado. La empresa lo verificará.');
+        $this->redirect('pedido/detalle/' . $pedidoId);
+    }
 }

@@ -22,7 +22,7 @@ class PedidoModel extends BaseModel
      * $items: [['producto_id'=>, 'cantidad'=>, 'precio_unit'=>, 'subtotal'=>], ...]
      * $sucursalesIds: [sucursal_id, ...] — sucursales involucradas
      */
-    public function crear(array $pedidoData, array $items, array $sucursalesIds): int
+    public function crear(array $pedidoData, array $items, array $sucursalesIds = []): int
     {
         $this->db->beginTransaction();
         try {
@@ -54,6 +54,50 @@ class PedidoModel extends BaseModel
             $this->db->rollBack();
             throw $e;
         }
+    }
+
+    public function asignarEntrega(int $id, string $tipo, ?int $repartidorId, float $costoEnvio, string $notaEmpresa = ''): void
+    {
+        $this->execute(
+            'UPDATE pedidos SET tipo_entrega = ?, repartidor_asignado_id = ?, costo_envio = ?, nota_empresa = ?
+              WHERE id = ?',
+            [$tipo, $repartidorId, $costoEnvio, $notaEmpresa ?: null, $id]
+        );
+    }
+
+    public function aprobarPedido(int $id, int $aprobadoPorId): void
+    {
+        $this->execute(
+            "UPDATE pedidos
+                SET estado = 'confirmado', aprobado_por = ?, aprobado_at = NOW(),
+                    total = subtotal + costo_envio
+              WHERE id = ?",
+            [$aprobadoPorId, $id]
+        );
+    }
+
+    public function rechazarPedido(int $id, string $nota): void
+    {
+        $this->execute(
+            "UPDATE pedidos SET estado = 'cancelado', nota_empresa = ? WHERE id = ?",
+            [$nota ?: null, $id]
+        );
+    }
+
+    public function subirComprobante(int $id, string $path): void
+    {
+        $this->execute(
+            "UPDATE pedidos SET foto_comprobante_path = ?, estado = 'en_preparacion' WHERE id = ?",
+            [$path, $id]
+        );
+    }
+
+    public function subirFotoEntrega(int $id, string $path): void
+    {
+        $this->execute(
+            "UPDATE pedidos SET foto_entrega_path = ?, estado = 'entregado' WHERE id = ?",
+            [$path, $id]
+        );
     }
 
     public function listadoEmpresa(int $empresaId, array $filtros = [], int $page = 1): array
@@ -88,7 +132,7 @@ class PedidoModel extends BaseModel
                   FROM pedidos p
                   JOIN usuarios u ON u.id = p.comprador_id
                  WHERE ' . implode(' AND ', $where) . '
-              ORDER BY p.created_at DESC';
+              ORDER BY (p.estado = "pendiente") DESC, p.created_at DESC';
 
         return $this->paginate($sql, $params, $page);
     }

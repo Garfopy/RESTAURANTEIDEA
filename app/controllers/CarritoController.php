@@ -2,15 +2,217 @@
 require_once ROOT_PATH . '/app/controllers/BaseController.php';
 
 /**
- * CarritoController — Flujo de compra en 4 pasos.
+ * CarritoController — Flujo de compra en 3 pasos.
  *
- * Paso 1 /carrito/index       — Selección de productos y cantidades
- * Paso 2 /carrito/sucursales  — Distribución por sucursal
- * Paso 3 /carrito/resumen     — Revisión + fecha/pago
- * Paso 4 /carrito/confirmado  — Pedido creado con folio
+ * Paso 1 /carrito/index      — Selección de productos y cantidades
+ * Paso 2 /carrito/resumen    — Revisión + fecha/notas
+ * Paso 3 /carrito/confirmado — Pedido creado con folio
+ *
+ * Cada comprador representa un punto de entrega (sucursal).
+ * No hay distribución multi-sucursal; el pedido va directo al comprador.
  */
 class CarritoController extends BaseController
 {
+    private ProductoModel $productoModel;
+    private PedidoModel   $pedidoModel;
+
+    public function __construct()
+    {
+        parent::__construct();
+        $this->requireComprador();
+        $this->productoModel = new ProductoModel();
+        $this->pedidoModel   = new PedidoModel();
+    }
+
+    // ── Paso 1: Selección de productos ────────────────────────────
+    public function index(?string $p = null): void
+    {
+        $filtros = [
+            'buscar'       => $this->get('buscar', ''),
+            'categoria_id' => (int)$this->get('categoria_id', 0) ?: null,
+        ];
+
+        $resultado  = $this->productoModel->listadoConPrecio($filtros);
+        $productos  = $resultado['data'];
+
+        $db = Database::getInstance();
+        $categorias = $db->query('SELECT * FROM categorias WHERE activo = 1 ORDER BY nombre')->fetchAll();
+
+        $carrito    = $_SESSION['carrito']['items'] ?? [];
+        $flash      = $this->getFlash();
+        $pageTitle  = 'Hacer pedido — Paso 1: Productos';
+        $activeMenu = 'carrito';
+
+        ob_start();
+        require ROOT_PATH . '/app/views/empresa/carrito/paso1.php';
+        $content = ob_get_clean();
+        require ROOT_PATH . '/app/views/empresa/layouts/main.php';
+    }
+
+    // Guarda los ítems del carrito (POST desde paso 1)
+    public function actualizar(?string $p = null): void
+    {
+        if (!$this->isPost()) {
+            $this->redirect('carrito/index');
+        }
+
+        $compradorId = $this->usuarioId();
+        $cantidades  = $_POST['cantidad'] ?? [];
+        $items = [];
+
+        foreach ($cantidades as $productoId => $cantidad) {
+            $productoId = (int)$productoId;
+            $cantidad   = (float)str_replace(',', '.', $cantidad);
+            if ($cantidad <= 0) continue;
+
+            $producto = $this->productoModel->find($productoId);
+            if (!$producto || !$producto['activo']) continue;
+
+            $precio   = $this->productoModel->getPrecioFinal($compradorId, $productoId, $cantidad);
+            $items[$productoId] = [
+                'producto_id'  => $productoId,
+                'nombre'       => $producto['nombre'],
+                'presentacion' => $producto['presentacion'],
+                'cantidad'     => $cantidad,
+                'precio'       => $precio,
+                'subtotal'     => round($precio * $cantidad, 2),
+            ];
+        }
+
+        if (empty($items)) {
+            $this->flash('error', 'Agrega al menos un producto con cantidad mayor a 0.');
+            $this->redirect('carrito/index');
+        }
+
+        $_SESSION['carrito']['items'] = $items;
+        unset($_SESSION['carrito']['meta']);
+
+        $this->redirect('carrito/resumen');
+    }
+
+    // Paso 2 ya no existe (redirect directo) — se mantiene por compatibilidad de URLs
+    public function sucursales(?string $p = null): void
+    {
+        $this->redirect('carrito/resumen');
+    }
+
+    public function guardarSucursales(?string $p = null): void
+    {
+        $this->redirect('carrito/resumen');
+    }
+
+    // ── Paso 2: Resumen y confirmación ────────────────────────────
+    public function resumen(?string $p = null): void
+    {
+        $items = $_SESSION['carrito']['items'] ?? [];
+
+        if (empty($items)) {
+            $this->redirect('carrito/index');
+        }
+
+        $total = array_sum(array_column($items, 'subtotal'));
+
+        $flash      = $this->getFlash();
+        $meta       = $_SESSION['carrito']['meta'] ?? [];
+        $pageTitle  = 'Hacer pedido — Paso 2: Resumen';
+        $activeMenu = 'carrito';
+
+        ob_start();
+        require ROOT_PATH . '/app/views/empresa/carrito/paso3.php';
+        $content = ob_get_clean();
+        require ROOT_PATH . '/app/views/empresa/layouts/main.php';
+    }
+
+    // Crea el pedido en BD (POST desde resumen)
+    public function confirmar(?string $p = null): void
+    {
+        if (!$this->isPost()) {
+            $this->redirect('carrito/resumen');
+        }
+
+        $items = $_SESSION['carrito']['items'] ?? [];
+
+        if (empty($items)) {
+            $this->redirect('carrito/index');
+        }
+
+        $fechaEntrega = trim($this->post('fecha_entrega', ''));
+        $notas        = trim($this->post('notas', ''));
+
+        if (empty($fechaEntrega)) {
+            $this->flash('error', 'Selecciona la fecha de entrega.');
+            $this->redirect('carrito/resumen');
+        }
+
+        $compradorId = $this->usuarioId();
+
+        // Revalidar precios con precios especiales aplicados
+        $itemsDB = [];
+        foreach ($items as $prodId => $item) {
+            $precio = $this->productoModel->getPrecioFinal($compradorId, (int)$prodId, $item['cantidad']);
+            $itemsDB[] = [
+                'producto_id' => $prodId,
+                'cantidad'    => $item['cantidad'],
+                'precio_unit' => $precio,
+                'subtotal'    => round($precio * $item['cantidad'], 2),
+            ];
+        }
+
+        $pedidoData = [
+            'empresa_id'          => $this->empresaId(),
+            'comprador_id'        => $compradorId,
+            'estado'              => 'pendiente',
+            'requiere_aprobacion' => 0,
+            'fecha_entrega'       => $fechaEntrega,
+            'notas'               => $notas ?: null,
+        ];
+
+        try {
+            $pedidoId = $this->pedidoModel->crear($pedidoData, $itemsDB);
+            $pedido   = $this->pedidoModel->find($pedidoId);
+
+            $this->log('crear_pedido', 'carrito', "Pedido {$pedido['folio']} creado");
+
+            $_SESSION['carrito'] = [];
+            $_SESSION['ultimo_folio'] = $pedido['folio'];
+            $_SESSION['ultimo_pedido_id'] = $pedidoId;
+
+            $this->redirect('carrito/confirmado');
+        } catch (\Throwable $e) {
+            $this->flash('error', 'Error al crear el pedido. Intenta de nuevo.');
+            $this->redirect('carrito/resumen');
+        }
+    }
+
+    // ── Paso 3: Confirmado ────────────────────────────────────────
+    public function confirmado(?string $p = null): void
+    {
+        $folio    = $_SESSION['ultimo_folio'] ?? null;
+        $pedidoId = $_SESSION['ultimo_pedido_id'] ?? null;
+
+        if (!$folio) {
+            $this->redirect('pedido/index');
+        }
+
+        unset($_SESSION['ultimo_folio'], $_SESSION['ultimo_pedido_id']);
+
+        $flash      = $this->getFlash();
+        $pageTitle  = 'Pedido confirmado';
+        $activeMenu = 'carrito';
+
+        ob_start();
+        require ROOT_PATH . '/app/views/empresa/carrito/paso4.php';
+        $content = ob_get_clean();
+        require ROOT_PATH . '/app/views/empresa/layouts/main.php';
+    }
+
+    public function vaciar(?string $p = null): void
+    {
+        $_SESSION['carrito'] = [];
+        $this->redirect('carrito/index');
+    }
+}
+
     private ProductoModel $productoModel;
     private PedidoModel   $pedidoModel;
 

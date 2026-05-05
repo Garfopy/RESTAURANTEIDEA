@@ -8,14 +8,24 @@ $estados = [
     'entregado'      => ['label'=>'Entregado',         'bg'=>'#D1FAE5','tx'=>'#065F46'],
     'cancelado'      => ['label'=>'Cancelado',         'bg'=>'#FEE2E2','tx'=>'#991B1B'],
 ];
-$rol = $_SESSION['usuario']['rol_slug'] ?? '';
 ?>
 
 <!-- Flash -->
 <?php if ($flash): ?>
 <div style="margin-bottom:16px;padding:12px 16px;border-radius:8px;font-size:.875rem;font-weight:500;
   <?= $flash['type'] === 'success' ? 'background:#D1FAE5;color:#065F46;border:1px solid #A7F3D0' : 'background:#FEE2E2;color:#991B1B;border:1px solid #FECACA' ?>">
-  <?= htmlspecialchars($flash['message']) ?>
+  <?= $flash['message'] ?>
+</div>
+<?php endif; ?>
+
+<!-- Badge de pedidos pendientes -->
+<?php if ($countPendientes > 0): ?>
+<div style="margin-bottom:16px;padding:12px 16px;background:#FEF3C7;border:1px solid #FCD34D;border-radius:10px;display:flex;align-items:center;gap:10px">
+  <span style="font-size:1.1rem">⚠️</span>
+  <div>
+    <strong style="color:#92400E"><?= $countPendientes ?> pedido(s) pendiente(s) de revisión</strong>
+    <span style="font-size:.8rem;color:#B45309;display:block">Asigna tipo de entrega y aprueba o rechaza cada uno.</span>
+  </div>
 </div>
 <?php endif; ?>
 
@@ -55,7 +65,7 @@ $rol = $_SESSION['usuario']['rol_slug'] ?? '';
         <th style="padding:10px 16px;text-align:left;font-size:.7rem;color:#6B7280;font-weight:600;text-transform:uppercase">Folio</th>
         <th style="padding:10px 16px;text-align:left;font-size:.7rem;color:#6B7280;font-weight:600;text-transform:uppercase">Comprador</th>
         <th style="padding:10px 16px;text-align:center;font-size:.7rem;color:#6B7280;font-weight:600;text-transform:uppercase">Estado</th>
-        <th style="padding:10px 16px;text-align:center;font-size:.7rem;color:#6B7280;font-weight:600;text-transform:uppercase">Tipo</th>
+        <th style="padding:10px 16px;text-align:center;font-size:.7rem;color:#6B7280;font-weight:600;text-transform:uppercase">Entrega</th>
         <th style="padding:10px 16px;text-align:right;font-size:.7rem;color:#6B7280;font-weight:600;text-transform:uppercase">Total</th>
         <th style="padding:10px 16px;text-align:left;font-size:.7rem;color:#6B7280;font-weight:600;text-transform:uppercase">Fecha</th>
         <th style="padding:10px 16px;text-align:center;font-size:.7rem;color:#6B7280;font-weight:600;text-transform:uppercase">Acciones</th>
@@ -65,11 +75,16 @@ $rol = $_SESSION['usuario']['rol_slug'] ?? '';
       <?php foreach ($items as $p): ?>
       <?php
         $est = $estados[$p['estado']] ?? ['label' => $p['estado'], 'bg' => '#F3F4F6', 'tx' => '#374151'];
+        $esPendiente = $p['estado'] === 'pendiente';
         $esPersonalizado = ($p['tipo'] ?? 'normal') === 'personalizado';
+        $tieneComprobante = !empty($p['foto_comprobante_path']);
       ?>
-      <tr style="border-bottom:1px solid #F3F4F6">
+      <tr style="border-bottom:1px solid #F3F4F6;<?= $esPendiente ? 'background:#FFFBEB' : '' ?>">
         <td style="padding:10px 16px">
           <div style="font-weight:700;font-size:.85rem;color:#111827;font-family:monospace"><?= htmlspecialchars($p['folio']) ?></div>
+          <?php if ($esPersonalizado): ?>
+          <span style="padding:1px 6px;border-radius:999px;background:#F3E8FF;color:#6B21A8;font-size:.65rem;font-weight:700">Personalizado</span>
+          <?php endif; ?>
         </td>
         <td style="padding:10px 16px;font-size:.85rem;color:#374151">
           <?= htmlspecialchars($p['comprador_nombre'] . ' ' . $p['comprador_apellido']) ?>
@@ -78,31 +93,48 @@ $rol = $_SESSION['usuario']['rol_slug'] ?? '';
           <span style="padding:3px 10px;border-radius:999px;background:<?= $est['bg'] ?>;color:<?= $est['tx'] ?>;font-size:.7rem;font-weight:700">
             <?= $est['label'] ?>
           </span>
+          <?php if ($tieneComprobante): ?>
+          <div style="font-size:.65rem;color:#059669;margin-top:2px;font-weight:600">✓ Comprobante</div>
+          <?php endif; ?>
         </td>
         <td style="padding:10px 16px;text-align:center">
-          <?php if ($esPersonalizado): ?>
-          <span style="padding:2px 8px;border-radius:999px;background:#F3E8FF;color:#6B21A8;font-size:.65rem;font-weight:700">
-            Personalizado
+          <?php if (!empty($p['tipo_entrega'])): ?>
+          <span style="font-size:.75rem;color:#374151;font-weight:600">
+            <?= $p['tipo_entrega'] === 'pickup' ? '🏭 Pickup' : '🚚 Repartidor' ?>
           </span>
           <?php else: ?>
-          <span style="font-size:.75rem;color:#9CA3AF">Normal</span>
+          <span style="font-size:.75rem;color:#9CA3AF">—</span>
           <?php endif; ?>
         </td>
         <td style="padding:10px 16px;text-align:right;font-size:.9rem;font-weight:700;color:#111827">
           $<?= number_format((float)$p['total'], 2) ?>
+          <?php if (($p['costo_envio'] ?? 0) > 0): ?>
+          <div style="font-size:.7rem;color:#6B7280;font-weight:400">+ $<?= number_format($p['costo_envio'], 2) ?> envío</div>
+          <?php endif; ?>
         </td>
         <td style="padding:10px 16px;font-size:.78rem;color:#6B7280">
           <?= date('d/m/Y', strtotime($p['created_at'])) ?>
         </td>
         <td style="padding:10px 16px;text-align:center">
-          <div style="display:flex;justify-content:center;gap:6px;flex-wrap:wrap">
+          <div style="display:flex;justify-content:center;gap:4px;flex-wrap:wrap">
             <a href="<?= $baseUrl ?>pedido/detalle/<?= $p['id'] ?>"
-               style="padding:5px 10px;border:1px solid #D1D5DB;border-radius:6px;color:#374151;text-decoration:none;font-size:.75rem">
+               style="padding:4px 8px;border:1px solid #D1D5DB;border-radius:6px;color:#374151;text-decoration:none;font-size:.72rem">
               Ver
             </a>
-            <!-- Cambiar estado rápido -->
+            <?php if ($esPendiente): ?>
+            <button onclick="abrirRevision(<?= $p['id'] ?>, '<?= htmlspecialchars(addslashes($p['comprador_nombre'] . ' ' . $p['comprador_apellido'])) ?>')"
+                    style="padding:4px 8px;border:1px solid #F59E0B;border-radius:6px;color:#B45309;background:#FEF3C7;cursor:pointer;font-size:.72rem;font-weight:700;font-family:inherit">
+              Revisar
+            </button>
+            <?php endif; ?>
+            <?php if (in_array($p['estado'], ['en_preparacion','en_ruta','confirmado'], true)): ?>
+            <button onclick="abrirSubirFoto(<?= $p['id'] ?>)"
+                    style="padding:4px 8px;border:1px solid #10B981;border-radius:6px;color:#065F46;background:#D1FAE5;cursor:pointer;font-size:.72rem;font-weight:600;font-family:inherit">
+              📷 Entrega
+            </button>
+            <?php endif; ?>
             <button onclick="abrirCambioEstado(<?= $p['id'] ?>, '<?= $p['estado'] ?>')"
-                    style="padding:5px 10px;border:1px solid #D1D5DB;border-radius:6px;color:#374151;background:#fff;cursor:pointer;font-size:.75rem">
+                    style="padding:4px 8px;border:1px solid #D1D5DB;border-radius:6px;color:#374151;background:#fff;cursor:pointer;font-size:.72rem;font-family:inherit">
               Estado
             </button>
           </div>
@@ -126,7 +158,102 @@ $rol = $_SESSION['usuario']['rol_slug'] ?? '';
   <?php endif; ?>
 </div>
 
-<!-- Modal cambio de estado -->
+<!-- Modal: Revisar pedido (asignar entrega + aprobar/rechazar) -->
+<div id="modalRevision" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:14px;padding:28px;width:480px;max-width:95vw;max-height:90vh;overflow-y:auto">
+    <h3 style="font-size:1rem;font-weight:700;color:#111827;margin:0 0 4px 0">Revisar pedido</h3>
+    <p id="revisionComprador" style="font-size:.85rem;color:#6B7280;margin:0 0 20px 0"></p>
+
+    <form method="POST" action="<?= $baseUrl ?>empresa-pedido/asignarEntrega" id="formAsignar">
+      <input type="hidden" name="pedido_id" id="revPedidoId">
+      <div style="margin-bottom:14px">
+        <label style="display:block;font-size:.8rem;font-weight:600;color:#374151;margin-bottom:6px">Tipo de entrega <span style="color:#DC2626">*</span></label>
+        <select name="tipo_entrega" required onchange="toggleRepartidor(this.value)"
+                style="width:100%;padding:9px 12px;border:1px solid #D1D5DB;border-radius:8px;font-size:.875rem;background:#fff">
+          <option value="">— Seleccionar —</option>
+          <option value="pickup">🏭 Recoger en bodega (sin costo de envío)</option>
+          <option value="repartidor">🚚 Envío por repartidor</option>
+        </select>
+      </div>
+      <div id="campoRepartidor" style="display:none;margin-bottom:14px">
+        <label style="display:block;font-size:.8rem;font-weight:600;color:#374151;margin-bottom:6px">Repartidor asignado</label>
+        <select name="repartidor_asignado_id"
+                style="width:100%;padding:9px 12px;border:1px solid #D1D5DB;border-radius:8px;font-size:.875rem;background:#fff">
+          <option value="">— Sin asignar aún —</option>
+          <?php foreach ($repartidores as $r): ?>
+          <option value="<?= $r['id'] ?>"><?= htmlspecialchars($r['nombre'] . ' ' . $r['apellido_paterno']) ?></option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <div style="margin-bottom:14px">
+        <label style="display:block;font-size:.8rem;font-weight:600;color:#374151;margin-bottom:6px">Costo de envío ($)</label>
+        <input type="number" name="costo_envio" id="revCostoEnvio" min="0" step="0.01" value="0"
+               style="width:100%;padding:9px 12px;border:1px solid #D1D5DB;border-radius:8px;font-size:.875rem;box-sizing:border-box">
+        <div style="font-size:.75rem;color:#9CA3AF;margin-top:3px">0 si es pickup o si el envío está incluido en el precio.</div>
+      </div>
+      <div style="margin-bottom:18px">
+        <label style="display:block;font-size:.8rem;font-weight:600;color:#374151;margin-bottom:6px">Nota para el comprador (opcional)</label>
+        <textarea name="nota_empresa" rows="2" placeholder="Ej: Tu pedido estará listo el jueves a las 10am..."
+                  style="width:100%;padding:9px 12px;border:1px solid #D1D5DB;border-radius:8px;font-size:.875rem;resize:vertical;box-sizing:border-box"></textarea>
+      </div>
+      <button type="submit"
+              style="width:100%;padding:10px;background:#374151;color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:.875rem;margin-bottom:12px">
+        Guardar asignación
+      </button>
+    </form>
+
+    <hr style="border:none;border-top:1px solid #F3F4F6;margin:4px 0 12px 0">
+
+    <form method="POST" action="<?= $baseUrl ?>empresa-pedido/aprobar" style="margin-bottom:8px">
+      <input type="hidden" name="pedido_id" class="syncPedidoId">
+      <button type="submit"
+              style="width:100%;padding:10px;background:#059669;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:.875rem">
+        ✓ Aprobar pedido
+      </button>
+    </form>
+    <form method="POST" action="<?= $baseUrl ?>empresa-pedido/rechazar">
+      <input type="hidden" name="pedido_id" class="syncPedidoId">
+      <div style="display:flex;gap:8px">
+        <input type="text" name="nota_rechazo" placeholder="Motivo del rechazo..." required
+               style="flex:1;padding:9px 12px;border:1px solid #FECACA;border-radius:8px;font-size:.85rem">
+        <button type="submit"
+                style="padding:9px 14px;background:#FEE2E2;color:#991B1B;border:1px solid #FECACA;border-radius:8px;font-weight:700;cursor:pointer;font-size:.82rem;white-space:nowrap">
+          ✕ Rechazar
+        </button>
+      </div>
+    </form>
+
+    <button onclick="document.getElementById('modalRevision').style.display='none'"
+            style="width:100%;margin-top:12px;padding:8px;border:1px solid #D1D5DB;border-radius:8px;background:#fff;cursor:pointer;font-size:.85rem;color:#6B7280">
+      Cancelar
+    </button>
+  </div>
+</div>
+
+<!-- Modal: Subir foto de entrega -->
+<div id="modalFotoEntrega" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:14px;padding:28px;width:400px;max-width:95vw">
+    <h3 style="font-size:1rem;font-weight:700;color:#111827;margin:0 0 16px 0">📷 Foto de entrega</h3>
+    <form method="POST" action="<?= $baseUrl ?>empresa-pedido/subirFotoEntrega" enctype="multipart/form-data">
+      <input type="hidden" name="pedido_id" id="fotoEntregaPedidoId">
+      <input type="file" name="foto" accept="image/*" capture="environment" required
+             style="width:100%;padding:8px;border:1px solid #D1D5DB;border-radius:8px;font-size:.85rem;margin-bottom:8px;box-sizing:border-box">
+      <div style="font-size:.75rem;color:#9CA3AF;margin-bottom:14px">JPG, PNG o WEBP. Al guardar, el pedido se marcará como <strong>Entregado</strong>.</div>
+      <div style="display:flex;gap:8px">
+        <button type="submit"
+                style="flex:1;padding:10px;background:#059669;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer">
+          Guardar y marcar entregado
+        </button>
+        <button type="button" onclick="document.getElementById('modalFotoEntrega').style.display='none'"
+                style="padding:10px 16px;border:1px solid #D1D5DB;border-radius:8px;background:#fff;cursor:pointer">
+          Cancelar
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal: Cambio de estado rápido -->
 <div id="modalEstado" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;align-items:center;justify-content:center">
   <div style="background:#fff;border-radius:12px;padding:28px;width:380px;max-width:95vw">
     <h3 style="font-size:1rem;font-weight:700;color:#111827;margin-bottom:20px">Cambiar Estado del Pedido</h3>
@@ -140,11 +267,6 @@ $rol = $_SESSION['usuario']['rol_slug'] ?? '';
           <?php endforeach; ?>
         </select>
       </div>
-      <div style="margin-bottom:20px">
-        <label style="display:block;font-size:.8rem;font-weight:600;color:#374151;margin-bottom:6px">Nota (opcional)</label>
-        <input type="text" name="nota" placeholder="Ej: Paquete entregado a cliente..."
-               style="width:100%;padding:9px;border:1px solid #D1D5DB;border-radius:8px;font-size:.875rem;box-sizing:border-box">
-      </div>
       <div style="display:flex;gap:10px">
         <button type="submit" style="flex:1;padding:10px;background:var(--color-primary);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer">Guardar</button>
         <button type="button" onclick="document.getElementById('modalEstado').style.display='none'"
@@ -155,12 +277,28 @@ $rol = $_SESSION['usuario']['rol_slug'] ?? '';
 </div>
 
 <script>
+function abrirRevision(id, comprador) {
+  document.getElementById('revPedidoId').value = id;
+  document.getElementById('revisionComprador').textContent = 'Comprador: ' + comprador;
+  document.querySelectorAll('.syncPedidoId').forEach(el => el.value = id);
+  document.getElementById('modalRevision').style.display = 'flex';
+}
+function abrirSubirFoto(id) {
+  document.getElementById('fotoEntregaPedidoId').value = id;
+  document.getElementById('modalFotoEntrega').style.display = 'flex';
+}
 function abrirCambioEstado(id, estadoActual) {
   document.getElementById('modalPedidoId').value = id;
   document.getElementById('modalEstadoSelect').value = estadoActual;
   document.getElementById('modalEstado').style.display = 'flex';
 }
-document.getElementById('modalEstado').addEventListener('click', function(e) {
-  if (e.target === this) this.style.display = 'none';
+function toggleRepartidor(val) {
+  document.getElementById('campoRepartidor').style.display = val === 'repartidor' ? 'block' : 'none';
+  if (val === 'pickup') document.getElementById('revCostoEnvio').value = '0';
+}
+['modalRevision','modalEstado','modalFotoEntrega'].forEach(id => {
+  document.getElementById(id).addEventListener('click', function(e) {
+    if (e.target === this) this.style.display = 'none';
+  });
 });
 </script>
