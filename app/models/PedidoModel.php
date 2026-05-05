@@ -302,7 +302,7 @@ class PedidoModel extends BaseModel
     public function getItemsPedido(int $pedidoId): array
     {
         return $this->query(
-            'SELECT pd.id, pd.producto_id, pd.cantidad, pd.precio_unit, pd.subtotal,
+            'SELECT pd.id, pd.producto_id, pd.cantidad, pd.precio_unit, pd.precio_original, pd.subtotal,
                     pr.nombre AS producto_nombre, pr.presentacion
                FROM pedido_detalle pd
                JOIN productos pr ON pr.id = pd.producto_id

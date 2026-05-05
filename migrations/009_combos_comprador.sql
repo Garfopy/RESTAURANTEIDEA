@@ -16,6 +16,7 @@ CREATE TABLE combo_items (
     combo_id    INT NOT NULL,
     producto_id INT NOT NULL,
     cantidad    DECIMAL(10,2) NOT NULL,
+    UNIQUE KEY uq_ci_combo_producto (combo_id, producto_id),
     CONSTRAINT fk_ci_combo    FOREIGN KEY (combo_id)    REFERENCES combos(id)    ON DELETE CASCADE,
     CONSTRAINT fk_ci_producto FOREIGN KEY (producto_id) REFERENCES productos(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

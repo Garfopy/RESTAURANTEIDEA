@@ -19,6 +19,7 @@ class CatalogoController extends BaseController
     public function index(?string $p = null): void
     {
         $filtros = [
+            'empresa_id'   => $this->empresaId(),
             'buscar'       => $this->get('buscar', ''),
             'categoria_id' => (int)$this->get('categoria_id', 0) ?: null,
         ];

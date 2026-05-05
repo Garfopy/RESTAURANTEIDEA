@@ -29,7 +29,9 @@ class CarritoController extends BaseController
     // ── Paso 1: Selección de productos ────────────────────────────
     public function index(?string $p = null): void
     {
+        $empresaId = $this->empresaId();
         $filtros = [
+            'empresa_id'   => $empresaId,
             'buscar'       => $this->get('buscar', ''),
             'categoria_id' => (int)$this->get('categoria_id', 0) ?: null,
         ];
@@ -41,7 +43,6 @@ class CarritoController extends BaseController
         $categorias = $db->query('SELECT * FROM categorias WHERE activo = 1 ORDER BY nombre')->fetchAll();
 
         $compradorId = $this->usuarioId();
-        $empresaId   = $this->empresaId();
         $combos      = $this->comboModel->getCombosParaComprador($compradorId, $empresaId);
 
         $carrito    = $_SESSION['carrito']['items'] ?? [];
@@ -63,6 +64,7 @@ class CarritoController extends BaseController
         }
 
         $compradorId = $this->usuarioId();
+        $empresaId   = $this->empresaId();
         $cantidades  = $_POST['cantidad'] ?? [];
         $items = [];
 
@@ -73,6 +75,7 @@ class CarritoController extends BaseController
 
             $producto = $this->productoModel->find($productoId);
             if (!$producto || !$producto['activo']) continue;
+            if ((int)$producto['empresa_id'] !== $empresaId) continue;
 
             $precio   = $this->productoModel->getPrecioFinal($compradorId, $productoId, $cantidad);
             $items[$productoId] = [
@@ -228,7 +231,8 @@ class CarritoController extends BaseController
         $compradorId = $this->usuarioId();
         $empresaId   = $this->empresaId();
 
-        if (!$this->comboModel->estaAsignadoAComprador($comboId, $compradorId)) {
+        if (!$this->comboModel->perteneceAEmpresa($comboId, $empresaId) ||
+            !$this->comboModel->estaAsignadoAComprador($comboId, $compradorId)) {
             $this->flash('error', 'Combo no disponible.');
             $this->redirect('carrito/index');
         }
