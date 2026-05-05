@@ -47,8 +47,18 @@ $baseUrl = BASE_URL;
       ?>
       <tr style="border-bottom:1px solid #F3F4F6">
         <td style="padding:12px 16px">
-          <div style="font-weight:600;color:#111827;font-size:.875rem"><?= htmlspecialchars($item['nombre']) ?></div>
-          <div style="font-size:.75rem;color:#6B7280"><?= htmlspecialchars($item['presentacion']) ?> · <?= htmlspecialchars($item['categoria_nombre'] ?? '') ?></div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <?php if (!empty($item['imagen'])): ?>
+              <img src="<?= htmlspecialchars($item['imagen']) ?>"
+                   alt="" style="width:40px;height:40px;object-fit:cover;border-radius:6px;flex-shrink:0;border:1px solid #E5E7EB">
+            <?php else: ?>
+              <div style="width:40px;height:40px;background:#F3F4F6;border-radius:6px;flex-shrink:0;border:1px solid #E5E7EB"></div>
+            <?php endif; ?>
+            <div>
+              <div style="font-weight:600;color:#111827;font-size:.875rem"><?= htmlspecialchars($item['nombre']) ?></div>
+              <div style="font-size:.75rem;color:#6B7280"><?= htmlspecialchars($item['presentacion']) ?> · <?= htmlspecialchars($item['categoria_nombre'] ?? '') ?></div>
+            </div>
+          </div>
         </td>
         <td style="padding:12px 16px;text-align:right">
           <span style="font-size:1rem;font-weight:700;color:<?= $color ?>"><?= number_format($stock, 1) ?></span>
@@ -78,7 +88,7 @@ $baseUrl = BASE_URL;
   <?php if (($paginacion['total_pages'] ?? 1) > 1): ?>
   <div style="padding:16px;display:flex;justify-content:center;gap:4px;border-top:1px solid #E5E7EB">
     <?php for ($i = 1; $i <= $paginacion['total_pages']; $i++): ?>
-      <a href="?<?= http_build_query(array_merge($filtros, ['page' => $i])) ?>"
+      <a href="?<?= http_build_query(array_merge(array_diff_key($filtros, ['empresa_id' => '']), ['page' => $i])) ?>"
          style="padding:6px 12px;border-radius:6px;font-size:.8rem;text-decoration:none;<?= $i === ($paginacion['current_page'] ?? 1) ? 'background:var(--color-primary);color:#fff' : 'background:#F3F4F6;color:#374151' ?>">
         <?= $i ?>
       </a>

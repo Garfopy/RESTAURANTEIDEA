@@ -68,3 +68,13 @@ ALTER TABLE `empresas`
   ADD COLUMN `suscripcion_estado`
     ENUM('activo','suspendido','sin_plan') NOT NULL DEFAULT 'sin_plan'
     AFTER `activo`;
+
+-- ── Suscripción demo para empresa 1 (buensabor) ───────────────────────────────
+-- El seed de 001 inserta la empresa directamente en BD, omitiendo EmpresaController
+-- que normalmente crea el registro en suscripciones. Este INSERT lo repara.
+INSERT IGNORE INTO `suscripciones`
+  (`empresa_id`, `plan_id`, `estado`, `ciclo`, `fecha_inicio`, `created_by`)
+SELECT 1, id, 'activo', 'mensual', CURDATE(), 1
+FROM `planes_saas` WHERE `slug` = 'pro' LIMIT 1;
+
+UPDATE `empresas` SET `suscripcion_estado` = 'activo' WHERE `id` = 1;

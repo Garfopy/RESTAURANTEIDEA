@@ -1,5 +1,5 @@
-# CarniHub — Plan v2.1
-**Versión:** 2.3.0 | **Fecha:** 2026-05-05 | **Stack:** PHP 8.3 · MySQL · Tailwind CDN · MVC sin framework
+# CarniHub — Plan v2.4
+**Versión:** 2.5.1 | **Fecha:** 2026-05-05 | **Stack:** PHP 8.3 · MySQL · Tailwind CDN · MVC sin framework
 
 ---
 
@@ -138,9 +138,9 @@ SuperAdmin (plataforma — 1 usuario inicial, seed en BD)
 
 ## PERMISOS POR ROL
 
-### Super Admin — solo monitoreo de plataforma
+### Super Admin — monitoreo + configuración de plataforma
 
-El superadmin **nunca** toca productos, inventario, pedidos ni ninguna operación interna de las empresas. Su función es garantizar que la plataforma funcione correctamente.
+El superadmin **nunca** toca productos, inventario, pedidos ni ninguna operación interna de las empresas. Su función es garantizar que la plataforma funcione correctamente y configurar los parámetros globales del SaaS.
 
 | Capacidad | Descripción |
 |-----------|-------------|
@@ -150,18 +150,23 @@ El superadmin **nunca** toca productos, inventario, pedidos ni ninguna operació
 | Configuración global | Logo, colores, claves de API, configuración SMTP |
 | Gestionar empresas | Crear/activar/desactivar cuentas de Admin Empresa |
 | Crear Admin CarniHub | Para soporte interno del sistema |
-| Ver analítica de ventas | Reportes globales entre todas las empresas (solo lectura, sin modificar nada) |
+| **Editar precios de planes** | Modificar precio, límites de usuarios/productos/pedidos/sucursales por plan desde `/suscripcion/configurar` |
+| **Incidencias lógicas** | Panel de errores del sistema: excepciones PHP, intentos de login fallidos, accesos denegados, errores de pago (fuente: `error_logs` + `action_logs`) |
+| **Reportes de funcionamiento** | Uptime de APIs, pedidos procesados por mes, tasa de errores, transacciones PayPal con gráficas Chart.js |
+| **Reportes de ventas SaaS** | Ingresos por suscripciones, churn, planes más contratados, empresas nuevas vs. canceladas |
 
 ### Admin Empresa — control total de su empresa
 
-El Admin Empresa es el productor de carne. Tiene control completo sobre su propia operación.
+El Admin Empresa es el productor de carne. Tiene control completo sobre su propia operación. El dashboard es un **panel de estado general**, no un punto de acción de pedidos.
 
 | Capacidad | Descripción |
 |-----------|-------------|
-| Dashboard de empresa | Ventas, pedidos pendientes, alertas de stock, equipo activo |
+| **Dashboard — panel de estado general** | Ventas del día/mes, cobros pendientes de cobrar, últimos movimientos financieros, stock crítico (alertas en rojo), equipo activo, pedidos en curso — todo en vista rápida sin botón "Nuevo pedido" |
 | Catálogo de productos | CRUD de productos, precios escalonados, imágenes, categorías |
 | Inventario | Stock, alertas de mínimo, ajustes manuales |
-| Pedidos de su empresa | Ver todos los pedidos, cambiar estado, aprobar, cancelar |
+| Pedidos de su empresa | Ver todos los pedidos de sus compradores, cambiar estado, aprobar, cancelar |
+| **Cobros y movimientos** | Ver qué compradores tienen pedidos pendientes de pago, historial de pagos recibidos, saldos por cobrar |
+| **Configurar métodos de cobro** | Definir cómo recibe pagos de sus clientes: transferencia, efectivo, PayPal (mock en Sprint 5P, real posterior) |
 | Crear compradores | Agrega a sus clientes/compradores para que hagan pedidos |
 | Crear supervisores | Empleados que aprueban pedidos y configuran límites |
 | Crear repartidores | Choferes de su flota con app GPS |
@@ -490,15 +495,121 @@ Login exitoso redirige según rol:
 - [x] `public/planes.php` — pricing público standalone
 - [x] `index.php` — rutas `suscripcion/*`, `empresa-suscripcion/*`, `planes/*`; autoload services
 
-### Sprint 4C-1 — Dashboard Empresa funcional (admin_empresa) 🔄 SIGUIENTE
-> Prioridad: que el admin_empresa pueda trabajar completamente sin errores.
+### Sprint 4C-0 — Hotfixes críticos (pre-4C) ✅ COMPLETADO
+> Bugs activos encontrados en revisión 2026-05-05. Todos corregidos en rama `sprint-4C-0`.
 
-- [ ] Verificar que inventario (`/empresa-inventario/index`) carga sin errores tras fix `p.unidad`
-- [ ] Verificar que logística (`/empresa-logistica/index`) carga sin errores tras fix `query()` protected
+**Bug 1 — Inventario: stock siempre mostraba 0**
+- [x] `ProductoModel::listadoInventario()` — alias corregido: `AS stock` → `AS stock_actual`
+
+**Bug 2 — Inventario: imágenes no se ven + sin filtro por empresa (bug de seguridad)**
+- [x] `ProductoModel::listadoInventario()` — añadido `p.imagen` al SELECT
+- [x] `ProductoModel::listadoInventario()` — filtro `AND p.empresa_id = ?` (requiere migration 005)
+- [x] `ProductoModel::listadoAdmin()` — filtro por `empresa_id` añadido
+- [x] `EmpresaInventarioController::index()` — pasa `empresa_id` al modelo
+- [x] `EmpresaProductoController::index()` — pasa `empresa_id` al modelo
+- [x] `EmpresaProductoController::guardar()` — guarda `empresa_id` al crear producto
+- [x] Vista `empresa/inventario/index.php` — miniatura 40×40 con fallback gris + URL de imagen correcta (campo ya guarda URL completa)
+- [x] `migrations/005_productos_empresa_id.sql` — ALTER TABLE agrega columna `empresa_id` a `productos` (default 1 para datos existentes)
+
+**Bug 3 — Suscripciones vacías en panel superadmin**
+- [x] `migrations/003_saas_suscripciones.sql` — agrega INSERT suscripción demo empresa 1 al final
+- [x] `migrations/004_hotfix_4c0.sql` — parche para BD existente (ya aplicado en producción)
+
+**Bug 4 — Dashboard admin_empresa: botón "+ Nuevo pedido" incorrecto**
+- [x] Vista `empresa/dashboard.php` — eliminado botón "+ Nuevo pedido" (los pedidos los hace el comprador desde el catálogo)
+
+**Migraciones para aplicar en phpMyAdmin (si no se ha hecho reset completo):**
+```
+004_hotfix_4c0.sql   → suscripción demo empresa 1 (si ya corriste 003)
+005_productos_empresa_id.sql → ALTER TABLE productos ADD empresa_id
+```
+
+---
+
+### Sprint 4S-3 — Landing pública + Super Admin: precios, incidencias y reportes SaaS
+> Prioridad menor que 4C-1/4C-2/4C-3. Hacer después de completar los portales de empresa, supervisor y comprador.
+
+**A — Landing page pública** (`/` o `/inicio`)
+- [ ] `LandingController` — ruta pública `/` → vista `public/landing.php`
+- [ ] Secciones de la landing:
+  - Hero: qué es CarniHub (titular + subtítulo + CTA "Ver planes")
+  - Características: 6 cards con ventajas clave (pedidos, GPS, inventario, aprobaciones, reportes, suscripción SaaS)
+  - Cómo funciona: 3 pasos ilustrados (te registras → configuras tu empresa → tus clientes piden)
+  - Planes y precios: embed o link a `/planes` (ya existe)
+  - Footer con contacto
+- [ ] Diseño con Tailwind CDN, sin login requerido
+- [ ] Navbar: logo + "Iniciar sesión" + "Ver planes"
+- [ ] Rutas: `GET /` → landing, `GET /planes` → ya existe
+
+**B — Super Admin: editar precios de planes**
+- [ ] `SuscripcionController::editarPlan()` y `guardarPlan()` — formulario editar precio + límites por plan
+- [ ] Vista `panel/suscripciones/editar_plan.php` — campos: precio, max_usuarios, max_productos, max_pedidos_mes, max_sucursales
+- [ ] Guard: solo superadmin puede editar (admin no)
+
+**C — Super Admin: incidencias lógicas del sistema**
+- [ ] `PanelIncidenciaController` — fuente: tablas `error_logs`, `action_logs`, `login_intentos`
+- [ ] Vista `panel/incidencias/index.php` — tabla con filtros: tipo (error PHP / login fallido / acceso denegado / pago fallido), empresa, fecha
+- [ ] Resumen cards: errores hoy, intentos de login fallidos hoy, transacciones PayPal fallidas hoy
+- [ ] Detalle de incidencia: mensaje completo, stack trace si existe, IP, usuario_id
+- [ ] Ruta: `panel-incidencia/*` (solo superadmin)
+
+**D — Super Admin: reportes de funcionamiento y ventas SaaS**
+- [ ] `PanelReporteController` — KPIs de la plataforma con Chart.js
+- [ ] Vista `panel/reportes/index.php`:
+  - Ingresos SaaS por mes (suma suscripciones activas × precio plan) — gráfica de línea
+  - Empresas activas vs. suspendidas vs. canceladas — gráfica de dona
+  - Distribución de planes (cuántas empresas en cada plan) — gráfica de barras
+  - Pedidos totales procesados por el sistema por mes — gráfica de área
+  - Top 5 empresas por volumen de pedidos
+  - Tasa de errores del sistema (errores/día últimos 30 días)
+- [ ] Ruta: `panel-reporte/*` (superadmin, admin — solo lectura)
+
+### Sprint 4C-1 — Email Service + Dashboard Empresa + EmpresaPedidoController 🔄 SIGUIENTE
+> Hacer después de 4C-0 hotfixes. Incluye el email service (adelantado desde Sprint 6).
+
+**A — Email Service: credenciales al crear usuario**
+> El admin NO debe ver la contraseña del usuario que crea. El usuario la recibe por email directamente.
+- [ ] Instalar PHPMailer: `composer require phpmailer/phpmailer`
+- [ ] `app/services/EmailService.php` — wrapper PHPMailer:
+  - Lee `smtp_host`, `smtp_port`, `smtp_user`, `smtp_pass`, `smtp_from`, `smtp_from_name` desde `global_settings`
+  - Método: `enviarBienvenida(string $emailDest, string $nombre, string $password, string $urlLogin): bool`
+  - Template HTML mínimo: logo de la empresa, nombre del usuario, email, contraseña, botón "Iniciar sesión"
+  - Si SMTP no está configurado: lanza excepción silenciosa y devuelve `false`
+- [ ] `EmpresaUsuarioController::guardar()` — cambiar flujo de contraseña:
+  1. Generar `$passwordTemporal` (no cambia)
+  2. Llamar `EmailService::enviarBienvenida($email, $nombre, $passwordTemporal, BASE_URL . 'auth/login')`
+  3. Si envío OK → flash: `"Usuario creado. Se envió un correo con sus credenciales a $email."`
+  4. Si fallo SMTP → flash con contraseña como fallback: `"Usuario creado. (Email no pudo enviarse) Contraseña: <strong>$pass</strong>"`
+- [ ] `PanelUsuarioController::guardar()` — mismo patrón para Admin Empresa creado por superadmin
+- [ ] Prerrequisito: superadmin debe configurar SMTP en `/config/correo` antes de crear usuarios
+
+**B — Anti-spam: configuración de servidor (DNS)**
+> El sistema puede enviar correos pero sin estas configuraciones DNS llegarán a spam. El superadmin/hosting debe aplicarlas.
+
+| Registro DNS | Para qué | Cómo configurar |
+|---|---|---|
+| **SPF** | Autoriza al servidor de email a enviar en nombre del dominio | En cPanel → Zona DNS → TXT: `"v=spf1 include:tu-servidor mx ~all"` |
+| **DKIM** | Firma digital de cada correo (evita spoofing) | En cPanel → Email → Autenticación de Correo → Activar DKIM |
+| **DMARC** | Política que dice qué hacer si SPF/DKIM fallan | TXT `_dmarc.tudominio.com`: `"v=DMARC1; p=none; rua=mailto:admin@tudominio.com"` |
+| **PTR / rDNS** | El IP del servidor debe resolver al dominio | Configurar en el panel de hosting (soporte técnico) |
+
+> ℹ️ Si usas un hosting compartido (ej: cPanel), SPF y DKIM ya están preconfigurados para el dominio. Solo verifica en cPanel → Email → Autenticación de Correo.
+
+**C — Dashboard admin_empresa refactorizado**
+- [ ] **Quitar "+ Nuevo pedido"** del dashboard (el dashboard es vista, no punto de acción)
+- [ ] **Panel de estado general** con cards de:
+  - Ventas del día y del mes (suma de pedidos entregados/pagados)
+  - Cobros pendientes (pedidos confirmados sin pago registrado)
+  - Stock crítico: productos bajo mínimo (alerta roja)
+  - Últimos 5 movimientos (pedidos recientes, pagos recibidos)
+  - Pedidos en ruta ahora (enlace a logística)
+  - Equipo activo hoy (repartidores con ruta asignada)
+
+**D — EmpresaPedidoController**
 - [ ] `EmpresaPedidoController` — ver todos los pedidos de su empresa + cambiar estado
-  - [ ] Vista `empresa/pedidos/index.php` (existe en panel/ — migrar)
+  - [ ] Vista `empresa/pedidos/empresa_index.php` (listado con filtros por estado, fecha, comprador)
   - [ ] Ruta: `empresa-pedido/*`
-- [ ] Sidebar empresa: agregar enlace "Pedidos" para admin_empresa (falta en `empresa/layouts/main.php`)
+- [ ] Sidebar empresa: verificar enlace "Pedidos" para admin_empresa
 
 ### Sprint 4C-2 — Portal Supervisor funcional 🔄 SIGUIENTE
 - [ ] `SupervisorController::dashboard()` — cola de pedidos + KPIs del día
@@ -525,13 +636,37 @@ Login exitoso redirige según rol:
   - [ ] Ruta: `empresa-vehiculo/*`
 - [ ] Al crear repartidor: guardar datos de vehículo en `repartidor_vehiculo` + `vehiculos` (en lugar de solo loguear a action_logs)
 
-### Sprint 5 — Pagos y Facturación
-- [ ] `PagoController` — transferencia (subir comprobante), PayPal SDK, crédito
+### Sprint 5P — Pagos empresa→comprador (simulados / mock)
+> El Admin Empresa necesita recibir pagos de sus compradores. Se simula la pasarela para que el flujo se vea completo; la integración real con PayPal/Stripe va después.
+
+- [ ] **Flujo simulado de pago al confirmar pedido:**
+  - Al confirmar pedido (paso 4 del carrito), comprador ve pantalla "Selecciona método de pago"
+  - Opciones: Transferencia bancaria · Efectivo al repartidor · Tarjeta (simulado)
+  - Modal "Tarjeta simulada": formulario con número ficticio → botón "Pagar $X" → siempre aprueba
+  - Estado pedido pasa a `pagado_simulado` (diferente a `pagado_real` en sprint posterior)
+- [ ] **`PagoController`** — acciones:
+  - `seleccionarMetodo($pedidoId)` — pantalla elección de método
+  - `procesarSimulado($pedidoId)` — mock: inserta registro en tabla `pagos` con `metodo=mock`, `estado=aprobado`
+  - `comprobante($pagoId)` — PDF/vista del comprobante
+  - `registrarTransferencia($pedidoId)` — comprador sube foto del comprobante bancario
+- [ ] **`PagoModel`** — tabla `pagos` ya existe en schema, métodos: `crear`, `getByPedido`, `getByEmpresa`, `pendientes`
+- [ ] **Dashboard Admin Empresa — sección cobros:**
+  - `EmpresaCobroController` — lista de pedidos pendientes de cobro agrupados por comprador
+  - Vista `empresa/cobros/index.php` — tabla: comprador · pedido · monto · método elegido · estado pago · acción (confirmar/rechazar)
+  - Admin puede marcar "Cobro confirmado" en transferencias/efectivo
+- [ ] **Configuración de métodos de cobro del Admin Empresa:**
+  - Vista `empresa/cobros/configurar.php` — toggles: habilitar/deshabilitar cada método
+  - Datos bancarios (para transferencia): CLABE, banco, nombre titular
+- [ ] Rutas: `pago/*` (comprador), `empresa-cobro/*` (admin_empresa)
+- [ ] **Sin integración PayPal real en este sprint** — se deja preparado para reemplazar mock
+
+### Sprint 5 — Pagos reales y Facturación
+- [ ] Reemplazar mock de tarjeta con `PayPalPagoService` (checkout pedidos individuales, diferente a suscripciones)
 - [ ] `FacturaloService` — CFDI automático al confirmar pago
 - [ ] Vista de facturas descargables para el cliente
 
 ### Sprint 6 — Notificaciones y Pedidos avanzados
-- [ ] `NotificacionService` — PHPMailer SMTP + WhatsApp Cloud API
+- [ ] `NotificacionService` — Eventos WhatsApp Cloud API (EmailService ya existe desde 4C-1)
 - [ ] Eventos: pedido confirmado, en ruta, próximo (<1km), entregado
 - [ ] `RecurrenteController` — plantillas + generación automática
 - [ ] `LimiteController` — supervisor configura límites por sucursal/producto
@@ -540,6 +675,56 @@ Login exitoso redirige según rol:
 - [ ] `EmpresaReporteController` — consumo mensual, gasto por sucursal, top productos
 - [ ] `PanelReporteController` — ventas globales con gráficas Chart.js (solo lectura para superadmin)
 - [ ] Exportar Excel (PhpSpreadsheet) y PDF (Dompdf)
+
+---
+
+## PAYPAL SUBSCRIPTIONS — CONFIGURACIÓN PASO A PASO
+
+> El botón "Configurar PayPal" en `/suscripcion/configurar` ya existe. Solo falta poner los Plan IDs reales.
+
+### Paso 1 — Crear cuenta de desarrollador y app
+1. Ve a [developer.paypal.com](https://developer.paypal.com) → inicia sesión con tu cuenta PayPal
+2. En **Dashboard → My Apps & Credentials** → clic "Create App"
+3. Ponle nombre (ej: "CarniHub"), tipo: **Merchant**
+4. Copia el **Client ID** y **Secret** → guárdalos en CarniHub en `/config/apis` (campos `paypal_client_id` y `paypal_secret`)
+5. En `/config/apis` también pon `paypal_mode = sandbox` para pruebas (cambiar a `live` en producción)
+
+### Paso 2 — Crear productos en PayPal
+1. En el panel de developer → **Sandbox → Subscriptions → Products** → "Create Product"
+2. Crea **un producto por plan**:
+   - Nombre: "CarniHub Básico", tipo: SERVICE, categoría: SOFTWARE
+   - Nombre: "CarniHub Pro", tipo: SERVICE
+   - Nombre: "CarniHub Empresa", tipo: SERVICE
+3. Guarda el **Product ID** de cada uno (empieza con `PROD-`)
+
+### Paso 3 — Crear Billing Plans
+1. En **Sandbox → Subscriptions → Plans** → "Create Plan"
+2. Por cada producto creado:
+   - Selecciona el producto correspondiente
+   - Nombre del plan (ej: "Plan Básico Mensual")
+   - Ciclo de facturación: **Monthly**, precio en MXN
+   - `$2,600 MXN` para Básico · `$3,200 MXN` para Pro · `$4,000 MXN` para Empresa
+3. Activa el plan (status: ACTIVE)
+4. Copia el **Plan ID** de cada uno (empieza con `P-`)
+
+### Paso 4 — Configurar en CarniHub
+1. Entra como superadmin → `/suscripcion/configurar`
+2. Pega cada Plan ID en el campo correspondiente → "Guardar IDs"
+3. Configura también el Webhook ID:
+   - En developer.paypal.com → **Webhooks → Add Webhook**
+   - URL: `https://tudominio.com/carnihub/suscripcion/webhook`
+   - Eventos a suscribir: `BILLING.SUBSCRIPTION.ACTIVATED`, `BILLING.SUBSCRIPTION.SUSPENDED`, `BILLING.SUBSCRIPTION.CANCELLED`, `PAYMENT.SALE.COMPLETED`
+   - Copia el **Webhook ID** → guárdalo en `/config/apis` campo `paypal_webhook_id`
+
+### Paso 5 — Por qué no se ven suscripciones ahora
+El panel muestra vacío porque la empresa demo del seed no tiene un registro en la tabla `suscripciones`.
+Esto se corrige con el fix del **Sprint 4C-0 Bug 3** (INSERT en migration).
+Cuando el superadmin crea una empresa nueva via `/panel-empresa/nueva`, la suscripción se crea automáticamente en ese momento.
+
+### Prueba en Sandbox
+- Usa la cuenta de comprador sandbox de PayPal (en developer.paypal.com → Sandbox Accounts)
+- Flujo empresa: `/empresa-suscripcion/planes` → elige plan → PayPal checkout → regresa → estado activo
+- El webhook dispara automáticamente cuando el pago se procesa
 
 ---
 
@@ -554,7 +739,7 @@ Login exitoso redirige según rol:
 | Mapas base | OpenStreetMap | Gratuito | Tiles sin costo |
 | Gráficas | Chart.js | CDN | KPIs y reportes |
 | GPS servidor | Traccar | Self-hosted | Rastreo real-time |
-| Email | PHPMailer | Composer | SMTP en sprints 5+ |
+| Email | PHPMailer | Composer | SMTP — **adelantado a Sprint 4C-1** (credenciales a usuarios) |
 | Excel | PhpSpreadsheet | Composer | Exportar reportes |
 | PDF | Dompdf | Composer | Facturas/reportes |
 | WhatsApp | Meta Cloud API | Gratuito (hasta límite) | Notificaciones |
@@ -615,4 +800,4 @@ Todos se configuran desde `/config/apis` y `/config/correo` (solo visible para s
 
 ---
 
-*Última actualización: 2026-05-05 — v2.3.0 (Sprint 4S: SaaS Suscripciones + PayPal — planes $2,600/$3,200/$4,000 MXN/mes)*
+*Última actualización: 2026-05-05 — v2.5.0 (Hotfixes 4C-0: inventario stock/imagen/empresa_id · Sprint 4C-1: email service + credenciales por correo · PayPal Subscriptions guía completa · anti-spam DNS)*

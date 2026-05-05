@@ -12,6 +12,7 @@ class EmpresaInventarioController extends BaseController
     public function index(?string $p = null): void
     {
         $filtros = [
+            'empresa_id' => $this->empresaId(),
             'buscar'     => $this->get('buscar', ''),
             'stock_bajo' => $this->get('stock_bajo', ''),
         ];

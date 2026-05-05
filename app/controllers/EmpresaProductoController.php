@@ -15,6 +15,7 @@ class EmpresaProductoController extends BaseController
     public function index(?string $p = null): void
     {
         $filtros = [
+            'empresa_id'   => $this->empresaId(),
             'buscar'       => $this->get('buscar', ''),
             'categoria_id' => $this->get('categoria_id', ''),
             'stock_bajo'   => $this->get('stock_bajo', ''),
@@ -64,6 +65,7 @@ class EmpresaProductoController extends BaseController
         }
 
         $id = $this->productoModel->insert([
+            'empresa_id'   => $this->empresaId(),
             'nombre'       => trim($this->post('nombre')),
             'descripcion'  => trim($this->post('descripcion', '')),
             'categoria_id' => (int)$this->post('categoria_id'),
