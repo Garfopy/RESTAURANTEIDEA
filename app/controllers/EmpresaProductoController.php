@@ -155,7 +155,21 @@ class EmpresaProductoController extends BaseController
         $id = (int)$p;
         $this->productoModel->update($id, ['activo' => 0]);
         $this->log('Desactivar producto', 'productos', "ID: $id");
-        $this->flash('success', 'Producto desactivado.');
+        $this->flash('success', 'Producto ocultado — ya no es visible para los compradores.');
+        $this->redirect('empresa-producto/index');
+    }
+
+    public function activar(?string $p = null): void
+    {
+        $id = (int)$p;
+        // Verificar que el producto pertenece a esta empresa
+        $prod = $this->productoModel->find($id);
+        if (!$prod || $prod['empresa_id'] != $this->empresaId()) {
+            $this->redirect('empresa-producto/index');
+        }
+        $this->productoModel->update($id, ['activo' => 1]);
+        $this->log('Activar producto', 'productos', "ID: $id");
+        $this->flash('success', 'Producto activado — ya es visible para los compradores.');
         $this->redirect('empresa-producto/index');
     }
 

@@ -100,7 +100,7 @@ class ProductoModel extends BaseModel
 
         $sqlWhere = 'WHERE ' . implode(' AND ', $where);
         $sql = "SELECT p.*, c.nombre AS categoria_nombre,
-                       COALESCE(inv.stock, 0) AS stock,
+                       COALESCE(inv.stock, 0) AS stock_actual,
                        COALESCE(inv.umbral_minimo, 10) AS umbral_minimo
                   FROM productos p
                   JOIN categorias c ON c.id = p.categoria_id
