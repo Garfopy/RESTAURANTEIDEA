@@ -110,6 +110,11 @@ class UsuarioModel extends BaseModel
         return $this->queryOne('SELECT id, slug, nombre FROM roles WHERE slug = ?', [$slug]);
     }
 
+    public function getRolPorId(int $rolId): ?array
+    {
+        return $this->queryOne('SELECT * FROM roles WHERE id = ?', [$rolId]);
+    }
+
     public function getRepartidoresGlobal(): array
     {
         return $this->query(
@@ -120,5 +125,10 @@ class UsuarioModel extends BaseModel
               WHERE r.slug = 'repartidor' AND u.activo = 1
               ORDER BY e.razon_social, u.nombre"
         );
+    }
+
+    public function getRepartidoresPorEmpresa(int $empresaId): array
+    {
+        return $this->getByRolEmpresa('repartidor', $empresaId);
     }
 }

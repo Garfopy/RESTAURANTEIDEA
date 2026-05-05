@@ -12,7 +12,7 @@ $usuario      = $_SESSION['usuario'] ?? [];
 $empresa      = $_SESSION['empresa'] ?? [];
 $rol          = $usuario['rol_slug'] ?? '';
 $esAdmin      = $rol === 'admin_empresa';
-$esComprador  = in_array($rol, ['admin_empresa', 'comprador'], true);
+$esComprador  = $rol === 'comprador';
 $esSupervisor = in_array($rol, ['admin_empresa', 'supervisor'], true);
 ?>
 <!DOCTYPE html>

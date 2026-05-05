@@ -51,6 +51,7 @@ class EmpresaUsuarioController extends BaseController
         $rolId     = (int)$this->post('rol_id');
         $nombre    = trim($this->post('nombre', ''));
         $apellido  = trim($this->post('apellido_paterno', ''));
+        $apellidoM = trim($this->post('apellido_materno', ''));
         $email     = trim($this->post('email', ''));
         $telefono  = trim($this->post('telefono', ''));
 
@@ -63,16 +64,17 @@ class EmpresaUsuarioController extends BaseController
 
         // Validar email único
         if ($this->model->getByEmail($email)) {
-            $this->flash('error', 'El correo ya está registrado.');
+            $this->flash('error', 'El correo ya está registrado en el sistema.');
             $this->redirect('empresa-usuario/nuevo');
         }
 
         // Generar contraseña temporal
         $passwordTemporal = 'Ch' . rand(1000, 9999) . '!';
 
-        $this->model->crear([
+        $usuarioId = $this->model->crear([
             'nombre'           => $nombre,
             'apellido_paterno' => $apellido,
+            'apellido_materno' => $apellidoM ?: null,
             'email'            => $email,
             'telefono'         => $telefono,
             'rol_id'           => $rolId,
@@ -81,12 +83,59 @@ class EmpresaUsuarioController extends BaseController
             'created_by'       => $this->usuarioId(),
         ], $passwordTemporal);
 
-        $this->log('Crear usuario empresa', 'empresa_usuario', "Email: $email, Rol: $rolId");
+        // Detectar el slug del rol recién creado
+        $rolInfo = $this->model->getRolPorId($rolId);
+        $rolSlug = $rolInfo['slug'] ?? '';
 
-        // TODO: enviar email de bienvenida con contraseña temporal
-        // (cuando NotificacionService esté implementado)
+        // Si es comprador: crear su sucursal de entrega automáticamente
+        if ($rolSlug === 'comprador') {
+            $nombreNegocio  = trim($this->post('nombre_negocio', ''));
+            $direccion      = trim($this->post('direccion_entrega', ''));
+            $ciudad         = trim($this->post('ciudad', ''));
+            $cp             = trim($this->post('codigo_postal', ''));
+            $responsable    = trim($this->post('responsable_entrega', ''));
+            $horario        = trim($this->post('horario_entrega', ''));
 
-        $this->flash('success', "Usuario creado. Contraseña temporal: $passwordTemporal (comunícala al usuario).");
+            if ($nombreNegocio && $direccion) {
+                $dirCompleta = $direccion;
+                if ($ciudad)  $dirCompleta .= ', ' . $ciudad;
+                if ($cp)      $dirCompleta .= ' C.P. ' . $cp;
+                if ($horario) $dirCompleta .= ' (Horario: ' . $horario . ')';
+
+                $db = Database::getInstance();
+                $stmt = $db->prepare(
+                    "INSERT INTO sucursales (empresa_id, nombre, direccion, responsable, telefono, activo)
+                     VALUES (?, ?, ?, ?, ?, 1)"
+                );
+                $stmt->execute([
+                    $empresaId,
+                    $nombreNegocio,
+                    $dirCompleta,
+                    $responsable ?: ($nombre . ' ' . $apellido),
+                    $telefono,
+                ]);
+            }
+        }
+
+        // Si es repartidor: guardar datos del vehículo en el log para referencia
+        if ($rolSlug === 'repartidor') {
+            $tipoVehiculo  = trim($this->post('tipo_vehiculo', ''));
+            $placas        = trim($this->post('placas_vehiculo', ''));
+            $modelo        = trim($this->post('vehiculo_modelo', ''));
+            $licencia      = trim($this->post('licencia', ''));
+
+            if ($tipoVehiculo || $placas) {
+                $this->log(
+                    'Repartidor con vehículo',
+                    'empresa_usuario',
+                    "Usuario: $usuarioId | Tipo: $tipoVehiculo | Placas: $placas | Modelo: $modelo | Licencia: $licencia"
+                );
+            }
+        }
+
+        $this->log('Crear usuario empresa', 'empresa_usuario', "Email: $email, Rol: $rolSlug");
+
+        $this->flash('success', "Usuario creado. Contraseña temporal: <strong>$passwordTemporal</strong> — comunícala al usuario.");
         $this->redirect('empresa-usuario/index');
     }
 

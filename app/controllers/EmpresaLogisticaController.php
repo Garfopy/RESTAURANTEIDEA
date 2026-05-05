@@ -57,7 +57,7 @@ class EmpresaLogisticaController extends BaseController
     {
         $empresaId    = $_SESSION['usuario']['empresa_id'] ?? 0;
         $usuarioModel = new UsuarioModel();
-        $repartidores = $usuarioModel->getByEmpresa($empresaId, 'repartidor');
+        $repartidores = $usuarioModel->getRepartidoresPorEmpresa($empresaId);
 
         $pedidoModel  = new PedidoModel();
         $pedidosDisp  = $pedidoModel->listadoConfirmadosPorEmpresa($empresaId);
