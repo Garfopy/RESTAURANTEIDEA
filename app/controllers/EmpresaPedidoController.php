@@ -120,6 +120,7 @@ class EmpresaPedidoController extends BaseController
     }
 
     // Aprobar pedido → estado confirmado, acepta ajustes de precio (solo a la baja)
+    // También guarda entrega si se envían los campos (cuando se aprueba sin "Guardar asignación" antes)
     public function aprobar(?string $id = null): void
     {
         if (!$this->isPost()) {
@@ -130,6 +131,15 @@ class EmpresaPedidoController extends BaseController
 
         if (!$this->pedidoModel->verificarPertenece($pedidoId, $this->empresaId())) {
             $this->redirect('empresa-pedido');
+        }
+
+        // Guardar entrega si viene en el POST (flujo directo sin "Guardar asignación")
+        $tipoEntrega = $this->post('tipo_entrega');
+        if (in_array($tipoEntrega, ['pickup', 'repartidor'], true)) {
+            $repartidorId = (int)$this->post('repartidor_asignado_id') ?: null;
+            $costoEnvio   = $tipoEntrega === 'pickup' ? 0.0 : (float)$this->post('costo_envio', 0);
+            $notaEmpresa  = trim($this->post('nota_empresa', ''));
+            $this->pedidoModel->asignarEntrega($pedidoId, $tipoEntrega, $repartidorId, $costoEnvio, $notaEmpresa);
         }
 
         $ajustes = (array)($_POST['ajustes'] ?? []);

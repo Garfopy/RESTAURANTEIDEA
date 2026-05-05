@@ -63,6 +63,51 @@ $esComprador = in_array($rol, ['comprador'], true);
 </div>
 <?php endif; ?>
 
+<!-- Banner "En camino" para el comprador -->
+<?php if ($esComprador && $pedido['estado'] === 'en_ruta'): ?>
+<div style="margin-bottom:20px;background:linear-gradient(135deg,#FEF3C7,#FDE68A);border:2px solid #F59E0B;border-radius:14px;padding:20px 24px">
+  <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+    <div style="font-size:2.5rem;flex-shrink:0">🚚</div>
+    <div style="flex:1">
+      <div style="font-size:1.05rem;font-weight:800;color:#92400E">¡Tu pedido está en camino!</div>
+      <div style="font-size:.85rem;color:#B45309;margin-top:4px">
+        Tu pedido <strong><?= htmlspecialchars($pedido['folio']) ?></strong> fue despachado y está siendo entregado.
+      </div>
+      <?php if (!empty($pedido['tipo_entrega'])): ?>
+      <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:12px">
+        <div style="background:rgba(255,255,255,.6);border-radius:8px;padding:8px 14px;font-size:.82rem">
+          <div style="color:#92400E;font-weight:700;font-size:.7rem;margin-bottom:2px">TIPO DE ENTREGA</div>
+          <div style="color:#78350F;font-weight:600">
+            <?= $pedido['tipo_entrega'] === 'pickup' ? '🏭 Recoger en bodega' : '🚚 Envío a domicilio' ?>
+          </div>
+        </div>
+        <?php
+        $repartidorNombre = null;
+        if (!empty($pedido['repartidor_asignado_id'])) {
+            $usuarioModel = new UsuarioModel();
+            $rep = $usuarioModel->find((int)$pedido['repartidor_asignado_id']);
+            if ($rep) $repartidorNombre = trim(($rep['nombre'] ?? '') . ' ' . ($rep['apellido_paterno'] ?? ''));
+        }
+        ?>
+        <?php if ($repartidorNombre): ?>
+        <div style="background:rgba(255,255,255,.6);border-radius:8px;padding:8px 14px;font-size:.82rem">
+          <div style="color:#92400E;font-weight:700;font-size:.7rem;margin-bottom:2px">REPARTIDOR</div>
+          <div style="color:#78350F;font-weight:600"><?= htmlspecialchars($repartidorNombre) ?></div>
+        </div>
+        <?php endif; ?>
+        <?php if (!empty($pedido['fecha_entrega'])): ?>
+        <div style="background:rgba(255,255,255,.6);border-radius:8px;padding:8px 14px;font-size:.82rem">
+          <div style="color:#92400E;font-weight:700;font-size:.7rem;margin-bottom:2px">FECHA ESTIMADA</div>
+          <div style="color:#78350F;font-weight:600"><?= date('d/m/Y', strtotime($pedido['fecha_entrega'])) ?></div>
+        </div>
+        <?php endif; ?>
+      </div>
+      <?php endif; ?>
+    </div>
+  </div>
+</div>
+<?php endif; ?>
+
 <!-- Comprobante de pago (solo comprador, solo si está confirmado) -->
 <?php if ($esComprador && $pedido['estado'] === 'confirmado'): ?>
 <div style="margin-bottom:20px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:12px;padding:18px 20px">

@@ -1,5 +1,5 @@
-# CarniHub — Plan v2.6.2
-**Versión:** 2.6.2 | **Fecha:** 2026-05-05 | **Stack:** PHP 8.3 · MySQL · Tailwind CDN · MVC sin framework
+# CarniHub — Plan v2.6.3
+**Versión:** 2.6.3 | **Fecha:** 2026-05-05 | **Stack:** PHP 8.3 · MySQL · Tailwind CDN · MVC sin framework
 
 ---
 
@@ -710,6 +710,29 @@ Empresa/Repartidor → "En camino" → en_ruta → sube foto entrega → entrega
 - [x] `empresa_index.php` — modal Revisar: carga items via AJAX al abrir, muestra precios editables con límite máximo = precio original; inputs fluyen al formAprobar
 - [x] `detalle.php` — column "Precio unit." muestra precio tachado + nuevo precio en verde + descuento % cuando fue ajustado
 
+**J — UX Catálogo + Carrito: Modal AJAX + Tiempo Real ✅ COMPLETADO (2026-05-05)**
+- [x] `catalogo/index.php` — reescrito completo:
+  - [x] Imágenes corregidas: eliminado doble-prefijo `UPLOAD_URL`, ahora usa `$prod['imagen']` directamente
+  - [x] Pre-carga de `escalonados` por producto en PHP (`$productoModelCat->getEscalonados()`)
+  - [x] "Ver precios" → modal en modo lectura (sin botón Agregar para roles sin carrito)
+  - [x] "+ Agregar" → modal AJAX: cantidad, tabla de precios por volumen, estimación de precio/subtotal
+  - [x] Precio se actualiza en tiempo real vía `fetch('/api/precios/{id}')` con 280ms debounce
+  - [x] Alertas dinámicas: verde "Ahorrando X%" cuando aplica descuento; amarillo "Agrega N más → precio Y"
+  - [x] Fila activa de tramos resaltada en verde según cantidad ingresada
+  - [x] AJAX POST a `carrito/agregarProducto` — sin salir del catálogo; badge del carrito actualiza sin reload
+- [x] `CarritoController::agregarProducto()` — nuevo endpoint AJAX:
+  - Valida producto activo y pertenece a empresa del comprador
+  - Merge de cantidad si producto ya estaba en carrito (recalcula precio con nuevo total)
+  - Retorna `{ok, msg, total_items}` para actualizar badge
+- [x] `paso1.php` — precios actualizados en tiempo real con `oninput` + debounce 350ms por producto; muestra "..." mientras carga
+- [x] `empresa_index.php` — fixes UX pedidos admin:
+  - [x] Eliminado botón "+ Pedido Personalizado" del listado
+  - [x] "Costo de envío" se oculta automáticamente cuando se selecciona "Pickup"
+  - [x] Botón "Aprobar" sincroniza campos de entrega (tipo, repartidor, costo, nota) al formAprobar antes de submit — ya no es necesario "Guardar asignación" antes
+- [x] `EmpresaPedidoController::aprobar()` — también guarda asignación de entrega si `tipo_entrega` viene en POST
+- [x] `detalle.php` — banner "En camino 🚚" para comprador cuando `estado = 'en_ruta'`:
+  - Tipo de entrega, repartidor asignado (nombre), fecha estimada
+
 **F — Email Service (movido de prioridad — hacer cuando SMTP esté configurado en cPanel)**
 > El admin puede seguir viendo la contraseña generada como fallback mientras no haya SMTP activo.
 - [ ] `app/services/EmailService.php` con PHPMailer
@@ -764,6 +787,18 @@ Modal "Entrada rápida IA" en /empresa-inventario
   - [ ] Vista `comprador/inicio.php`
 - [ ] Verificar flujo completo: inicio → catálogo (con precios especiales si aplica) → carrito → confirmar pedido
 - [ ] Verificar que límites de compra bloquean correctamente cuando están activos
+
+### Sprint 4C-4 — Detalle de producto + Descuentos en pedidos (pendiente)
+- [ ] **Página de detalle de producto** (`/catalogo/detalle/{id}` o modal expandido):
+  - [ ] Foto ampliada, descripción completa, tabla de precios escalonados, precio especial del comprador si aplica
+  - [ ] Botón "+ Agregar" desde el detalle (igual que en el catálogo)
+  - [ ] El admin puede agregar esta info desde `/empresa-producto/editar/{id}` (campo descripción larga)
+- [ ] **Descuentos visibles en detalle de pedido**:
+  - [ ] Si el pedido tiene precio escalonado, mostrar ahorro por volumen vs. precio base en cada línea
+  - [ ] Resumen al pie: "Ahorro total por volumen: $X"
+- [ ] **Límites de compra en el carrito**:
+  - [ ] `LimiteController` — supervisor configura máximos por comprador/producto/mes
+  - [ ] `CarritoController::actualizar()` — validar límites antes de crear pedido; mostrar error descriptivo
 
 ### Sprint 4D — Sucursales del Comprador (CRUD) + Vehículos
 > Las sucursales son los PUNTOS DE ENTREGA del comprador (no almacenes del productor).
@@ -951,4 +986,4 @@ Todos se configuran desde `/config/apis` y `/config/correo` (solo visible para s
 
 ---
 
-*Última actualización: 2026-05-05 — v2.6.2 (Sprint 4C-1 completado: bugs corregidos — tipo duplicado en paginate, query() protegido en EmpresaPedidoController, código duplicado en CarritoController · Stock invisible al comprador · Formulario de producto rediseñado con UI guiada por secciones · Flujo pedido: comprador solicita → empresa revisa/aprueba/rechaza)*
+*Última actualización: 2026-05-05 — v2.6.3 (Sprint 4C-1 J: catálogo reescrito con modal AJAX + precios en tiempo real + imágenes corregidas · CarritoController::agregarProducto nuevo endpoint · paso1.php oninput debounce · empresa_index.php: pickup oculta costo envío + Aprobar guarda entrega en un clic · detalle.php: banner "En camino" para comprador en en_ruta · plan.md: Sprint 4C-4 planificado con detalle producto + descuentos + límites)*

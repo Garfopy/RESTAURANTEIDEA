@@ -105,7 +105,7 @@ $carritoItems = $carrito ?? [];
                        value="<?= $prev > 0 ? $prev : '' ?>"
                        min="0" step="0.5"
                        placeholder="0"
-                       onchange="actualizarFila(<?= $prod['id'] ?>, <?= $prod['precio_base'] ?>, '<?= htmlspecialchars($prod['nombre']) ?>', '<?= $prod['presentacion'] ?>')"
+                       oninput="actualizarFila(<?= $prod['id'] ?>, <?= $prod['precio_base'] ?>, '<?= htmlspecialchars($prod['nombre']) ?>', '<?= $prod['presentacion'] ?>')"
                        style="width:90px;padding:6px 10px;border:1px solid #D1D5DB;border-radius:6px;text-align:center;font-size:.875rem">
               </td>
               <td style="padding:12px;text-align:right;font-weight:700;color:#111827" id="sub-<?= $prod['id'] ?>">
@@ -176,6 +176,7 @@ $carritoItems = $carrito ?? [];
 // Datos del carrito inicial (desde sesión PHP)
 const carritoInicial = <?= json_encode(array_values($carritoItems)) ?>;
 const preciosProductos = {};
+let debTimers = {};
 
 // Inicializar desde el carrito existente
 carritoInicial.forEach(item => {
@@ -193,8 +194,19 @@ function actualizarFila(id, precioBase, nombre, presentacion) {
   const row = document.getElementById('row-'+id);
   const sub = document.getElementById('sub-'+id);
 
-  if (qty > 0) {
-    row.style.background = '#FFF7F7';
+  if (qty <= 0) {
+    row.style.background = '';
+    sub.textContent = '—';
+    delete preciosProductos[id];
+    renderTicket();
+    return;
+  }
+
+  row.style.background = '#FFF7F7';
+  sub.textContent = '...';
+
+  clearTimeout(debTimers[id]);
+  debTimers[id] = setTimeout(() => {
     fetch('<?= BASE_URL ?>api/precios/'+id+'?cantidad='+qty)
       .then(r => r.json())
       .then(d => {
@@ -210,12 +222,7 @@ function actualizarFila(id, precioBase, nombre, presentacion) {
         preciosProductos[id] = { precio: precioBase, nombre, presentacion, cantidad: qty, subtotal };
         renderTicket();
       });
-  } else {
-    row.style.background = '';
-    sub.textContent = '—';
-    delete preciosProductos[id];
-    renderTicket();
-  }
+  }, 350);
 }
 
 function renderTicket() {

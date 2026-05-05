@@ -215,6 +215,62 @@ class CarritoController extends BaseController
         require ROOT_PATH . '/app/views/empresa/layouts/main.php';
     }
 
+    // AJAX: agrega un solo producto al carrito desde el catálogo
+    public function agregarProducto(?string $p = null): void
+    {
+        header('Content-Type: application/json');
+        if (!$this->isPost()) {
+            echo json_encode(['ok' => false, 'msg' => 'Método no permitido']);
+            return;
+        }
+
+        $productoId  = (int)$this->post('producto_id');
+        $cantidad    = (float)str_replace(',', '.', $this->post('cantidad', 0));
+        $compradorId = $this->usuarioId();
+        $empresaId   = $this->empresaId();
+
+        if ($cantidad <= 0 || $productoId <= 0) {
+            echo json_encode(['ok' => false, 'msg' => 'Cantidad inválida']);
+            return;
+        }
+
+        $producto = $this->productoModel->find($productoId);
+        if (!$producto || !$producto['activo'] || (int)$producto['empresa_id'] !== $empresaId) {
+            echo json_encode(['ok' => false, 'msg' => 'Producto no disponible']);
+            return;
+        }
+
+        $carrito = $_SESSION['carrito']['items'] ?? [];
+
+        if (isset($carrito[$productoId])) {
+            $nuevaCant = $carrito[$productoId]['cantidad'] + $cantidad;
+            $precio    = $this->productoModel->getPrecioFinal($compradorId, $productoId, $nuevaCant);
+            $carrito[$productoId] = array_merge($carrito[$productoId], [
+                'cantidad' => $nuevaCant,
+                'precio'   => $precio,
+                'subtotal' => round($precio * $nuevaCant, 2),
+            ]);
+        } else {
+            $precio = $this->productoModel->getPrecioFinal($compradorId, $productoId, $cantidad);
+            $carrito[$productoId] = [
+                'producto_id'  => $productoId,
+                'nombre'       => $producto['nombre'],
+                'presentacion' => $producto['presentacion'],
+                'cantidad'     => $cantidad,
+                'precio'       => $precio,
+                'subtotal'     => round($precio * $cantidad, 2),
+            ];
+        }
+
+        $_SESSION['carrito']['items'] = $carrito;
+
+        echo json_encode([
+            'ok'          => true,
+            'msg'         => "Agregado: {$producto['nombre']}.",
+            'total_items' => count($carrito),
+        ]);
+    }
+
     public function vaciar(?string $p = null): void
     {
         $_SESSION['carrito'] = [];

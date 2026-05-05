@@ -48,10 +48,6 @@ $estados = [
     </select>
     <button type="submit" style="padding:8px 16px;background:#374151;color:#fff;border:none;border-radius:8px;font-size:.85rem;cursor:pointer;font-weight:600">Filtrar</button>
   </form>
-  <a href="<?= $baseUrl ?>empresa-pedido/personalizado"
-     style="padding:9px 18px;background:var(--color-primary);color:#fff;border-radius:8px;text-decoration:none;font-weight:700;font-size:.85rem;white-space:nowrap">
-    + Pedido Personalizado
-  </a>
 </div>
 
 <!-- Tabla de pedidos -->
@@ -185,11 +181,11 @@ $estados = [
           <?php endforeach; ?>
         </select>
       </div>
-      <div style="margin-bottom:14px">
+      <div id="costoEnvioContainer" style="margin-bottom:14px">
         <label style="display:block;font-size:.8rem;font-weight:600;color:#374151;margin-bottom:6px">Costo de envío ($)</label>
         <input type="number" name="costo_envio" id="revCostoEnvio" min="0" step="0.01" value="0"
                style="width:100%;padding:9px 12px;border:1px solid #D1D5DB;border-radius:8px;font-size:.875rem;box-sizing:border-box">
-        <div style="font-size:.75rem;color:#9CA3AF;margin-top:3px">0 si es pickup o si el envío está incluido en el precio.</div>
+        <div style="font-size:.75rem;color:#9CA3AF;margin-top:3px">0 si el envío está incluido en el precio.</div>
       </div>
       <div style="margin-bottom:18px">
         <label style="display:block;font-size:.8rem;font-weight:600;color:#374151;margin-bottom:6px">Nota para el comprador (opcional)</label>
@@ -216,7 +212,11 @@ $estados = [
 
     <form method="POST" action="<?= $baseUrl ?>empresa-pedido/aprobar" id="formAprobar" style="margin-bottom:8px">
       <input type="hidden" name="pedido_id" class="syncPedidoId">
-      <button type="submit"
+      <input type="hidden" name="tipo_entrega" id="hTipoEntrega">
+      <input type="hidden" name="repartidor_asignado_id" id="hRepartidorId">
+      <input type="hidden" name="costo_envio" id="hCostoEnvio">
+      <input type="hidden" name="nota_empresa" id="hNotaEmpresa">
+      <button type="submit" onclick="sincronizarEntrega()"
               style="width:100%;padding:10px;background:#059669;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:.875rem">
         ✓ Aprobar pedido
       </button>
@@ -350,7 +350,16 @@ function abrirCambioEstado(id, estadoActual) {
 
 function toggleRepartidor(val) {
   document.getElementById('campoRepartidor').style.display = val === 'repartidor' ? 'block' : 'none';
+  document.getElementById('costoEnvioContainer').style.display = val === 'pickup' ? 'none' : 'block';
   if (val === 'pickup') document.getElementById('revCostoEnvio').value = '0';
+}
+
+function sincronizarEntrega() {
+  const form = document.getElementById('formAsignar');
+  document.getElementById('hTipoEntrega').value   = form.querySelector('[name="tipo_entrega"]').value;
+  document.getElementById('hRepartidorId').value  = form.querySelector('[name="repartidor_asignado_id"]').value;
+  document.getElementById('hCostoEnvio').value    = form.querySelector('[name="costo_envio"]').value;
+  document.getElementById('hNotaEmpresa').value   = form.querySelector('[name="nota_empresa"]').value;
 }
 
 ['modalRevision','modalEstado','modalFotoEntrega'].forEach(id => {
