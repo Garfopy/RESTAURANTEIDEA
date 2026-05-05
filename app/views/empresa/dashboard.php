@@ -40,12 +40,9 @@
   <?php endif; ?>
 </div>
 
-<!-- Acciones rápidas (solo admin_empresa y comprador) -->
+<!-- Acciones rápidas (solo admin_empresa) -->
 <?php if ($rol === 'admin_empresa'): ?>
 <div style="display:flex;gap:10px;margin-bottom:24px;flex-wrap:wrap">
-  <a href="<?= BASE_URL ?>catalogo/index" style="padding:10px 20px;background:var(--color-primary);color:#fff;border-radius:8px;text-decoration:none;font-weight:600;font-size:.875rem">
-    + Nuevo pedido
-  </a>
   <a href="<?= BASE_URL ?>empresa-usuario/nuevo" style="padding:10px 20px;background:#F3F4F6;color:#374151;border-radius:8px;text-decoration:none;font-weight:600;font-size:.875rem">
     + Agregar usuario
   </a>

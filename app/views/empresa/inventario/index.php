@@ -49,7 +49,7 @@ $baseUrl = BASE_URL;
         <td style="padding:12px 16px">
           <div style="display:flex;align-items:center;gap:10px">
             <?php if (!empty($item['imagen'])): ?>
-              <img src="<?= BASE_URL ?>public/uploads/productos/<?= htmlspecialchars($item['imagen']) ?>"
+              <img src="<?= htmlspecialchars($item['imagen']) ?>"
                    alt="" style="width:40px;height:40px;object-fit:cover;border-radius:6px;flex-shrink:0;border:1px solid #E5E7EB">
             <?php else: ?>
               <div style="width:40px;height:40px;background:#F3F4F6;border-radius:6px;flex-shrink:0;border:1px solid #E5E7EB"></div>

@@ -82,6 +82,10 @@ class ProductoModel extends BaseModel
         $where  = ['1=1'];
         $params = [];
 
+        if (!empty($filtros['empresa_id'])) {
+            $where[]  = 'p.empresa_id = ?';
+            $params[] = (int)$filtros['empresa_id'];
+        }
         if (!empty($filtros['categoria_id'])) {
             $where[]  = 'p.categoria_id = ?';
             $params[] = $filtros['categoria_id'];
