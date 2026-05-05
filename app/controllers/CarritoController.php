@@ -15,6 +15,7 @@ class CarritoController extends BaseController
 {
     private ProductoModel $productoModel;
     private PedidoModel   $pedidoModel;
+    private ComboModel    $comboModel;
 
     public function __construct()
     {
@@ -22,6 +23,7 @@ class CarritoController extends BaseController
         $this->requireComprador();
         $this->productoModel = new ProductoModel();
         $this->pedidoModel   = new PedidoModel();
+        $this->comboModel    = new ComboModel();
     }
 
     // ── Paso 1: Selección de productos ────────────────────────────
@@ -37,6 +39,10 @@ class CarritoController extends BaseController
 
         $db = Database::getInstance();
         $categorias = $db->query('SELECT * FROM categorias WHERE activo = 1 ORDER BY nombre')->fetchAll();
+
+        $compradorId = $this->usuarioId();
+        $empresaId   = $this->empresaId();
+        $combos      = $this->comboModel->getCombosParaComprador($compradorId, $empresaId);
 
         $carrito    = $_SESSION['carrito']['items'] ?? [];
         $flash      = $this->getFlash();
@@ -209,6 +215,59 @@ class CarritoController extends BaseController
     public function vaciar(?string $p = null): void
     {
         $_SESSION['carrito'] = [];
+        $this->redirect('carrito/index');
+    }
+
+    public function cargarCombo(?string $p = null): void
+    {
+        if (!$this->isPost()) {
+            $this->redirect('carrito/index');
+        }
+
+        $comboId     = (int)$this->post('combo_id');
+        $compradorId = $this->usuarioId();
+        $empresaId   = $this->empresaId();
+
+        if (!$this->comboModel->estaAsignadoAComprador($comboId, $compradorId)) {
+            $this->flash('error', 'Combo no disponible.');
+            $this->redirect('carrito/index');
+        }
+
+        $items = $this->comboModel->getItems($comboId);
+        if (empty($items)) {
+            $this->flash('error', 'Este combo no tiene productos.');
+            $this->redirect('carrito/index');
+        }
+
+        $carrito = $_SESSION['carrito']['items'] ?? [];
+
+        foreach ($items as $ci) {
+            $prodId   = (int)$ci['producto_id'];
+            $cantidad = (float)$ci['cantidad'];
+            $producto = $this->productoModel->find($prodId);
+            if (!$producto || !$producto['activo']) continue;
+
+            $precio = $this->productoModel->getPrecioFinal($compradorId, $prodId, $cantidad);
+
+            if (isset($carrito[$prodId])) {
+                $nuevaCant = $carrito[$prodId]['cantidad'] + $cantidad;
+                $carrito[$prodId]['cantidad'] = $nuevaCant;
+                $carrito[$prodId]['precio']   = $this->productoModel->getPrecioFinal($compradorId, $prodId, $nuevaCant);
+                $carrito[$prodId]['subtotal'] = round($carrito[$prodId]['precio'] * $nuevaCant, 2);
+            } else {
+                $carrito[$prodId] = [
+                    'producto_id'  => $prodId,
+                    'nombre'       => $producto['nombre'],
+                    'presentacion' => $producto['presentacion'],
+                    'cantidad'     => $cantidad,
+                    'precio'       => $precio,
+                    'subtotal'     => round($precio * $cantidad, 2),
+                ];
+            }
+        }
+
+        $_SESSION['carrito']['items'] = $carrito;
+        $this->flash('success', 'Combo cargado en tu pedido.');
         $this->redirect('carrito/index');
     }
 }

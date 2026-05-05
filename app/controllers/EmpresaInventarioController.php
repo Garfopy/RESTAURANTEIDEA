@@ -77,11 +77,7 @@ class EmpresaInventarioController extends BaseController
         }
 
         // Verificar que el producto pertenece a la empresa
-        $producto = $this->productoModel->queryOne(
-            'SELECT id FROM productos WHERE id = ? AND empresa_id = ?',
-            [$productoId, $empresaId]
-        );
-        if (!$producto) {
+        if (!$this->productoModel->perteneceAEmpresa($productoId, $empresaId)) {
             $this->flash('error', 'Producto no válido.');
             $this->redirect('empresa-inventario');
         }
@@ -97,7 +93,7 @@ class EmpresaInventarioController extends BaseController
             'stock_despues'=> $result['stock_despues'],
             'motivo'       => $motivo ?: null,
             'referencia'   => $referencia ?: null,
-            'usuario_id'   => $this->userId(),
+            'usuario_id'   => $this->usuarioId(),
         ]);
 
         $etiqueta = match ($tipo) {
@@ -119,13 +115,7 @@ class EmpresaInventarioController extends BaseController
 
         if (!$this->isPost()) {
             $empresaId = $this->empresaId();
-            $producto  = $this->productoModel->queryOne(
-                'SELECT p.*, COALESCE(inv.stock, 0) AS stock_actual, COALESCE(inv.umbral_minimo, 10) AS umbral_minimo
-                   FROM productos p
-              LEFT JOIN inventario inv ON inv.producto_id = p.id
-                  WHERE p.id = ? AND p.empresa_id = ?',
-                [$id, $empresaId]
-            );
+            $producto  = $this->productoModel->conStockDetalleEmpresa($id, $empresaId);
             if (!$producto) {
                 $this->redirect('empresa-inventario');
             }
@@ -144,20 +134,13 @@ class EmpresaInventarioController extends BaseController
         $umbral      = (float)$this->post('umbral_minimo');
         $motivo      = trim($this->post('motivo', ''));
 
-        $producto = $this->productoModel->queryOne(
-            'SELECT id FROM productos WHERE id = ? AND empresa_id = ?',
-            [$id, $empresaId]
-        );
-        if (!$producto) {
+        if (!$this->productoModel->perteneceAEmpresa($id, $empresaId)) {
             $this->redirect('empresa-inventario');
         }
 
         $stockAntes = $this->movModel->stockActual($id);
 
-        $this->productoModel->execute(
-            'UPDATE inventario SET stock = ?, umbral_minimo = ? WHERE producto_id = ?',
-            [$stockNuevo, $umbral, $id]
-        );
+        $this->productoModel->ajustarInventarioDirecto($id, $stockNuevo, $umbral);
 
         $this->movModel->registrar([
             'empresa_id'    => $empresaId,
@@ -168,7 +151,7 @@ class EmpresaInventarioController extends BaseController
             'stock_despues' => $stockNuevo,
             'motivo'        => $motivo ?: 'Ajuste manual',
             'referencia'    => null,
-            'usuario_id'    => $this->userId(),
+            'usuario_id'    => $this->usuarioId(),
         ]);
 
         $this->flash('success', 'Stock ajustado correctamente.');
@@ -182,13 +165,7 @@ class EmpresaInventarioController extends BaseController
         $id        = (int)$productoId;
         $page      = max(1, (int)$this->get('page', 1));
 
-        $producto = $this->productoModel->queryOne(
-            'SELECT p.*, COALESCE(inv.stock, 0) AS stock_actual
-               FROM productos p
-          LEFT JOIN inventario inv ON inv.producto_id = p.id
-              WHERE p.id = ? AND p.empresa_id = ?',
-            [$id, $empresaId]
-        );
+        $producto = $this->productoModel->conStockDetalleEmpresa($id, $empresaId);
         if (!$producto) {
             $this->redirect('empresa-inventario');
         }

@@ -27,7 +27,7 @@ class MovimientoInventarioModel extends BaseModel
     public function historialProducto(int $productoId, int $empresaId, int $page = 1): array
     {
         $sql = "SELECT mi.*, p.nombre AS producto_nombre,
-                       CONCAT(u.nombre, ' ', u.apellido_paterno) AS usuario_nombre, u.rol_slug
+                       CONCAT(u.nombre, ' ', u.apellido_paterno) AS usuario_nombre
                   FROM movimientos_inventario mi
                   JOIN productos p ON p.id = mi.producto_id
                   JOIN usuarios u ON u.id = mi.usuario_id

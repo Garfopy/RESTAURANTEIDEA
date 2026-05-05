@@ -30,10 +30,8 @@ class EmpresaPedidoController extends BaseController
         $items      = $resultado['data'];
         $paginacion = $resultado;
 
-        // Contar pendientes para badge de alerta
         $countPendientes = $this->pedidoModel->countPendientes($empresaId);
 
-        // Repartidores disponibles (para modal de asignación)
         $usuarioModel = new UsuarioModel();
         $repartidores = $usuarioModel->getByRolEmpresa('repartidor', $empresaId);
 
@@ -45,6 +43,20 @@ class EmpresaPedidoController extends BaseController
         require ROOT_PATH . '/app/views/empresa/pedidos/empresa_index.php';
         $content = ob_get_clean();
         require ROOT_PATH . '/app/views/empresa/layouts/main.php';
+    }
+
+    // Devuelve JSON con items de un pedido (para el modal de revisión)
+    public function itemsJson(?string $id = null): void
+    {
+        header('Content-Type: application/json');
+        $pedidoId = (int)$id;
+
+        if (!$this->pedidoModel->verificarPertenece($pedidoId, $this->empresaId())) {
+            echo json_encode([]);
+            return;
+        }
+
+        echo json_encode($this->pedidoModel->getItemsPedido($pedidoId));
     }
 
     // Cambiar estado de un pedido (modal rápido)
@@ -64,15 +76,10 @@ class EmpresaPedidoController extends BaseController
             $this->redirect('empresa-pedido');
         }
 
-        $pedido = $this->pedidoModel->queryOne(
-            'SELECT id FROM pedidos WHERE id = ? AND empresa_id = ?',
-            [$pedidoId, $this->empresaId()]
-        );
-        if (!$pedido) {
+        if (!$this->pedidoModel->verificarPertenece($pedidoId, $this->empresaId())) {
             $this->redirect('empresa-pedido');
         }
 
-        // Si marcan entregado y hay foto, procesarla
         if ($estado === 'entregado' && !empty($_FILES['foto']['tmp_name'])) {
             $this->_procesarFotoEntrega($pedidoId);
         } else {
@@ -102,11 +109,7 @@ class EmpresaPedidoController extends BaseController
             $this->redirect('empresa-pedido');
         }
 
-        $pedido = $this->pedidoModel->queryOne(
-            'SELECT id FROM pedidos WHERE id = ? AND empresa_id = ?',
-            [$pedidoId, $this->empresaId()]
-        );
-        if (!$pedido) {
+        if (!$this->pedidoModel->verificarPertenece($pedidoId, $this->empresaId())) {
             $this->redirect('empresa-pedido');
         }
 
@@ -116,7 +119,7 @@ class EmpresaPedidoController extends BaseController
         $this->redirect('empresa-pedido');
     }
 
-    // Aprobar pedido → estado confirmado, total = subtotal + costo_envio
+    // Aprobar pedido → estado confirmado, acepta ajustes de precio (solo a la baja)
     public function aprobar(?string $id = null): void
     {
         if (!$this->isPost()) {
@@ -124,15 +127,14 @@ class EmpresaPedidoController extends BaseController
         }
 
         $pedidoId = (int)($id ?? $this->post('pedido_id'));
-        $pedido   = $this->pedidoModel->queryOne(
-            'SELECT id FROM pedidos WHERE id = ? AND empresa_id = ?',
-            [$pedidoId, $this->empresaId()]
-        );
-        if (!$pedido) {
+
+        if (!$this->pedidoModel->verificarPertenece($pedidoId, $this->empresaId())) {
             $this->redirect('empresa-pedido');
         }
 
-        $this->pedidoModel->aprobarPedido($pedidoId, $this->usuarioId());
+        $ajustes = (array)($_POST['ajustes'] ?? []);
+
+        $this->pedidoModel->aprobarPedido($pedidoId, $this->usuarioId(), $ajustes);
         $this->log('Aprobar pedido', 'pedidos', "Pedido $pedidoId aprobado");
         $this->flash('success', 'Pedido aprobado. El comprador recibirá la confirmación.');
         $this->redirect('empresa-pedido');
@@ -147,11 +149,8 @@ class EmpresaPedidoController extends BaseController
 
         $pedidoId = (int)($id ?? $this->post('pedido_id'));
         $nota     = trim($this->post('nota_rechazo', 'Pedido rechazado por la empresa.'));
-        $pedido   = $this->pedidoModel->queryOne(
-            'SELECT id FROM pedidos WHERE id = ? AND empresa_id = ?',
-            [$pedidoId, $this->empresaId()]
-        );
-        if (!$pedido) {
+
+        if (!$this->pedidoModel->verificarPertenece($pedidoId, $this->empresaId())) {
             $this->redirect('empresa-pedido');
         }
 
@@ -169,11 +168,8 @@ class EmpresaPedidoController extends BaseController
         }
 
         $pedidoId = (int)($id ?? $this->post('pedido_id'));
-        $pedido   = $this->pedidoModel->queryOne(
-            'SELECT id FROM pedidos WHERE id = ? AND empresa_id = ?',
-            [$pedidoId, $this->empresaId()]
-        );
-        if (!$pedido || empty($_FILES['foto']['tmp_name'])) {
+
+        if (!$this->pedidoModel->verificarPertenece($pedidoId, $this->empresaId()) || empty($_FILES['foto']['tmp_name'])) {
             $this->flash('error', 'Pedido no encontrado o foto no enviada.');
             $this->redirect('empresa-pedido');
         }
@@ -223,12 +219,7 @@ class EmpresaPedidoController extends BaseController
         }
 
         $usuarioModel = new UsuarioModel();
-        $comprador    = $usuarioModel->queryOne(
-            "SELECT u.id FROM usuarios u JOIN roles r ON r.id = u.rol_id
-              WHERE u.id = ? AND u.empresa_id = ? AND r.slug = 'comprador'",
-            [$compradorId, $empresaId]
-        );
-        if (!$comprador) {
+        if (!$usuarioModel->compradorValido($compradorId, $empresaId)) {
             $this->flash('error', 'Comprador no válido.');
             $this->redirect('empresa-pedido/personalizado');
         }

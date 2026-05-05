@@ -686,12 +686,70 @@ Empresa/Repartidor → "En camino" → en_ruta → sube foto entrega → entrega
 - [x] `EmpresaPedidoController` — reemplazados 3 usos de métodos `protected` (query/queryOne) por llamadas públicas correctas: `getByRolEmpresa()` y nuevo `countPendientes()`
 - [x] `CarritoController.php` — eliminado código duplicado fuera de la clase (causaba error de sintaxis PHP)
 - [x] `paso1.php` — eliminada versión antigua con columna Stock visible al comprador; sin stock en vista del comprador
+- [x] `EmpresaInventarioController` — corregidos 3 bugs: `userId()` → `usuarioId()`, llamadas a métodos `protected` (`queryOne`, `execute`) reemplazadas por métodos públicos nuevos en `ProductoModel` (`perteneceAEmpresa`, `conStockDetalleEmpresa`, `ajustarInventarioDirecto`)
+- [x] `MovimientoInventarioModel::historialProducto()` — eliminada columna `u.rol_slug` que no existe en `usuarios` sin JOIN de roles
+- [x] `detalle.php` — eliminado bloque duplicado (líneas 197+); añadido display de precio original vs ajustado con diff visual en verde
+- [x] `paso3.php` — actualizado indicador de pasos a 3 pasos; eliminada sección "Distribución por sucursal" obsoleta
+
+**H — Combos por Comprador ✅ COMPLETADO (2026-05-05)**
+- [x] `migrations/009_combos_comprador.sql` — tablas `combos`, `combo_items`, `combo_compradores`
+- [x] `ComboModel` — CRUD, `getItems()`, `getCompradores()`, `getCombosParaComprador()`, `guardarItems()`, `guardarCompradores()`
+- [x] `EmpresaComboController` — index, nuevo, guardar, editar, actualizar, eliminar, activar
+- [x] Vistas `empresa/combos/index.php`, `empresa/combos/form.php`
+- [x] Route `empresa-combo` → `EmpresaComboController` en `index.php`
+- [x] Sidebar admin: "Combos por comprador" bajo Operación
+- [x] `CarritoController::cargarCombo()` — carga combo en sesión de carrito (merge de cantidades)
+- [x] `paso1.php` — sección de combos del comprador al inicio con botón "Cargar"
+
+**I — Ajuste de precios en aprobación ✅ COMPLETADO (2026-05-05)**
+- [x] `migrations/010_precio_ajuste_pedido.sql` — ADD `precio_original DECIMAL(10,2) NULL` en `pedido_detalle`
+- [x] `PedidoModel::aprobarPedido(ajustes[])` — acepta array de precio ajustado por `detalle_id`; solo permite bajar; guarda `precio_original`; recalcula subtotal y total
+- [x] `PedidoModel::getItemsPedido()` — retorna items para el modal AJAX
+- [x] `EmpresaPedidoController::itemsJson()` — endpoint JSON de items de un pedido (verificación de pertenencia)
+- [x] `EmpresaPedidoController::aprobar()` — pasa `$_POST['ajustes']` al modelo
+- [x] `empresa_index.php` — modal Revisar: carga items via AJAX al abrir, muestra precios editables con límite máximo = precio original; inputs fluyen al formAprobar
+- [x] `detalle.php` — column "Precio unit." muestra precio tachado + nuevo precio en verde + descuento % cuando fue ajustado
 
 **F — Email Service (movido de prioridad — hacer cuando SMTP esté configurado en cPanel)**
 > El admin puede seguir viendo la contraseña generada como fallback mientras no haya SMTP activo.
 - [ ] `app/services/EmailService.php` con PHPMailer
 - [ ] Template HTML: bienvenida con credenciales
 - [ ] Prerrequisito: superadmin configura SMTP en `/config/correo`
+
+---
+
+### Sprint 4C-IA — Reconocimiento de Facturas para Stock (🔮 FUTURO)
+> El objetivo es que el admin/supervisor pueda fotografiar una factura de compra y el sistema registre automáticamente los movimientos de entrada sin captura manual.
+
+**Casos de uso:**
+1. Admin toma foto de factura con la cámara del celular → el sistema extrae: proveedor, lista de productos, cantidades, montos → propone movimiento de entrada → admin confirma
+2. Admin dicta por voz: "Entraron 50 kilos de arrachera y 30 kilos de lomo" → el sistema parsea y propone el movimiento
+
+**Stack propuesto:**
+- **API vision**: Claude Vision (Anthropic API) o GPT-4V para OCR + extracción estructurada de facturas
+- **API voz**: Web Speech API del navegador (sin backend, sin costo) para transcripción de voz a texto
+- Endpoint PHP: `POST /api/ia/analizarFactura` — recibe imagen base64 → llama a API externa → devuelve JSON con productos detectados
+- Endpoint PHP: `POST /api/ia/analizarVoz` — recibe texto transcrito → parsea con regex o LLM → devuelve JSON
+
+**Flujo UI:**
+```
+Modal "Entrada rápida IA" en /empresa-inventario
+    ├── [📷 Subir/Tomar foto] → OCR factura → tabla propuesta (editable)
+    └── [🎤 Dictado de voz]   → transcripción → parseo → tabla propuesta (editable)
+         ↓
+    [Confirmar] → POST /empresa-inventario/guardarMovimientosLote
+```
+
+**Migraciones necesarias:**
+- Ninguna — usa la tabla existente `movimientos_inventario` con `tipo='entrada'`
+- Opcional: campo `fuente_ia TINYINT(1)` para auditoría de movimientos generados por IA
+
+**Prerrequisitos:**
+- Clave API de Anthropic o OpenAI configurada en `global_settings` (superadmin)
+- HTTPS activo en producción (Web Speech API requiere HTTPS)
+- Servidor con soporte de `cURL` para llamadas a API externa
+
+**Estimación:** Sprint completo (3-4 días de desarrollo + testing)
 
 ### Sprint 4C-2 — Portal Supervisor funcional 🔄 SIGUIENTE
 - [ ] `SupervisorController::dashboard()` — cola de pedidos + KPIs del día

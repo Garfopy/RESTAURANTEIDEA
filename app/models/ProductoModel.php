@@ -274,4 +274,31 @@ class ProductoModel extends BaseModel
             [$umbral, $productoId]
         );
     }
+
+    public function perteneceAEmpresa(int $productoId, int $empresaId): bool
+    {
+        return (bool)$this->queryOne(
+            'SELECT id FROM productos WHERE id = ? AND empresa_id = ?',
+            [$productoId, $empresaId]
+        );
+    }
+
+    public function conStockDetalleEmpresa(int $id, int $empresaId): ?array
+    {
+        return $this->queryOne(
+            'SELECT p.*, COALESCE(inv.stock, 0) AS stock_actual, COALESCE(inv.umbral_minimo, 10) AS umbral_minimo
+               FROM productos p
+          LEFT JOIN inventario inv ON inv.producto_id = p.id
+              WHERE p.id = ? AND p.empresa_id = ?',
+            [$id, $empresaId]
+        );
+    }
+
+    public function ajustarInventarioDirecto(int $productoId, float $stock, float $umbral): void
+    {
+        $this->execute(
+            'UPDATE inventario SET stock = ?, umbral_minimo = ? WHERE producto_id = ?',
+            [$stock, $umbral, $productoId]
+        );
+    }
 }

@@ -160,7 +160,7 @@ $estados = [
 
 <!-- Modal: Revisar pedido (asignar entrega + aprobar/rechazar) -->
 <div id="modalRevision" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center">
-  <div style="background:#fff;border-radius:14px;padding:28px;width:480px;max-width:95vw;max-height:90vh;overflow-y:auto">
+  <div style="background:#fff;border-radius:14px;padding:28px;width:560px;max-width:96vw;max-height:90vh;overflow-y:auto">
     <h3 style="font-size:1rem;font-weight:700;color:#111827;margin:0 0 4px 0">Revisar pedido</h3>
     <p id="revisionComprador" style="font-size:.85rem;color:#6B7280;margin:0 0 20px 0"></p>
 
@@ -202,9 +202,19 @@ $estados = [
       </button>
     </form>
 
-    <hr style="border:none;border-top:1px solid #F3F4F6;margin:4px 0 12px 0">
+    <hr style="border:none;border-top:1px solid #F3F4F6;margin:4px 0 16px 0">
 
-    <form method="POST" action="<?= $baseUrl ?>empresa-pedido/aprobar" style="margin-bottom:8px">
+    <!-- Productos con precios ajustables -->
+    <div id="preciosSection" style="display:none;margin-bottom:16px">
+      <div style="font-size:.85rem;font-weight:700;color:#111827;margin-bottom:6px">
+        Ajuste de precios (opcional)
+        <span style="font-size:.72rem;color:#9CA3AF;font-weight:400"> — solo puedes bajar precios, no subirlos</span>
+      </div>
+      <div id="itemsContainer" style="font-size:.85rem"></div>
+    </div>
+    <div id="preciosLoading" style="display:none;font-size:.82rem;color:#9CA3AF;margin-bottom:12px">Cargando productos del pedido...</div>
+
+    <form method="POST" action="<?= $baseUrl ?>empresa-pedido/aprobar" id="formAprobar" style="margin-bottom:8px">
       <input type="hidden" name="pedido_id" class="syncPedidoId">
       <button type="submit"
               style="width:100%;padding:10px;background:#059669;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:.875rem">
@@ -277,25 +287,72 @@ $estados = [
 </div>
 
 <script>
+const BASE_URL = '<?= $baseUrl ?>';
+
 function abrirRevision(id, comprador) {
   document.getElementById('revPedidoId').value = id;
   document.getElementById('revisionComprador').textContent = 'Comprador: ' + comprador;
   document.querySelectorAll('.syncPedidoId').forEach(el => el.value = id);
   document.getElementById('modalRevision').style.display = 'flex';
+
+  // Load items for price adjustment
+  const section = document.getElementById('preciosSection');
+  const loading = document.getElementById('preciosLoading');
+  const cont    = document.getElementById('itemsContainer');
+  const formAprobar = document.getElementById('formAprobar');
+
+  // Clear previous items from formAprobar (keep hidden input)
+  const oldInputs = formAprobar.querySelectorAll('input[name^="ajustes"]');
+  oldInputs.forEach(el => el.remove());
+
+  section.style.display = 'none';
+  loading.style.display = 'block';
+  cont.innerHTML = '';
+
+  fetch(BASE_URL + 'empresa-pedido/itemsJson/' + id)
+    .then(r => r.json())
+    .then(items => {
+      loading.style.display = 'none';
+      if (!items || items.length === 0) return;
+
+      section.style.display = 'block';
+      items.forEach(item => {
+        const row = document.createElement('div');
+        row.style.cssText = 'display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:8px;border-bottom:1px solid #F3F4F6;margin-bottom:2px';
+        row.innerHTML = `
+          <div>
+            <div style="font-weight:600;color:#111827">${item.producto_nombre}</div>
+            <div style="font-size:.75rem;color:#9CA3AF">${item.cantidad} ${item.presentacion} × $${parseFloat(item.precio_unit).toFixed(2)} = $${parseFloat(item.subtotal).toFixed(2)}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="font-size:.72rem;color:#9CA3AF">Nuevo precio:</span>
+            <input type="number" name="ajustes[${item.id}]" form="formAprobar"
+                   min="0.01" max="${item.precio_unit}" step="0.01"
+                   placeholder="${parseFloat(item.precio_unit).toFixed(2)}"
+                   style="width:90px;padding:5px 8px;border:1px solid #D1D5DB;border-radius:6px;font-size:.85rem;text-align:right">
+          </div>`;
+        cont.appendChild(row);
+      });
+    })
+    .catch(() => { loading.style.display = 'none'; });
 }
+
 function abrirSubirFoto(id) {
   document.getElementById('fotoEntregaPedidoId').value = id;
   document.getElementById('modalFotoEntrega').style.display = 'flex';
 }
+
 function abrirCambioEstado(id, estadoActual) {
   document.getElementById('modalPedidoId').value = id;
   document.getElementById('modalEstadoSelect').value = estadoActual;
   document.getElementById('modalEstado').style.display = 'flex';
 }
+
 function toggleRepartidor(val) {
   document.getElementById('campoRepartidor').style.display = val === 'repartidor' ? 'block' : 'none';
   if (val === 'pickup') document.getElementById('revCostoEnvio').value = '0';
 }
+
 ['modalRevision','modalEstado','modalFotoEntrega'].forEach(id => {
   document.getElementById(id).addEventListener('click', function(e) {
     if (e.target === this) this.style.display = 'none';

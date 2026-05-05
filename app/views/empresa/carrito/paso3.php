@@ -5,16 +5,16 @@ $metaSaved = $meta ?? [];
 <!-- Pasos -->
 <div style="display:flex;align-items:center;gap:0;margin-bottom:24px;font-size:.8rem">
   <?php
-  $pasos = ['1'=>'Productos','2'=>'Sucursales','3'=>'Resumen','4'=>'Confirmado'];
+  $pasos = ['1'=>'Productos','2'=>'Resumen','3'=>'Confirmado'];
   foreach ($pasos as $num => $label):
-    $activo = $num === '3';
-    $hecho  = $num < '3';
+    $activo = $num === '2';
+    $hecho  = $num < '2';
   ?>
-  <div style="display:flex;align-items:center;gap:6px;padding:8px 14px;background:<?= $activo ? 'var(--color-primary)' : ($hecho ? '#D1FAE5' : '#E5E7EB') ?>;color:<?= $activo ? '#fff' : ($hecho ? '#065F46' : '#9CA3AF') ?>;<?= $num === '1' ? 'border-radius:8px 0 0 8px' : ($num === '4' ? 'border-radius:0 8px 8px 0' : '') ?>">
+  <div style="display:flex;align-items:center;gap:6px;padding:8px 14px;background:<?= $activo ? 'var(--color-primary)' : ($hecho ? '#D1FAE5' : '#E5E7EB') ?>;color:<?= $activo ? '#fff' : ($hecho ? '#065F46' : '#9CA3AF') ?>;<?= $num === '1' ? 'border-radius:8px 0 0 8px' : ($num === '3' ? 'border-radius:0 8px 8px 0' : '') ?>">
     <span style="font-weight:700"><?= $hecho ? '✓' : $num ?></span>
     <?= $label ?>
   </div>
-  <?php if ($num < '4'): ?>
+  <?php if ($num < '3'): ?>
   <div style="width:0;height:0;border-top:18px solid transparent;border-bottom:18px solid transparent;border-left:10px solid <?= $activo ? 'var(--color-primary)' : ($hecho ? '#D1FAE5' : '#E5E7EB') ?>"></div>
   <?php endif; ?>
   <?php endforeach; ?>
@@ -59,23 +59,6 @@ $metaSaved = $meta ?? [];
         </tfoot>
       </table>
     </div>
-
-    <!-- Distribución por sucursal -->
-    <div style="background:#fff;border-radius:12px;border:1px solid #E5E7EB;padding:14px 16px">
-      <div style="font-weight:700;font-size:.9rem;color:#111827;margin-bottom:10px">Distribución por sucursal</div>
-      <?php
-      // Build readable map: sucursal_name => [producto => qty]
-      foreach ($items as $prodId => $item):
-        foreach ($distribucion[$prodId] ?? [] as $sucId => $qty):
-          if ($qty <= 0) continue;
-          $sucNombre = $sucursalesArr[$sucId] ?? "Sucursal #$sucId";
-      ?>
-      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #F3F4F6;font-size:.85rem">
-        <span style="color:#374151"><?= htmlspecialchars($item['nombre']) ?> → <?= htmlspecialchars($sucNombre) ?></span>
-        <span style="font-weight:600;color:#111827"><?= number_format($qty, 2) ?> <?= $item['presentacion'] ?></span>
-      </div>
-      <?php endforeach; endforeach; ?>
-    </div>
   </div>
 
   <!-- Panel de confirmación -->
@@ -102,22 +85,26 @@ $metaSaved = $meta ?? [];
       </div>
 
       <div style="margin-bottom:18px">
-        <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px">Notas adicionales</label>
-        <textarea name="notas" rows="3" placeholder="Instrucciones especiales de entrega..."
+        <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px">
+          Notas adicionales
+          <span style="font-size:.72rem;color:#9CA3AF;font-weight:400"> — instrucciones especiales, cortes específicos, etc.</span>
+        </label>
+        <textarea name="notas" rows="3" placeholder="Ej: Entregar antes del mediodía, pedir al guardia que avise..."
                   style="width:100%;padding:9px 12px;border:1px solid #D1D5DB;border-radius:8px;font-size:.875rem;resize:vertical"><?= htmlspecialchars($metaSaved['notas'] ?? '') ?></textarea>
       </div>
 
       <div style="background:#F9FAFB;border-radius:8px;padding:14px;margin-bottom:16px;text-align:center">
         <div style="font-size:.8rem;color:#6B7280;margin-bottom:4px">Total del pedido</div>
         <div style="font-size:1.8rem;font-weight:800;color:var(--color-primary)">$<?= number_format($total, 2) ?></div>
+        <div style="font-size:.72rem;color:#9CA3AF;margin-top:2px">El proveedor puede ajustar precios al aprobar tu pedido</div>
       </div>
 
       <div style="display:flex;flex-direction:column;gap:8px">
         <button type="submit" style="padding:12px;background:var(--color-primary);color:#fff;border:none;border-radius:8px;font-weight:700;font-size:.9rem;cursor:pointer;width:100%">
           Confirmar pedido
         </button>
-        <a href="<?= BASE_URL ?>carrito/sucursales" style="text-align:center;padding:10px;background:#F3F4F6;color:#374151;border-radius:8px;text-decoration:none;font-weight:600;font-size:.875rem">
-          ← Atrás
+        <a href="<?= BASE_URL ?>carrito/index" style="text-align:center;padding:10px;background:#F3F4F6;color:#374151;border-radius:8px;text-decoration:none;font-weight:600;font-size:.875rem">
+          ← Volver al carrito
         </a>
       </div>
     </div>

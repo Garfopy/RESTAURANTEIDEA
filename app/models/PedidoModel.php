@@ -65,15 +65,51 @@ class PedidoModel extends BaseModel
         );
     }
 
-    public function aprobarPedido(int $id, int $aprobadoPorId): void
+    public function aprobarPedido(int $id, int $aprobadoPorId, array $ajustes = []): void
     {
-        $this->execute(
-            "UPDATE pedidos
-                SET estado = 'confirmado', aprobado_por = ?, aprobado_at = NOW(),
-                    total = subtotal + costo_envio
-              WHERE id = ?",
-            [$aprobadoPorId, $id]
-        );
+        $this->db->beginTransaction();
+        try {
+            // Apply price adjustments (admin can only lower prices)
+            foreach ($ajustes as $detalleId => $precioNuevo) {
+                $detalleId  = (int)$detalleId;
+                $precioNuevo = (float)$precioNuevo;
+                if ($detalleId <= 0 || $precioNuevo <= 0) continue;
+
+                $linea = $this->queryOne(
+                    'SELECT id, precio_unit, cantidad FROM pedido_detalle WHERE id = ? AND pedido_id = ?',
+                    [$detalleId, $id]
+                );
+                if (!$linea) continue;
+                $precioOriginal = (float)$linea['precio_unit'];
+                if ($precioNuevo >= $precioOriginal) continue; // Only allow lowering
+
+                $subtotalNuevo = round($precioNuevo * (float)$linea['cantidad'], 2);
+                $this->execute(
+                    'UPDATE pedido_detalle SET precio_original = ?, precio_unit = ?, subtotal = ? WHERE id = ?',
+                    [$precioOriginal, $precioNuevo, $subtotalNuevo, $detalleId]
+                );
+            }
+
+            // Recalculate subtotal
+            $row = $this->queryOne(
+                'SELECT SUM(subtotal) AS subtotal FROM pedido_detalle WHERE pedido_id = ?',
+                [$id]
+            );
+            $nuevoSubtotal = (float)($row['subtotal'] ?? 0);
+
+            $this->execute(
+                "UPDATE pedidos
+                    SET estado = 'confirmado', aprobado_por = ?, aprobado_at = NOW(),
+                        subtotal = ?, total = ? + costo_envio
+                  WHERE id = ?",
+                [$aprobadoPorId, $nuevoSubtotal, $nuevoSubtotal, $id]
+            );
+
+            $this->db->commit();
+        } catch (\Throwable $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
     }
 
     public function rechazarPedido(int $id, string $nota): void
@@ -261,6 +297,19 @@ class PedidoModel extends BaseModel
             'SELECT id FROM pedidos WHERE id = ? AND empresa_id = ?',
             [$id, $empresaId]
         ) !== null;
+    }
+
+    public function getItemsPedido(int $pedidoId): array
+    {
+        return $this->query(
+            'SELECT pd.id, pd.producto_id, pd.cantidad, pd.precio_unit, pd.subtotal,
+                    pr.nombre AS producto_nombre, pr.presentacion
+               FROM pedido_detalle pd
+               JOIN productos pr ON pr.id = pd.producto_id
+              WHERE pd.pedido_id = ?
+           ORDER BY pr.nombre',
+            [$pedidoId]
+        );
     }
 
     public function cancelar(int $id, int $usuarioId): bool
