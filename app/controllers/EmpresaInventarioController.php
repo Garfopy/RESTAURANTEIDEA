@@ -1,18 +1,18 @@
 <?php
 require_once ROOT_PATH . '/app/controllers/BaseController.php';
 
-class PanelInventarioController extends BaseController
+class EmpresaInventarioController extends BaseController
 {
     public function __construct()
     {
         parent::__construct();
-        $this->requireAdmin();
+        $this->requireAdminEmpresa();
     }
 
     public function index(?string $p = null): void
     {
         $filtros = [
-            'buscar'    => $this->get('buscar', ''),
+            'buscar'     => $this->get('buscar', ''),
             'stock_bajo' => $this->get('stock_bajo', ''),
         ];
         $page = max(1, (int)$this->get('page', 1));
@@ -26,25 +26,25 @@ class PanelInventarioController extends BaseController
         $activeMenu    = 'inventario';
 
         ob_start();
-        require ROOT_PATH . '/app/views/panel/inventario/index.php';
+        require ROOT_PATH . '/app/views/empresa/inventario/index.php';
         $content = ob_get_clean();
-        require ROOT_PATH . '/app/views/panel/layouts/main.php';
+        require ROOT_PATH . '/app/views/empresa/layouts/main.php';
     }
 
     public function ajustar(?string $p = null): void
     {
         if (!$this->isPost()) {
-            $this->redirect('panel-inventario/index');
+            $this->redirect('empresa-inventario/index');
         }
 
         $productoId = (int)$this->post('producto_id');
-        $tipo       = $this->post('tipo'); // 'entrada' o 'salida' o 'ajuste'
+        $tipo       = $this->post('tipo');
         $cantidad   = (float)$this->post('cantidad');
         $notas      = trim($this->post('notas', ''));
 
         if ($productoId <= 0 || $cantidad <= 0) {
             $this->flash('error', 'Datos inválidos para el ajuste.');
-            $this->redirect('panel-inventario/index');
+            $this->redirect('empresa-inventario/index');
         }
 
         $productoModel = new ProductoModel();
@@ -52,6 +52,6 @@ class PanelInventarioController extends BaseController
 
         $this->log('Ajuste inventario', 'inventario', "$tipo $cantidad uds — producto $productoId — $notas");
         $this->flash('success', 'Inventario actualizado correctamente.');
-        $this->redirect('panel-inventario/index');
+        $this->redirect('empresa-inventario/index');
     }
 }

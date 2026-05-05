@@ -12,6 +12,21 @@ class ApiController extends BaseController
         parent::__construct();
     }
 
+    // ── Pedidos confirmados por empresa (para form de rutas) ──────────
+    /** GET /api/pedidosConfirmados?empresa_id=X */
+    public function pedidosConfirmados(?string $p = null): void
+    {
+        $this->requireAdmin();
+        $empresaId = (int)$this->get('empresa_id', 0);
+        if (!$empresaId) {
+            $this->json([]);
+        }
+
+        $model   = new PedidoModel();
+        $pedidos = $model->listadoConfirmadosPorEmpresa($empresaId);
+        $this->json($pedidos);
+    }
+
     // ── Precios escalonados ───────────────────────────────────────
     /** GET /api/precios/{producto_id}?cantidad=X */
     public function precios(?string $productoId = null): void

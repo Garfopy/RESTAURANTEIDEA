@@ -97,9 +97,11 @@ class PedidoModel extends BaseModel
         $pedido = $this->queryOne(
             "SELECT p.*,
                     u.nombre AS comprador_nombre, u.apellido_paterno AS comprador_apellido,
-                    ap.nombre AS aprobador_nombre
+                    ap.nombre AS aprobador_nombre,
+                    e.razon_social AS empresa_nombre
                FROM pedidos p
                JOIN usuarios u ON u.id = p.comprador_id
+               JOIN empresas e ON e.id = p.empresa_id
           LEFT JOIN usuarios ap ON ap.id = p.aprobado_por
               WHERE p.id = ?",
             [$id]
@@ -178,6 +180,135 @@ class PedidoModel extends BaseModel
                 SET estado = 'cancelado'
               WHERE id = ? AND comprador_id = ? AND estado IN ('pendiente')",
             [$id, $usuarioId]
+        );
+    }
+
+    // ── Panel Admin ───────────────────────────────────────────────────────────
+
+    public function listadoGlobal(array $filtros = [], int $page = 1): array
+    {
+        $where  = ['1=1'];
+        $params = [];
+
+        if (!empty($filtros['empresa_id'])) {
+            $where[]  = 'p.empresa_id = ?';
+            $params[] = $filtros['empresa_id'];
+        }
+        if (!empty($filtros['estado'])) {
+            $where[]  = 'p.estado = ?';
+            $params[] = $filtros['estado'];
+        }
+        if (!empty($filtros['buscar'])) {
+            $where[]  = '(p.folio LIKE ? OR u.nombre LIKE ? OR e.razon_social LIKE ?)';
+            $t = '%' . $filtros['buscar'] . '%';
+            array_push($params, $t, $t, $t);
+        }
+
+        $sql = 'SELECT p.*, u.nombre AS comprador_nombre, u.apellido_paterno AS comprador_apellido,
+                       e.razon_social AS empresa_nombre
+                  FROM pedidos p
+                  JOIN usuarios u ON u.id = p.comprador_id
+                  JOIN empresas e ON e.id = p.empresa_id
+                 WHERE ' . implode(' AND ', $where) . '
+              ORDER BY p.created_at DESC';
+
+        return $this->paginate($sql, $params, $page);
+    }
+
+    public function cambiarEstado(int $id, string $estado): bool
+    {
+        $validos = ['pendiente', 'confirmado', 'en_preparacion', 'en_ruta', 'entregado', 'cancelado'];
+        if (!in_array($estado, $validos, true)) return false;
+
+        return $this->execute(
+            'UPDATE pedidos SET estado = ? WHERE id = ?',
+            [$estado, $id]
+        );
+    }
+
+    public function listadoConfirmadosPorEmpresa(int $empresaId): array
+    {
+        return $this->query(
+            "SELECT p.id, p.folio, p.total,
+                    u.nombre AS comprador_nombre, u.apellido_paterno AS comprador_apellido
+               FROM pedidos p
+               JOIN usuarios u ON u.id = p.comprador_id
+              WHERE p.empresa_id = ? AND p.estado IN ('confirmado', 'aprobado')
+              ORDER BY p.created_at DESC",
+            [$empresaId]
+        );
+    }
+
+    public function crearRuta(int $repartidorId, int $empresaId, string $fecha, array $pedidosIds): int
+    {
+        $this->db->beginTransaction();
+        try {
+            $stmt = $this->db->prepare(
+                'INSERT INTO rutas (repartidor_id, empresa_id, fecha, estado) VALUES (?, ?, ?, "pendiente")'
+            );
+            $stmt->execute([$repartidorId, $empresaId, $fecha]);
+            $rutaId = (int)$this->db->lastInsertId();
+
+            foreach ($pedidosIds as $pedidoId) {
+                $pedido = $this->conDetalle((int)$pedidoId);
+                if (!$pedido) continue;
+                foreach ($pedido['sucursales'] as $suc) {
+                    $this->execute(
+                        'INSERT INTO ruta_detalle (ruta_id, pedido_id, sucursal_id, orden, estado) VALUES (?, ?, ?, 0, "pendiente")',
+                        [$rutaId, $pedidoId, $suc['sucursal_id']]
+                    );
+                }
+                $this->update((int)$pedidoId, ['estado' => 'en_preparacion']);
+            }
+
+            $this->db->commit();
+            return $rutaId;
+        } catch (\Throwable $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
+    }
+
+    public function getRutasActivas(int $empresaId = 0): array
+    {
+        $filtroEmpresa = $empresaId > 0 ? 'AND r.empresa_id = ?' : '';
+        $params = $empresaId > 0 ? [$empresaId] : [];
+
+        return $this->query(
+            "SELECT r.id, r.fecha, r.estado,
+                    u.nombre AS repartidor_nombre, u.apellido_paterno AS repartidor_apellido,
+                    e.razon_social AS empresa_nombre,
+                    COUNT(rd.id) AS total_paradas,
+                    SUM(rd.estado = 'entregado') AS entregadas
+               FROM rutas r
+               JOIN usuarios u ON u.id = r.repartidor_id
+               JOIN empresas e ON e.id = r.empresa_id
+               JOIN ruta_detalle rd ON rd.ruta_id = r.id
+              WHERE r.estado IN ('planificada', 'en_curso')
+                    $filtroEmpresa
+              GROUP BY r.id
+              ORDER BY r.fecha DESC
+              LIMIT 50",
+            $params
+        );
+    }
+
+    public function getPosicionesActivas(int $empresaId = 0): array
+    {
+        $filtroEmpresa = $empresaId > 0 ? 'AND r.empresa_id = ?' : '';
+        $params = $empresaId > 0 ? [$empresaId] : [];
+
+        return $this->query(
+            "SELECT DISTINCT rd.lat_actual, rd.lng_actual,
+                    u.nombre AS repartidor_nombre,
+                    r.id AS ruta_id
+               FROM ruta_detalle rd
+               JOIN rutas r ON r.id = rd.ruta_id
+               JOIN usuarios u ON u.id = r.repartidor_id
+              WHERE rd.tracking_activo = 1
+                AND rd.lat_actual IS NOT NULL
+                    $filtroEmpresa",
+            $params
         );
     }
 }
