@@ -3,7 +3,7 @@
 
 -- Columnas en pedidos para el nuevo flujo de revisión y entrega
 ALTER TABLE `pedidos`
-  ADD COLUMN `tipo_entrega`          ENUM('pickup','repartidor') NULL          AFTER `tipo`,
+  ADD COLUMN `tipo_entrega`           ENUM('pickup','repartidor') NULL          AFTER `creado_por_id`,
   ADD COLUMN `repartidor_asignado_id` INT UNSIGNED               NULL          AFTER `tipo_entrega`,
   ADD COLUMN `costo_envio`           DECIMAL(10,2)  NOT NULL DEFAULT 0.00      AFTER `repartidor_asignado_id`,
   ADD COLUMN `nota_empresa`          TEXT           NULL                        AFTER `costo_envio`,

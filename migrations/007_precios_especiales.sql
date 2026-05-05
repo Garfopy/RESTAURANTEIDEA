@@ -19,9 +19,9 @@ CREATE TABLE IF NOT EXISTS `precios_especiales` (
   KEY `idx_comprador` (`comprador_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Agregar tipo de pedido para soportar pedidos personalizados (creados por admin/supervisor)
+-- Agregar columnas a pedidos (sin IF NOT EXISTS — compatible con MySQL 5.7)
 ALTER TABLE `pedidos`
-  ADD COLUMN IF NOT EXISTS `tipo` enum('normal','personalizado') NOT NULL DEFAULT 'normal' AFTER `notas`,
-  ADD COLUMN IF NOT EXISTS `creado_por_id` int(10) UNSIGNED DEFAULT NULL AFTER `tipo` COMMENT 'Si es personalizado, quién lo creó';
+  ADD COLUMN `tipo`          enum('normal','personalizado') NOT NULL DEFAULT 'normal' AFTER `notas`,
+  ADD COLUMN `creado_por_id` int(10) UNSIGNED DEFAULT NULL AFTER `tipo`;
 
 SET FOREIGN_KEY_CHECKS = 1;
