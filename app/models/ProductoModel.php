@@ -112,6 +112,10 @@ class ProductoModel extends BaseModel
         $where  = ['p.activo = 1'];
         $params = [];
 
+        if (!empty($filtros['empresa_id'])) {
+            $where[]  = 'p.empresa_id = ?';
+            $params[] = (int)$filtros['empresa_id'];
+        }
         if (!empty($filtros['buscar'])) {
             $where[]  = 'p.nombre LIKE ?';
             $params[] = '%' . $filtros['buscar'] . '%';
@@ -121,8 +125,8 @@ class ProductoModel extends BaseModel
         }
 
         $sqlWhere = 'WHERE ' . implode(' AND ', $where);
-        $sql = "SELECT p.id, p.nombre, p.presentacion, c.nombre AS categoria_nombre,
-                       COALESCE(inv.stock, 0) AS stock,
+        $sql = "SELECT p.id, p.nombre, p.presentacion, p.imagen, c.nombre AS categoria_nombre,
+                       COALESCE(inv.stock, 0) AS stock_actual,
                        COALESCE(inv.umbral_minimo, 10) AS umbral_minimo,
                        inv.id AS inventario_id
                   FROM productos p
