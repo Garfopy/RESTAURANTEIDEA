@@ -2,6 +2,34 @@ Options -Indexes
 RewriteEngine On
 RewriteBase /carnihub/
 
+# ── Content Security Policy ───────────────────────────────────────────────────
+# Incluye todos los dominios necesarios para Google Maps JS API + Embed API
+<IfModule mod_headers.c>
+  Header always set Content-Security-Policy "\
+    default-src 'self'; \
+    script-src 'self' 'unsafe-inline' \
+      cdn.tailwindcss.com \
+      fonts.googleapis.com \
+      maps.googleapis.com \
+      *.googleapis.com \
+      unpkg.com \
+      accounts.google.com \
+      www.paypal.com \
+      www.paypalobjects.com; \
+    style-src 'self' 'unsafe-inline' \
+      fonts.googleapis.com \
+      cdn.tailwindcss.com \
+      *.googleapis.com; \
+    font-src 'self' fonts.gstatic.com data:; \
+    img-src 'self' data: blob: \
+      *.googleapis.com \
+      *.gstatic.com \
+      maps.gstatic.com; \
+    connect-src 'self' *.googleapis.com; \
+    frame-src 'self' www.google.com; \
+    object-src 'none'"
+</IfModule>
+
 # Block direct file access to sensitive directories (but allow virtual routes like config/general)
 RewriteCond %{REQUEST_FILENAME} -f
 RewriteRule ^(config|app)/.*$ - [F,L]
