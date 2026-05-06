@@ -125,4 +125,38 @@ $iniciales = strtoupper(mb_substr($usuario['nombre'] ?? 'U', 0, 1) . mb_substr($
       </button>
     </form>
   </div>
+
+  <?php if (($rol ?? '') === 'comprador'): ?>
+  <!-- Dirección de entrega (solo compradores) -->
+  <div style="background:#fff;border-radius:12px;border:1px solid #E5E7EB;padding:24px;margin-top:16px">
+    <h2 style="font-size:.95rem;font-weight:700;margin-bottom:4px;color:#111827">Dirección de entrega</h2>
+    <p style="font-size:.8rem;color:#6B7280;margin-bottom:16px">
+      Se usará como dirección predeterminada al hacer pedidos con envío a domicilio.
+    </p>
+    <form method="POST" action="<?= BASE_URL ?>cuenta/guardarDireccion">
+      <div style="margin-bottom:12px">
+        <label class="form-label">Dirección completa</label>
+        <textarea name="direccion_entrega" class="form-control" rows="2"
+                  placeholder="Calle, número exterior, colonia, municipio, estado..."><?= htmlspecialchars($usuario['direccion_entrega'] ?? '') ?></textarea>
+      </div>
+      <div style="margin-bottom:16px">
+        <label class="form-label">Referencia / número interior</label>
+        <input type="text" name="referencia_entrega" class="form-control"
+               placeholder="Ej: Depto 3B, edificio azul, portón negro..."
+               value="<?= htmlspecialchars($usuario['referencia_entrega'] ?? '') ?>">
+      </div>
+      <?php if (!empty($usuario['lat_entrega']) && !empty($usuario['lng_entrega'])): ?>
+      <div style="margin-bottom:12px;font-size:.8rem;color:#6B7280">
+        Coordenadas guardadas: <?= number_format((float)$usuario['lat_entrega'],6) ?>, <?= number_format((float)$usuario['lng_entrega'],6) ?>
+      </div>
+      <?php endif; ?>
+      <input type="hidden" name="lat_entrega" value="<?= htmlspecialchars($usuario['lat_entrega'] ?? '') ?>">
+      <input type="hidden" name="lng_entrega" value="<?= htmlspecialchars($usuario['lng_entrega'] ?? '') ?>">
+      <button type="submit" style="padding:9px 20px;background:var(--color-primary);color:#fff;border:none;border-radius:8px;font-weight:600;font-size:.875rem;cursor:pointer">
+        Guardar dirección
+      </button>
+    </form>
+  </div>
+  <?php endif; ?>
+
 </div>

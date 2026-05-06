@@ -1,5 +1,5 @@
-# CarniHub — Plan v2.4
-**Versión:** 2.5.1 | **Fecha:** 2026-05-05 | **Stack:** PHP 8.3 · MySQL · Tailwind CDN · MVC sin framework
+# CarniHub — Plan v2.6.6
+**Versión:** 2.6.6 | **Fecha:** 2026-05-05 | **Stack:** PHP 8.3 · MySQL · Tailwind CDN · MVC sin framework
 
 ---
 
@@ -268,7 +268,7 @@ Login exitoso redirige según rol:
 | EmpresaUsuarioController | ✅ Funcional | admin_empresa | Crea supervisor/comprador/repartidor para su empresa |
 | EmpresaDashboardController | ✅ Funcional | admin_empresa | Dashboard del productor (ventas, stock, equipo) |
 | CatalogoController | ✅ Funcional | comprador | Catálogo con filtros, detalle de producto |
-| CuentaController | ✅ Funcional | Todos | Perfil, guardar datos, cambiar contraseña, avatar |
+| CuentaController | ✅ Funcional | Todos | Perfil, guardar datos, cambiar contraseña, avatar, guardarDireccion (compradores) |
 | CarritoController | ✅ Funcional | comprador | 4 pasos: productos → sucursales → resumen → confirmar |
 | PedidoController | ✅ Funcional | comprador, supervisor, admin_empresa | Historial, detalle, aprobación, tracking GPS, cancelar |
 | ConfigController | ✅ Completo | superadmin | general (logo+colores), apis (claves), correo (SMTP) |
@@ -279,7 +279,7 @@ Login exitoso redirige según rol:
 | EmpresaLogisticaController | ✅ Funcional | admin_empresa | Rutas de la empresa — fix query() protected aplicado |
 | SupervisorController | ⚠️ Esqueleto | supervisor | Panel dedicado — vistas pendientes |
 | CompradorController | ⚠️ Esqueleto | comprador | Portal de compras — vistas pendientes |
-| EmpresaPedidoController | ❌ Pendiente | admin_empresa | Pedidos de su empresa (consolidar) |
+| EmpresaPedidoController | ✅ Funcional | admin_empresa | Pedidos de su empresa: index, aprobar, rechazar, asignarEntrega, cambiarEstado, subirFotoEntrega, personalizado, guardarPersonalizado |
 | PanelReporteController | ❌ Pendiente | superadmin, admin | Reportes globales de plataforma (solo lectura) |
 | RecurrenteController | ❌ Pendiente | comprador, admin_empresa | Plantillas de pedido automático |
 | LimiteController | ❌ Pendiente | supervisor, admin_empresa | Límites de compra |
@@ -564,77 +564,321 @@ Login exitoso redirige según rol:
   - Tasa de errores del sistema (errores/día últimos 30 días)
 - [ ] Ruta: `panel-reporte/*` (superadmin, admin — solo lectura)
 
-### Sprint 4C-1 — Email Service + Dashboard Empresa + EmpresaPedidoController 🔄 SIGUIENTE
-> Hacer después de 4C-0 hotfixes. Incluye el email service (adelantado desde Sprint 6).
+### Sprint 4C-1 — Stock Inteligente + Productos + Precios Especiales + Pedido Personalizado ✅ COMPLETADO
+> Email service movido a Sprint 4C-Email (no prioritario). El foco ahora es hacer que el catálogo, inventario y precios sean sólidos y usables antes de seguir con pedidos.
 
-**A — Email Service: credenciales al crear usuario**
-> El admin NO debe ver la contraseña del usuario que crea. El usuario la recibe por email directamente.
-- [ ] Instalar PHPMailer: `composer require phpmailer/phpmailer`
-- [ ] `app/services/EmailService.php` — wrapper PHPMailer:
-  - Lee `smtp_host`, `smtp_port`, `smtp_user`, `smtp_pass`, `smtp_from`, `smtp_from_name` desde `global_settings`
-  - Método: `enviarBienvenida(string $emailDest, string $nombre, string $password, string $urlLogin): bool`
-  - Template HTML mínimo: logo de la empresa, nombre del usuario, email, contraseña, botón "Iniciar sesión"
-  - Si SMTP no está configurado: lanza excepción silenciosa y devuelve `false`
-- [ ] `EmpresaUsuarioController::guardar()` — cambiar flujo de contraseña:
-  1. Generar `$passwordTemporal` (no cambia)
-  2. Llamar `EmailService::enviarBienvenida($email, $nombre, $passwordTemporal, BASE_URL . 'auth/login')`
-  3. Si envío OK → flash: `"Usuario creado. Se envió un correo con sus credenciales a $email."`
-  4. Si fallo SMTP → flash con contraseña como fallback: `"Usuario creado. (Email no pudo enviarse) Contraseña: <strong>$pass</strong>"`
-- [ ] `PanelUsuarioController::guardar()` — mismo patrón para Admin Empresa creado por superadmin
-- [ ] Prerrequisito: superadmin debe configurar SMTP en `/config/correo` antes de crear usuarios
+#### Modelo de Sucursales (definitivo — aclarado 2026-05-05)
+> Las sucursales NO son almacenes del productor. Son puntos de entrega de los compradores.
 
-**B — Anti-spam: configuración de servidor (DNS)**
-> El sistema puede enviar correos pero sin estas configuraciones DNS llegarán a spam. El superadmin/hosting debe aplicarlas.
+```
+Empresa (productor de carne) — UN solo inventario global
+    │
+    ├── Comprador A (Taquería Centro) → Sucursal Centro, Sucursal Norte
+    ├── Comprador B (Restaurante Las Flores) → Sucursal Única
+    └── Comprador C (Carnicería del Valle) → Sucursal 1, Sucursal 2, Sucursal 3
+```
 
-| Registro DNS | Para qué | Cómo configurar |
-|---|---|---|
-| **SPF** | Autoriza al servidor de email a enviar en nombre del dominio | En cPanel → Zona DNS → TXT: `"v=spf1 include:tu-servidor mx ~all"` |
-| **DKIM** | Firma digital de cada correo (evita spoofing) | En cPanel → Email → Autenticación de Correo → Activar DKIM |
-| **DMARC** | Política que dice qué hacer si SPF/DKIM fallan | TXT `_dmarc.tudominio.com`: `"v=DMARC1; p=none; rua=mailto:admin@tudominio.com"` |
-| **PTR / rDNS** | El IP del servidor debe resolver al dominio | Configurar en el panel de hosting (soporte técnico) |
+- El productor envía desde su bodega → a los puntos del comprador
+- El repartidor sigue ruta con múltiples paradas (ya implementado)
+- **No hay envíos entre sucursales** en el MVP
+- **Futuro Sprint 4D+**: `almacenes_empresa` con stock por almacén y transferencias internas
 
-> ℹ️ Si usas un hosting compartido (ej: cPanel), SPF y DKIM ya están preconfigurados para el dominio. Solo verifica en cPanel → Email → Autenticación de Correo.
+**A — Movimientos de Inventario (prioridad máxima)**
+> El sistema actual solo tiene un número de stock. El supervisor y admin necesitan registrar entradas/salidas con historial.
 
-**C — Dashboard admin_empresa refactorizado**
-- [ ] **Quitar "+ Nuevo pedido"** del dashboard (el dashboard es vista, no punto de acción)
-- [ ] **Panel de estado general** con cards de:
-  - Ventas del día y del mes (suma de pedidos entregados/pagados)
-  - Cobros pendientes (pedidos confirmados sin pago registrado)
-  - Stock crítico: productos bajo mínimo (alerta roja)
-  - Últimos 5 movimientos (pedidos recientes, pagos recibidos)
-  - Pedidos en ruta ahora (enlace a logística)
-  - Equipo activo hoy (repartidores con ruta asignada)
+- [x] `migrations/006_movimientos_inventario.sql` — nueva tabla:
+- [x] `EmpresaInventarioController` — reescrito completo:
+  - [x] `index()` — dashboard de stock: tarjetas con semáforo (verde/amarillo/rojo), resumen rápido
+  - [x] `movimiento()` — formulario rápido entrada/salida/merma con cálculo de stock resultante
+  - [x] `guardarMovimiento()` — registra movimiento + actualiza inventario
+  - [x] `historial($productoId)` — historial de movimientos por producto con paginación
+  - [x] `log_movimientos()` — log global con filtros por tipo, producto, fecha
+  - [x] `ajuste($productoId)` — corrección manual de stock (solo admin_empresa)
+- [x] `ProductoModel::ajustarStock()` — ahora retorna {stock_antes, stock_despues}
+- [x] `MovimientoInventarioModel` — registrar, historialProducto, historialEmpresa, resumenStock, ultimosMovimientos, stockActual
+- [x] **Delegación al supervisor**: supervisor puede hacer entradas/salidas; ajustes solo admin_empresa
+- [x] Sidebar empresa: "Control de Stock" visible para admin_empresa Y supervisor
+- [x] Vista `empresa/inventario/index.php` — nueva UI con cards semáforo + botones rápidos + últimos movimientos
+- [x] Vista `empresa/inventario/movimiento_form.php` — formulario unificado entrada/salida/merma con preview de stock resultante
+- [x] Vista `empresa/inventario/historial.php` — log de movimientos de un producto
+- [x] Vista `empresa/inventario/log.php` — log global con filtros
+- [x] Vista `empresa/inventario/ajuste_form.php` — ajuste directo de stock
 
-**D — EmpresaPedidoController**
-- [ ] `EmpresaPedidoController` — ver todos los pedidos de su empresa + cambiar estado
-  - [ ] Vista `empresa/pedidos/empresa_index.php` (listado con filtros por estado, fecha, comprador)
-  - [ ] Ruta: `empresa-pedido/*`
-- [ ] Sidebar empresa: verificar enlace "Pedidos" para admin_empresa
+**B — Precios Especiales por Comprador**
+> Cada comprador puede tener un precio acordado diferente al catálogo general. Esto es común en ventas B2B de carne.
+
+- [x] `migrations/007_precios_especiales.sql` — tabla `precios_especiales` + columnas `tipo` y `creado_por_id` en `pedidos`
+- [x] `ProductoModel::getPrecioEspecial()` — retorna precio especial si existe
+- [x] `ProductoModel::getPrecioFinal()` — aplica: primero precio especial, sino precio escalonado por volumen
+- [x] `ProductoModel::guardarPrecioEspecial()`, `eliminarPrecioEspecial()`, `listadoParaPreciosEspeciales()`
+- [x] `EmpresaUsuarioController::precios()` — GET muestra tabla de productos + precios, POST guarda
+- [x] Vista `empresa/usuarios/precios_comprador.php` — tabla inline con toggle y cálculo de diferencia
+- [x] Lista de usuarios: link "Precios especiales" visible solo para compradores
+
+**C — Pedido Personalizado**
+> El admin_empresa o supervisor puede crear un pedido especial para un comprador con precios negociados ad-hoc, fuera del flujo estándar del carrito.
+
+- [x] `PedidoModel::crearPersonalizado()` — transacción: crea pedido + detalle con tipo='personalizado'
+- [x] `PedidoModel::listadoEmpresa()` — añadidos filtros: tipo, fecha_desde, fecha_hasta
+- [x] `EmpresaPedidoController` — creado completo:
+  - [x] `index()` — lista pedidos empresa con filtros + badge "Personalizado"
+  - [x] `cambiarEstado()` — modal de cambio de estado
+  - [x] `personalizado()` — formulario dinámico con líneas add/remove
+  - [x] `guardarPersonalizado()` — valida y crea pedido personalizado
+- [x] Vista `empresa/pedidos/empresa_index.php` — tabla con modal de estado
+- [x] Vista `empresa/pedidos/personalizado.php` — formulario dinámico con JS + cálculo de total
+- [x] Sidebar empresa: "Pedidos" → empresa-pedido, "Pedido personalizado" como ítem separado
+
+**D — EmpresaPedidoController — Vista general pedidos** ✅ (incluido en C)
+
+**E — Flujo de Pedido Completo (revisión 2026-05-05)**
+> Corrección de lógica de negocio: sucursal=comprador, sin stock visible al comprador, flujo con revisión empresa.
+
+- [x] `migrations/008_flujo_pedido_entrega.sql` — pedidos: tipo_entrega, repartidor_asignado_id, costo_envio, nota_empresa, foto_comprobante_path, foto_entrega_path · usuarios: direccion_entrega, referencia_entrega, lat_entrega, lng_entrega
+- [x] `PedidoModel::asignarEntrega()` — empresa asigna tipo y repartidor
+- [x] `PedidoModel::aprobarPedido()` — confirmar + recalcular total con envío
+- [x] `PedidoModel::rechazarPedido()` — cancelar con nota
+- [x] `PedidoModel::subirComprobante()` — comprador sube comprobante → en_preparacion
+- [x] `PedidoModel::subirFotoEntrega()` — empresa/repartidor sube foto → entregado
+- [x] `EmpresaPedidoController::asignarEntrega()` — modal de asignación
+- [x] `EmpresaPedidoController::aprobar()` / `rechazar()` / `subirFotoEntrega()` — acciones inline
+- [x] `PedidoController::subirComprobante()` — comprador sube comprobante desde detalle
+- [x] `CarritoController` simplificado — 3 pasos (sin paso2 sucursales), usa `getPrecioFinal()`
+- [x] Catálogo y carrito sin stock visible para compradores
+- [x] Vista `empresa_index.php` — modal revisar (asignar+aprobar+rechazar), badge pendientes, badge comprobante
+- [x] Vista `detalle.php` — comprobante upload para comprador en estado confirmado, foto entrega, costo envío desglosado
+- [x] `EmpresaUsuarioController::guardar()` — guarda `direccion_entrega` en usuarios al crear comprador
+
+**Modelo Sucursal = Comprador (definitivo 2026-05-05)**
+```
+Empresa (productor) — UN solo inventario
+├── Comprador "Taquería El Buen Sabor — Norte"  ← usuario comprador, 1 punto de entrega
+├── Comprador "Taquería El Buen Sabor — Sur"    ← usuario comprador, 1 punto de entrega
+└── Comprador "Restaurante Las Flores"           ← usuario comprador, 1 punto de entrega
+```
+- La empresa crea un comprador por cada punto de entrega de su cliente
+- Tabla `sucursales` se mantiene para Sprint 4D (rutas con múltiples paradas)
+- No hay distribución multi-sucursal en el carrito del MVP
+
+**Flujo de pedido completo (post-revisión)**
+```
+Comprador → solicita (pendiente)
+Empresa → asigna tipo_entrega + costo_envio → aprueba (confirmado) o rechaza (cancelado)
+Comprador → ve total final → sube comprobante de pago → en_preparacion
+Empresa/Repartidor → "En camino" → en_ruta → sube foto entrega → entregado
+```
+
+**F — GPS — Sprint 4D (plan, no implementar ahora)**
+- Google Maps JS API: mapa con marcador origen (empresa) → destino (lat_entrega del comprador)
+- Repartidor móvil: `navigator.geolocation.watchPosition()` → POST `/api/posicion` cada 30s
+- `ruta_detalle.lat_actual` + `lng_actual` ya existen en schema
+- Comprador: iframe con posición del repartidor en tiempo real
+
+**G — UI Productos mejorada ✅ COMPLETADO (2026-05-05)**
+- [x] Formulario producto rediseñado con 3 secciones guiadas: Información básica · Precios y rangos · Stock inicial
+- [x] Preview en tiempo real del precio al configurar
+- [x] Precios escalonados con filas add/remove dinámicas y leyenda explicativa
+- [x] Helper text en cada campo explicando su propósito
+- [x] Nota clara: "Los compradores NO ven el stock"
+
+**Bugs corregidos en producción (2026-05-05):**
+- [x] `PedidoModel::listadoEmpresa()` — eliminado `COALESCE(p.tipo,"normal") AS tipo` (duplicaba columna de `p.*` → MySQL 5.7 error en paginate COUNT subquery)
+- [x] `EmpresaPedidoController` — reemplazados 3 usos de métodos `protected` (query/queryOne) por llamadas públicas correctas: `getByRolEmpresa()` y nuevo `countPendientes()`
+- [x] `CarritoController.php` — eliminado código duplicado fuera de la clase (causaba error de sintaxis PHP)
+- [x] `paso1.php` — eliminada versión antigua con columna Stock visible al comprador; sin stock en vista del comprador
+- [x] `EmpresaInventarioController` — corregidos 3 bugs: `userId()` → `usuarioId()`, llamadas a métodos `protected` (`queryOne`, `execute`) reemplazadas por métodos públicos nuevos en `ProductoModel` (`perteneceAEmpresa`, `conStockDetalleEmpresa`, `ajustarInventarioDirecto`)
+- [x] `MovimientoInventarioModel::historialProducto()` — eliminada columna `u.rol_slug` que no existe en `usuarios` sin JOIN de roles
+- [x] `detalle.php` — eliminado bloque duplicado (líneas 197+); añadido display de precio original vs ajustado con diff visual en verde
+- [x] `paso3.php` — actualizado indicador de pasos a 3 pasos; eliminada sección "Distribución por sucursal" obsoleta
+
+**H — Combos por Comprador ✅ COMPLETADO (2026-05-05)**
+- [x] `migrations/009_combos_comprador.sql` — tablas `combos`, `combo_items`, `combo_compradores`
+- [x] `ComboModel` — CRUD, `getItems()`, `getCompradores()`, `getCombosParaComprador()`, `guardarItems()`, `guardarCompradores()`
+- [x] `EmpresaComboController` — index, nuevo, guardar, editar, actualizar, eliminar, activar
+- [x] Vistas `empresa/combos/index.php`, `empresa/combos/form.php`
+- [x] Route `empresa-combo` → `EmpresaComboController` en `index.php`
+- [x] Sidebar admin: "Combos por comprador" bajo Operación
+- [x] `CarritoController::cargarCombo()` — carga combo en sesión de carrito (merge de cantidades)
+- [x] `paso1.php` — sección de combos del comprador al inicio con botón "Cargar"
+
+**I — Ajuste de precios en aprobación ✅ COMPLETADO (2026-05-05)**
+- [x] `migrations/010_precio_ajuste_pedido.sql` — ADD `precio_original DECIMAL(10,2) NULL` en `pedido_detalle`
+- [x] `PedidoModel::aprobarPedido(ajustes[])` — acepta array de precio ajustado por `detalle_id`; solo permite bajar; guarda `precio_original`; recalcula subtotal y total
+- [x] `PedidoModel::getItemsPedido()` — retorna items para el modal AJAX
+- [x] `EmpresaPedidoController::itemsJson()` — endpoint JSON de items de un pedido (verificación de pertenencia)
+- [x] `EmpresaPedidoController::aprobar()` — pasa `$_POST['ajustes']` al modelo
+- [x] `empresa_index.php` — modal Revisar: carga items via AJAX al abrir, muestra precios editables con límite máximo = precio original; inputs fluyen al formAprobar
+- [x] `detalle.php` — column "Precio unit." muestra precio tachado + nuevo precio en verde + descuento % cuando fue ajustado
+
+**J — UX Catálogo + Carrito: Modal AJAX + Tiempo Real ✅ COMPLETADO (2026-05-05)**
+- [x] `catalogo/index.php` — reescrito completo:
+  - [x] Imágenes corregidas: eliminado doble-prefijo `UPLOAD_URL`, ahora usa `$prod['imagen']` directamente
+  - [x] Pre-carga de `escalonados` por producto en PHP (`$productoModelCat->getEscalonados()`)
+  - [x] "Ver precios" → modal en modo lectura (sin botón Agregar para roles sin carrito)
+  - [x] "+ Agregar" → modal AJAX: cantidad, tabla de precios por volumen, estimación de precio/subtotal
+  - [x] Precio se actualiza en tiempo real vía `fetch('/api/precios/{id}')` con 280ms debounce
+  - [x] Alertas dinámicas: verde "Ahorrando X%" cuando aplica descuento; amarillo "Agrega N más → precio Y"
+  - [x] Fila activa de tramos resaltada en verde según cantidad ingresada
+  - [x] AJAX POST a `carrito/agregarProducto` — sin salir del catálogo; badge del carrito actualiza sin reload
+- [x] `CarritoController::agregarProducto()` — nuevo endpoint AJAX:
+  - Valida producto activo y pertenece a empresa del comprador
+  - Merge de cantidad si producto ya estaba en carrito (recalcula precio con nuevo total)
+  - Retorna `{ok, msg, total_items}` para actualizar badge
+- [x] `paso1.php` — precios actualizados en tiempo real con `oninput` + debounce 350ms por producto; muestra "..." mientras carga
+- [x] `empresa_index.php` — fixes UX pedidos admin:
+  - [x] Eliminado botón "+ Pedido Personalizado" del listado
+  - [x] "Costo de envío" se oculta automáticamente cuando se selecciona "Pickup"
+  - [x] Botón "Aprobar" sincroniza campos de entrega (tipo, repartidor, costo, nota) al formAprobar antes de submit — ya no es necesario "Guardar asignación" antes
+- [x] `EmpresaPedidoController::aprobar()` — también guarda asignación de entrega si `tipo_entrega` viene en POST
+- [x] `detalle.php` — banner "En camino 🚚" para comprador cuando `estado = 'en_ruta'`:
+  - Tipo de entrega, repartidor asignado (nombre), fecha estimada
+
+**K — Flujo de Pago Completo + Tipo de Entrega + Comprobante + Dirección ✅ COMPLETADO (2026-05-05)**
+> Bug crítico corregido: `CarritoController::confirmar()` no guardaba `metodo_pago` ni `tipo_entrega` en BD.
+> Todas las pantallas ahora guían al usuario paso a paso y mantienen el estado visible en todo momento.
+
+- [x] **Bug fix**: `CarritoController::confirmar()` — ahora guarda `metodo_pago`, `tipo_entrega`, `direccion_entrega`, `referencia_entrega`, `lat_entrega`, `lng_entrega` al crear el pedido
+- [x] `migrations/011_checkout_entrega_direccion.sql` — ADD columnas snapshot de dirección en `pedidos` (`direccion_entrega`, `referencia_entrega`, `lat_entrega`, `lng_entrega`) · ADD `lat` y `lng` en `empresas` para comparativa de ubicación
+- [x] `CarritoController::resumen()` — carga y pasa `$comprador` (usuario con dirección guardada) y `$empresa` al view paso3
+- [x] `CarritoController::confirmado()` — carga el pedido desde BD para pasarlo a paso4 (necesario para mostrar `tipo_entrega` en timeline)
+- [x] **`paso3.php` (resumen)** — reescrito completo:
+  - Selector visual de tipo de entrega con tarjetas interactivas: 🏭 "Recoger en bodega" / 🚚 "Envío a domicilio"
+  - Bloque **pickup**: muestra `empresas.direccion_fiscal` como punto de retiro
+  - Bloque **repartidor**: muestra dirección guardada del perfil con botón "Cambiar"; si no tiene, muestra campos editables
+  - JS: toggle visual de tarjetas + mostrar/ocultar bloques según selección
+  - `direccion_entrega` y `referencia_entrega` se envían al `confirmar()`
+- [x] **`paso4.php` (confirmado)** — reescrito con timeline "¿Qué sigue?":
+  - 4 pasos visuales: ✓ Pedido registrado · ⏳ Revisión del equipo · ○ Sube comprobante · ○ Entrega/Recoger
+  - Paso 4 se adapta al `tipo_entrega` del pedido (pickup vs. repartidor)
+- [x] **`perfil.php`** — nueva sección "Dirección de entrega" visible **solo para compradores** (`$rol === 'comprador'`):
+  - Campos: `direccion_entrega` (textarea), `referencia_entrega`, `lat_entrega`/`lng_entrega` (ocultos, para futuro mapa)
+- [x] **`CuentaController::guardarDireccion()`** — nuevo método; guarda `direccion_entrega`, `referencia_entrega`, `lat_entrega`, `lng_entrega` en `usuarios`; ruta `cuenta/guardarDireccion`
+- [x] **`detalle.php`** — reescrito con bloques contextuales por estado y rol:
+  - **Barra de progreso/timeline** con 5 estados: pendiente → aprobado → en preparación → en camino → entregado
+  - Estado **`pendiente`**: bloque azul "Tu pedido está en revisión"
+  - Estado **`confirmado`**: bloque upload comprobante (ya existía) + muestra tipo de entrega y método de pago
+  - Estado **`en_preparacion`**: bloque violeta; si pickup → muestra dirección fiscal de empresa; si repartidor → muestra dirección de entrega y aviso de repartidor próximo
+  - Estado **`en_ruta`**: banner naranja con repartidor + fecha estimada (ya existía, mantenido)
+  - Estado **`entregado`**: banner verde confirmación
+  - **Admin**: sección "Comprobante de pago" siempre visible — muestra preview de imagen o "Sin comprobante aún"
+  - Panel lateral: muestra `tipo_entrega`, `metodo_pago`, y bloque de dirección de entrega si aplica
+- [x] **`empresa_index.php`** — mejoras admin:
+  - Nuevo alert banner verde cuando hay pedidos con `foto_comprobante_path IS NOT NULL AND estado = 'en_preparacion'` (comprobantes pendientes de revisar)
+  - Badge `💳 Comprobante` visible y prominente en filas que tienen comprobante adjunto
+  - Botón **"✓ Recogido"** para pedidos `tipo_entrega='pickup'` en estado `en_preparacion`/`en_ruta` — confirma entrega sin requerir foto
+  - Botón **"📷 Entrega"** ahora solo aparece para pedidos con repartidor
+- [x] `PedidoModel::countConComprobantePendiente(int $empresaId)` — nuevo método para el badge admin
+- [x] `EmpresaPedidoController::index()` — agrega `$countConComprobante` para pasar al view
+
+**Flujo de pedido completo (post K)**
+```
+Comprador:
+  1. Carrito paso 3 → elige metodo_pago + tipo_entrega (pickup/repartidor) + dirección
+  2. Confirmar → pedido en BD con todos los campos guardados
+  3. paso4 → timeline "¿Qué sigue?" con 4 pasos claros
+
+Empresa (admin/supervisor):
+  4. Revisar pedido → asignar entrega + aprobar/rechazar
+  5. Si pickup: botón "✓ Recogido" cuando el cliente pasa a recoger (sin foto)
+  6. Si repartidor: asignar repartidor → repartidor sube foto de entrega → entregado
+
+Comprador:
+  3b. Si aprobado → detalle muestra bloque "Sube tu comprobante"
+  3c. Sube imagen de pago → estado en_preparacion
+  3d. Detalle muestra estado actual con instrucciones para cada paso
+
+Repartidor (ya existía desde 4C-1):
+  - confirmarEntrega() con firma digital + foto → pedido entregado
+```
+
+**F — Email Service (movido de prioridad — hacer cuando SMTP esté configurado en cPanel)**
+> El admin puede seguir viendo la contraseña generada como fallback mientras no haya SMTP activo.
+- [ ] `app/services/EmailService.php` con PHPMailer
+- [ ] Template HTML: bienvenida con credenciales
+- [ ] Prerrequisito: superadmin configura SMTP en `/config/correo`
+
+---
+
+### Sprint 4C-IA — Reconocimiento de Facturas para Stock (🔮 FUTURO)
+> El objetivo es que el admin/supervisor pueda fotografiar una factura de compra y el sistema registre automáticamente los movimientos de entrada sin captura manual.
+
+**Casos de uso:**
+1. Admin toma foto de factura con la cámara del celular → el sistema extrae: proveedor, lista de productos, cantidades, montos → propone movimiento de entrada → admin confirma
+2. Admin dicta por voz: "Entraron 50 kilos de arrachera y 30 kilos de lomo" → el sistema parsea y propone el movimiento
+
+**Stack propuesto:**
+- **API vision**: Claude Vision (Anthropic API) o GPT-4V para OCR + extracción estructurada de facturas
+- **API voz**: Web Speech API del navegador (sin backend, sin costo) para transcripción de voz a texto
+- Endpoint PHP: `POST /api/ia/analizarFactura` — recibe imagen base64 → llama a API externa → devuelve JSON con productos detectados
+- Endpoint PHP: `POST /api/ia/analizarVoz` — recibe texto transcrito → parsea con regex o LLM → devuelve JSON
+
+**Flujo UI:**
+```
+Modal "Entrada rápida IA" en /empresa-inventario
+    ├── [📷 Subir/Tomar foto] → OCR factura → tabla propuesta (editable)
+    └── [🎤 Dictado de voz]   → transcripción → parseo → tabla propuesta (editable)
+         ↓
+    [Confirmar] → POST /empresa-inventario/guardarMovimientosLote
+```
+
+**Migraciones necesarias:**
+- Ninguna — usa la tabla existente `movimientos_inventario` con `tipo='entrada'`
+- Opcional: campo `fuente_ia TINYINT(1)` para auditoría de movimientos generados por IA
+
+**Prerrequisitos:**
+- Clave API de Anthropic o OpenAI configurada en `global_settings` (superadmin)
+- HTTPS activo en producción (Web Speech API requiere HTTPS)
+- Servidor con soporte de `cURL` para llamadas a API externa
+
+**Estimación:** Sprint completo (3-4 días de desarrollo + testing)
 
 ### Sprint 4C-2 — Portal Supervisor funcional 🔄 SIGUIENTE
 - [ ] `SupervisorController::dashboard()` — cola de pedidos + KPIs del día
   - [ ] Pedidos pendientes de aprobación (lista + modal aprobar/rechazar)
   - [ ] Resumen operativo: pedidos hoy, entregados, en ruta
+  - [ ] Acceso a movimientos de inventario (entradas/salidas delegadas desde admin)
   - [ ] Vista `supervisor/dashboard.php`
-- [ ] Sidebar supervisor: verificar que las rutas de aprobación y límites funcionan
+- [ ] Sidebar supervisor: verificar rutas de aprobación, límites e inventario
 
 ### Sprint 4C-3 — Portal Comprador funcional 🔄 SIGUIENTE
 - [ ] `CompradorController::inicio()` — bienvenida + últimos pedidos + acceso rápido al catálogo
   - [ ] Vista `comprador/inicio.php`
-- [ ] Verificar flujo completo: inicio → catálogo → carrito → confirmar pedido
+- [ ] Verificar flujo completo: inicio → catálogo (con precios especiales si aplica) → carrito → confirmar pedido
 - [ ] Verificar que límites de compra bloquean correctamente cuando están activos
 
-### Sprint 4D — Sucursales y Vehículos del Admin Empresa
-- [ ] `EmpresaSucursalController` — CRUD sucursales con Leaflet.js
-  - [ ] index: listado de sucursales con mapa
-  - [ ] form: crear/editar con picker de coordenadas en mapa
+### Sprint 4C-4 — Detalle de producto + Descuentos en pedidos (pendiente)
+- [ ] **Página de detalle de producto** (`/catalogo/detalle/{id}` o modal expandido):
+  - [ ] Foto ampliada, descripción completa, tabla de precios escalonados, precio especial del comprador si aplica
+  - [ ] Botón "+ Agregar" desde el detalle (igual que en el catálogo)
+  - [ ] El admin puede agregar esta info desde `/empresa-producto/editar/{id}` (campo descripción larga)
+- [ ] **Descuentos visibles en detalle de pedido**:
+  - [ ] Si el pedido tiene precio escalonado, mostrar ahorro por volumen vs. precio base en cada línea
+  - [ ] Resumen al pie: "Ahorro total por volumen: $X"
+- [ ] **Límites de compra en el carrito**:
+  - [ ] `LimiteController` — supervisor configura máximos por comprador/producto/mes
+  - [ ] `CarritoController::actualizar()` — validar límites antes de crear pedido; mostrar error descriptivo
+
+### Sprint 4D — Sucursales del Comprador (CRUD) + Vehículos
+> Las sucursales son los PUNTOS DE ENTREGA del comprador (no almacenes del productor).
+
+- [ ] `EmpresaSucursalController` — gestión de sucursales (puntos de entrega de compradores)
+  - [ ] index: listado de sucursales de todos los compradores de la empresa
+  - [ ] form: crear/editar con picker de coordenadas en mapa Leaflet
+  - [ ] toggle activo/inactivo
   - [ ] Ruta: `empresa-sucursal/*`
 - [ ] `EmpresaVehiculoController` — vehículos y asignación a repartidores
   - [ ] index: listado de vehículos con estado y repartidor asignado
   - [ ] form: alta de vehículo (placa, modelo, capacidad)
   - [ ] Asignación en tabla `repartidor_vehiculo`
   - [ ] Ruta: `empresa-vehiculo/*`
-- [ ] Al crear repartidor: guardar datos de vehículo en `repartidor_vehiculo` + `vehiculos` (en lugar de solo loguear a action_logs)
+- [ ] Al crear repartidor: guardar datos de vehículo en `repartidor_vehiculo` + `vehiculos`
+
+### Sprint 4D+ — Almacenes del Productor (futuro, no MVP)
+> Si el productor tiene múltiples bodegas/centros de distribución propios con stock independiente.
+- [ ] Nueva tabla `almacenes_empresa` (diferente a `sucursales` que son del comprador)
+- [ ] Stock por almacén en `inventario` + columna `almacen_id`
+- [ ] Transferencias internas entre almacenes (`transferencias_almacen`)
+- [ ] Interfaz para mover stock entre almacenes
 
 ### Sprint 5P — Pagos empresa→comprador (simulados / mock)
 > El Admin Empresa necesita recibir pagos de sus compradores. Se simula la pasarela para que el flujo se vea completo; la integración real con PayPal/Stripe va después.
@@ -800,4 +1044,4 @@ Todos se configuran desde `/config/apis` y `/config/correo` (solo visible para s
 
 ---
 
-*Última actualización: 2026-05-05 — v2.5.0 (Hotfixes 4C-0: inventario stock/imagen/empresa_id · Sprint 4C-1: email service + credenciales por correo · PayPal Subscriptions guía completa · anti-spam DNS)*
+*Última actualización: 2026-05-05 — v2.6.6 (Sprint 4C-1 M: botones de acción contextuales · empresa_index: botón único por estado (🔍Revisar→pendiente, 💳Confirmar pago→comprobante recibido, ✓Recogido→pickup en_ruta, 📷Foto→repartidor en_ruta), elimina botón "Estado" y modalEstado de la lista · detalle.php: nueva sección "Acciones del pedido" para admin con guía contextual por estado + botones (Confirmar pago→en_ruta, Marcar recogido, Registrar entrega con foto) + cambio manual de estado en collapsible ⚙)*

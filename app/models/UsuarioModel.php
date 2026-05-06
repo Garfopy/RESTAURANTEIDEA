@@ -131,4 +131,13 @@ class UsuarioModel extends BaseModel
     {
         return $this->getByRolEmpresa('repartidor', $empresaId);
     }
+
+    public function compradorValido(int $compradorId, int $empresaId): bool
+    {
+        return (bool)$this->queryOne(
+            "SELECT u.id FROM usuarios u JOIN roles r ON r.id = u.rol_id
+              WHERE u.id = ? AND u.empresa_id = ? AND r.slug = 'comprador' AND u.activo = 1",
+            [$compradorId, $empresaId]
+        );
+    }
 }

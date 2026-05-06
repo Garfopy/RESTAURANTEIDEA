@@ -56,6 +56,10 @@
         <td style="padding:12px;white-space:nowrap">
           <a href="<?= BASE_URL ?>empresa-usuario/editar/<?= $u['id'] ?>"
              style="font-size:.8rem;color:#6B7280;text-decoration:none;margin-right:10px">Editar</a>
+          <?php if ($u['rol_slug'] === 'comprador'): ?>
+          <a href="<?= BASE_URL ?>empresa-usuario/precios/<?= $u['id'] ?>"
+             style="font-size:.8rem;color:#7C3AED;text-decoration:none;margin-right:10px">Precios especiales</a>
+          <?php endif; ?>
           <button onclick="toggleUsuario(<?= $u['id'] ?>, this)"
                   style="font-size:.8rem;color:<?= $u['activo'] ? '#991B1B' : '#065F46' ?>;background:none;border:none;cursor:pointer;font-family:inherit">
             <?= $u['activo'] ? 'Desactivar' : 'Activar' ?>

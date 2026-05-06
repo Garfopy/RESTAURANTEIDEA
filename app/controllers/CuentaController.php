@@ -107,6 +107,25 @@ class CuentaController extends BaseController
         $this->redirect('cuenta/perfil');
     }
 
+    public function guardarDireccion(?string $p = null): void
+    {
+        if (!$this->isPost()) $this->redirect('cuenta/perfil');
+
+        $this->requireComprador();
+
+        $data = [
+            'direccion_entrega'  => trim($this->post('direccion_entrega', '')),
+            'referencia_entrega' => trim($this->post('referencia_entrega', '')) ?: null,
+            'lat_entrega'        => $this->post('lat_entrega') ?: null,
+            'lng_entrega'        => $this->post('lng_entrega') ?: null,
+        ];
+
+        (new UsuarioModel())->update($this->usuarioId(), $data);
+        $this->log('Guardar dirección de entrega', 'cuenta');
+        $this->flash('success', 'Dirección de entrega guardada correctamente.');
+        $this->redirect('cuenta/perfil');
+    }
+
     public function cambiarPassword(?string $p = null): void
     {
         if (!$this->isPost()) $this->redirect('cuenta/perfil');

@@ -2,17 +2,22 @@
 require_once ROOT_PATH . '/app/controllers/BaseController.php';
 
 /**
- * CarritoController — Flujo de compra en 4 pasos.
+ * CarritoController — Flujo de compra en 3 pasos.
  *
- * Paso 1 /carrito/index       — Selección de productos y cantidades
- * Paso 2 /carrito/sucursales  — Distribución por sucursal
- * Paso 3 /carrito/resumen     — Revisión + fecha/pago
- * Paso 4 /carrito/confirmado  — Pedido creado con folio
+ * Paso 1 /carrito/index      — Selección de productos y cantidades
+ * Paso 2 /carrito/resumen    — Revisión + fecha/notas
+ * Paso 3 /carrito/confirmado — Pedido creado con folio
+ *
+ * Cada comprador representa un punto de entrega.
+ * No hay distribución multi-sucursal en el MVP.
  */
 class CarritoController extends BaseController
 {
     private ProductoModel $productoModel;
     private PedidoModel   $pedidoModel;
+    private ComboModel    $comboModel;
+    private EmpresaModel  $empresaModel;
+    private UsuarioModel  $usuarioModel;
 
     public function __construct()
     {
@@ -20,12 +25,17 @@ class CarritoController extends BaseController
         $this->requireComprador();
         $this->productoModel = new ProductoModel();
         $this->pedidoModel   = new PedidoModel();
+        $this->comboModel    = new ComboModel();
+        $this->empresaModel  = new EmpresaModel();
+        $this->usuarioModel  = new UsuarioModel();
     }
 
     // ── Paso 1: Selección de productos ────────────────────────────
     public function index(?string $p = null): void
     {
+        $empresaId = $this->empresaId();
         $filtros = [
+            'empresa_id'   => $empresaId,
             'buscar'       => $this->get('buscar', ''),
             'categoria_id' => (int)$this->get('categoria_id', 0) ?: null,
         ];
@@ -35,6 +45,9 @@ class CarritoController extends BaseController
 
         $db = Database::getInstance();
         $categorias = $db->query('SELECT * FROM categorias WHERE activo = 1 ORDER BY nombre')->fetchAll();
+
+        $compradorId = $this->usuarioId();
+        $combos      = $this->comboModel->getCombosParaComprador($compradorId, $empresaId);
 
         $carrito    = $_SESSION['carrito']['items'] ?? [];
         $flash      = $this->getFlash();
@@ -54,7 +67,9 @@ class CarritoController extends BaseController
             $this->redirect('carrito/index');
         }
 
-        $cantidades = $_POST['cantidad'] ?? [];
+        $compradorId = $this->usuarioId();
+        $empresaId   = $this->empresaId();
+        $cantidades  = $_POST['cantidad'] ?? [];
         $items = [];
 
         foreach ($cantidades as $productoId => $cantidad) {
@@ -64,8 +79,9 @@ class CarritoController extends BaseController
 
             $producto = $this->productoModel->find($productoId);
             if (!$producto || !$producto['activo']) continue;
+            if ((int)$producto['empresa_id'] !== $empresaId) continue;
 
-            $precio   = $this->productoModel->getPrecioParaCantidad($productoId, $cantidad);
+            $precio   = $this->productoModel->getPrecioFinal($compradorId, $productoId, $cantidad);
             $items[$productoId] = [
                 'producto_id'  => $productoId,
                 'nombre'       => $producto['nombre'],
@@ -82,120 +98,39 @@ class CarritoController extends BaseController
         }
 
         $_SESSION['carrito']['items'] = $items;
-        // Reset downstream steps when items change
-        unset($_SESSION['carrito']['distribucion'], $_SESSION['carrito']['meta']);
+        unset($_SESSION['carrito']['meta']);
 
-        $this->redirect('carrito/sucursales');
-    }
-
-    // ── Paso 2: Distribución por sucursal ─────────────────────────
-    public function sucursales(?string $p = null): void
-    {
-        $items = $_SESSION['carrito']['items'] ?? [];
-        if (empty($items)) {
-            $this->redirect('carrito/index');
-        }
-
-        $db = Database::getInstance();
-        $stmt = $db->prepare(
-            'SELECT id, nombre, direccion FROM sucursales WHERE empresa_id = ? AND activo = 1 ORDER BY nombre'
-        );
-        $stmt->execute([$this->empresaId()]);
-        $sucursales = $stmt->fetchAll();
-
-        if (empty($sucursales)) {
-            $this->flash('error', 'Tu empresa no tiene sucursales activas. Contacta al administrador.');
-            $this->redirect('carrito/index');
-        }
-
-        // Si hay solo una sucursal, auto-distribución y saltar al paso 3
-        if (count($sucursales) === 1) {
-            $sucursalId = $sucursales[0]['id'];
-            $distribucion = [];
-            foreach ($items as $prodId => $item) {
-                $distribucion[$prodId] = [$sucursalId => $item['cantidad']];
-            }
-            $_SESSION['carrito']['distribucion'] = $distribucion;
-            $this->redirect('carrito/resumen');
-        }
-
-        $distribucion = $_SESSION['carrito']['distribucion'] ?? [];
-        $flash        = $this->getFlash();
-        $pageTitle    = 'Hacer pedido — Paso 2: Sucursales';
-        $activeMenu   = 'carrito';
-
-        ob_start();
-        require ROOT_PATH . '/app/views/empresa/carrito/paso2.php';
-        $content = ob_get_clean();
-        require ROOT_PATH . '/app/views/empresa/layouts/main.php';
-    }
-
-    // Guarda distribución por sucursal (POST desde paso 2)
-    public function guardarSucursales(?string $p = null): void
-    {
-        if (!$this->isPost()) {
-            $this->redirect('carrito/sucursales');
-        }
-
-        $items = $_SESSION['carrito']['items'] ?? [];
-        if (empty($items)) {
-            $this->redirect('carrito/index');
-        }
-
-        $distribucionPost = $_POST['dist'] ?? [];
-        $distribucion     = [];
-        $errores          = [];
-
-        foreach ($items as $prodId => $item) {
-            $totalAsignado = 0;
-            $distProd      = [];
-
-            foreach ($distribucionPost[$prodId] ?? [] as $sucursalId => $qty) {
-                $qty = (float)str_replace(',', '.', $qty);
-                if ($qty > 0) {
-                    $distProd[(int)$sucursalId] = $qty;
-                    $totalAsignado += $qty;
-                }
-            }
-
-            // Tolerancia de redondeo de 0.01
-            if (abs($totalAsignado - $item['cantidad']) > 0.01) {
-                $errores[] = "'{$item['nombre']}': debes distribuir exactamente {$item['cantidad']} {$item['presentacion']} (distribuiste {$totalAsignado}).";
-            }
-            $distribucion[$prodId] = $distProd;
-        }
-
-        if (!empty($errores)) {
-            $this->flash('error', implode(' | ', $errores));
-            $this->redirect('carrito/sucursales');
-        }
-
-        $_SESSION['carrito']['distribucion'] = $distribucion;
         $this->redirect('carrito/resumen');
     }
 
-    // ── Paso 3: Resumen y confirmación ────────────────────────────
+    // Paso de sucursales eliminado — compatibilidad de URLs
+    public function sucursales(?string $p = null): void
+    {
+        $this->redirect('carrito/resumen');
+    }
+
+    public function guardarSucursales(?string $p = null): void
+    {
+        $this->redirect('carrito/resumen');
+    }
+
+    // ── Paso 2: Resumen y confirmación ────────────────────────────
     public function resumen(?string $p = null): void
     {
-        $items        = $_SESSION['carrito']['items'] ?? [];
-        $distribucion = $_SESSION['carrito']['distribucion'] ?? [];
+        $items = $_SESSION['carrito']['items'] ?? [];
 
-        if (empty($items) || empty($distribucion)) {
+        if (empty($items)) {
             $this->redirect('carrito/index');
         }
 
         $total = array_sum(array_column($items, 'subtotal'));
 
-        $db = Database::getInstance();
-        $stmt = $db->prepare(
-            'SELECT id, nombre FROM sucursales WHERE empresa_id = ? AND activo = 1'
-        );
-        $stmt->execute([$this->empresaId()]);
-        $sucursalesArr = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+        $comprador = $this->usuarioModel->find($this->usuarioId());
+        $empresa   = $this->empresaModel->find($this->empresaId());
 
         $flash      = $this->getFlash();
         $meta       = $_SESSION['carrito']['meta'] ?? [];
-        $pageTitle  = 'Hacer pedido — Paso 3: Resumen';
+        $pageTitle  = 'Hacer pedido — Paso 2: Resumen';
         $activeMenu = 'carrito';
 
         ob_start();
@@ -204,33 +139,42 @@ class CarritoController extends BaseController
         require ROOT_PATH . '/app/views/empresa/layouts/main.php';
     }
 
-    // Crea el pedido en BD (POST desde paso 3)
+    // Crea el pedido en BD (POST desde resumen)
     public function confirmar(?string $p = null): void
     {
         if (!$this->isPost()) {
             $this->redirect('carrito/resumen');
         }
 
-        $items        = $_SESSION['carrito']['items'] ?? [];
-        $distribucion = $_SESSION['carrito']['distribucion'] ?? [];
+        $items = $_SESSION['carrito']['items'] ?? [];
 
-        if (empty($items) || empty($distribucion)) {
+        if (empty($items)) {
             $this->redirect('carrito/index');
         }
 
         $fechaEntrega = trim($this->post('fecha_entrega', ''));
-        $metodoPago   = $this->post('metodo_pago', 'transferencia');
         $notas        = trim($this->post('notas', ''));
+        $tipoEntrega  = $this->post('tipo_entrega');
+        $metodoPago   = $this->post('metodo_pago');
+
+        if (!in_array($tipoEntrega, ['pickup', 'repartidor'], true)) {
+            $tipoEntrega = 'pickup';
+        }
+        if (!in_array($metodoPago, ['transferencia', 'tarjeta', 'credito'], true)) {
+            $metodoPago = 'transferencia';
+        }
 
         if (empty($fechaEntrega)) {
             $this->flash('error', 'Selecciona la fecha de entrega.');
             $this->redirect('carrito/resumen');
         }
 
-        // Revalidar precios actuales
+        $compradorId = $this->usuarioId();
+
+        // Revalidar precios con precios especiales aplicados
         $itemsDB = [];
         foreach ($items as $prodId => $item) {
-            $precio = $this->productoModel->getPrecioParaCantidad((int)$prodId, $item['cantidad']);
+            $precio = $this->productoModel->getPrecioFinal($compradorId, (int)$prodId, $item['cantidad']);
             $itemsDB[] = [
                 'producto_id' => $prodId,
                 'cantidad'    => $item['cantidad'],
@@ -239,26 +183,27 @@ class CarritoController extends BaseController
             ];
         }
 
-        // Sucursales únicas involucradas
-        $sucursalesIds = [];
-        foreach ($distribucion as $distProd) {
-            foreach (array_keys($distProd) as $sucursalId) {
-                $sucursalesIds[] = (int)$sucursalId;
-            }
-        }
-
         $pedidoData = [
             'empresa_id'          => $this->empresaId(),
-            'comprador_id'        => $this->usuarioId(),
+            'comprador_id'        => $compradorId,
             'estado'              => 'pendiente',
             'requiere_aprobacion' => 0,
             'fecha_entrega'       => $fechaEntrega,
             'metodo_pago'         => $metodoPago,
+            'tipo_entrega'        => $tipoEntrega,
             'notas'               => $notas ?: null,
         ];
 
+        if ($tipoEntrega === 'repartidor') {
+            $comprador = $this->usuarioModel->find($compradorId);
+            $pedidoData['direccion_entrega']  = trim($this->post('direccion_entrega', '')) ?: ($comprador['direccion_entrega'] ?? null);
+            $pedidoData['referencia_entrega'] = trim($this->post('referencia_entrega', '')) ?: ($comprador['referencia_entrega'] ?? null);
+            $pedidoData['lat_entrega']        = $comprador['lat_entrega'] ?? null;
+            $pedidoData['lng_entrega']        = $comprador['lng_entrega'] ?? null;
+        }
+
         try {
-            $pedidoId = $this->pedidoModel->crear($pedidoData, $itemsDB, $sucursalesIds);
+            $pedidoId = $this->pedidoModel->crear($pedidoData, $itemsDB);
             $pedido   = $this->pedidoModel->find($pedidoId);
 
             $this->log('crear_pedido', 'carrito', "Pedido {$pedido['folio']} creado");
@@ -274,7 +219,7 @@ class CarritoController extends BaseController
         }
     }
 
-    // ── Paso 4: Confirmado ────────────────────────────────────────
+    // ── Paso 3: Confirmado ────────────────────────────────────────
     public function confirmado(?string $p = null): void
     {
         $folio    = $_SESSION['ultimo_folio'] ?? null;
@@ -286,6 +231,7 @@ class CarritoController extends BaseController
 
         unset($_SESSION['ultimo_folio'], $_SESSION['ultimo_pedido_id']);
 
+        $pedido     = $pedidoId ? $this->pedidoModel->find((int)$pedidoId) : null;
         $flash      = $this->getFlash();
         $pageTitle  = 'Pedido confirmado';
         $activeMenu = 'carrito';
@@ -296,9 +242,119 @@ class CarritoController extends BaseController
         require ROOT_PATH . '/app/views/empresa/layouts/main.php';
     }
 
+    // AJAX: agrega un solo producto al carrito desde el catálogo
+    public function agregarProducto(?string $p = null): void
+    {
+        header('Content-Type: application/json');
+        if (!$this->isPost()) {
+            echo json_encode(['ok' => false, 'msg' => 'Método no permitido']);
+            return;
+        }
+
+        $productoId  = (int)$this->post('producto_id');
+        $cantidad    = (float)str_replace(',', '.', $this->post('cantidad', 0));
+        $compradorId = $this->usuarioId();
+        $empresaId   = $this->empresaId();
+
+        if ($cantidad <= 0 || $productoId <= 0) {
+            echo json_encode(['ok' => false, 'msg' => 'Cantidad inválida']);
+            return;
+        }
+
+        $producto = $this->productoModel->find($productoId);
+        if (!$producto || !$producto['activo'] || (int)$producto['empresa_id'] !== $empresaId) {
+            echo json_encode(['ok' => false, 'msg' => 'Producto no disponible']);
+            return;
+        }
+
+        $carrito = $_SESSION['carrito']['items'] ?? [];
+
+        if (isset($carrito[$productoId])) {
+            $nuevaCant = $carrito[$productoId]['cantidad'] + $cantidad;
+            $precio    = $this->productoModel->getPrecioFinal($compradorId, $productoId, $nuevaCant);
+            $carrito[$productoId] = array_merge($carrito[$productoId], [
+                'cantidad' => $nuevaCant,
+                'precio'   => $precio,
+                'subtotal' => round($precio * $nuevaCant, 2),
+            ]);
+        } else {
+            $precio = $this->productoModel->getPrecioFinal($compradorId, $productoId, $cantidad);
+            $carrito[$productoId] = [
+                'producto_id'  => $productoId,
+                'nombre'       => $producto['nombre'],
+                'presentacion' => $producto['presentacion'],
+                'cantidad'     => $cantidad,
+                'precio'       => $precio,
+                'subtotal'     => round($precio * $cantidad, 2),
+            ];
+        }
+
+        $_SESSION['carrito']['items'] = $carrito;
+
+        echo json_encode([
+            'ok'          => true,
+            'msg'         => "Agregado: {$producto['nombre']}.",
+            'total_items' => count($carrito),
+        ]);
+    }
+
     public function vaciar(?string $p = null): void
     {
         $_SESSION['carrito'] = [];
+        $this->redirect('carrito/index');
+    }
+
+    public function cargarCombo(?string $p = null): void
+    {
+        if (!$this->isPost()) {
+            $this->redirect('carrito/index');
+        }
+
+        $comboId     = (int)$this->post('combo_id');
+        $compradorId = $this->usuarioId();
+        $empresaId   = $this->empresaId();
+
+        if (!$this->comboModel->perteneceAEmpresa($comboId, $empresaId) ||
+            !$this->comboModel->estaAsignadoAComprador($comboId, $compradorId)) {
+            $this->flash('error', 'Combo no disponible.');
+            $this->redirect('carrito/index');
+        }
+
+        $items = $this->comboModel->getItems($comboId);
+        if (empty($items)) {
+            $this->flash('error', 'Este combo no tiene productos.');
+            $this->redirect('carrito/index');
+        }
+
+        $carrito = $_SESSION['carrito']['items'] ?? [];
+
+        foreach ($items as $ci) {
+            $prodId   = (int)$ci['producto_id'];
+            $cantidad = (float)$ci['cantidad'];
+            $producto = $this->productoModel->find($prodId);
+            if (!$producto || !$producto['activo']) continue;
+
+            $precio = $this->productoModel->getPrecioFinal($compradorId, $prodId, $cantidad);
+
+            if (isset($carrito[$prodId])) {
+                $nuevaCant = $carrito[$prodId]['cantidad'] + $cantidad;
+                $carrito[$prodId]['cantidad'] = $nuevaCant;
+                $carrito[$prodId]['precio']   = $this->productoModel->getPrecioFinal($compradorId, $prodId, $nuevaCant);
+                $carrito[$prodId]['subtotal'] = round($carrito[$prodId]['precio'] * $nuevaCant, 2);
+            } else {
+                $carrito[$prodId] = [
+                    'producto_id'  => $prodId,
+                    'nombre'       => $producto['nombre'],
+                    'presentacion' => $producto['presentacion'],
+                    'cantidad'     => $cantidad,
+                    'precio'       => $precio,
+                    'subtotal'     => round($precio * $cantidad, 2),
+                ];
+            }
+        }
+
+        $_SESSION['carrito']['items'] = $carrito;
+        $this->flash('success', 'Combo cargado en tu pedido.');
         $this->redirect('carrito/index');
     }
 }

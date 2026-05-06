@@ -87,7 +87,7 @@ class EmpresaUsuarioController extends BaseController
         $rolInfo = $this->model->getRolPorId($rolId);
         $rolSlug = $rolInfo['slug'] ?? '';
 
-        // Si es comprador: crear su sucursal de entrega automáticamente
+        // Si es comprador: guardar dirección en usuario + crear sucursal de entrega
         if ($rolSlug === 'comprador') {
             $nombreNegocio  = trim($this->post('nombre_negocio', ''));
             $direccion      = trim($this->post('direccion_entrega', ''));
@@ -95,6 +95,15 @@ class EmpresaUsuarioController extends BaseController
             $cp             = trim($this->post('codigo_postal', ''));
             $responsable    = trim($this->post('responsable_entrega', ''));
             $horario        = trim($this->post('horario_entrega', ''));
+
+            // Guardar dirección de entrega en la columna del usuario (migration 008)
+            if ($direccion) {
+                $db = Database::getInstance();
+                $referencia = $horario ? "Horario: $horario" : null;
+                if ($responsable) $referencia = ($referencia ? $referencia . ' | ' : '') . "Recibe: $responsable";
+                $db->prepare("UPDATE usuarios SET direccion_entrega = ?, referencia_entrega = ? WHERE id = ?")
+                   ->execute([$direccion, $referencia, $usuarioId]);
+            }
 
             if ($nombreNegocio && $direccion) {
                 $dirCompleta = $direccion;
@@ -195,5 +204,58 @@ class EmpresaUsuarioController extends BaseController
         $nuevo = $usuario['activo'] ? 0 : 1;
         $this->model->update($userId, ['activo' => $nuevo]);
         $this->json(['ok' => true, 'activo' => $nuevo]);
+    }
+
+    // Precios especiales para un comprador
+    public function precios(?string $compradorId = null): void
+    {
+        $empresaId = $this->empresaId();
+        $cId       = (int)$compradorId;
+
+        $comprador = $this->model->queryOne(
+            "SELECT u.id, u.nombre, u.apellido_paterno, u.email
+               FROM usuarios u JOIN roles r ON r.id = u.rol_id
+              WHERE u.id = ? AND u.empresa_id = ? AND r.slug = 'comprador'",
+            [$cId, $empresaId]
+        );
+        if (!$comprador) {
+            $this->redirect('empresa-usuario');
+        }
+
+        $productoModel = new ProductoModel();
+
+        if ($this->isPost()) {
+            // Guardar precios especiales
+            $productosIds = (array)$this->post('producto_id', []);
+            $precios      = (array)$this->post('precio', []);
+            $activos      = (array)$this->post('activo', []);
+
+            foreach ($productosIds as $i => $pid) {
+                $pid    = (int)$pid;
+                $precio = (float)($precios[$i] ?? 0);
+                $activo = isset($activos[$i]) ? 1 : 0;
+
+                if ($pid <= 0) continue;
+
+                if ($activo && $precio > 0) {
+                    $productoModel->guardarPrecioEspecial($empresaId, $cId, $pid, $precio);
+                } elseif (!$activo) {
+                    $productoModel->eliminarPrecioEspecial($cId, $pid);
+                }
+            }
+
+            $this->flash('success', 'Precios especiales guardados correctamente.');
+            $this->redirect('empresa-usuario/precios/' . $cId);
+        }
+
+        $productos  = $productoModel->listadoParaPreciosEspeciales($empresaId, $cId);
+        $flash      = $this->getFlash();
+        $pageTitle  = 'Precios especiales — ' . $comprador['nombre'];
+        $activeMenu = 'usuarios';
+
+        ob_start();
+        require ROOT_PATH . '/app/views/empresa/usuarios/precios_comprador.php';
+        $content = ob_get_clean();
+        require ROOT_PATH . '/app/views/empresa/layouts/main.php';
     }
 }
