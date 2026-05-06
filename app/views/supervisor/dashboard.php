@@ -383,7 +383,7 @@ function periodoUrl(string $p, string $base): string {
 </div><!-- /fila 6 -->
 
 <!-- ── CHART.JS ──────────────────────────────────────────────────────────── -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://unpkg.com/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
 Chart.defaults.font.family = "'Inter', sans-serif";
 Chart.defaults.color = '#6B7280';

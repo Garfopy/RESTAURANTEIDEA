@@ -1,5 +1,5 @@
-# CarniHub — Plan v2.6.6
-**Versión:** 2.6.6 | **Fecha:** 2026-05-05 | **Stack:** PHP 8.3 · MySQL · Tailwind CDN · MVC sin framework
+# CarniHub — Plan v2.6.7
+**Versión:** 2.6.7 | **Fecha:** 2026-05-06 | **Stack:** PHP 8.3 · MySQL · Tailwind CDN · MVC sin framework
 
 ---
 
@@ -854,6 +854,8 @@ Modal "Entrada rápida IA" en /empresa-inventario
 - [x] Nuevos métodos `MovimientoInventarioModel`: `getStockActual`, `descontarStockPedido`, `entradasVsSalidasSemanal`
 - [x] Nuevo método `LogModel::getAccesosUsuario()`
 - [x] Fix fatal error: `countEntregadosHoy` usaba `updated_at` (columna inexistente); corregido a `created_at`
+- [x] Fix Chart.js: CDN `cdn.jsdelivr.net` bloqueado por CSP del servidor → cambiado a `unpkg.com` (whitelistado)
+- [x] Fix redirect post-login: supervisor aterrizaba en `empresa/dashboard`; `BaseController::redirectSegunRol()` ahora tiene caso dedicado `supervisor → supervisor/dashboard`
 
 ### Sprint 4C-3 — Portal Comprador funcional 🔄 SIGUIENTE
 - [ ] `CompradorController::inicio()` — bienvenida + últimos pedidos + acceso rápido al catálogo
@@ -1059,4 +1061,4 @@ Todos se configuran desde `/config/apis` y `/config/correo` (solo visible para s
 
 ---
 
-*Última actualización: 2026-05-05 — v2.6.6 (Sprint 4C-1 M: botones de acción contextuales · empresa_index: botón único por estado (🔍Revisar→pendiente, 💳Confirmar pago→comprobante recibido, ✓Recogido→pickup en_ruta, 📷Foto→repartidor en_ruta), elimina botón "Estado" y modalEstado de la lista · detalle.php: nueva sección "Acciones del pedido" para admin con guía contextual por estado + botones (Confirmar pago→en_ruta, Marcar recogido, Registrar entrega con foto) + cambio manual de estado en collapsible ⚙)*
+*Última actualización: 2026-05-06 — v2.6.7 (Sprint 4C-2 fixes: Chart.js CDN → unpkg.com (CSP fix) · BaseController::redirectSegunRol supervisor → supervisor/dashboard)*
