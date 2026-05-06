@@ -210,21 +210,34 @@ class CarritoController extends BaseController
             'notas'               => $notas ?: null,
         ];
 
+        // IDs de sucursales multi-parada (0, 1 o varias)
+        $sucursalesIds = [];
+
         if ($tipoEntrega === 'repartidor') {
             $comprador = $this->usuarioModel->find($compradorId);
-            $sucursalId = (int)$this->post('sucursal_id', 0);
-            if ($sucursalId > 0) {
-                // Entrega en sucursal registrada: tomar dirección de la sucursal
-                $sucursalModel = new SucursalModel();
-                $sucursal = $sucursalModel->find($sucursalId);
-                if ($sucursal && $sucursal['comprador_id'] == $compradorId) {
-                    $pedidoData['direccion_entrega']  = $sucursal['direccion'];
-                    $pedidoData['lat_entrega']         = $sucursal['lat'] ?? null;
-                    $pedidoData['lng_entrega']         = $sucursal['lng'] ?? null;
-                    $pedidoData['referencia_entrega']  = null;
+
+            // Recoger array del picker multi-parada
+            $rawIds = $_POST['sucursales_ids'] ?? [];
+            if (is_array($rawIds)) {
+                foreach ($rawIds as $sid) {
+                    $sid = (int)$sid;
+                    if ($sid > 0 && $sucursalModel->perteneceAComprador($sid, $compradorId)) {
+                        $sucursalesIds[] = $sid;
+                    }
+                }
+            }
+
+            if (!empty($sucursalesIds)) {
+                // Dirección del pedido = primera parada
+                $primera = $sucursalModel->find($sucursalesIds[0]);
+                if ($primera) {
+                    $pedidoData['direccion_entrega']  = $primera['direccion'];
+                    $pedidoData['lat_entrega']        = $primera['lat'] ?? null;
+                    $pedidoData['lng_entrega']        = $primera['lng'] ?? null;
+                    $pedidoData['referencia_entrega'] = null;
                 }
             } else {
-                // Dirección manual o del perfil
+                // Dirección manual o del perfil (sin sucursales / "Otra dirección")
                 $pedidoData['direccion_entrega']  = trim($this->post('direccion_entrega', '')) ?: ($comprador['direccion_entrega'] ?? null);
                 $pedidoData['referencia_entrega'] = trim($this->post('referencia_entrega', '')) ?: ($comprador['referencia_entrega'] ?? null);
                 $pedidoData['lat_entrega']        = $this->post('lat_entrega') ?: ($comprador['lat_entrega'] ?? null);
@@ -233,7 +246,7 @@ class CarritoController extends BaseController
         }
 
         try {
-            $pedidoId = $this->pedidoModel->crear($pedidoData, $itemsDB);
+            $pedidoId = $this->pedidoModel->crear($pedidoData, $itemsDB, $sucursalesIds);
             $pedido   = $this->pedidoModel->find($pedidoId);
 
             $this->log('crear_pedido', 'carrito', "Pedido {$pedido['folio']} creado");

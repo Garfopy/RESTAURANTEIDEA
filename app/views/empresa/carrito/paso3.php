@@ -129,61 +129,89 @@ $gmKey = $configModel->get('google_maps_key', '');
         </div>
       </div>
 
-      <!-- Bloque: Repartidor — dirección del comprador o sucursal -->
+      <!-- ── Bloque: Envío a domicilio ────────────────────────────── -->
       <div id="bloque-direccion" style="margin-bottom:14px;<?= $teActual!=='repartidor' ? 'display:none' : '' ?>">
-        <?php
-        $tieneDireccion = !empty($comprador['direccion_entrega']);
-        $tieneSucursales = !empty($misSucursales);
-        ?>
 
-        <?php if ($tieneSucursales): ?>
-        <!-- Selector de sucursal registrada -->
-        <div style="margin-bottom:10px">
-          <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:4px">Entregar en *</label>
-          <div style="display:flex;flex-direction:column;gap:6px" id="opciones-destino">
-            <!-- Opción: mis sucursales -->
-            <?php foreach ($misSucursales as $suc): ?>
-            <label style="cursor:pointer;border:1px solid #E5E7EB;border-radius:8px;padding:10px 12px;display:flex;align-items:flex-start;gap:10px;transition:border-color .15s" class="card-sucursal">
-              <input type="radio" name="sucursal_id" value="<?= $suc['id'] ?>"
-                     data-dir="<?= htmlspecialchars($suc['direccion']) ?>"
-                     data-lat="<?= (float)($suc['lat'] ?? 0) ?>"
-                     data-lng="<?= (float)($suc['lng'] ?? 0) ?>"
-                     style="margin-top:2px;accent-color:var(--color-primary)">
-              <div>
-                <div style="font-size:.85rem;font-weight:700;color:#111827"><?= htmlspecialchars($suc['nombre']) ?></div>
-                <div style="font-size:.78rem;color:#6B7280"><?= htmlspecialchars($suc['direccion']) ?></div>
-                <?php if (!empty($suc['responsable'])): ?>
-                <div style="font-size:.75rem;color:#9CA3AF">Resp: <?= htmlspecialchars($suc['responsable']) ?></div>
-                <?php endif; ?>
+        <?php if (!empty($misSucursales)): ?>
+        <!-- ── MODO MULTI-PARADA (tiene sucursales registradas) ──── -->
+        <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:6px">
+          Paradas de entrega *
+          <span style="font-size:.72rem;font-weight:400;color:#9CA3AF"> — el repartidor visita cada parada</span>
+        </label>
+
+        <!-- Lista de paradas añadidas -->
+        <div id="lista-paradas" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px"></div>
+
+        <!-- Estado vacío -->
+        <div id="paradas-empty" style="border:1.5px dashed #D1D5DB;border-radius:8px;padding:14px 12px;text-align:center;color:#9CA3AF;font-size:.8rem;margin-bottom:8px">
+          Añade al menos una parada de entrega
+        </div>
+
+        <!-- Botones para añadir -->
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+          <div style="position:relative">
+            <button type="button" id="btn-toggle-dropdown"
+                    style="padding:7px 14px;background:#F3F4F6;border:1px solid #D1D5DB;border-radius:8px;font-size:.82rem;font-weight:600;color:#374151;cursor:pointer">
+              + Añadir sucursal ▾
+            </button>
+            <!-- Dropdown de sucursales disponibles -->
+            <div id="dropdown-sucursales"
+                 style="display:none;position:absolute;top:100%;left:0;margin-top:4px;background:#fff;border:1px solid #E5E7EB;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.12);z-index:50;min-width:260px;overflow:hidden">
+              <?php foreach ($misSucursales as $suc): ?>
+              <div class="suc-option" data-id="<?= $suc['id'] ?>"
+                   data-nombre="<?= htmlspecialchars($suc['nombre'], ENT_QUOTES) ?>"
+                   data-dir="<?= htmlspecialchars($suc['direccion'], ENT_QUOTES) ?>"
+                   data-lat="<?= (float)($suc['lat'] ?? 0) ?>"
+                   data-lng="<?= (float)($suc['lng'] ?? 0) ?>"
+                   style="padding:10px 14px;cursor:pointer;border-bottom:1px solid #F3F4F6;font-size:.85rem">
+                <div style="font-weight:700;color:#111827"><?= htmlspecialchars($suc['nombre']) ?></div>
+                <div style="font-size:.75rem;color:#6B7280"><?= htmlspecialchars($suc['direccion']) ?></div>
               </div>
-            </label>
-            <?php endforeach; ?>
-            <!-- Opción: otra dirección -->
-            <label style="cursor:pointer;border:1px solid #E5E7EB;border-radius:8px;padding:10px 12px;display:flex;align-items:center;gap:10px" class="card-sucursal">
-              <input type="radio" name="sucursal_id" value="" id="radio-otra-dir"
-                     style="accent-color:var(--color-primary)" <?= !$tieneDireccion ? 'checked' : '' ?>>
-              <div>
-                <div style="font-size:.85rem;font-weight:700;color:#111827">Otra dirección</div>
-                <div style="font-size:.78rem;color:#6B7280">Ingresar dirección manual</div>
+              <?php endforeach; ?>
+              <div id="dropdown-vacio" style="display:none;padding:10px 14px;font-size:.8rem;color:#9CA3AF;text-align:center">
+                Ya añadiste todas tus sucursales
               </div>
-            </label>
+            </div>
           </div>
+
+          <button type="button" id="btn-add-manual"
+                  style="padding:7px 14px;background:#F3F4F6;border:1px solid #D1D5DB;border-radius:8px;font-size:.82rem;font-weight:600;color:#374151;cursor:pointer">
+            + Otra dirección
+          </button>
         </div>
 
-        <!-- Mapa de la sucursal seleccionada -->
-        <?php if ($gmKey): ?>
-        <div id="mapa-sucursal-container" style="border-radius:8px;overflow:hidden;height:160px;margin-bottom:10px;border:1px solid #E5E7EB;display:none">
-          <div id="mapa-sucursal" style="width:100%;height:100%"></div>
+        <!-- Formulario dirección manual (oculto por defecto) -->
+        <div id="panel-dir-manual" style="display:none;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px;padding:12px;margin-bottom:8px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <span style="font-size:.8rem;font-weight:700;color:#374151">Otra dirección de entrega</span>
+            <button type="button" id="btn-remove-manual"
+                    style="background:none;border:none;color:#EF4444;font-size:.8rem;font-weight:700;cursor:pointer">× Quitar</button>
+          </div>
+          <?php if ($gmKey): ?>
+          <input type="text" id="input-dir-checkout" name="direccion_entrega"
+                 placeholder="Escribe para buscar con Google Maps..."
+                 value="<?= htmlspecialchars($comprador['direccion_entrega'] ?? '') ?>"
+                 autocomplete="off"
+                 style="width:100%;padding:8px 10px;border:1px solid #D1D5DB;border-radius:8px;font-size:.85rem;box-sizing:border-box;margin-bottom:6px">
+          <?php else: ?>
+          <textarea name="direccion_entrega" id="input-dir-checkout" rows="2"
+                    placeholder="Calle, colonia, municipio..."
+                    style="width:100%;padding:8px 10px;border:1px solid #D1D5DB;border-radius:8px;font-size:.85rem;resize:none;box-sizing:border-box;margin-bottom:6px"><?= htmlspecialchars($comprador['direccion_entrega'] ?? '') ?></textarea>
+          <?php endif; ?>
+          <input type="text" name="referencia_entrega" id="input-ref-checkout"
+                 placeholder="Ej: Interior 3B, portón negro..."
+                 value="<?= htmlspecialchars($comprador['referencia_entrega'] ?? '') ?>"
+                 style="width:100%;padding:8px 10px;border:1px solid #D1D5DB;border-radius:8px;font-size:.85rem;box-sizing:border-box">
+          <input type="hidden" name="lat_entrega" id="input-lat-checkout" value="<?= htmlspecialchars($comprador['lat_entrega'] ?? '') ?>">
+          <input type="hidden" name="lng_entrega" id="input-lng-checkout" value="<?= htmlspecialchars($comprador['lng_entrega'] ?? '') ?>">
         </div>
-        <?php endif; ?>
 
-        <!-- Campos de dirección manual (se muestra solo si elige "Otra dirección") -->
-        <div id="bloque-dir-manual" style="<?= $tieneSucursales ? 'display:none' : '' ?>">
-        <?php endif; ?>
+        <!-- Inputs ocultos: IDs de sucursales añadidas (JS los genera) -->
+        <div id="hidden-sucursales-ids"></div>
 
-        <?php if (!$tieneSucursales): ?>
-        <!-- Sin sucursales: muestra dirección del perfil o campos manuales -->
-        <?php if ($tieneDireccion): ?>
+        <?php else: ?>
+        <!-- ── MODO DIRECCIÓN ÚNICA (sin sucursales registradas) ──── -->
+        <?php if (!empty($comprador['direccion_entrega'])): ?>
         <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:10px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
           <div>
             <div style="font-size:.75rem;font-weight:700;color:#1E40AF;margin-bottom:2px">DIRECCIÓN GUARDADA EN TU PERFIL</div>
@@ -196,53 +224,53 @@ $gmKey = $configModel->get('google_maps_key', '');
         </div>
         <input type="hidden" name="direccion_entrega" id="hidden-dir" value="<?= htmlspecialchars($comprador['direccion_entrega'] ?? '') ?>">
         <input type="hidden" name="referencia_entrega" id="hidden-ref" value="<?= htmlspecialchars($comprador['referencia_entrega'] ?? '') ?>">
+        <input type="hidden" name="lat_entrega" id="input-lat-checkout" value="<?= htmlspecialchars($comprador['lat_entrega'] ?? '') ?>">
+        <input type="hidden" name="lng_entrega" id="input-lng-checkout" value="<?= htmlspecialchars($comprador['lng_entrega'] ?? '') ?>">
         <div id="edit-direccion" style="display:none">
         <?php endif; ?>
+
+        <!-- Campos manuales -->
+        <?php if ($gmKey): ?>
+        <input type="text" id="input-dir-checkout"
+               name="<?= !empty($comprador['direccion_entrega']) ? 'direccion_entrega_edit' : 'direccion_entrega' ?>"
+               placeholder="Escribe para buscar con Google Maps..."
+               value="<?= htmlspecialchars($comprador['direccion_entrega'] ?? '') ?>"
+               autocomplete="off"
+               style="width:100%;padding:8px 10px;border:1px solid #D1D5DB;border-radius:8px;font-size:.85rem;box-sizing:border-box;margin-bottom:6px"
+               <?= empty($comprador['direccion_entrega']) && $teActual==='repartidor' ? 'required' : '' ?>>
+        <?php else: ?>
+        <textarea name="<?= !empty($comprador['direccion_entrega']) ? 'direccion_entrega_edit' : 'direccion_entrega' ?>"
+                  id="input-dir-checkout" rows="2"
+                  placeholder="Calle, colonia, municipio..."
+                  style="width:100%;padding:8px 10px;border:1px solid #D1D5DB;border-radius:8px;font-size:.85rem;resize:none;box-sizing:border-box;margin-bottom:6px"
+                  <?= empty($comprador['direccion_entrega']) && $teActual==='repartidor' ? 'required' : '' ?>><?= htmlspecialchars($comprador['direccion_entrega'] ?? '') ?></textarea>
+        <?php endif; ?>
+        <input type="text"
+               name="<?= !empty($comprador['direccion_entrega']) ? 'referencia_entrega_edit' : 'referencia_entrega' ?>"
+               id="input-ref-checkout"
+               placeholder="Ej: Interior 3B, edificio azul..."
+               value="<?= htmlspecialchars($comprador['referencia_entrega'] ?? '') ?>"
+               style="width:100%;padding:8px 10px;border:1px solid #D1D5DB;border-radius:8px;font-size:.85rem;box-sizing:border-box">
+        <?php if (!empty($comprador['lat_entrega']) && empty($comprador['direccion_entrega']) === false): ?>
+        <input type="hidden" name="lat_entrega" id="input-lat-checkout" value="<?= htmlspecialchars($comprador['lat_entrega'] ?? '') ?>">
+        <input type="hidden" name="lng_entrega" id="input-lng-checkout" value="<?= htmlspecialchars($comprador['lng_entrega'] ?? '') ?>">
+        <?php else: ?>
+        <input type="hidden" name="lat_entrega" id="input-lat-checkout" value="">
+        <input type="hidden" name="lng_entrega" id="input-lng-checkout" value="">
         <?php endif; ?>
 
-          <!-- Campos manuales de dirección -->
-          <div style="margin-bottom:8px">
-            <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:3px">Dirección de entrega *</label>
-            <?php if ($gmKey && !$tieneSucursales): ?>
-            <input type="text" id="input-dir-checkout"
-                   name="<?= ($tieneDireccion && !$tieneSucursales) ? 'direccion_entrega_edit' : 'direccion_entrega' ?>"
-                   id="input-dir"
-                   placeholder="Escribe para buscar con Google Maps..."
-                   value="<?= htmlspecialchars($comprador['direccion_entrega'] ?? '') ?>"
-                   style="width:100%;padding:8px 10px;border:1px solid #D1D5DB;border-radius:8px;font-size:.85rem"
-                   autocomplete="off"
-                   <?= (!$tieneDireccion && $teActual==='repartidor') ? 'required' : '' ?>>
-            <?php else: ?>
-            <textarea name="<?= ($tieneDireccion && !$tieneSucursales) ? 'direccion_entrega_edit' : 'direccion_entrega' ?>" id="input-dir"
-                      rows="2" placeholder="Calle, colonia, municipio..."
-                      style="width:100%;padding:8px 10px;border:1px solid #D1D5DB;border-radius:8px;font-size:.85rem;resize:none"
-                      <?= (!$tieneDireccion && $teActual==='repartidor') ? 'required' : '' ?>><?= htmlspecialchars($comprador['direccion_entrega'] ?? '') ?></textarea>
-            <?php endif; ?>
-          </div>
-          <div>
-            <label style="font-size:.8rem;font-weight:600;color:#374151;display:block;margin-bottom:3px">Referencia / número interior</label>
-            <input type="text" name="<?= ($tieneDireccion && !$tieneSucursales) ? 'referencia_entrega_edit' : 'referencia_entrega' ?>" id="input-ref"
-                   placeholder="Ej: Interior 3B, edificio azul..."
-                   value="<?= htmlspecialchars($comprador['referencia_entrega'] ?? '') ?>"
-                   style="width:100%;padding:8px 10px;border:1px solid #D1D5DB;border-radius:8px;font-size:.85rem">
-          </div>
-          <input type="hidden" name="lat_entrega" id="input-lat-checkout" value="<?= htmlspecialchars($comprador['lat_entrega'] ?? '') ?>">
-          <input type="hidden" name="lng_entrega" id="input-lng-checkout" value="<?= htmlspecialchars($comprador['lng_entrega'] ?? '') ?>">
-
-        <?php if (!$tieneSucursales && $tieneDireccion): ?>
+        <?php if (!empty($comprador['direccion_entrega'])): ?>
         </div><!-- /edit-direccion -->
         <?php endif; ?>
 
-        <?php if ($tieneSucursales): ?>
-        </div><!-- /bloque-dir-manual -->
-        <?php endif; ?>
-
-        <?php if (!$tieneDireccion && !$tieneSucursales): ?>
+        <?php if (empty($comprador['direccion_entrega'])): ?>
         <div style="font-size:.75rem;color:#6B7280;margin-top:6px">
-          Puedes guardar tu dirección en tu <a href="<?= BASE_URL ?>cuenta/perfil" target="_blank" style="color:var(--color-primary)">perfil</a> para futuros pedidos.
+          Guarda tu dirección en tu <a href="<?= BASE_URL ?>cuenta/perfil" target="_blank" style="color:var(--color-primary)">perfil</a> para futuros pedidos.
         </div>
         <?php endif; ?>
-      </div>
+        <?php endif; // fin sin sucursales ?>
+
+      </div><!-- /bloque-direccion -->
 
       <!-- Notas -->
       <div style="margin-bottom:18px">
@@ -254,15 +282,25 @@ $gmKey = $configModel->get('google_maps_key', '');
                   style="width:100%;padding:9px 12px;border:1px solid #D1D5DB;border-radius:8px;font-size:.875rem;resize:vertical"><?= htmlspecialchars($metaSaved['notas'] ?? '') ?></textarea>
       </div>
 
-      <!-- Total -->
-      <div style="background:#F9FAFB;border-radius:8px;padding:14px;margin-bottom:16px;text-align:center">
-        <div style="font-size:.8rem;color:#6B7280;margin-bottom:4px">Total del pedido</div>
-        <div style="font-size:1.8rem;font-weight:800;color:var(--color-primary)">$<?= number_format($total, 2) ?></div>
-        <div style="font-size:.72rem;color:#9CA3AF;margin-top:2px">El proveedor puede ajustar precios al aprobar tu pedido</div>
+      <!-- Total + costo envío -->
+      <div style="background:#F9FAFB;border-radius:8px;padding:14px;margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;font-size:.82rem;color:#6B7280;margin-bottom:6px">
+          <span>Subtotal productos</span>
+          <span>$<?= number_format($total, 2) ?></span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:.82rem;color:#9CA3AF;margin-bottom:10px" id="fila-envio">
+          <span>Costo de envío</span>
+          <span id="txt-costo-envio">— La empresa lo asigna —</span>
+        </div>
+        <div style="border-top:1px solid #E5E7EB;padding-top:10px;text-align:center">
+          <div style="font-size:.8rem;color:#6B7280;margin-bottom:2px">Total del pedido</div>
+          <div style="font-size:1.8rem;font-weight:800;color:var(--color-primary)">$<?= number_format($total, 2) ?></div>
+          <div style="font-size:.72rem;color:#9CA3AF;margin-top:2px">El costo de envío se confirma al aprobar</div>
+        </div>
       </div>
 
       <div style="display:flex;flex-direction:column;gap:8px">
-        <button type="submit" style="padding:12px;background:var(--color-primary);color:#fff;border:none;border-radius:8px;font-weight:700;font-size:.9rem;cursor:pointer;width:100%">
+        <button type="submit" id="btn-confirmar" style="padding:12px;background:var(--color-primary);color:#fff;border:none;border-radius:8px;font-weight:700;font-size:.9rem;cursor:pointer;width:100%">
           Confirmar pedido
         </button>
         <a href="<?= BASE_URL ?>carrito/index" style="text-align:center;padding:10px;background:#F3F4F6;color:#374151;border-radius:8px;text-decoration:none;font-weight:600;font-size:.875rem">
@@ -277,109 +315,208 @@ $gmKey = $configModel->get('google_maps_key', '');
 (function () {
   var primary = getComputedStyle(document.documentElement).getPropertyValue('--color-primary').trim() || '#DC2626';
 
+  // ── Tipo de entrega cards ─────────────────────────────────────────────
   function actualizarCards() {
     var val = document.querySelector('[name="tipo_entrega"]:checked')?.value;
     ['pickup','repartidor'].forEach(function(v) {
       var card = document.getElementById('card-' + v);
       if (!card) return;
       var sel = (val === v);
-      card.style.borderColor  = sel ? primary : '#E5E7EB';
-      card.style.background   = sel ? '#FFF5F5' : '#fff';
+      card.style.borderColor = sel ? primary : '#E5E7EB';
+      card.style.background  = sel ? '#FFF5F5' : '#fff';
     });
-    document.getElementById('bloque-pickup').style.display    = (val === 'pickup')     ? '' : 'none';
-    document.getElementById('bloque-direccion').style.display = (val === 'repartidor') ? '' : 'none';
+    var bPickup = document.getElementById('bloque-pickup');
+    var bDir    = document.getElementById('bloque-direccion');
+    if (bPickup) bPickup.style.display = (val === 'pickup')     ? '' : 'none';
+    if (bDir)    bDir.style.display    = (val === 'repartidor') ? '' : 'none';
   }
-
   document.querySelectorAll('[name="tipo_entrega"]').forEach(function(r) {
     r.addEventListener('change', actualizarCards);
     r.closest('label').addEventListener('click', function() { r.checked = true; actualizarCards(); });
   });
-
   actualizarCards();
 
-  // ── Selector de sucursal ──────────────────────────────────────────
-  var mapaSucursal = null, markerSucursal = null;
-
-  document.querySelectorAll('[name="sucursal_id"]').forEach(function(radio) {
-    radio.addEventListener('change', function() {
-      var dir = this.dataset.dir || '';
-      var lat = parseFloat(this.dataset.lat || 0);
-      var lng = parseFloat(this.dataset.lng || 0);
-      var esOtra = this.id === 'radio-otra-dir' || this.value === '';
-
-      // Mostrar/ocultar dirección manual
-      var bloqueManual = document.getElementById('bloque-dir-manual');
-      if (bloqueManual) bloqueManual.style.display = esOtra ? '' : 'none';
-
-      // Estilo borde tarjetas sucursal
-      document.querySelectorAll('.card-sucursal').forEach(function(c) {
-        c.style.borderColor = '#E5E7EB';
-        c.style.background = '#fff';
-      });
-      this.closest('.card-sucursal').style.borderColor = primary;
-      this.closest('.card-sucursal').style.background = '#FFF5F5';
-
-      // Mapa de sucursal seleccionada
-      var mapaContainer = document.getElementById('mapa-sucursal-container');
-      if (mapaContainer && !esOtra && lat && lng && typeof google !== 'undefined') {
-        mapaContainer.style.display = '';
-        var pos = { lat: lat, lng: lng };
-        if (!mapaSucursal) {
-          mapaSucursal = new google.maps.Map(document.getElementById('mapa-sucursal'), {
-            center: pos, zoom: 15, mapTypeControl: false, streetViewControl: false
-          });
-          markerSucursal = new google.maps.Marker({ position: pos, map: mapaSucursal });
-        } else {
-          mapaSucursal.setCenter(pos);
-          markerSucursal.setPosition(pos);
-        }
-      } else if (mapaContainer) {
-        mapaContainer.style.display = 'none';
-      }
-
-      // Llenar lat/lng del checkout con los de la sucursal
-      var latEl = document.getElementById('input-lat-checkout');
-      var lngEl = document.getElementById('input-lng-checkout');
-      if (latEl && lngEl) {
-        latEl.value = esOtra ? '' : lat;
-        lngEl.value = esOtra ? '' : lng;
-      }
-    });
-  });
-
-  // ── Editar dirección guardada ──────────────────────────────────────
+  // ── Editar dirección guardada (modo sin sucursales) ───────────────────
   window.toggleEditDireccion = function() {
-    var ed  = document.getElementById('edit-direccion');
-    var hd  = document.getElementById('hidden-dir');
-    var hr  = document.getElementById('hidden-ref');
-    var inp = document.getElementById('input-dir');
-    var inr = document.getElementById('input-ref');
+    var ed = document.getElementById('edit-direccion');
+    var hd = document.getElementById('hidden-dir');
+    var hr = document.getElementById('hidden-ref');
     if (!ed || !hd) return;
     var visible = ed.style.display !== 'none';
     ed.style.display = visible ? 'none' : '';
-    if (!visible) {
-      hd.disabled = true;
-      if (hr) hr.disabled = true;
-      if (inp) inp.name = 'direccion_entrega';
-      if (inr) inr.name = 'referencia_entrega';
-    } else {
-      hd.disabled = false;
-      if (hr) hr.disabled = false;
-      if (inp) inp.name = 'direccion_entrega_edit';
-      if (inr) inr.name = 'referencia_entrega_edit';
-    }
+    hd.disabled = !visible;
+    if (hr) hr.disabled = !visible;
   };
 
-  // ── Google Maps Autocomplete (checkout — dirección manual) ─────────
+  // ── Multi-parada (solo si hay sucursales registradas) ─────────────────
+  var listaParadas  = document.getElementById('lista-paradas');
+  if (!listaParadas) return; // modo sin sucursales, salir
+
+  var paradasEmpty  = document.getElementById('paradas-empty');
+  var hiddenCont    = document.getElementById('hidden-sucursales-ids');
+  var btnToggle     = document.getElementById('btn-toggle-dropdown');
+  var dropdown      = document.getElementById('dropdown-sucursales');
+  var dropdownVacio = document.getElementById('dropdown-vacio');
+  var btnAddManual  = document.getElementById('btn-add-manual');
+  var panelManual   = document.getElementById('panel-dir-manual');
+  var btnRemManual  = document.getElementById('btn-remove-manual');
+
+  // Estado
+  var paradasIds = []; // array de sucursal_id (enteros)
+  var manualActivo = false;
+
+  // Abrir/cerrar dropdown sucursales
+  btnToggle.addEventListener('click', function(e) {
+    e.stopPropagation();
+    dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+  });
+  document.addEventListener('click', function() {
+    if (dropdown) dropdown.style.display = 'none';
+  });
+  dropdown.addEventListener('click', function(e) { e.stopPropagation(); });
+
+  // Añadir sucursal desde dropdown
+  dropdown.querySelectorAll('.suc-option').forEach(function(opt) {
+    opt.addEventListener('click', function() {
+      var id     = parseInt(this.dataset.id);
+      var nombre = this.dataset.nombre;
+      var dir    = this.dataset.dir;
+      var lat    = parseFloat(this.dataset.lat) || 0;
+      var lng    = parseFloat(this.dataset.lng) || 0;
+      if (paradasIds.indexOf(id) !== -1) return; // ya añadida
+      paradasIds.push(id);
+      agregarParadaUI(id, nombre, dir, lat, lng);
+      actualizarDropdown();
+      sincronizarHiddens();
+      dropdown.style.display = 'none';
+    });
+  });
+
+  // Añadir dirección manual
+  btnAddManual.addEventListener('click', function() {
+    if (manualActivo) return;
+    manualActivo = true;
+    panelManual.style.display = '';
+    btnAddManual.disabled = true;
+    btnAddManual.style.opacity = '.4';
+    paradasEmpty.style.display = 'none';
+  });
+
+  // Quitar dirección manual
+  if (btnRemManual) {
+    btnRemManual.addEventListener('click', function() {
+      manualActivo = false;
+      panelManual.style.display = 'none';
+      btnAddManual.disabled = false;
+      btnAddManual.style.opacity = '1';
+      // Limpiar campos manuales
+      var dirInput = document.getElementById('input-dir-checkout');
+      var refInput = document.getElementById('input-ref-checkout');
+      if (dirInput) dirInput.value = '';
+      if (refInput) refInput.value = '';
+      var latEl = document.getElementById('input-lat-checkout');
+      var lngEl = document.getElementById('input-lng-checkout');
+      if (latEl) latEl.value = '';
+      if (lngEl) lngEl.value = '';
+      actualizarEmptyState();
+    });
+  }
+
+  function agregarParadaUI(id, nombre, dir, lat, lng) {
+    var item = document.createElement('div');
+    item.className  = 'parada-item';
+    item.dataset.id = id;
+    item.style.cssText = 'border:1px solid #E5E7EB;border-radius:8px;padding:10px 12px;display:flex;align-items:flex-start;gap:8px;background:#fff';
+    var num = paradasIds.indexOf(id) + 1;
+    item.innerHTML =
+      '<div style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:var(--color-primary);color:#fff;font-size:.7rem;font-weight:700;display:flex;align-items:center;justify-content:center">' + num + '</div>' +
+      '<div style="flex:1;min-width:0">' +
+        '<div style="font-size:.85rem;font-weight:700;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + htmlEsc(nombre) + '</div>' +
+        '<div style="font-size:.75rem;color:#6B7280;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + htmlEsc(dir) + '</div>' +
+      '</div>' +
+      '<button type="button" data-rm="' + id + '" style="background:none;border:none;color:#9CA3AF;font-size:1rem;cursor:pointer;padding:0;line-height:1;flex-shrink:0">×</button>';
+    item.querySelector('[data-rm]').addEventListener('click', function() {
+      quitarParada(parseInt(this.dataset.rm));
+    });
+    listaParadas.appendChild(item);
+    paradasEmpty.style.display = 'none';
+  }
+
+  function quitarParada(id) {
+    var idx = paradasIds.indexOf(id);
+    if (idx === -1) return;
+    paradasIds.splice(idx, 1);
+    // Quitar del DOM
+    var item = listaParadas.querySelector('[data-id="' + id + '"]');
+    if (item) item.remove();
+    // Renumerar
+    listaParadas.querySelectorAll('.parada-item').forEach(function(el, i) {
+      var badge = el.querySelector('div[style*="border-radius:50%"]');
+      if (badge) badge.textContent = i + 1;
+    });
+    actualizarDropdown();
+    sincronizarHiddens();
+    actualizarEmptyState();
+  }
+
+  function actualizarDropdown() {
+    var alguno = false;
+    dropdown.querySelectorAll('.suc-option').forEach(function(opt) {
+      var id = parseInt(opt.dataset.id);
+      var usada = paradasIds.indexOf(id) !== -1;
+      opt.style.display = usada ? 'none' : '';
+      if (!usada) alguno = true;
+    });
+    if (dropdownVacio) dropdownVacio.style.display = alguno ? 'none' : '';
+    btnToggle.disabled = !alguno && !dropdownVacio;
+  }
+
+  function sincronizarHiddens() {
+    hiddenCont.innerHTML = '';
+    paradasIds.forEach(function(id) {
+      var inp = document.createElement('input');
+      inp.type  = 'hidden';
+      inp.name  = 'sucursales_ids[]';
+      inp.value = id;
+      hiddenCont.appendChild(inp);
+    });
+  }
+
+  function actualizarEmptyState() {
+    var hayParadas = paradasIds.length > 0 || manualActivo;
+    paradasEmpty.style.display = hayParadas ? 'none' : '';
+  }
+
+  // Validar al enviar: al menos una parada si es repartidor
+  document.getElementById('form-pedido').addEventListener('submit', function(e) {
+    var te = document.querySelector('[name="tipo_entrega"]:checked');
+    if (!te || te.value !== 'repartidor') return;
+    if (paradasIds.length === 0 && !manualActivo) {
+      e.preventDefault();
+      paradasEmpty.style.borderColor = '#EF4444';
+      paradasEmpty.style.color = '#EF4444';
+      paradasEmpty.textContent = 'Añade al menos una parada de entrega antes de confirmar';
+      paradasEmpty.style.display = '';
+      paradasEmpty.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  });
+
+  function htmlEsc(str) {
+    var d = document.createElement('div');
+    d.appendChild(document.createTextNode(str));
+    return d.innerHTML;
+  }
+
+  // ── Google Maps Autocomplete (campo dirección manual) ─────────────────
   window.initGoogleMapsCheckout = function() {
     var inputDir = document.getElementById('input-dir-checkout');
-    if (!inputDir) return;
-    var autocomplete = new google.maps.places.Autocomplete(inputDir, {
+    if (!inputDir || typeof google === 'undefined') return;
+    var ac = new google.maps.places.Autocomplete(inputDir, {
       componentRestrictions: { country: 'mx' },
       fields: ['geometry', 'formatted_address'],
     });
-    autocomplete.addListener('place_changed', function() {
-      var place = autocomplete.getPlace();
+    ac.addListener('place_changed', function() {
+      var place = ac.getPlace();
       if (!place.geometry) return;
       var pos = place.geometry.location;
       var latEl = document.getElementById('input-lat-checkout');

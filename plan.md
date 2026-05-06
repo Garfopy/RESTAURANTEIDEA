@@ -865,59 +865,85 @@ Modal "Entrada rápida IA" en /empresa-inventario
 - [x] Fix Chart.js final: `unpkg.com` tampoco servía el archivo → Chart.js descargado localmente a `public/js/chart.min.js`, script tag usa `BASE_URL` (served from 'self', sin CSP)
 - [x] Fix redirect post-login: supervisor aterrizaba en `empresa/dashboard`; `BaseController::redirectSegunRol()` ahora tiene caso dedicado `supervisor → supervisor/dashboard`
 
-### Sprint 4C-3 — Portal Comprador + Sucursales Multi-Destino + Google Maps 🔄 EN CURSO (rama 4C-3)
-> El portal del comprador ya estaba funcional. Este sprint agrega sucursales propias del comprador, Google Maps para ubicación, y simplifica los métodos de pago.
+### Sprint 4C-3 — Portal Comprador + Sucursales Multi-Destino + Google Maps ✅ COMPLETADO (rama 4C-3)
+> El portal del comprador ya estaba funcional. Este sprint agrega sucursales propias del comprador, Google Maps para ubicación, checkout multi-parada y simplifica los métodos de pago.
 
-**Estado actual (2026-05-06):**
+**Implementado:**
 - [x] `migrations/012_sucursales_comprador.sql` — ADD comprador_id a sucursales, CREATE pedido_sucursal_detalle, seed demo
 - [x] `SucursalModel` — getByComprador, getByEmpresa, contarPorComprador, crear, actualizar, toggleActivo, perteneceAComprador
-- [x] `CompradorSucursalController` — index, nueva, guardar, editar, actualizar, toggleActivo (con verificación de límite del plan)
+- [x] `CompradorSucursalController` — CRUD con límite de plan (Básico 3 / Pro 10 / Empresa ilimitado)
 - [x] `comprador/sucursales/index.php` — cards con mapa embed, barra de uso del plan (X/Y)
-- [x] `comprador/sucursales/form.php` — Google Maps Places Autocomplete + mapa interactivo con pin arrastrable
-- [x] Sidebar comprador: "Mis sucursales" con badge "X/Y" (sección nueva "Mis ubicaciones")
+- [x] `comprador/sucursales/form.php` — Google Maps Places Autocomplete + pin arrastrable
+- [x] Sidebar comprador: "Mis sucursales" con badge "X/Y"
 - [x] `index.php` — ruta `comprador-sucursal → CompradorSucursalController`
-- [x] `paso3.php` — selector de sucursal al elegir "Envío a domicilio"; mapa por sucursal seleccionada; Google Maps Autocomplete para dirección manual
-- [x] `paso3.php` — métodos de pago: solo `transferencia` y `efectivo` (eliminados tarjeta/credito)
-- [x] `CarritoController::confirmar()` — maneja sucursal_id (toma dirección/lat/lng de la sucursal); acepta efectivo como método de pago
-- [x] `perfil.php` — Google Maps Places Autocomplete + mapa interactivo para guardar dirección de entrega con coordenadas
+- [x] `paso3.php` — **picker multi-parada**: botón "+ Añadir sucursal" con dropdown, previene duplicados, botón "× quitar", numeración de paradas; validación al enviar (mínimo 1 parada)
+- [x] `paso3.php` — "+ Otra dirección" (solo 1, manual con Autocomplete Google Maps)
+- [x] `paso3.php` — costo de envío visible "La empresa lo asigna" (se fija al aprobar el pedido)
+- [x] `paso3.php` — métodos de pago: solo `transferencia` y `efectivo`
+- [x] `CarritoController::confirmar()` — acepta `sucursales_ids[]` (array multi-parada), pasa a `PedidoModel::crear()`, dirección del pedido = primera parada
+- [x] `perfil.php` — Google Maps Autocomplete + mapa interactivo para guardar lat/lng
 
-**Pendiente de este sprint:**
-- [ ] Correr `migrations/012_sucursales_comprador.sql` en producción
-- [ ] Configurar Google Maps API key en superadmin → /config/apis → campo `google_maps_key`
-  - Habilitar: Maps JavaScript API + Places API en console.cloud.google.com
-  - Restricción HTTP referrer: `*.tudominio.com/*`
-- [ ] Verificar flujo completo: catálogo → carrito → seleccionar sucursal → confirmar → detalle del pedido
-- [ ] `pedido_sucursal_detalle` — distribución por producto por sucursal (Parte C — futuro si se necesita multi-producto)
+**Pendiente de producción:**
+- [ ] Correr `migrations/012_sucursales_comprador.sql` en BD de producción
+- [ ] Configurar Google Maps API key (ver instrucciones abajo)
+- [ ] Verificar flujo: catálogo → carrito → checkout multi-parada → confirmar → admin ve pedido_sucursal
 
 **Modelo de negocio implementado:**
 ```
 Comprador "Taquería El Buen Sabor"
-    ├── Sucursal Norte (lat/lng confirmado en Google Maps)
-    ├── Sucursal Sur   (lat/lng confirmado en Google Maps)
-    └── Cocina Central (lat/lng confirmado en Google Maps)
+    ├── Cocina Central  (lat/lng guardado)
+    ├── Sucursal Centro (lat/lng guardado)
+    └── Sucursal Norte  (lat/lng guardado)
 
-Al hacer pedido → elige tipo_entrega:
-  🏭 Pickup → dirección fiscal de la empresa
-  🚚 Envío → selecciona una sucursal registrada (o dirección manual)
+Al hacer pedido → tipo_entrega = repartidor:
+  → Picker multi-parada: + Añadir sucursal (sin duplicados)
+  → Repartidor hace 1 ruta con N paradas, pago único
+  → pedido_sucursal: 1 registro por parada seleccionada
 ```
 
-**Google Maps — Setup (hacer antes de usar):**
+**Google Maps — Setup completo:**
 ```
-1. console.cloud.google.com → Enable: Maps JavaScript API + Places API
-2. Credentials → Create API Key → HTTP referrer restriction
-3. CarniHub: superadmin → /config/apis → campo "Google Maps API Key"
-   (se guarda como google_maps_key en global_settings)
+1. Ir a console.cloud.google.com
+2. Menú → APIs & Services → Library
+   - Buscar y habilitar: "Maps JavaScript API"
+   - Buscar y habilitar: "Places API"
+3. APIs & Services → Credentials → + Create Credentials → API Key
+4. Editar la key → HTTP referrers → añadir:
+   - https://tudominio.com/*
+   - http://localhost/*   (para pruebas locales)
+5. Copiar la key
+6. En CarniHub: iniciar sesión como superadmin
+   → /config/apis → campo "Google Maps API Key" → Guardar
+   (se guarda en global_settings como google_maps_key)
+7. Verificar: ir a /comprador-sucursal/nueva → debe aparecer el buscador de dirección
 ```
-> Sin la key configurada el sistema funciona igual pero sin autocomplete/mapa (degradación elegante).
+> cPanel no afecta esto: Google Maps es client-side (un script JS en el navegador).
+> Sin key configurada, el sistema funciona igual pero sin autocomplete/mapa (campos de texto normales).
 
-#### Siguiente — Parte D: Vista admin distribución por sucursal (futuro)
-- [ ] `PedidoModel::getSucursalesConDetalle($pedidoId)`
-- [ ] `empresa_index.php` — tab "Distribución" cuando hay pedido_sucursal
-- [ ] `detalle.php` — estado por sucursal + hora entrega
+**GPS / Tracking del repartidor — Decisión de arquitectura:**
+```
+OPCIÓN A: Firebase Realtime Database (recomendada para MVP)
+  - Repartidor usa el navegador del celular: envía {lat, lng} cada N segundos via JS/fetch
+  - Comprador ve posición en tiempo real con Google Maps JS polling a Firebase
+  - No requiere hardware especial, funciona en cualquier smartphone
+  - Firebase gratuito hasta ~50k ops/día (más que suficiente para MVP)
 
-#### Siguiente — Parte E: Repartidor multi-parada (futuro)
-- [ ] `RepartidorController::marcarEntregaSucursal()` — marca parada individual
-- [ ] Timeline con nodo por sucursal en detalle del pedido
+OPCIÓN B: Traccar (para GPS hardware físico — futuro)
+  - Dispositivo GPS (GL300, Concox, etc.) con SIM card
+  - El GPS envía NMEA packets al servidor Traccar por TCP
+  - Traccar server: self-hosted (VPS dedicado recomendado, no cPanel)
+  - cPanel NO soporta Traccar (necesita Java + puertos TCP abiertos)
+  - API REST: GET /api/positions?deviceId=X → retorna última posición
+  - Bueno para flotas con hardware dedicado, no para app móvil del repartidor
+```
+> Decisión: usar Firebase para Sprint 4D (repartidor envía ubicación desde navegador).
+> Si la empresa ya tiene GPS hardware + Traccar → integrar en Sprint 4D+ con la REST API.
+> Implementación real del tracker va en Sprint 4D (ver más abajo).
+
+#### Pendiente Sprint 4C-3+ — Vista admin paradas del pedido
+- [ ] `empresa_index.php` / `detalle.php` — tab "Paradas" cuando hay pedido_sucursal (lista de sucursales con estado por parada)
+- [ ] `RepartidorController::marcarEntregaSucursal()` — repartidor marca cada parada como entregada
+- [ ] Timeline con nodo por sucursal en historial del pedido (comprador)
 
 ### Sprint 4C-4 — Detalle de producto + Descuentos en pedidos (pendiente)
 - [ ] **Página de detalle de producto** (`/catalogo/detalle/{id}` o modal expandido):
@@ -1117,4 +1143,4 @@ Todos se configuran desde `/config/apis` y `/config/correo` (solo visible para s
 
 ---
 
-*Última actualización: 2026-05-06 — v2.8.0 (Sprint 4C-3 expandido: sucursales multi-destino del comprador, carrito multi-sucursal, Google Maps integration, repartidor multi-parada con timeline por sucursal — nueva rama 4C-3)*
+*Última actualización: 2026-05-06 — v2.9.0 (Sprint 4C-3 completado: checkout multi-parada (picker + anti-duplicados + validación), arquitectura GPS Firebase vs Traccar documentada, Google Maps setup completo)*
