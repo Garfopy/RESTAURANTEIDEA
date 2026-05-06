@@ -28,6 +28,12 @@ $ctrlSlug = strtolower($segments[0] ?? 'auth');
 $action   = $segments[1] ?? 'index';
 $param    = $segments[2] ?? null;
 
+// ── Ruta raíz → landing pública ──────────────────────────────────────────────
+if ($path === '') {
+    $ctrlSlug = 'landing';
+    $action   = 'landing';
+}
+
 // ── Route map: URL slug → Controller class ────────────────────────────────────
 $routes = [
     // Auth (público)
@@ -71,10 +77,12 @@ $routes = [
     'empresa-suscripcion' => 'EmpresaSuscripcionController',
     // Página pública de planes
     'planes'              => 'PublicController',
+    // Landing page pública
+    'landing'             => 'PublicController',
 ];
 
 // ── Auth guard ────────────────────────────────────────────────────────────────
-$publicPaths = ['auth/login', 'auth/dologin', 'auth/index', 'planes/index', 'suscripcion/webhook'];
+$publicPaths = ['auth/login', 'auth/dologin', 'auth/index', 'planes/index', 'suscripcion/webhook', 'landing/landing'];
 
 $currentPath = strtolower($ctrlSlug . '/' . $action);
 
