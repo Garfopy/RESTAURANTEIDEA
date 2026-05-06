@@ -14,23 +14,9 @@ class SupervisorController extends BaseController
         $empresaId   = $_SESSION['usuario']['empresa_id'] ?? 0;
         $pedidoModel = new PedidoModel();
 
-        $pendientes = $pedidoModel->pendientesAprobacion($empresaId);
-
-        $enRuta = $pedidoModel->query(
-            "SELECT p.id, p.folio, p.total, p.created_at,
-                    u.nombre AS comprador_nombre
-               FROM pedidos p
-               JOIN usuarios u ON u.id = p.comprador_id
-              WHERE p.empresa_id = ? AND p.estado = 'en_ruta'
-              ORDER BY p.created_at DESC LIMIT 10",
-            [$empresaId]
-        );
-
-        $entregadosHoy = $pedidoModel->query(
-            "SELECT COUNT(*) AS total FROM pedidos
-              WHERE empresa_id = ? AND estado = 'entregado' AND DATE(updated_at) = CURDATE()",
-            [$empresaId]
-        )[0]['total'] ?? 0;
+        $pendientes    = $pedidoModel->pendientesAprobacion($empresaId);
+        $enRuta        = $pedidoModel->getPedidosEnRutaEmpresa($empresaId, 10);
+        $entregadosHoy = $pedidoModel->getEntregadosHoy($empresaId);
 
         $flash      = $this->getFlash();
         $pageTitle  = 'Panel de Supervisión';

@@ -331,6 +331,51 @@ class PedidoModel extends BaseModel
         );
     }
 
+    public function getUltimosPedidosComprador(int $compradorId, int $empresaId, int $limit = 5): array
+    {
+        return $this->query(
+            "SELECT p.id, p.folio, p.total, p.estado, p.created_at
+               FROM pedidos p
+              WHERE p.comprador_id = ? AND p.empresa_id = ?
+              ORDER BY p.created_at DESC LIMIT ?",
+            [$compradorId, $empresaId, $limit]
+        );
+    }
+
+    public function getPedidosEnRuta(int $compradorId, int $empresaId, int $limit = 3): array
+    {
+        return $this->query(
+            "SELECT p.id, p.folio, p.estado
+               FROM pedidos p
+              WHERE p.comprador_id = ? AND p.empresa_id = ? AND p.estado = 'en_ruta'
+              ORDER BY p.created_at DESC LIMIT ?",
+            [$compradorId, $empresaId, $limit]
+        );
+    }
+
+    public function getPedidosEnRutaEmpresa(int $empresaId, int $limit = 10): array
+    {
+        return $this->query(
+            "SELECT p.id, p.folio, p.total, p.created_at,
+                    u.nombre AS comprador_nombre
+               FROM pedidos p
+               JOIN usuarios u ON u.id = p.comprador_id
+              WHERE p.empresa_id = ? AND p.estado = 'en_ruta'
+              ORDER BY p.created_at DESC LIMIT ?",
+            [$empresaId, $limit]
+        );
+    }
+
+    public function getEntregadosHoy(int $empresaId): int
+    {
+        $row = $this->queryOne(
+            "SELECT COUNT(*) AS total FROM pedidos
+              WHERE empresa_id = ? AND estado = 'entregado' AND DATE(updated_at) = CURDATE()",
+            [$empresaId]
+        );
+        return (int)($row['total'] ?? 0);
+    }
+
     // ── Panel Admin ───────────────────────────────────────────────────────────
 
     public function listadoGlobal(array $filtros = [], int $page = 1): array
