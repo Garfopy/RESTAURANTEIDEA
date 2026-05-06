@@ -41,10 +41,11 @@ abstract class BaseController
     protected function redirectSegunRol(string $rol): void
     {
         match (true) {
-            $rol === 'repartidor'                                                              => $this->redirect('repartidor/inicio'),
-            in_array($rol, ['comprador', 'supervisor', 'admin_empresa'], true)                => $this->redirect('empresa/dashboard'),
-            in_array($rol, ['superadmin', 'admin'], true)                                     => $this->redirect('panel/dashboard'),
-            default                                                                            => $this->redirect('auth/login'),
+            $rol === 'repartidor'                                          => $this->redirect('repartidor/inicio'),
+            $rol === 'comprador'                                           => $this->redirect('comprador/inicio'),
+            in_array($rol, ['supervisor', 'admin_empresa'], true)         => $this->redirect('empresa/dashboard'),
+            in_array($rol, ['superadmin', 'admin'], true)                 => $this->redirect('panel/dashboard'),
+            default                                                        => $this->redirect('auth/login'),
         };
     }
 
