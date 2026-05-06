@@ -42,7 +42,8 @@ abstract class BaseController
     {
         match (true) {
             $rol === 'repartidor'                                                              => $this->redirect('repartidor/inicio'),
-            in_array($rol, ['comprador', 'supervisor', 'admin_empresa'], true)                => $this->redirect('empresa/dashboard'),
+            $rol === 'supervisor'                                                               => $this->redirect('supervisor/dashboard'),
+            in_array($rol, ['comprador', 'admin_empresa'], true)                               => $this->redirect('empresa/dashboard'),
             in_array($rol, ['superadmin', 'admin'], true)                                     => $this->redirect('panel/dashboard'),
             default                                                                            => $this->redirect('auth/login'),
         };

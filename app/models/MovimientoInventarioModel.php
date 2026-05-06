@@ -112,4 +112,81 @@ class MovimientoInventarioModel extends BaseModel
         $row = $this->queryOne('SELECT stock FROM inventario WHERE producto_id = ?', [$productoId]);
         return $row ? (float)$row['stock'] : 0.0;
     }
+
+    /**
+     * Returns current stock as float, or null if the product is not tracked in inventario.
+     * null = no inventory row → no restriction.
+     * 0.0  = tracked but empty.
+     */
+    public function getStockActual(int $productoId): ?float
+    {
+        $row = $this->queryOne('SELECT stock FROM inventario WHERE producto_id = ?', [$productoId]);
+        return $row !== null ? (float)$row['stock'] : null;
+    }
+
+    public function entradasVsSalidasSemanal(int $empresaId, int $semanas = 6): array
+    {
+        return $this->query(
+            "SELECT YEARWEEK(created_at, 1) AS semana_num,
+                    MIN(DATE(created_at)) AS inicio_semana,
+                    SUM(CASE WHEN tipo = 'entrada'              THEN cantidad ELSE 0 END) AS entradas,
+                    SUM(CASE WHEN tipo IN ('salida','merma')    THEN cantidad ELSE 0 END) AS salidas
+               FROM movimientos_inventario
+              WHERE empresa_id = ?
+                AND created_at >= DATE_SUB(CURDATE(), INTERVAL ? WEEK)
+              GROUP BY YEARWEEK(created_at, 1)
+              ORDER BY semana_num ASC",
+            [$empresaId, $semanas]
+        );
+    }
+
+    /**
+     * Deducts stock for every item in a pedido and registers outbound movements.
+     * Skips products that have no inventario row (untracked = unlimited).
+     * Stock never goes below 0.
+     */
+    public function descontarStockPedido(int $pedidoId, int $empresaId, int $usuarioId, string $folio): void
+    {
+        $items = $this->query(
+            'SELECT pd.producto_id, pd.cantidad FROM pedido_detalle pd WHERE pd.pedido_id = ?',
+            [$pedidoId]
+        );
+
+        if (empty($items)) return;
+
+        $this->db->beginTransaction();
+        try {
+            foreach ($items as $item) {
+                $prodId = (int)$item['producto_id'];
+                $cant   = (float)$item['cantidad'];
+
+                $inv = $this->queryOne('SELECT stock FROM inventario WHERE producto_id = ?', [$prodId]);
+                if ($inv === null) continue;
+
+                $stockAntes   = (float)$inv['stock'];
+                $stockDespues = max(0.0, $stockAntes - $cant);
+
+                $this->execute(
+                    'UPDATE inventario SET stock = ? WHERE producto_id = ?',
+                    [$stockDespues, $prodId]
+                );
+
+                $this->registrar([
+                    'empresa_id'    => $empresaId,
+                    'producto_id'   => $prodId,
+                    'tipo'          => 'salida',
+                    'cantidad'      => $cant,
+                    'stock_antes'   => $stockAntes,
+                    'stock_despues' => $stockDespues,
+                    'motivo'        => 'Venta — Pedido ' . $folio,
+                    'referencia'    => 'pedido:' . $pedidoId,
+                    'usuario_id'    => $usuarioId,
+                ]);
+            }
+            $this->db->commit();
+        } catch (\Throwable $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
+    }
 }

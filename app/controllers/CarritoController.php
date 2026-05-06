@@ -97,6 +97,21 @@ class CarritoController extends BaseController
             $this->redirect('carrito/index');
         }
 
+        // Validar stock disponible
+        $movimientoModel = new MovimientoInventarioModel();
+        $erroresStock = [];
+        foreach ($items as $item) {
+            $stockDisponible = $movimientoModel->getStockActual((int)$item['producto_id']);
+            if ($stockDisponible !== null && $item['cantidad'] > $stockDisponible) {
+                $disponibleStr = number_format($stockDisponible, 0);
+                $erroresStock[] = "{$item['nombre']}: solicitado {$item['cantidad']}, disponible {$disponibleStr}";
+            }
+        }
+        if (!empty($erroresStock)) {
+            $this->flash('error', 'Stock insuficiente — ' . implode(' | ', $erroresStock) . '. Ajusta las cantidades.');
+            $this->redirect('carrito/index');
+        }
+
         $_SESSION['carrito']['items'] = $items;
         unset($_SESSION['carrito']['meta']);
 
@@ -264,6 +279,17 @@ class CarritoController extends BaseController
         $producto = $this->productoModel->find($productoId);
         if (!$producto || !$producto['activo'] || (int)$producto['empresa_id'] !== $empresaId) {
             echo json_encode(['ok' => false, 'msg' => 'Producto no disponible']);
+            return;
+        }
+
+        // Validar stock disponible
+        $movimientoModel = new MovimientoInventarioModel();
+        $stockDisponible = $movimientoModel->getStockActual($productoId);
+        $carritoActual   = $_SESSION['carrito']['items'][$productoId]['cantidad'] ?? 0;
+        $totalSolicitado = $carritoActual + $cantidad;
+        if ($stockDisponible !== null && $totalSolicitado > $stockDisponible) {
+            $disponible = max(0, $stockDisponible - $carritoActual);
+            echo json_encode(['ok' => false, 'msg' => "Stock insuficiente. Disponible: " . number_format($stockDisponible, 0) . " (ya tienes " . number_format($carritoActual, 0) . " en el carrito)"]);
             return;
         }
 

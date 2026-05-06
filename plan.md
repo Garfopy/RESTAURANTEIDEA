@@ -1,5 +1,5 @@
-# CarniHub — Plan v2.6.6
-**Versión:** 2.6.6 | **Fecha:** 2026-05-05 | **Stack:** PHP 8.3 · MySQL · Tailwind CDN · MVC sin framework
+# CarniHub — Plan v2.6.8
+**Versión:** 2.6.8 | **Fecha:** 2026-05-06 | **Stack:** PHP 8.3 · MySQL · Tailwind CDN · MVC sin framework
 
 ---
 
@@ -832,13 +832,31 @@ Modal "Entrada rápida IA" en /empresa-inventario
 
 **Estimación:** Sprint completo (3-4 días de desarrollo + testing)
 
-### Sprint 4C-2 — Portal Supervisor funcional 🔄 SIGUIENTE
-- [ ] `SupervisorController::dashboard()` — cola de pedidos + KPIs del día
-  - [ ] Pedidos pendientes de aprobación (lista + modal aprobar/rechazar)
-  - [ ] Resumen operativo: pedidos hoy, entregados, en ruta
-  - [ ] Acceso a movimientos de inventario (entradas/salidas delegadas desde admin)
-  - [ ] Vista `supervisor/dashboard.php`
-- [ ] Sidebar supervisor: verificar rutas de aprobación, límites e inventario
+### Sprint 4C-2 — Portal Supervisor funcional ✅ COMPLETADO (2026-05-06)
+- [x] `SupervisorController::dashboard()` — Dashboard analytics completo con Chart.js
+  - [x] Selector de período: Hoy / 7D / 30D / 90D / Este año / Personalizado (rango libre)
+  - [x] 5 KPI cards primarios con gradiente: Pedidos, Ingresos, Tasa entrega, Pendientes, Tiempo aprobación
+  - [x] 4 KPI cards secundarios: Entregados hoy, Confirmados, Cancelados, Alertas stock
+  - [x] Gráfica de línea dual (pedidos + monto por día) — Chart.js
+  - [x] Donut de pedidos por estado — Chart.js
+  - [x] Bar horizontal de top 8 productos — Chart.js
+  - [x] Donut estado inventario (agotado/crítico/bajo/normal) — Chart.js
+  - [x] Bar entradas vs salidas de stock por semana — Chart.js
+  - [x] Tabla de pedidos recientes con links
+  - [x] Historial de accesos con IP, fecha, tiempo relativo (desde `action_logs`)
+- [x] Sidebar supervisor limpio: Mi Panel → Pedidos (badge pendientes) → Control de Stock → Registrar movimiento
+- [x] Supervisor accede a `empresa-pedido` para gestión completa de pedidos
+- [x] Supervisor puede hacer ajuste directo de stock (sin restricción admin_empresa)
+- [x] Fix sidebar admin_empresa: sección "Supervisión" eliminada; "Límites de compra" en Operación
+- [x] **Descuento de stock automático al aprobar pedido** → `MovimientoInventarioModel::descontarStockPedido()`
+- [x] **Validación de stock en carrito**: bloquea cantidad > stock disponible
+- [x] Nuevos métodos públicos `PedidoModel`: `kpisResumen`, `pedidosPorDia`, `pedidosPorEstado`, `topProductos`, `pedidosRecientes`, `getPedidosEnRuta`, `countEntregadosHoy`, `countPedidosHoy`, `montoMes`
+- [x] Nuevos métodos `MovimientoInventarioModel`: `getStockActual`, `descontarStockPedido`, `entradasVsSalidasSemanal`
+- [x] Nuevo método `LogModel::getAccesosUsuario()`
+- [x] Fix fatal error: `countEntregadosHoy` usaba `updated_at` (columna inexistente); corregido a `created_at`
+- [x] Fix Chart.js: CDN `cdn.jsdelivr.net` bloqueado por CSP del servidor → cambiado a `unpkg.com` (whitelistado)
+- [x] Fix Chart.js final: `unpkg.com` tampoco servía el archivo → Chart.js descargado localmente a `public/js/chart.min.js`, script tag usa `BASE_URL` (served from 'self', sin CSP)
+- [x] Fix redirect post-login: supervisor aterrizaba en `empresa/dashboard`; `BaseController::redirectSegunRol()` ahora tiene caso dedicado `supervisor → supervisor/dashboard`
 
 ### Sprint 4C-3 — Portal Comprador funcional 🔄 SIGUIENTE
 - [ ] `CompradorController::inicio()` — bienvenida + últimos pedidos + acceso rápido al catálogo
@@ -1044,4 +1062,4 @@ Todos se configuran desde `/config/apis` y `/config/correo` (solo visible para s
 
 ---
 
-*Última actualización: 2026-05-05 — v2.6.6 (Sprint 4C-1 M: botones de acción contextuales · empresa_index: botón único por estado (🔍Revisar→pendiente, 💳Confirmar pago→comprobante recibido, ✓Recogido→pickup en_ruta, 📷Foto→repartidor en_ruta), elimina botón "Estado" y modalEstado de la lista · detalle.php: nueva sección "Acciones del pedido" para admin con guía contextual por estado + botones (Confirmar pago→en_ruta, Marcar recogido, Registrar entrega con foto) + cambio manual de estado en collapsible ⚙)*
+*Última actualización: 2026-05-06 — v2.6.8 (Sprint 4C-2 fix final: Chart.js hospedado localmente en public/js/chart.min.js para evitar bloqueo CSP; fix redirect supervisor post-login)*

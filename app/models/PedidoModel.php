@@ -504,4 +504,132 @@ class PedidoModel extends BaseModel
             $params
         );
     }
+
+    // ── Métodos de resumen para SupervisorController ─────────────────────────
+
+    public function getPedidosEnRuta(int $empresaId): array
+    {
+        return $this->query(
+            "SELECT p.id, p.folio, p.total, p.created_at,
+                    u.nombre AS comprador_nombre
+               FROM pedidos p
+               JOIN usuarios u ON u.id = p.comprador_id
+              WHERE p.empresa_id = ? AND p.estado = 'en_ruta'
+              ORDER BY p.created_at DESC LIMIT 10",
+            [$empresaId]
+        );
+    }
+
+    public function countEntregadosHoy(int $empresaId): int
+    {
+        $row = $this->queryOne(
+            "SELECT COUNT(*) AS n FROM pedidos
+              WHERE empresa_id = ? AND estado = 'entregado' AND DATE(created_at) = CURDATE()",
+            [$empresaId]
+        );
+        return (int)($row['n'] ?? 0);
+    }
+
+    public function countPedidosHoy(int $empresaId): int
+    {
+        $row = $this->queryOne(
+            "SELECT COUNT(*) AS n FROM pedidos
+              WHERE empresa_id = ? AND DATE(created_at) = CURDATE()",
+            [$empresaId]
+        );
+        return (int)($row['n'] ?? 0);
+    }
+
+    public function montoMes(int $empresaId): float
+    {
+        $row = $this->queryOne(
+            "SELECT COALESCE(SUM(total), 0) AS monto FROM pedidos
+              WHERE empresa_id = ? AND estado NOT IN ('cancelado')
+                AND YEAR(created_at) = YEAR(CURDATE()) AND MONTH(created_at) = MONTH(CURDATE())",
+            [$empresaId]
+        );
+        return (float)($row['monto'] ?? 0);
+    }
+
+    // ── Analytics para dashboard de supervisión ──────────────────────────────
+
+    public function kpisResumen(int $empresaId, string $desde, string $hasta): array
+    {
+        $row = $this->queryOne(
+            "SELECT COUNT(*) AS total_pedidos,
+                    COALESCE(SUM(total), 0) AS monto_total,
+                    SUM(estado = 'entregado')    AS entregados,
+                    SUM(estado = 'cancelado')    AS cancelados,
+                    SUM(estado = 'pendiente')    AS pendientes,
+                    SUM(estado = 'en_ruta')      AS en_ruta,
+                    SUM(estado = 'confirmado')   AS confirmados,
+                    SUM(estado = 'en_preparacion') AS en_preparacion,
+                    AVG(CASE WHEN aprobado_at IS NOT NULL
+                             THEN TIMESTAMPDIFF(MINUTE, created_at, aprobado_at)
+                             ELSE NULL END) AS avg_minutos_aprobacion
+               FROM pedidos
+              WHERE empresa_id = ? AND DATE(created_at) BETWEEN ? AND ?",
+            [$empresaId, $desde, $hasta]
+        );
+        return $row ?? [];
+    }
+
+    public function pedidosPorDia(int $empresaId, string $desde, string $hasta): array
+    {
+        return $this->query(
+            "SELECT DATE(created_at) AS dia,
+                    COUNT(*) AS total_pedidos,
+                    COALESCE(SUM(total), 0) AS monto_total
+               FROM pedidos
+              WHERE empresa_id = ? AND DATE(created_at) BETWEEN ? AND ?
+                AND estado != 'cancelado'
+              GROUP BY DATE(created_at)
+              ORDER BY dia ASC",
+            [$empresaId, $desde, $hasta]
+        );
+    }
+
+    public function pedidosPorEstado(int $empresaId, string $desde, string $hasta): array
+    {
+        return $this->query(
+            "SELECT estado, COUNT(*) AS total
+               FROM pedidos
+              WHERE empresa_id = ? AND DATE(created_at) BETWEEN ? AND ?
+              GROUP BY estado
+              ORDER BY total DESC",
+            [$empresaId, $desde, $hasta]
+        );
+    }
+
+    public function topProductos(int $empresaId, string $desde, string $hasta, int $limite = 8): array
+    {
+        return $this->query(
+            "SELECT pr.nombre, pr.presentacion,
+                    SUM(pd.cantidad) AS total_cantidad,
+                    SUM(pd.subtotal) AS total_monto
+               FROM pedido_detalle pd
+               JOIN pedidos p  ON p.id  = pd.pedido_id
+               JOIN productos pr ON pr.id = pd.producto_id
+              WHERE p.empresa_id = ? AND DATE(p.created_at) BETWEEN ? AND ?
+                AND p.estado != 'cancelado'
+              GROUP BY pd.producto_id
+              ORDER BY total_cantidad DESC
+              LIMIT $limite",
+            [$empresaId, $desde, $hasta]
+        );
+    }
+
+    public function pedidosRecientes(int $empresaId, int $limite = 8): array
+    {
+        return $this->query(
+            "SELECT p.id, p.folio, p.estado, p.total, p.created_at,
+                    u.nombre AS comprador_nombre, u.apellido_paterno AS comprador_apellido
+               FROM pedidos p
+               JOIN usuarios u ON u.id = p.comprador_id
+              WHERE p.empresa_id = ?
+              ORDER BY p.created_at DESC
+              LIMIT $limite",
+            [$empresaId]
+        );
+    }
 }
