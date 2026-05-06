@@ -227,6 +227,28 @@ class PedidoModel extends BaseModel
         );
     }
 
+    public function getUltimosPedidosComprador(int $compradorId, int $empresaId, int $limite = 5): array
+    {
+        return $this->query(
+            "SELECT p.id, p.folio, p.total, p.estado, p.created_at
+               FROM pedidos p
+              WHERE p.comprador_id = ? AND p.empresa_id = ?
+              ORDER BY p.created_at DESC LIMIT ?",
+            [$compradorId, $empresaId, $limite]
+        );
+    }
+
+    public function getPedidosEnRuta(int $compradorId, int $empresaId, int $limite = 3): array
+    {
+        return $this->query(
+            "SELECT p.id, p.folio, p.estado
+               FROM pedidos p
+              WHERE p.comprador_id = ? AND p.empresa_id = ? AND p.estado = 'en_ruta'
+              ORDER BY p.created_at DESC LIMIT ?",
+            [$compradorId, $empresaId, $limite]
+        );
+    }
+
     public function conDetalle(int $id): ?array
     {
         $pedido = $this->queryOne(

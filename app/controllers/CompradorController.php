@@ -16,21 +16,8 @@ class CompradorController extends BaseController
         $compradorId = $usuario['id'] ?? 0;
         $pedidoModel = new PedidoModel();
 
-        $ultimosPedidos = $pedidoModel->query(
-            "SELECT p.id, p.folio, p.total, p.estado, p.created_at
-               FROM pedidos p
-              WHERE p.comprador_id = ? AND p.empresa_id = ?
-              ORDER BY p.created_at DESC LIMIT 5",
-            [$compradorId, $empresaId]
-        );
-
-        $enRuta = $pedidoModel->query(
-            "SELECT p.id, p.folio, p.estado
-               FROM pedidos p
-              WHERE p.comprador_id = ? AND p.empresa_id = ? AND p.estado = 'en_ruta'
-              ORDER BY p.created_at DESC LIMIT 3",
-            [$compradorId, $empresaId]
-        );
+        $ultimosPedidos = $pedidoModel->getUltimosPedidosComprador($compradorId, $empresaId, 5);
+        $enRuta = $pedidoModel->getPedidosEnRuta($compradorId, $empresaId, 3);
 
         $productoModel  = new ProductoModel();
         $destacados     = $productoModel->listadoConPrecio(['activo' => 1], 1)['data'] ?? [];
