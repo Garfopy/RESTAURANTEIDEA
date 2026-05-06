@@ -175,7 +175,7 @@ class CarritoController extends BaseController
         if (!in_array($tipoEntrega, ['pickup', 'repartidor'], true)) {
             $tipoEntrega = 'pickup';
         }
-        if (!in_array($metodoPago, ['transferencia', 'tarjeta', 'credito'], true)) {
+        if (!in_array($metodoPago, ['transferencia', 'efectivo'], true)) {
             $metodoPago = 'transferencia';
         }
 
@@ -187,6 +187,7 @@ class CarritoController extends BaseController
         $compradorId = $this->usuarioId();
 
         // Revalidar precios con precios especiales aplicados
+        $sucursalModel = new SucursalModel();
         $itemsDB = [];
         foreach ($items as $prodId => $item) {
             $precio = $this->productoModel->getPrecioFinal($compradorId, (int)$prodId, $item['cantidad']);
@@ -211,10 +212,24 @@ class CarritoController extends BaseController
 
         if ($tipoEntrega === 'repartidor') {
             $comprador = $this->usuarioModel->find($compradorId);
-            $pedidoData['direccion_entrega']  = trim($this->post('direccion_entrega', '')) ?: ($comprador['direccion_entrega'] ?? null);
-            $pedidoData['referencia_entrega'] = trim($this->post('referencia_entrega', '')) ?: ($comprador['referencia_entrega'] ?? null);
-            $pedidoData['lat_entrega']        = $comprador['lat_entrega'] ?? null;
-            $pedidoData['lng_entrega']        = $comprador['lng_entrega'] ?? null;
+            $sucursalId = (int)$this->post('sucursal_id', 0);
+            if ($sucursalId > 0) {
+                // Entrega en sucursal registrada: tomar dirección de la sucursal
+                $sucursalModel = new SucursalModel();
+                $sucursal = $sucursalModel->find($sucursalId);
+                if ($sucursal && $sucursal['comprador_id'] == $compradorId) {
+                    $pedidoData['direccion_entrega']  = $sucursal['direccion'];
+                    $pedidoData['lat_entrega']         = $sucursal['lat'] ?? null;
+                    $pedidoData['lng_entrega']         = $sucursal['lng'] ?? null;
+                    $pedidoData['referencia_entrega']  = null;
+                }
+            } else {
+                // Dirección manual o del perfil
+                $pedidoData['direccion_entrega']  = trim($this->post('direccion_entrega', '')) ?: ($comprador['direccion_entrega'] ?? null);
+                $pedidoData['referencia_entrega'] = trim($this->post('referencia_entrega', '')) ?: ($comprador['referencia_entrega'] ?? null);
+                $pedidoData['lat_entrega']        = $this->post('lat_entrega') ?: ($comprador['lat_entrega'] ?? null);
+                $pedidoData['lng_entrega']        = $this->post('lng_entrega') ?: ($comprador['lng_entrega'] ?? null);
+            }
         }
 
         try {

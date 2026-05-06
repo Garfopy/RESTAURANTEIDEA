@@ -128,35 +128,124 @@ $iniciales = strtoupper(mb_substr($usuario['nombre'] ?? 'U', 0, 1) . mb_substr($
 
   <?php if (($rol ?? '') === 'comprador'): ?>
   <!-- Dirección de entrega (solo compradores) -->
+  <?php
+  $configModel2 = new ConfigModel();
+  $gmKeyPerfil  = $configModel2->get('google_maps_key', '');
+  ?>
   <div style="background:#fff;border-radius:12px;border:1px solid #E5E7EB;padding:24px;margin-top:16px">
-    <h2 style="font-size:.95rem;font-weight:700;margin-bottom:4px;color:#111827">Dirección de entrega</h2>
+    <h2 style="font-size:.95rem;font-weight:700;margin-bottom:4px;color:#111827">Dirección de entrega principal</h2>
     <p style="font-size:.8rem;color:#6B7280;margin-bottom:16px">
-      Se usará como dirección predeterminada al hacer pedidos con envío a domicilio.
+      Dirección predeterminada para pedidos con envío. También puedes gestionar múltiples sucursales desde
+      <a href="<?= BASE_URL ?>comprador-sucursal/index" style="color:var(--color-primary)">Mis sucursales</a>.
     </p>
     <form method="POST" action="<?= BASE_URL ?>cuenta/guardarDireccion">
       <div style="margin-bottom:12px">
         <label class="form-label">Dirección completa</label>
+        <?php if ($gmKeyPerfil): ?>
+        <input type="text" id="perfil-dir-input" name="direccion_entrega" class="form-control"
+               placeholder="Escribe tu dirección para buscar con Google Maps..."
+               value="<?= htmlspecialchars($usuario['direccion_entrega'] ?? '') ?>"
+               autocomplete="off">
+        <?php else: ?>
         <textarea name="direccion_entrega" class="form-control" rows="2"
                   placeholder="Calle, número exterior, colonia, municipio, estado..."><?= htmlspecialchars($usuario['direccion_entrega'] ?? '') ?></textarea>
+        <?php endif; ?>
       </div>
-      <div style="margin-bottom:16px">
+      <div style="margin-bottom:<?= $gmKeyPerfil ? '12px' : '16px' ?>">
         <label class="form-label">Referencia / número interior</label>
         <input type="text" name="referencia_entrega" class="form-control"
                placeholder="Ej: Depto 3B, edificio azul, portón negro..."
                value="<?= htmlspecialchars($usuario['referencia_entrega'] ?? '') ?>">
       </div>
+
+      <?php if ($gmKeyPerfil): ?>
+      <!-- Mapa para confirmar ubicación -->
+      <div id="mapa-perfil-container" style="border-radius:10px;overflow:hidden;height:220px;margin-bottom:12px;border:1px solid #E5E7EB;display:<?= (!empty($usuario['lat_entrega'])) ? 'block' : 'none' ?>">
+        <div id="mapa-perfil" style="width:100%;height:100%"></div>
+      </div>
+      <p id="mapa-perfil-hint" style="font-size:.75rem;color:#6B7280;margin-bottom:12px;display:<?= (!empty($usuario['lat_entrega'])) ? 'none' : 'block' ?>">
+        Escribe la dirección para ver el mapa y confirmar la ubicación exacta.
+      </p>
+      <?php endif; ?>
+
       <?php if (!empty($usuario['lat_entrega']) && !empty($usuario['lng_entrega'])): ?>
-      <div style="margin-bottom:12px;font-size:.8rem;color:#6B7280">
-        Coordenadas guardadas: <?= number_format((float)$usuario['lat_entrega'],6) ?>, <?= number_format((float)$usuario['lng_entrega'],6) ?>
+      <div style="margin-bottom:12px;font-size:.78rem;color:#059669">
+        ✓ Ubicación GPS guardada (<?= number_format((float)$usuario['lat_entrega'],5) ?>, <?= number_format((float)$usuario['lng_entrega'],5) ?>)
       </div>
       <?php endif; ?>
-      <input type="hidden" name="lat_entrega" value="<?= htmlspecialchars($usuario['lat_entrega'] ?? '') ?>">
-      <input type="hidden" name="lng_entrega" value="<?= htmlspecialchars($usuario['lng_entrega'] ?? '') ?>">
+
+      <input type="hidden" name="lat_entrega" id="perfil-lat" value="<?= htmlspecialchars($usuario['lat_entrega'] ?? '') ?>">
+      <input type="hidden" name="lng_entrega" id="perfil-lng" value="<?= htmlspecialchars($usuario['lng_entrega'] ?? '') ?>">
+
       <button type="submit" style="padding:9px 20px;background:var(--color-primary);color:#fff;border:none;border-radius:8px;font-weight:600;font-size:.875rem;cursor:pointer">
         Guardar dirección
       </button>
     </form>
   </div>
+
+  <?php if ($gmKeyPerfil): ?>
+  <script>
+  (function() {
+    var mapPerfil = null, markerPerfil = null;
+    var initLat = parseFloat('<?= (float)($usuario['lat_entrega'] ?? 0) ?>') || null;
+    var initLng = parseFloat('<?= (float)($usuario['lng_entrega'] ?? 0) ?>') || null;
+
+    window.initGoogleMapsPerfil = function() {
+      var center = (initLat && initLng) ? { lat: initLat, lng: initLng } : { lat: 19.4326, lng: -99.1332 };
+      mapPerfil = new google.maps.Map(document.getElementById('mapa-perfil'), {
+        center: center, zoom: (initLat && initLng) ? 16 : 12,
+        mapTypeControl: false, streetViewControl: false
+      });
+
+      if (initLat && initLng) {
+        markerPerfil = new google.maps.Marker({ position: center, map: mapPerfil, draggable: true });
+        markerPerfil.addListener('dragend', actualizarCoords);
+        document.getElementById('mapa-perfil-container').style.display = 'block';
+      }
+
+      mapPerfil.addListener('click', function(e) {
+        var pos = e.latLng;
+        if (markerPerfil) { markerPerfil.setPosition(pos); } else {
+          markerPerfil = new google.maps.Marker({ position: pos, map: mapPerfil, draggable: true });
+          markerPerfil.addListener('dragend', actualizarCoords);
+        }
+        actualizarCoords();
+      });
+
+      var autocomplete = new google.maps.places.Autocomplete(
+        document.getElementById('perfil-dir-input'),
+        { componentRestrictions: { country: 'mx' }, fields: ['geometry', 'formatted_address'] }
+      );
+      autocomplete.addListener('place_changed', function() {
+        var place = autocomplete.getPlace();
+        if (!place.geometry) return;
+        var pos = place.geometry.location;
+        mapPerfil.setCenter(pos);
+        mapPerfil.setZoom(16);
+        if (markerPerfil) { markerPerfil.setPosition(pos); } else {
+          markerPerfil = new google.maps.Marker({ position: pos, map: mapPerfil, draggable: true });
+          markerPerfil.addListener('dragend', actualizarCoords);
+        }
+        document.getElementById('perfil-lat').value = pos.lat().toFixed(7);
+        document.getElementById('perfil-lng').value = pos.lng().toFixed(7);
+        document.getElementById('mapa-perfil-container').style.display = 'block';
+        var hint = document.getElementById('mapa-perfil-hint');
+        if (hint) hint.style.display = 'none';
+      });
+    };
+
+    function actualizarCoords() {
+      if (!markerPerfil) return;
+      var pos = markerPerfil.getPosition();
+      document.getElementById('perfil-lat').value = pos.lat().toFixed(7);
+      document.getElementById('perfil-lng').value = pos.lng().toFixed(7);
+    }
+  })();
+  </script>
+  <script async defer
+    src="https://maps.googleapis.com/maps/api/js?key=<?= htmlspecialchars($gmKeyPerfil) ?>&libraries=places&callback=initGoogleMapsPerfil">
+  </script>
+  <?php endif; ?>
   <?php endif; ?>
 
 </div>
