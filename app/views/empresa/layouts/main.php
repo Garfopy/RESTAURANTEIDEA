@@ -11,9 +11,9 @@ $appLogo      = $configModel->get('app_logo', '');
 $usuario      = $_SESSION['usuario'] ?? [];
 $empresa      = $_SESSION['empresa'] ?? [];
 $rol          = $usuario['rol_slug'] ?? '';
-$esAdmin      = $rol === 'admin_empresa';
-$esComprador  = $rol === 'comprador';
-$esSupervisor = in_array($rol, ['admin_empresa', 'supervisor'], true);
+$esAdmin       = $rol === 'admin_empresa';
+$esSupervisor  = $rol === 'supervisor';
+$esComprador   = $rol === 'comprador';
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -56,69 +56,15 @@ $esSupervisor = in_array($rol, ['admin_empresa', 'supervisor'], true);
   </div>
 
   <nav style="padding:8px 0">
+
+    <?php /* ── ADMIN EMPRESA ─────────────────────────────────────── */ ?>
     <?php if ($esAdmin): ?>
     <div class="sidebar-section">General</div>
     <a href="<?= BASE_URL ?>empresa/dashboard" class="<?= ($activeMenu??'')==='dashboard'?'active':'' ?>">
       <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><rect x="3" y="3" width="7" height="7" rx="1" stroke-width="2"/><rect x="14" y="3" width="7" height="7" rx="1" stroke-width="2"/><rect x="3" y="14" width="7" height="7" rx="1" stroke-width="2"/><rect x="14" y="14" width="7" height="7" rx="1" stroke-width="2"/></svg>
       Dashboard
     </a>
-    <?php endif; ?>
 
-    <?php if ($rol === 'supervisor'): ?>
-    <div class="sidebar-section">Mi panel</div>
-    <a href="<?= BASE_URL ?>supervisor/dashboard" class="<?= ($activeMenu??'')==='supervisor_dashboard'?'active':'' ?>">
-      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><rect x="3" y="3" width="7" height="7" rx="1" stroke-width="2"/><rect x="14" y="3" width="7" height="7" rx="1" stroke-width="2"/><rect x="3" y="14" width="7" height="7" rx="1" stroke-width="2"/><rect x="14" y="14" width="7" height="7" rx="1" stroke-width="2"/></svg>
-      Mi panel
-    </a>
-    <?php endif; ?>
-
-    <?php if ($rol === 'comprador'): ?>
-    <div class="sidebar-section">Inicio</div>
-    <a href="<?= BASE_URL ?>comprador/inicio" class="<?= ($activeMenu??'')==='comprador_inicio'?'active':'' ?>">
-      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h3m10-11v10a1 1 0 01-1 1h-3M9 21h6"/></svg>
-      Inicio
-    </a>
-    <?php endif; ?>
-
-    <?php if ($esSupervisor): ?>
-    <div class="sidebar-section">Supervisión</div>
-    <?php if (!$esAdmin): ?>
-    <a href="<?= BASE_URL ?>empresa-inventario" class="<?= ($activeMenu??'')==='inventario'?'active':'' ?>">
-      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-      Control de Stock
-    </a>
-    <a href="<?= BASE_URL ?>empresa-pedido" class="<?= ($activeMenu??'')==='pedidos'?'active':'' ?>">
-      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-      Pedidos
-    </a>
-    <?php endif; ?>
-    <a href="<?= BASE_URL ?>limite/index" class="<?= ($activeMenu??'')==='limites'?'active':'' ?>">
-      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-      Límites de compra
-    </a>
-    <?php endif; ?>
-
-    <?php if ($esComprador): ?>
-    <div class="sidebar-section">Pedidos</div>
-    <a href="<?= BASE_URL ?>catalogo/index" class="<?= ($activeMenu??'')==='catalogo'?'active':'' ?>">
-      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
-      Catálogo
-    </a>
-    <a href="<?= BASE_URL ?>carrito/index" class="<?= ($activeMenu??'')==='carrito'?'active':'' ?>">
-      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2 9m5-9v9m4-9v9m5-9l2 9"/></svg>
-      Hacer pedido
-    </a>
-    <a href="<?= BASE_URL ?>pedido/index" class="<?= ($activeMenu??'')==='pedidos'?'active':'' ?>">
-      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-      Mis pedidos
-    </a>
-    <a href="<?= BASE_URL ?>recurrente/index" class="<?= ($activeMenu??'')==='recurrentes'?'active':'' ?>">
-      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-      Pedidos recurrentes
-    </a>
-    <?php endif; ?>
-
-    <?php if ($esAdmin): ?>
     <div class="sidebar-section">Catálogo y Stock</div>
     <a href="<?= BASE_URL ?>empresa-producto/index" class="<?= ($activeMenu??'')==='productos'?'active':'' ?>">
       <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10"/></svg>
@@ -142,6 +88,10 @@ $esSupervisor = in_array($rol, ['admin_empresa', 'supervisor'], true);
       <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
       Logística y rutas
     </a>
+    <a href="<?= BASE_URL ?>limite/index" class="<?= ($activeMenu??'')==='limites'?'active':'' ?>">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+      Límites de compra
+    </a>
 
     <div class="sidebar-section">Mi empresa</div>
     <a href="<?= BASE_URL ?>empresa-usuario/index" class="<?= ($activeMenu??'')==='usuarios'?'active':'' ?>">
@@ -159,6 +109,61 @@ $esSupervisor = in_array($rol, ['admin_empresa', 'supervisor'], true);
     <a href="<?= BASE_URL ?>empresa-reporte/index" class="<?= ($activeMenu??'')==='reportes'?'active':'' ?>">
       <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
       Reportes
+    </a>
+    <?php endif; ?>
+
+    <?php /* ── SUPERVISOR ──────────────────────────────────────────── */ ?>
+    <?php if ($esSupervisor): ?>
+    <div class="sidebar-section">Mi panel</div>
+    <a href="<?= BASE_URL ?>supervisor/dashboard" class="<?= ($activeMenu??'')==='supervisor_dashboard'?'active':'' ?>">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><rect x="3" y="3" width="7" height="7" rx="1" stroke-width="2"/><rect x="14" y="3" width="7" height="7" rx="1" stroke-width="2"/><rect x="3" y="14" width="7" height="7" rx="1" stroke-width="2"/><rect x="14" y="14" width="7" height="7" rx="1" stroke-width="2"/></svg>
+      Mi panel
+    </a>
+
+    <div class="sidebar-section">Pedidos</div>
+    <a href="<?= BASE_URL ?>empresa-pedido?estado=pendiente" class="<?= ($activeMenu??'')==='pedidos_pendientes'?'active':'' ?>">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+      Cola de aprobación
+      <?php if (!empty($countPendientesSidebar) && $countPendientesSidebar > 0): ?>
+        <span style="margin-left:auto;background:#DC2626;color:#fff;font-size:.65rem;font-weight:700;padding:1px 6px;border-radius:999px"><?= (int)$countPendientesSidebar ?></span>
+      <?php endif; ?>
+    </a>
+    <a href="<?= BASE_URL ?>empresa-pedido" class="<?= ($activeMenu??'')==='pedidos'?'active':'' ?>">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+      Todos los pedidos
+    </a>
+
+    <div class="sidebar-section">Stock</div>
+    <a href="<?= BASE_URL ?>empresa-inventario" class="<?= ($activeMenu??'')==='inventario'?'active':'' ?>">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+      Control de Stock
+    </a>
+    <?php endif; ?>
+
+    <?php /* ── COMPRADOR ───────────────────────────────────────────── */ ?>
+    <?php if ($esComprador): ?>
+    <div class="sidebar-section">Inicio</div>
+    <a href="<?= BASE_URL ?>comprador/inicio" class="<?= ($activeMenu??'')==='comprador_inicio'?'active':'' ?>">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h3m10-11v10a1 1 0 01-1 1h-3M9 21h6"/></svg>
+      Inicio
+    </a>
+
+    <div class="sidebar-section">Pedidos</div>
+    <a href="<?= BASE_URL ?>catalogo/index" class="<?= ($activeMenu??'')==='catalogo'?'active':'' ?>">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+      Catálogo
+    </a>
+    <a href="<?= BASE_URL ?>carrito/index" class="<?= ($activeMenu??'')==='carrito'?'active':'' ?>">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2 9m5-9v9m4-9v9m5-9l2 9"/></svg>
+      Hacer pedido
+    </a>
+    <a href="<?= BASE_URL ?>pedido/index" class="<?= ($activeMenu??'')==='pedidos'?'active':'' ?>">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+      Mis pedidos
+    </a>
+    <a href="<?= BASE_URL ?>recurrente/index" class="<?= ($activeMenu??'')==='recurrentes'?'active':'' ?>">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+      Pedidos recurrentes
     </a>
     <?php endif; ?>
 

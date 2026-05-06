@@ -112,4 +112,65 @@ class MovimientoInventarioModel extends BaseModel
         $row = $this->queryOne('SELECT stock FROM inventario WHERE producto_id = ?', [$productoId]);
         return $row ? (float)$row['stock'] : 0.0;
     }
+
+    /**
+     * Returns current stock as float, or null if the product is not tracked in inventario.
+     * null = no inventory row → no restriction.
+     * 0.0  = tracked but empty.
+     */
+    public function getStockActual(int $productoId): ?float
+    {
+        $row = $this->queryOne('SELECT stock FROM inventario WHERE producto_id = ?', [$productoId]);
+        return $row !== null ? (float)$row['stock'] : null;
+    }
+
+    /**
+     * Deducts stock for every item in a pedido and registers outbound movements.
+     * Skips products that have no inventario row (untracked = unlimited).
+     * Stock never goes below 0.
+     */
+    public function descontarStockPedido(int $pedidoId, int $empresaId, int $usuarioId, string $folio): void
+    {
+        $items = $this->query(
+            'SELECT pd.producto_id, pd.cantidad FROM pedido_detalle pd WHERE pd.pedido_id = ?',
+            [$pedidoId]
+        );
+
+        if (empty($items)) return;
+
+        $this->db->beginTransaction();
+        try {
+            foreach ($items as $item) {
+                $prodId = (int)$item['producto_id'];
+                $cant   = (float)$item['cantidad'];
+
+                $inv = $this->queryOne('SELECT stock FROM inventario WHERE producto_id = ?', [$prodId]);
+                if ($inv === null) continue;
+
+                $stockAntes   = (float)$inv['stock'];
+                $stockDespues = max(0.0, $stockAntes - $cant);
+
+                $this->execute(
+                    'UPDATE inventario SET stock = ? WHERE producto_id = ?',
+                    [$stockDespues, $prodId]
+                );
+
+                $this->registrar([
+                    'empresa_id'    => $empresaId,
+                    'producto_id'   => $prodId,
+                    'tipo'          => 'salida',
+                    'cantidad'      => $cant,
+                    'stock_antes'   => $stockAntes,
+                    'stock_despues' => $stockDespues,
+                    'motivo'        => 'Venta — Pedido ' . $folio,
+                    'referencia'    => 'pedido:' . $pedidoId,
+                    'usuario_id'    => $usuarioId,
+                ]);
+            }
+            $this->db->commit();
+        } catch (\Throwable $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
+    }
 }

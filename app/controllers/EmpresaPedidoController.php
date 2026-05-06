@@ -147,6 +147,19 @@ class EmpresaPedidoController extends BaseController
 
         $this->pedidoModel->aprobarPedido($pedidoId, $this->usuarioId(), $ajustes);
         $this->log('Aprobar pedido', 'pedidos', "Pedido $pedidoId aprobado");
+
+        // Descontar stock de inventario al aprobar
+        $pedido = $this->pedidoModel->find($pedidoId);
+        if ($pedido) {
+            try {
+                $movimientoModel = new MovimientoInventarioModel();
+                $movimientoModel->descontarStockPedido($pedidoId, $this->empresaId(), $this->usuarioId(), $pedido['folio']);
+            } catch (\Throwable $e) {
+                // Non-fatal: approval already happened; stock error logged below
+                $this->log('Stock error al aprobar', 'pedidos', "Pedido $pedidoId: " . $e->getMessage());
+            }
+        }
+
         $this->flash('success', 'Pedido aprobado. El comprador recibirá la confirmación.');
         $this->redirect('empresa-pedido');
     }
