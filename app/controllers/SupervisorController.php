@@ -52,7 +52,7 @@ class SupervisorController extends BaseController
 
         // ── KPIs rápidos (tiempo real) ─────────────────────────────────────
         $pendientes     = $pedidoModel->pendientesAprobacion($empresaId);
-        $enRuta         = $pedidoModel->getPedidosEnRuta($empresaId);
+        $enRuta         = $pedidoModel->getPedidosEnRutaEmpresa($empresaId);
         $entregadosHoy  = $pedidoModel->countEntregadosHoy($empresaId);
         $pedidosHoy     = $pedidoModel->countPedidosHoy($empresaId);
 
