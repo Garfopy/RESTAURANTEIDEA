@@ -1,5 +1,5 @@
-# CarniHub — Plan v2.6.8
-**Versión:** 2.6.8 | **Fecha:** 2026-05-06 | **Stack:** PHP 8.3 · MySQL · Tailwind CDN · MVC sin framework
+# CarniHub — Plan v2.6.9
+**Versión:** 2.6.9 | **Fecha:** 2026-05-06 | **Stack:** PHP 8.3 · MySQL · Tailwind CDN · MVC sin framework
 
 ---
 
@@ -832,7 +832,7 @@ Modal "Entrada rápida IA" en /empresa-inventario
 
 **Estimación:** Sprint completo (3-4 días de desarrollo + testing)
 
-### Sprint 4C-2 — Portal Supervisor funcional ✅ COMPLETADO (2026-05-06)
+### Sprint 4C-2 — Portal Supervisor funcional ✅ COMPLETADO Y MERGEADO A MAIN (2026-05-06)
 - [x] `SupervisorController::dashboard()` — Dashboard analytics completo con Chart.js
   - [x] Selector de período: Hoy / 7D / 30D / 90D / Este año / Personalizado (rango libre)
   - [x] 5 KPI cards primarios con gradiente: Pedidos, Ingresos, Tasa entrega, Pendientes, Tiempo aprobación
@@ -1062,4 +1062,4 @@ Todos se configuran desde `/config/apis` y `/config/correo` (solo visible para s
 
 ---
 
-*Última actualización: 2026-05-06 — v2.6.8 (Sprint 4C-2 fix final: Chart.js hospedado localmente en public/js/chart.min.js para evitar bloqueo CSP; fix redirect supervisor post-login)*
+*Última actualización: 2026-05-06 — v2.6.9 (Sprint 4C-2 mergeado a main — conflicto SupervisorController.php resuelto conservando versión completa del dashboard analytics)*
