@@ -1,5 +1,5 @@
-# CarniHub — Plan v2.6.7
-**Versión:** 2.6.7 | **Fecha:** 2026-05-06 | **Stack:** PHP 8.3 · MySQL · Tailwind CDN · MVC sin framework
+# CarniHub — Plan v2.6.8
+**Versión:** 2.6.8 | **Fecha:** 2026-05-06 | **Stack:** PHP 8.3 · MySQL · Tailwind CDN · MVC sin framework
 
 ---
 
@@ -855,6 +855,7 @@ Modal "Entrada rápida IA" en /empresa-inventario
 - [x] Nuevo método `LogModel::getAccesosUsuario()`
 - [x] Fix fatal error: `countEntregadosHoy` usaba `updated_at` (columna inexistente); corregido a `created_at`
 - [x] Fix Chart.js: CDN `cdn.jsdelivr.net` bloqueado por CSP del servidor → cambiado a `unpkg.com` (whitelistado)
+- [x] Fix Chart.js final: `unpkg.com` tampoco servía el archivo → Chart.js descargado localmente a `public/js/chart.min.js`, script tag usa `BASE_URL` (served from 'self', sin CSP)
 - [x] Fix redirect post-login: supervisor aterrizaba en `empresa/dashboard`; `BaseController::redirectSegunRol()` ahora tiene caso dedicado `supervisor → supervisor/dashboard`
 
 ### Sprint 4C-3 — Portal Comprador funcional 🔄 SIGUIENTE
@@ -1061,4 +1062,4 @@ Todos se configuran desde `/config/apis` y `/config/correo` (solo visible para s
 
 ---
 
-*Última actualización: 2026-05-06 — v2.6.7 (Sprint 4C-2 fixes: Chart.js CDN → unpkg.com (CSP fix) · BaseController::redirectSegunRol supervisor → supervisor/dashboard)*
+*Última actualización: 2026-05-06 — v2.6.8 (Sprint 4C-2 fix final: Chart.js hospedado localmente en public/js/chart.min.js para evitar bloqueo CSP; fix redirect supervisor post-login)*
