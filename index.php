@@ -135,6 +135,9 @@ foreach (glob(ROOT_PATH . '/app/models/*.php') as $model) {
 foreach (glob(ROOT_PATH . '/app/services/*.php') as $service) {
     require_once $service;
 }
+foreach (glob(ROOT_PATH . '/app/helpers/*.php') as $helper) {
+    require_once $helper;
+}
 
 require_once ROOT_PATH . '/app/controllers/BaseController.php';
 require_once $controllerFile;

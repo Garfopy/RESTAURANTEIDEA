@@ -68,24 +68,66 @@ class EmpresaUsuarioController extends BaseController
             $this->redirect('empresa-usuario/nuevo');
         }
 
-        // Generar contraseña temporal
-        $passwordTemporal = 'Ch' . rand(1000, 9999) . '!';
+        // Generar contraseña segura automáticamente
+        $passwordTemporal = PasswordHelper::generar(14);
 
-        $usuarioId = $this->model->crear([
-            'nombre'           => $nombre,
-            'apellido_paterno' => $apellido,
-            'apellido_materno' => $apellidoM ?: null,
-            'email'            => $email,
-            'telefono'         => $telefono,
-            'rol_id'           => $rolId,
-            'empresa_id'       => $empresaId,
-            'activo'           => 1,
-            'created_by'       => $this->usuarioId(),
-        ], $passwordTemporal);
+        // Generar username FTP único
+        $emailPrefix = explode('@', $email)[0];
+        $emailPrefix = preg_replace('/[^a-z0-9]/', '', strtolower($emailPrefix));
+        $emailPrefix = substr($emailPrefix, 0, 7);
+        $ftpUsername = 'carnihub_' . $emailPrefix . '_' . rand(1000, 9999);
 
-        // Detectar el slug del rol recién creado
-        $rolInfo = $this->model->getRolPorId($rolId);
-        $rolSlug = $rolInfo['slug'] ?? '';
+        // Verificar unicidad
+        $db = Database::getInstance();
+        $stmt = $db->prepare("SELECT COUNT(*) FROM usuarios WHERE ftp_username = ?");
+        $stmt->execute([$ftpUsername]);
+        while ($stmt->fetchColumn() > 0) {
+            $ftpUsername = 'carnihub_' . $emailPrefix . '_' . rand(1000, 9999);
+            $stmt->execute([$ftpUsername]);
+        }
+
+        // ── Iniciar transacción ──
+        $db->beginTransaction();
+
+        try {
+            // 1. Crear usuario FTP
+            $cpanelService = new CpanelService();
+            $resultadoFTP  = $cpanelService->crearUsuarioFTP($ftpUsername, $passwordTemporal);
+
+            if (!$resultadoFTP['success']) {
+                throw new Exception('Error al crear usuario FTP: ' . $resultadoFTP['error']);
+            }
+
+            // 2. Crear usuario en BD
+            $usuarioId = $this->model->crear([
+                'nombre'           => $nombre,
+                'apellido_paterno' => $apellido,
+                'apellido_materno' => $apellidoM ?: null,
+                'email'            => $email,
+                'telefono'         => $telefono,
+                'rol_id'           => $rolId,
+                'empresa_id'       => $empresaId,
+                'activo'           => 1,
+                'ftp_username'     => $ftpUsername,
+                'ftp_creado'       => 1,
+                'created_by'       => $this->usuarioId(),
+            ], $passwordTemporal);
+
+            // 3. Enviar email con credenciales
+            $emailService = new EmailService();
+            $usuarioCreado = $this->model->find($usuarioId);
+            $emailEnviado = $emailService->enviarCredenciales($usuarioCreado, $passwordTemporal, $ftpUsername);
+
+            if (!$emailEnviado) {
+                error_log("[EmpresaUsuarioController] No se pudo enviar email a usuario ID: $usuarioId");
+            }
+
+            // 4. Commit transacción
+            $db->commit();
+
+            // Detectar el slug del rol recién creado
+            $rolInfo = $this->model->getRolPorId($rolId);
+            $rolSlug = $rolInfo['slug'] ?? '';
 
         // Si es comprador: guardar dirección en usuario + crear sucursal de entrega
         if ($rolSlug === 'comprador') {
@@ -142,10 +184,21 @@ class EmpresaUsuarioController extends BaseController
             }
         }
 
-        $this->log('Crear usuario empresa', 'empresa_usuario', "Email: $email, Rol: $rolSlug");
+        $this->log('Crear usuario empresa con FTP', 'empresa_usuario', "Email: $email, Rol: $rolSlug, FTP: $ftpUsername");
 
-        $this->flash('success', "Usuario creado. Contraseña temporal: <strong>$passwordTemporal</strong> — comunícala al usuario.");
+        $mensaje = 'Usuario agregado. Se ha enviado un correo con las credenciales de acceso.';
+        if (!$emailEnviado) {
+            $mensaje .= ' <strong>AVISO:</strong> No se pudo enviar el email. Contraseña: ' . htmlspecialchars($passwordTemporal);
+        }
+        $this->flash('success', $mensaje);
         $this->redirect('empresa-usuario/index');
+
+        } catch (Exception $e) {
+            $db->rollBack();
+            error_log("[EmpresaUsuarioController] Error al crear usuario: " . $e->getMessage());
+            $this->flash('error', 'No se pudo crear el usuario. Verifica la configuración de cPanel.');
+            $this->redirect('empresa-usuario/nuevo');
+        }
     }
 
     public function editar(?string $id = null): void

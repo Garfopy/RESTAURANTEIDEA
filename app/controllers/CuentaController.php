@@ -146,9 +146,34 @@ class CuentaController extends BaseController
             $this->redirect('cuenta/perfil');
         }
 
+        // ── SINCRONIZAR CON FTP (si el usuario tiene FTP) ──
+        $errorFTP = null;
+        if (!empty($usuario['ftp_username']) && !empty($usuario['ftp_creado'])) {
+            $cpanelService = new CpanelService();
+            $resultadoFTP  = $cpanelService->cambiarPasswordFTP($usuario['ftp_username'], $nuevo);
+
+            if (!$resultadoFTP) {
+                $errorFTP = 'No se pudo sincronizar la contraseña FTP. Contacta al administrador.';
+                error_log("[CuentaController] Error al cambiar password FTP para usuario {$usuario['id']}");
+                // NO detenemos el proceso, solo alertamos
+            }
+        }
+
+        // Actualizar en BD
         $model->update($this->usuarioId(), ['password' => password_hash($nuevo, PASSWORD_BCRYPT)]);
         $this->log('Cambiar contraseña', 'cuenta');
-        $this->flash('success', 'Contraseña actualizada.');
+
+        // Mensaje diferenciado
+        if ($errorFTP) {
+            $this->flash('warning', 'Contraseña actualizada en CarniHub. ' . $errorFTP);
+        } else {
+            $mensaje = 'Contraseña actualizada correctamente';
+            if (!empty($usuario['ftp_username'])) {
+                $mensaje .= ' (incluyendo acceso FTP)';
+            }
+            $this->flash('success', $mensaje . '.');
+        }
+
         $this->redirect('cuenta/perfil');
     }
 }
