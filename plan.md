@@ -1,5 +1,5 @@
-# CarniHub — Plan v2.6.4
-**Versión:** 2.6.4 | **Fecha:** 2026-05-05 | **Stack:** PHP 8.3 · MySQL · Tailwind CDN · MVC sin framework
+# CarniHub — Plan v2.6.5
+**Versión:** 2.6.5 | **Fecha:** 2026-05-05 | **Stack:** PHP 8.3 · MySQL · Tailwind CDN · MVC sin framework
 
 ---
 
@@ -1044,4 +1044,4 @@ Todos se configuran desde `/config/apis` y `/config/correo` (solo visible para s
 
 ---
 
-*Última actualización: 2026-05-05 — v2.6.4 (Sprint 4C-1 K: flujo de pago completo — tipo_entrega + comprobante + dirección de entrega · Fix crítico: confirmar() ahora guarda metodo_pago y tipo_entrega · paso3 con tarjetas pickup/repartidor y dirección del comprador · paso4 con timeline "¿Qué sigue?" · perfil comprador con sección dirección de entrega · detalle con barra de progreso por 5 estados + bloques contextuales · empresa_index con badge comprobante + botón "Recogido" para pickup · migration 011 snapshot dirección en pedidos · EmpresaPedidoController ahora ✅ Funcional)*
+*Última actualización: 2026-05-05 — v2.6.5 (Sprint 4C-1 L: modal Revisar reescrito — elimina selector tipo_entrega, muestra info completa del pedido (folio, comprador, fecha, tipo entrega como badge read-only, método de pago, dirección, notas) + guía "¿Qué sigue?" contextual para el admin + tabla de productos vía AJAX + campos repartidor/costo solo si tipo=repartidor · Fix: "← Volver a pedidos" en detalle.php ahora dirige a empresa-pedido para admin/supervisor y a pedido/index para comprador)*

@@ -383,7 +383,8 @@ $cancelado = $pedido['estado'] === 'cancelado';
     </div>
     <?php endif; ?>
 
-    <a href="<?= BASE_URL ?>pedido/index" style="display:block;text-align:center;padding:10px;background:#F3F4F6;color:#374151;border-radius:8px;text-decoration:none;font-weight:600;font-size:.875rem">
+    <a href="<?= BASE_URL ?><?= $esComprador ? 'pedido/index' : 'empresa-pedido' ?>"
+       style="display:block;text-align:center;padding:10px;background:#F3F4F6;color:#374151;border-radius:8px;text-decoration:none;font-weight:600;font-size:.875rem">
       ← Volver a pedidos
     </a>
   </div>
