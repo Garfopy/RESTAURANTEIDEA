@@ -24,6 +24,9 @@ class CompradorSucursalController extends BaseController
         $maxSucursales = (int)($suscripcion['max_sucursales'] ?? 3);
         $usadas        = count($sucursales);
 
+        $configModel = new ConfigModel();
+        $gmKey       = $configModel->get('google_maps_key', '');
+
         $flash      = $this->getFlash();
         $pageTitle  = 'Mis sucursales';
         $activeMenu = 'mis_sucursales';

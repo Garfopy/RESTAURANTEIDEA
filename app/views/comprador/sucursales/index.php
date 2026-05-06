@@ -78,13 +78,21 @@ $porcentaje    = $ilimitado ? 0 : min(100, round($usadas / $maxSucursales * 100)
 
     <!-- Coordenadas / mapa -->
     <?php if (!empty($s['lat']) && !empty($s['lng'])): ?>
-    <div style="border-radius:8px;overflow:hidden;height:120px">
+    <div style="border-radius:8px;overflow:hidden;height:120px;background:#F3F4F6">
+      <?php if (!empty($gmKey)): ?>
       <iframe
-        style="width:100%;height:100%;border:0"
+        style="width:100%;height:100%;border:0;display:block"
         loading="lazy"
+        allowfullscreen
         referrerpolicy="no-referrer-when-downgrade"
-        src="https://www.google.com/maps?q=<?= (float)$s['lat'] ?>,<?= (float)$s['lng'] ?>&z=15&output=embed">
+        src="https://www.google.com/maps/embed/v1/view?key=<?= htmlspecialchars($gmKey) ?>&center=<?= (float)$s['lat'] ?>,<?= (float)$s['lng'] ?>&zoom=15">
       </iframe>
+      <?php else: ?>
+      <a href="https://www.google.com/maps?q=<?= (float)$s['lat'] ?>,<?= (float)$s['lng'] ?>" target="_blank"
+         style="display:flex;align-items:center;justify-content:center;height:100%;font-size:.8rem;color:var(--color-primary);text-decoration:none;gap:4px">
+        📍 Ver en Google Maps
+      </a>
+      <?php endif; ?>
     </div>
     <?php endif; ?>
 
