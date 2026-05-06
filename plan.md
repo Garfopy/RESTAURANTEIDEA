@@ -832,13 +832,22 @@ Modal "Entrada rápida IA" en /empresa-inventario
 
 **Estimación:** Sprint completo (3-4 días de desarrollo + testing)
 
-### Sprint 4C-2 — Portal Supervisor funcional 🔄 SIGUIENTE
-- [ ] `SupervisorController::dashboard()` — cola de pedidos + KPIs del día
-  - [ ] Pedidos pendientes de aprobación (lista + modal aprobar/rechazar)
-  - [ ] Resumen operativo: pedidos hoy, entregados, en ruta
-  - [ ] Acceso a movimientos de inventario (entradas/salidas delegadas desde admin)
-  - [ ] Vista `supervisor/dashboard.php`
-- [ ] Sidebar supervisor: verificar rutas de aprobación, límites e inventario
+### Sprint 4C-2 — Portal Supervisor funcional ✅ COMPLETADO (2026-05-06)
+- [x] `SupervisorController::dashboard()` — KPIs del día (pendientes, en ruta, entregados hoy, monto mes)
+  - [x] Resumen operativo: pedidos hoy, entregados, en ruta con botón Rastrear
+  - [x] Alertas de stock (agotado/crítico) con tarjetas clicables que van directo al ajuste
+  - [x] Panel lateral de últimos 5 movimientos de inventario
+  - [x] Accesos rápidos: Pendientes de aprobar + Registrar entrada de stock
+  - [x] Vista `supervisor/dashboard.php`
+- [x] Sidebar supervisor limpio y propio: Mi Panel → Pedidos (badge de pendientes) → Control de Stock → Registrar movimiento → Mi perfil
+- [x] Supervisor accede a `empresa-pedido` para gestión completa (aprobar/rechazar/cambiar estado)
+- [x] Supervisor puede hacer ajuste directo de stock (`empresa-inventario/ajuste`) sin restricción de admin
+- [x] Fix sidebar admin: eliminada sección "Supervisión" duplicada; "Límites de compra" movida a Operación
+- [x] **Descuento de stock automático al aprobar pedido** (`EmpresaPedidoController::aprobar()` → `MovimientoInventarioModel::descontarStockPedido()`)
+- [x] **Validación de stock en carrito**: `CarritoController::actualizar()` y `agregarProducto()` bloquean si la cantidad supera el stock disponible
+- [x] `PedidoModel` — nuevos métodos públicos: `getPedidosEnRuta`, `countEntregadosHoy`, `countPedidosHoy`, `montoMes`
+- [x] `MovimientoInventarioModel` — nuevos métodos: `getStockActual()` (null=no rastreado), `descontarStockPedido()`
+- [x] Fix fatal error: `SupervisorController` ya no llama métodos protegidos de `BaseModel` directamente
 
 ### Sprint 4C-3 — Portal Comprador funcional 🔄 SIGUIENTE
 - [ ] `CompradorController::inicio()` — bienvenida + últimos pedidos + acceso rápido al catálogo
