@@ -251,6 +251,126 @@ $cancelado = $pedido['estado'] === 'cancelado';
 </div>
 <?php endif; ?>
 
+<!-- ── ADMIN: Acciones y guía por estado ── -->
+<?php if (!$esComprador): ?>
+<div style="margin-bottom:16px;background:#fff;border-radius:12px;border:1px solid #E5E7EB;padding:18px 20px">
+  <div style="font-weight:700;font-size:.9rem;color:#111827;margin-bottom:14px">Acciones del pedido</div>
+
+  <?php if ($pedido['estado'] === 'pendiente'): ?>
+  <div style="padding:12px 14px;background:#FEF3C7;border:1px solid #FCD34D;border-radius:10px;font-size:.85rem;color:#92400E;margin-bottom:0">
+    <strong>Pendiente de revisión.</strong> Regresa a la lista y usa el botón <strong>🔍 Revisar</strong> para ver los productos, asignar entrega y aprobar o rechazar este pedido.
+    <div style="margin-top:10px">
+      <a href="<?= BASE_URL ?>empresa-pedido"
+         style="display:inline-block;padding:7px 16px;background:#F59E0B;color:#fff;border-radius:7px;text-decoration:none;font-size:.82rem;font-weight:700">
+        ← Ir a lista de pedidos
+      </a>
+    </div>
+  </div>
+
+  <?php elseif (in_array($pedido['estado'], ['confirmado','en_preparacion'], true) && !empty($pedido['foto_comprobante_path'])): ?>
+  <div style="padding:12px 14px;background:#DBEAFE;border:1px solid #BFDBFE;border-radius:10px;font-size:.85rem;color:#1E40AF;margin-bottom:12px">
+    <strong>Comprobante de pago recibido.</strong>
+    Revisa la imagen del comprobante arriba. Si el pago es correcto, confírmalo para continuar con la entrega.
+    <?php if (($pedido['tipo_entrega'] ?? '') === 'pickup'): ?>
+    <br><span style="font-size:.8rem;opacity:.8">El pedido quedará listo para que el comprador lo recoja.</span>
+    <?php else: ?>
+    <br><span style="font-size:.8rem;opacity:.8">El pedido pasará a "En camino" para el repartidor asignado.</span>
+    <?php endif; ?>
+  </div>
+  <form method="POST" action="<?= BASE_URL ?>empresa-pedido/cambiarEstado"
+        onsubmit="return confirm('¿Confirmar el pago y continuar con la entrega?')">
+    <input type="hidden" name="pedido_id" value="<?= $pedido['id'] ?>">
+    <input type="hidden" name="estado" value="en_ruta">
+    <button type="submit"
+            style="width:100%;padding:12px;background:#1D4ED8;color:#fff;border:none;border-radius:9px;font-weight:700;cursor:pointer;font-size:.9rem">
+      💳 Confirmar pago y continuar
+    </button>
+  </form>
+
+  <?php elseif (in_array($pedido['estado'], ['confirmado','en_preparacion'], true) && empty($pedido['foto_comprobante_path'])): ?>
+  <div style="padding:12px 14px;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:10px;font-size:.85rem;color:#6B7280">
+    <strong>Esperando comprobante de pago.</strong>
+    El comprador recibirá una notificación para subir su comprobante. Cuando lo suba, aparecerá aquí para que puedas confirmarlo.
+  </div>
+
+  <?php elseif ($pedido['estado'] === 'en_ruta' && ($pedido['tipo_entrega'] ?? '') === 'pickup'): ?>
+  <div style="padding:12px 14px;background:#F0FDF4;border:1px solid #A7F3D0;border-radius:10px;font-size:.85rem;color:#065F46;margin-bottom:12px">
+    <strong>Pedido listo para recoger.</strong>
+    El comprador puede pasar a recoger su pedido. Cuando lo haga, márcalo como entregado.
+  </div>
+  <form method="POST" action="<?= BASE_URL ?>empresa-pedido/cambiarEstado"
+        onsubmit="return confirm('¿Confirmar que el comprador recogió el pedido?')">
+    <input type="hidden" name="pedido_id" value="<?= $pedido['id'] ?>">
+    <input type="hidden" name="estado" value="entregado">
+    <button type="submit"
+            style="width:100%;padding:12px;background:#059669;color:#fff;border:none;border-radius:9px;font-weight:700;cursor:pointer;font-size:.9rem">
+      ✓ Marcar como recogido / entregado
+    </button>
+  </form>
+
+  <?php elseif ($pedido['estado'] === 'en_ruta'): ?>
+  <div style="padding:12px 14px;background:#FEF3C7;border:1px solid #FCD34D;border-radius:10px;font-size:.85rem;color:#92400E;margin-bottom:12px">
+    <strong>Pedido en camino.</strong>
+    El repartidor asignado entregará el pedido y subirá la foto de evidencia. Si necesitas registrarlo manualmente, usa el formulario de abajo.
+  </div>
+  <form method="POST" action="<?= BASE_URL ?>empresa-pedido/subirFotoEntrega/<?= $pedido['id'] ?>"
+        enctype="multipart/form-data">
+    <div style="display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap">
+      <input type="file" name="foto" accept="image/*" capture="environment"
+             style="flex:1;padding:8px;border:1px solid #D1D5DB;border-radius:8px;font-size:.82rem;background:#fff;min-width:160px">
+      <button type="submit"
+              style="padding:10px 18px;background:#059669;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;white-space:nowrap;font-size:.85rem">
+        📷 Registrar entrega
+      </button>
+    </div>
+    <div style="font-size:.72rem;color:#9CA3AF;margin-top:4px">JPG, PNG o WEBP · Al guardar, el pedido se marca como <strong>Entregado</strong></div>
+  </form>
+
+  <?php elseif ($pedido['estado'] === 'entregado'): ?>
+  <div style="padding:12px 14px;background:#D1FAE5;border:1px solid #A7F3D0;border-radius:10px;font-size:.85rem;color:#065F46">
+    ✅ <strong>Pedido entregado.</strong> Este pedido ha sido completado exitosamente.
+  </div>
+
+  <?php elseif ($pedido['estado'] === 'cancelado'): ?>
+  <div style="padding:12px 14px;background:#FEE2E2;border:1px solid #FECACA;border-radius:10px;font-size:.85rem;color:#991B1B">
+    ✕ <strong>Pedido cancelado.</strong>
+    <?php if (!empty($pedido['nota_empresa'])): ?>
+    Motivo registrado: <?= htmlspecialchars($pedido['nota_empresa']) ?>
+    <?php endif; ?>
+  </div>
+  <?php endif; ?>
+
+  <?php if (!in_array($pedido['estado'], ['entregado','cancelado'], true)): ?>
+  <details style="margin-top:14px">
+    <summary style="font-size:.8rem;color:#9CA3AF;cursor:pointer;user-select:none;font-weight:600;list-style:none;display:flex;align-items:center;gap:4px">
+      <span>⚙</span> Cambiar estado manualmente
+    </summary>
+    <div style="margin-top:10px;padding:12px;background:#F9FAFB;border-radius:8px;border:1px solid #F3F4F6">
+      <div style="font-size:.75rem;color:#9CA3AF;margin-bottom:8px">Usa esto solo si necesitas corregir el estado del pedido.</div>
+      <form method="POST" action="<?= BASE_URL ?>empresa-pedido/cambiarEstado">
+        <input type="hidden" name="pedido_id" value="<?= $pedido['id'] ?>">
+        <div style="display:flex;gap:8px;align-items:center">
+          <select name="estado"
+                  style="flex:1;padding:8px 10px;border:1px solid #D1D5DB;border-radius:8px;font-size:.85rem;background:#fff">
+            <?php
+            $estadosOpts  = ['pendiente','confirmado','en_preparacion','en_ruta','entregado','cancelado'];
+            $labelsOpts   = ['Pendiente','Confirmado','En preparación','En ruta','Entregado','Cancelado'];
+            foreach ($estadosOpts as $i => $sv): ?>
+            <option value="<?= $sv ?>" <?= $pedido['estado'] === $sv ? 'selected' : '' ?>><?= $labelsOpts[$i] ?></option>
+            <?php endforeach; ?>
+          </select>
+          <button type="submit"
+                  style="padding:8px 16px;background:#374151;color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:.85rem;white-space:nowrap">
+            Guardar
+          </button>
+        </div>
+      </form>
+    </div>
+  </details>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+
 <div style="display:grid;grid-template-columns:1fr 300px;gap:20px;align-items:start">
   <!-- Productos del pedido -->
   <div>

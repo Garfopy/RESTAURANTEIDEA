@@ -1,5 +1,5 @@
-# CarniHub — Plan v2.6.5
-**Versión:** 2.6.5 | **Fecha:** 2026-05-05 | **Stack:** PHP 8.3 · MySQL · Tailwind CDN · MVC sin framework
+# CarniHub — Plan v2.6.6
+**Versión:** 2.6.6 | **Fecha:** 2026-05-05 | **Stack:** PHP 8.3 · MySQL · Tailwind CDN · MVC sin framework
 
 ---
 
@@ -1044,4 +1044,4 @@ Todos se configuran desde `/config/apis` y `/config/correo` (solo visible para s
 
 ---
 
-*Última actualización: 2026-05-05 — v2.6.5 (Sprint 4C-1 L: modal Revisar reescrito — elimina selector tipo_entrega, muestra info completa del pedido (folio, comprador, fecha, tipo entrega como badge read-only, método de pago, dirección, notas) + guía "¿Qué sigue?" contextual para el admin + tabla de productos vía AJAX + campos repartidor/costo solo si tipo=repartidor · Fix: "← Volver a pedidos" en detalle.php ahora dirige a empresa-pedido para admin/supervisor y a pedido/index para comprador)*
+*Última actualización: 2026-05-05 — v2.6.6 (Sprint 4C-1 M: botones de acción contextuales · empresa_index: botón único por estado (🔍Revisar→pendiente, 💳Confirmar pago→comprobante recibido, ✓Recogido→pickup en_ruta, 📷Foto→repartidor en_ruta), elimina botón "Estado" y modalEstado de la lista · detalle.php: nueva sección "Acciones del pedido" para admin con guía contextual por estado + botones (Confirmar pago→en_ruta, Marcar recogido, Registrar entrega con foto) + cambio manual de estado en collapsible ⚙)*

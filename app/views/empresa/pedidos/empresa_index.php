@@ -24,7 +24,7 @@ $estados = [
   <span style="font-size:1.1rem">⚠️</span>
   <div>
     <strong style="color:#92400E"><?= $countPendientes ?> pedido(s) pendiente(s) de revisión</strong>
-    <span style="font-size:.8rem;color:#B45309;display:block">Asigna tipo de entrega y aprueba o rechaza cada uno.</span>
+    <span style="font-size:.8rem;color:#B45309;display:block">Revisa cada pedido, ajusta precios si es necesario, y apruébalo o recházalo.</span>
   </div>
 </div>
 <?php endif; ?>
@@ -124,11 +124,12 @@ $estados = [
           <?= date('d/m/Y', strtotime($p['created_at'])) ?>
         </td>
         <td style="padding:10px 16px;text-align:center">
-          <div style="display:flex;justify-content:center;gap:4px;flex-wrap:wrap">
+          <div style="display:flex;justify-content:center;gap:4px;flex-wrap:wrap;align-items:center">
             <a href="<?= $baseUrl ?>pedido/detalle/<?= $p['id'] ?>"
-               style="padding:4px 8px;border:1px solid #D1D5DB;border-radius:6px;color:#374151;text-decoration:none;font-size:.72rem">
-              Ver
+               style="padding:5px 10px;border:1px solid #D1D5DB;border-radius:6px;color:#374151;text-decoration:none;font-size:.72rem;font-weight:600">
+              Ver →
             </a>
+
             <?php if ($esPendiente): ?>
             <button onclick="abrirRevision(<?= htmlspecialchars(json_encode([
                 'id'                => (int)$p['id'],
@@ -143,30 +144,41 @@ $estados = [
                 'direccion_entrega' => $p['direccion_entrega'] ?? '',
                 'referencia_entrega'=> $p['referencia_entrega'] ?? '',
             ]), ENT_QUOTES) ?>)"
-                    style="padding:4px 8px;border:1px solid #F59E0B;border-radius:6px;color:#B45309;background:#FEF3C7;cursor:pointer;font-size:.72rem;font-weight:700;font-family:inherit">
-              Revisar
+                    style="padding:5px 10px;border:1px solid #F59E0B;border-radius:6px;color:#B45309;background:#FEF3C7;cursor:pointer;font-size:.72rem;font-weight:700;font-family:inherit">
+              🔍 Revisar
             </button>
-            <?php endif; ?>
-            <?php if (($p['tipo_entrega'] ?? '') === 'pickup' && in_array($p['estado'], ['en_preparacion','en_ruta'], true)): ?>
+
+            <?php elseif ($tieneComprobante && in_array($p['estado'], ['confirmado','en_preparacion'], true)): ?>
+            <form method="POST" action="<?= $baseUrl ?>empresa-pedido/cambiarEstado" style="display:inline"
+                  onsubmit="return confirm('¿Confirmar el comprobante de pago y continuar con la entrega?')">
+              <input type="hidden" name="pedido_id" value="<?= $p['id'] ?>">
+              <input type="hidden" name="estado" value="en_ruta">
+              <button type="submit"
+                      style="padding:5px 10px;border:1px solid #2563EB;border-radius:6px;color:#fff;background:#2563EB;cursor:pointer;font-size:.72rem;font-weight:700;font-family:inherit">
+                💳 Confirmar pago
+              </button>
+            </form>
+
+            <?php elseif (!$tieneComprobante && $p['estado'] === 'confirmado'): ?>
+            <span style="font-size:.7rem;color:#9CA3AF;font-style:italic">Esperando comprobante...</span>
+
+            <?php elseif ($p['estado'] === 'en_ruta' && ($p['tipo_entrega'] ?? '') === 'pickup'): ?>
             <form method="POST" action="<?= $baseUrl ?>empresa-pedido/cambiarEstado" style="display:inline"
                   onsubmit="return confirm('¿Confirmar que el comprador recogió el pedido?')">
               <input type="hidden" name="pedido_id" value="<?= $p['id'] ?>">
               <input type="hidden" name="estado" value="entregado">
               <button type="submit"
-                      style="padding:4px 8px;border:1px solid #10B981;border-radius:6px;color:#065F46;background:#D1FAE5;cursor:pointer;font-size:.72rem;font-weight:700;font-family:inherit">
+                      style="padding:5px 10px;border:1px solid #10B981;border-radius:6px;color:#fff;background:#059669;cursor:pointer;font-size:.72rem;font-weight:700;font-family:inherit">
                 ✓ Recogido
               </button>
             </form>
-            <?php elseif (in_array($p['estado'], ['en_preparacion','en_ruta','confirmado'], true)): ?>
+
+            <?php elseif ($p['estado'] === 'en_ruta'): ?>
             <button onclick="abrirSubirFoto(<?= $p['id'] ?>)"
-                    style="padding:4px 8px;border:1px solid #10B981;border-radius:6px;color:#065F46;background:#D1FAE5;cursor:pointer;font-size:.72rem;font-weight:600;font-family:inherit">
-              📷 Entrega
+                    style="padding:5px 10px;border:1px solid #10B981;border-radius:6px;color:#fff;background:#059669;cursor:pointer;font-size:.72rem;font-weight:700;font-family:inherit">
+              📷 Foto entrega
             </button>
             <?php endif; ?>
-            <button onclick="abrirCambioEstado(<?= $p['id'] ?>, '<?= $p['estado'] ?>')"
-                    style="padding:4px 8px;border:1px solid #D1D5DB;border-radius:6px;color:#374151;background:#fff;cursor:pointer;font-size:.72rem;font-family:inherit">
-              Estado
-            </button>
           </div>
         </td>
       </tr>
@@ -350,28 +362,7 @@ $estados = [
   </div>
 </div>
 
-<!-- Modal: Cambio de estado rápido -->
-<div id="modalEstado" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;align-items:center;justify-content:center">
-  <div style="background:#fff;border-radius:12px;padding:28px;width:380px;max-width:95vw">
-    <h3 style="font-size:1rem;font-weight:700;color:#111827;margin-bottom:20px">Cambiar Estado del Pedido</h3>
-    <form method="POST" action="<?= $baseUrl ?>empresa-pedido/cambiarEstado">
-      <input type="hidden" name="pedido_id" id="modalPedidoId">
-      <div style="margin-bottom:16px">
-        <label style="display:block;font-size:.8rem;font-weight:600;color:#374151;margin-bottom:6px">Nuevo estado</label>
-        <select name="estado" id="modalEstadoSelect" style="width:100%;padding:10px;border:1px solid #D1D5DB;border-radius:8px;font-size:.875rem;background:#fff">
-          <?php foreach ($estados as $k => $v): ?>
-          <option value="<?= $k ?>"><?= $v['label'] ?></option>
-          <?php endforeach; ?>
-        </select>
-      </div>
-      <div style="display:flex;gap:10px">
-        <button type="submit" style="flex:1;padding:10px;background:var(--color-primary);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer">Guardar</button>
-        <button type="button" onclick="document.getElementById('modalEstado').style.display='none'"
-                style="padding:10px 20px;border:1px solid #D1D5DB;border-radius:8px;background:#fff;cursor:pointer;font-size:.875rem">Cancelar</button>
-      </div>
-    </form>
-  </div>
-</div>
+
 
 <script>
 const BASE_URL = '<?= $baseUrl ?>';
@@ -538,12 +529,6 @@ function abrirSubirFoto(id) {
   document.getElementById('modalFotoEntrega').style.display = 'flex';
 }
 
-function abrirCambioEstado(id, estadoActual) {
-  document.getElementById('modalPedidoId').value = id;
-  document.getElementById('modalEstadoSelect').value = estadoActual;
-  document.getElementById('modalEstado').style.display = 'flex';
-}
-
 function sincronizarEntrega() {
   document.getElementById('hTipoEntrega').value  = (_revData && _revData.tipo_entrega) ? _revData.tipo_entrega : '';
   const repSel   = document.getElementById('revRepartidorSelect');
@@ -553,7 +538,7 @@ function sincronizarEntrega() {
   document.getElementById('hNotaEmpresa').value  = document.getElementById('revNotaEmpresaInput').value;
 }
 
-['modalRevision','modalEstado','modalFotoEntrega'].forEach(id => {
+['modalRevision','modalFotoEntrega'].forEach(id => {
   document.getElementById(id).addEventListener('click', function(e) {
     if (e.target === this) this.style.display = 'none';
   });
