@@ -853,7 +853,7 @@ Modal "Entrada rápida IA" en /empresa-inventario
 - [x] Nuevos métodos públicos `PedidoModel`: `kpisResumen`, `pedidosPorDia`, `pedidosPorEstado`, `topProductos`, `pedidosRecientes`, `getPedidosEnRuta`, `countEntregadosHoy`, `countPedidosHoy`, `montoMes`
 - [x] Nuevos métodos `MovimientoInventarioModel`: `getStockActual`, `descontarStockPedido`, `entradasVsSalidasSemanal`
 - [x] Nuevo método `LogModel::getAccesosUsuario()`
-- [x] Fix fatal error: controladores ya no llaman `query()` protegida directamente
+- [x] Fix fatal error: `countEntregadosHoy` usaba `updated_at` (columna inexistente); corregido a `created_at`
 
 ### Sprint 4C-3 — Portal Comprador funcional 🔄 SIGUIENTE
 - [ ] `CompradorController::inicio()` — bienvenida + últimos pedidos + acceso rápido al catálogo

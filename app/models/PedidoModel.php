@@ -479,7 +479,7 @@ class PedidoModel extends BaseModel
     {
         $row = $this->queryOne(
             "SELECT COUNT(*) AS n FROM pedidos
-              WHERE empresa_id = ? AND estado = 'entregado' AND DATE(updated_at) = CURDATE()",
+              WHERE empresa_id = ? AND estado = 'entregado' AND DATE(created_at) = CURDATE()",
             [$empresaId]
         );
         return (int)($row['n'] ?? 0);
