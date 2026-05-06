@@ -1,5 +1,5 @@
-# CarniHub — Plan v2.7.0
-**Versión:** 2.7.0 | **Fecha:** 2026-05-06 | **Stack:** PHP 8.3 · MySQL · Tailwind CDN · MVC sin framework
+# CarniHub — Plan v2.8.0
+**Versión:** 2.8.0 | **Fecha:** 2026-05-06 | **Stack:** PHP 8.3 · MySQL · Tailwind CDN · MVC sin framework
 
 ---
 
@@ -865,11 +865,116 @@ Modal "Entrada rápida IA" en /empresa-inventario
 - [x] Fix Chart.js final: `unpkg.com` tampoco servía el archivo → Chart.js descargado localmente a `public/js/chart.min.js`, script tag usa `BASE_URL` (served from 'self', sin CSP)
 - [x] Fix redirect post-login: supervisor aterrizaba en `empresa/dashboard`; `BaseController::redirectSegunRol()` ahora tiene caso dedicado `supervisor → supervisor/dashboard`
 
-### Sprint 4C-3 — Portal Comprador funcional 🔄 SIGUIENTE
-- [ ] `CompradorController::inicio()` — bienvenida + últimos pedidos + acceso rápido al catálogo
-  - [ ] Vista `comprador/inicio.php`
-- [ ] Verificar flujo completo: inicio → catálogo (con precios especiales si aplica) → carrito → confirmar pedido
-- [ ] Verificar que límites de compra bloquean correctamente cuando están activos
+### Sprint 4C-3 — Portal Comprador + Sucursales Multi-Destino + Google Maps 🔄 SIGUIENTE
+> Dividido en 5 partes para implementar una a la vez. El modelo definitivo: el comprador gestiona sus propias sucursales (puntos de entrega) y puede distribuir un pedido entre ellas para alcanzar mejor precio por volumen.
+
+**Modelo de negocio:**
+```
+Comprador "Taquería El Buen Sabor" (empresa con 3 ubicaciones)
+    ├── Sucursal Norte — Av. 100 #200 (lat/lng)
+    ├── Sucursal Sur   — Blvd. Reforma #500 (lat/lng)
+    └── Cocina Central — Calle 5 #10 (lat/lng)
+
+Pedido: 1 Ton de carne (para alcanzar precio escalonado)
+    ├── 400 kg → Sucursal Norte
+    ├── 350 kg → Sucursal Sur
+    └── 250 kg → Cocina Central
+```
+
+**Tablas nuevas (migration 012):**
+- `sucursales`: ADD `comprador_id` INT FK → usuarios (la sucursal pertenece al comprador, empresa_id queda para scope/seguridad)
+- `pedido_sucursal`: ADD `notas` TEXT, `costo_envio_sucursal` DECIMAL
+- `pedido_sucursal_detalle`: nueva tabla — distribución por producto por sucursal (pedido_sucursal_id, producto_id, cantidad, precio_unit, subtotal)
+
+#### Parte A — Portal Comprador Base
+- [ ] `CompradorController::inicio()` — dashboard comprador con KPIs
+  - [ ] Vista `comprador/inicio.php` — cards: pedidos activos, próxima entrega, acceso rápido catálogo, mis sucursales
+- [ ] Verificar flujo completo: inicio → catálogo (con precios especiales) → carrito → confirmar pedido
+- [ ] Verificar que precios especiales se aplican correctamente en el catálogo del comprador
+
+#### Parte B — Sucursales del Comprador (CRUD + Google Maps)
+> El comprador registra sus puntos de entrega. Limitados por el plan de la empresa (Básico: 3 · Pro: 10 · Empresa: ilimitado).
+
+- [ ] `migrations/012_sucursales_comprador.sql` — ver sección "Tablas nuevas" arriba
+- [ ] `SucursalModel` — métodos:
+  - `getByComprador($compradorId)` — lista sucursales activas del comprador
+  - `getByEmpresa($empresaId)` — lista todas las sucursales de la empresa (para admin/logística)
+  - `crear()`, `editar()`, `eliminar()`, `toggleActivo()`
+  - `contarPorComprador($compradorId)` — para verificar límite del plan
+- [ ] `CompradorSucursalController` — rutas `comprador-sucursal/*`:
+  - `index()` — listado + barra "X/Y sucursales usadas según tu plan"
+  - `nueva()`, `guardar()`, `editar()`, `actualizar()`, `toggleActivo()`
+- [ ] Vistas `comprador/sucursales/index.php` + `form.php`:
+  - **Google Maps JS API + Places Autocomplete**: campo dirección con sugerencias en tiempo real
+  - Mapa interactivo: click/drag pin → captura `lat`/`lng` automáticamente
+  - Formulario: nombre, dirección (autocompletado), responsable, teléfono, activo
+  - Al guardar: `lat` y `lng` se envían como campos hidden
+- [ ] Sidebar comprador: "Mis Sucursales" con badge "X/Y"
+- [ ] `SuscripcionModel::verificarLimite('sucursales', $empresaId)` — bloquear si se alcanzó el tope del plan
+
+**Google Maps — Setup (necesario antes de Parte B):**
+```
+1. Ir a console.cloud.google.com → APIs & Services → Enable APIs:
+   - Maps JavaScript API
+   - Places API
+   - Directions API
+2. Crear API Key → restricción por HTTP referrer (tu dominio)
+3. En CarniHub: superadmin → /config/apis → campo "Google Maps API Key"
+   (se guarda como google_maps_key en global_settings)
+4. Helper PHP: app/views/partials/googlemaps_script.php
+   <?php $gmKey = (new ConfigModel($db))->get('google_maps_key'); ?>
+   <script src="https://maps.googleapis.com/maps/api/js?key=<?= $gmKey ?>&libraries=places"></script>
+5. Incluir el partial en las vistas que usen mapas
+```
+> **Costo:** $200 crédito/mes gratis — para uso B2B interno de <50 pedidos/día el costo es ~$0.
+> **Seguridad:** restringir la API key por HTTP referrer en Google Console para evitar usos no autorizados.
+
+#### Parte C — Carrito Multi-Sucursal
+> Solo aplica cuando `tipo_entrega = repartidor` y el comprador tiene sucursales registradas.
+
+- [ ] **Paso 2 del carrito (restaurado)** — `empresa/carrito/paso2.php`:
+  - **Opción A**: 🏭 Recoger en bodega (pickup)
+  - **Opción B**: 🚚 Envío a dirección única (comportamiento actual, dirección del perfil)
+  - **Opción C**: 📦 Distribuir en mis sucursales (nuevo — solo visible si tiene sucursales)
+- [ ] Para opción C — UI de distribución multi-sucursal:
+  - Tabla: filas = productos del carrito, columnas = sucursales del comprador
+  - Input por celda: cantidad/kg para esa sucursal
+  - Validación JS en tiempo real: suma de celdas por fila = cantidad total del producto (verde ✓ / rojo ✗)
+  - Resumen inferior: costo de envío estimado por sucursal (si la empresa lo configura)
+  - Mapa Google Maps con pines de cada sucursal seleccionada
+- [ ] `CarritoController::configurarEnvio()` — nuevo método para el paso 2
+- [ ] `CarritoController::confirmar()` — si multi-sucursal: transacción que inserta `pedido_sucursal` + `pedido_sucursal_detalle` por cada sucursal
+- [ ] `paso4.php` — timeline adapta: "Entrega distribuida en X sucursales" + lista de sucursales
+
+#### Parte D — Admin/Supervisor: Distribución + Aprobación Multi-Sucursal
+> El admin ve la distribución completa al revisar el pedido. La asignación del repartidor genera automáticamente las paradas de ruta.
+
+- [ ] `PedidoModel::getSucursalesConDetalle($pedidoId)` — JOIN pedido_sucursal + detalle + sucursales
+- [ ] `empresa_index.php` — modal revisar: tab "📦 Distribución" cuando hay `pedido_sucursal` rows
+  - Tabla por sucursal: nombre, dirección, productos, kg, subtotal
+  - Mapa Google Maps con pines de cada sucursal del pedido
+- [ ] `detalle.php` — sección "Distribución por sucursal" con estado individual por sucursal:
+  - Card por sucursal: ⏳ pendiente / 🚚 en camino / ✓ entregado + hora
+- [ ] Al aprobar pedido multi-sucursal: `asignarEntrega()` genera `ruta_detalle` con una parada por sucursal (orden por distancia o manual)
+- [ ] `EmpresaPedidoController::asignarEntrega()` — si hay `pedido_sucursal`, generar `ruta_detalle` automáticamente
+
+#### Parte E — Repartidor Multi-Parada + Timeline en Tiempo Real
+> El repartidor ve cada sucursal como parada. Marca "Llegué" en cada una. El pedido se marca `entregado` solo cuando TODAS las sucursales están entregadas.
+
+- [ ] `RepartidorController::ruta()` — lista de paradas del día ordenadas con:
+  - Nombre y dirección de la sucursal, responsable, teléfono
+  - Productos a entregar en esa parada (kg por producto)
+  - Botón 📍 "Navegar" → abre Google Maps nativo con `geo:lat,lng` o URL `maps.google.com`
+  - Botón ✅ "Marcar entregado" — requiere foto o firma digital (igual que flujo actual)
+- [ ] `RepartidorController::marcarEntregaSucursal($pedidoSucursalId)` — POST:
+  - `pedido_sucursal.estado = 'entregado'`, `hora_entrega = NOW()`
+  - `ruta_detalle.estado = 'entregado'`, `hora_entrega = NOW()`
+  - Llama a `PedidoModel::verificarEntregaCompleta()` → si todas entregadas: `pedidos.estado = 'entregado'`
+- [ ] `PedidoModel::verificarEntregaCompleta($pedidoId)` — `SELECT COUNT(*) WHERE pedido_id = ? AND estado != 'entregado'`
+- [ ] **Timeline dinámico en `detalle.php`** (visible para comprador y admin):
+  - Nodo por sucursal: "✓ [Nombre Sucursal] — entregado 14:23" o "⏳ [Nombre Sucursal] — en camino"
+  - Nodo global "Entregado" solo se ilumina cuando TODAS las sucursales están entregadas
+- [ ] API polling `/api/tracking/{pedido_id}` — retorna también `sucursales_estado[]` para actualizar timeline vía AJAX sin reload
 
 ### Sprint 4C-4 — Detalle de producto + Descuentos en pedidos (pendiente)
 - [ ] **Página de detalle de producto** (`/catalogo/detalle/{id}` o modal expandido):
@@ -883,20 +988,20 @@ Modal "Entrada rápida IA" en /empresa-inventario
   - [ ] `LimiteController` — supervisor configura máximos por comprador/producto/mes
   - [ ] `CarritoController::actualizar()` — validar límites antes de crear pedido; mostrar error descriptivo
 
-### Sprint 4D — Sucursales del Comprador (CRUD) + Vehículos
-> Las sucursales son los PUNTOS DE ENTREGA del comprador (no almacenes del productor).
+### Sprint 4D — Vehículos + Logística de Rutas Avanzada
+> Sucursales del comprador: implementadas en Sprint 4C-3. Aquí: gestión de flota y optimización de rutas.
 
-- [ ] `EmpresaSucursalController` — gestión de sucursales (puntos de entrega de compradores)
-  - [ ] index: listado de sucursales de todos los compradores de la empresa
-  - [ ] form: crear/editar con picker de coordenadas en mapa Leaflet
-  - [ ] toggle activo/inactivo
-  - [ ] Ruta: `empresa-sucursal/*`
-- [ ] `EmpresaVehiculoController` — vehículos y asignación a repartidores
-  - [ ] index: listado de vehículos con estado y repartidor asignado
-  - [ ] form: alta de vehículo (placa, modelo, capacidad)
-  - [ ] Asignación en tabla `repartidor_vehiculo`
-  - [ ] Ruta: `empresa-vehiculo/*`
-- [ ] Al crear repartidor: guardar datos de vehículo en `repartidor_vehiculo` + `vehiculos`
+- [ ] `EmpresaVehiculoController` — gestión de flota, rutas `empresa-vehiculo/*`:
+  - [ ] `index()` — listado de vehículos con estado (activo/inactivo) y repartidor asignado actual
+  - [ ] `nuevo()`, `guardar()`, `editar()`, `actualizar()` — placa, modelo, capacidad (kg)
+  - [ ] `asignar($vehiculoId)` — asignación en `repartidor_vehiculo`
+- [ ] `EmpresaLogisticaController` mejorado — creación de rutas del día:
+  - [ ] Seleccionar pedidos aprobados del día → asignar a repartidor + vehículo
+  - [ ] Orden de paradas drag & drop (si multi-sucursal: una parada por sucursal)
+  - [ ] Vista logística: mapa Google Maps con ruta dibujada (Directions API)
+- [ ] Al crear repartidor: opción de asignar vehículo desde el formulario (INSERT en `repartidor_vehiculo`)
+- [ ] `EmpresaSucursalController` — vista admin de TODAS las sucursales de la empresa (solo lectura para logística):
+  - [ ] Ruta `empresa-sucursal/*` — listado por comprador, con mapa de pines Google Maps
 
 ### Sprint 4D+ — Almacenes del Productor (futuro, no MVP)
 > Si el productor tiene múltiples bodegas/centros de distribución propios con stock independiente.
@@ -1069,4 +1174,4 @@ Todos se configuran desde `/config/apis` y `/config/correo` (solo visible para s
 
 ---
 
-*Última actualización: 2026-05-06 — v2.7.0 (dashboard-admin mergeado a main — catálogo empresa modernizado: cards hover, modales separados "Ver Precios" y "Agregar", imágenes reales Unsplash, animaciones CSS; EmpresaDashboardController con queries SQL completos de KPIs; fix definitivo BaseController::redirectSegunRol: supervisor → supervisor/dashboard, comprador → comprador/inicio, admin_empresa → empresa/dashboard — cada rol tiene su ruta dedicada)*
+*Última actualización: 2026-05-06 — v2.8.0 (Sprint 4C-3 expandido: sucursales multi-destino del comprador, carrito multi-sucursal, Google Maps integration, repartidor multi-parada con timeline por sucursal — nueva rama 4C-3)*
