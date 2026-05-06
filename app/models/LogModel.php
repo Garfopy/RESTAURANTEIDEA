@@ -60,4 +60,16 @@ class LogModel extends BaseModel
         $sql = 'SELECT * FROM error_logs ORDER BY created_at DESC';
         return $this->paginate($sql, [], $page);
     }
+
+    public function getAccesosUsuario(int $usuarioId, int $limite = 10): array
+    {
+        return $this->query(
+            "SELECT accion, ip, descripcion, created_at
+               FROM action_logs
+              WHERE usuario_id = ? AND modulo = 'auth'
+              ORDER BY created_at DESC
+              LIMIT $limite",
+            [$usuarioId]
+        );
+    }
 }

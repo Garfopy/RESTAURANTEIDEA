@@ -833,21 +833,27 @@ Modal "Entrada rápida IA" en /empresa-inventario
 **Estimación:** Sprint completo (3-4 días de desarrollo + testing)
 
 ### Sprint 4C-2 — Portal Supervisor funcional ✅ COMPLETADO (2026-05-06)
-- [x] `SupervisorController::dashboard()` — KPIs del día (pendientes, en ruta, entregados hoy, monto mes)
-  - [x] Resumen operativo: pedidos hoy, entregados, en ruta con botón Rastrear
-  - [x] Alertas de stock (agotado/crítico) con tarjetas clicables que van directo al ajuste
-  - [x] Panel lateral de últimos 5 movimientos de inventario
-  - [x] Accesos rápidos: Pendientes de aprobar + Registrar entrada de stock
-  - [x] Vista `supervisor/dashboard.php`
-- [x] Sidebar supervisor limpio y propio: Mi Panel → Pedidos (badge de pendientes) → Control de Stock → Registrar movimiento → Mi perfil
-- [x] Supervisor accede a `empresa-pedido` para gestión completa (aprobar/rechazar/cambiar estado)
-- [x] Supervisor puede hacer ajuste directo de stock (`empresa-inventario/ajuste`) sin restricción de admin
-- [x] Fix sidebar admin: eliminada sección "Supervisión" duplicada; "Límites de compra" movida a Operación
-- [x] **Descuento de stock automático al aprobar pedido** (`EmpresaPedidoController::aprobar()` → `MovimientoInventarioModel::descontarStockPedido()`)
-- [x] **Validación de stock en carrito**: `CarritoController::actualizar()` y `agregarProducto()` bloquean si la cantidad supera el stock disponible
-- [x] `PedidoModel` — nuevos métodos públicos: `getPedidosEnRuta`, `countEntregadosHoy`, `countPedidosHoy`, `montoMes`
-- [x] `MovimientoInventarioModel` — nuevos métodos: `getStockActual()` (null=no rastreado), `descontarStockPedido()`
-- [x] Fix fatal error: `SupervisorController` ya no llama métodos protegidos de `BaseModel` directamente
+- [x] `SupervisorController::dashboard()` — Dashboard analytics completo con Chart.js
+  - [x] Selector de período: Hoy / 7D / 30D / 90D / Este año / Personalizado (rango libre)
+  - [x] 5 KPI cards primarios con gradiente: Pedidos, Ingresos, Tasa entrega, Pendientes, Tiempo aprobación
+  - [x] 4 KPI cards secundarios: Entregados hoy, Confirmados, Cancelados, Alertas stock
+  - [x] Gráfica de línea dual (pedidos + monto por día) — Chart.js
+  - [x] Donut de pedidos por estado — Chart.js
+  - [x] Bar horizontal de top 8 productos — Chart.js
+  - [x] Donut estado inventario (agotado/crítico/bajo/normal) — Chart.js
+  - [x] Bar entradas vs salidas de stock por semana — Chart.js
+  - [x] Tabla de pedidos recientes con links
+  - [x] Historial de accesos con IP, fecha, tiempo relativo (desde `action_logs`)
+- [x] Sidebar supervisor limpio: Mi Panel → Pedidos (badge pendientes) → Control de Stock → Registrar movimiento
+- [x] Supervisor accede a `empresa-pedido` para gestión completa de pedidos
+- [x] Supervisor puede hacer ajuste directo de stock (sin restricción admin_empresa)
+- [x] Fix sidebar admin_empresa: sección "Supervisión" eliminada; "Límites de compra" en Operación
+- [x] **Descuento de stock automático al aprobar pedido** → `MovimientoInventarioModel::descontarStockPedido()`
+- [x] **Validación de stock en carrito**: bloquea cantidad > stock disponible
+- [x] Nuevos métodos públicos `PedidoModel`: `kpisResumen`, `pedidosPorDia`, `pedidosPorEstado`, `topProductos`, `pedidosRecientes`, `getPedidosEnRuta`, `countEntregadosHoy`, `countPedidosHoy`, `montoMes`
+- [x] Nuevos métodos `MovimientoInventarioModel`: `getStockActual`, `descontarStockPedido`, `entradasVsSalidasSemanal`
+- [x] Nuevo método `LogModel::getAccesosUsuario()`
+- [x] Fix fatal error: controladores ya no llaman `query()` protegida directamente
 
 ### Sprint 4C-3 — Portal Comprador funcional 🔄 SIGUIENTE
 - [ ] `CompradorController::inicio()` — bienvenida + últimos pedidos + acceso rápido al catálogo

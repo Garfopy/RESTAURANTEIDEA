@@ -124,6 +124,22 @@ class MovimientoInventarioModel extends BaseModel
         return $row !== null ? (float)$row['stock'] : null;
     }
 
+    public function entradasVsSalidasSemanal(int $empresaId, int $semanas = 6): array
+    {
+        return $this->query(
+            "SELECT YEARWEEK(created_at, 1) AS semana_num,
+                    MIN(DATE(created_at)) AS inicio_semana,
+                    SUM(CASE WHEN tipo = 'entrada'              THEN cantidad ELSE 0 END) AS entradas,
+                    SUM(CASE WHEN tipo IN ('salida','merma')    THEN cantidad ELSE 0 END) AS salidas
+               FROM movimientos_inventario
+              WHERE empresa_id = ?
+                AND created_at >= DATE_SUB(CURDATE(), INTERVAL ? WEEK)
+              GROUP BY YEARWEEK(created_at, 1)
+              ORDER BY semana_num ASC",
+            [$empresaId, $semanas]
+        );
+    }
+
     /**
      * Deducts stock for every item in a pedido and registers outbound movements.
      * Skips products that have no inventario row (untracked = unlimited).
