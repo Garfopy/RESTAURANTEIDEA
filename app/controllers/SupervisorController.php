@@ -11,40 +11,15 @@ class SupervisorController extends BaseController
 
     public function dashboard(?string $p = null): void
     {
-        $empresaId        = $_SESSION['usuario']['empresa_id'] ?? 0;
-        $pedidoModel      = new PedidoModel();
-        $movimientoModel  = new MovimientoInventarioModel();
+        $empresaId       = $_SESSION['usuario']['empresa_id'] ?? 0;
+        $pedidoModel     = new PedidoModel();
+        $movimientoModel = new MovimientoInventarioModel();
 
-        $pendientes = $pedidoModel->pendientesAprobacion($empresaId);
-
-        $enRuta = $pedidoModel->query(
-            "SELECT p.id, p.folio, p.total, p.created_at,
-                    u.nombre AS comprador_nombre
-               FROM pedidos p
-               JOIN usuarios u ON u.id = p.comprador_id
-              WHERE p.empresa_id = ? AND p.estado = 'en_ruta'
-              ORDER BY p.created_at DESC LIMIT 10",
-            [$empresaId]
-        );
-
-        $entregadosHoy = (int)($pedidoModel->query(
-            "SELECT COUNT(*) AS total FROM pedidos
-              WHERE empresa_id = ? AND estado = 'entregado' AND DATE(updated_at) = CURDATE()",
-            [$empresaId]
-        )[0]['total'] ?? 0);
-
-        $pedidosHoy = (int)($pedidoModel->query(
-            "SELECT COUNT(*) AS total FROM pedidos
-              WHERE empresa_id = ? AND DATE(created_at) = CURDATE()",
-            [$empresaId]
-        )[0]['total'] ?? 0);
-
-        $montoMes = (float)($pedidoModel->query(
-            "SELECT COALESCE(SUM(total), 0) AS monto FROM pedidos
-              WHERE empresa_id = ? AND estado NOT IN ('cancelado')
-                AND YEAR(created_at) = YEAR(CURDATE()) AND MONTH(created_at) = MONTH(CURDATE())",
-            [$empresaId]
-        )[0]['monto'] ?? 0);
+        $pendientes  = $pedidoModel->pendientesAprobacion($empresaId);
+        $enRuta      = $pedidoModel->getPedidosEnRuta($empresaId);
+        $entregadosHoy = $pedidoModel->countEntregadosHoy($empresaId);
+        $pedidosHoy    = $pedidoModel->countPedidosHoy($empresaId);
+        $montoMes      = $pedidoModel->montoMes($empresaId);
 
         $stockResumen = $movimientoModel->resumenStock($empresaId);
         $alertasStock = array_values(array_filter(

@@ -107,10 +107,9 @@ class EmpresaInventarioController extends BaseController
         $this->redirect('empresa-inventario');
     }
 
-    // Ajuste directo (solo admin_empresa)
+    // Ajuste directo de stock (admin_empresa y supervisor)
     public function ajuste(?string $productoId = null): void
     {
-        $this->requireAdminEmpresa();
         $id = (int)$productoId;
 
         if (!$this->isPost()) {

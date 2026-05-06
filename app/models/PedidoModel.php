@@ -459,4 +459,50 @@ class PedidoModel extends BaseModel
             $params
         );
     }
+
+    // ── Métodos de resumen para SupervisorController ─────────────────────────
+
+    public function getPedidosEnRuta(int $empresaId): array
+    {
+        return $this->query(
+            "SELECT p.id, p.folio, p.total, p.created_at,
+                    u.nombre AS comprador_nombre
+               FROM pedidos p
+               JOIN usuarios u ON u.id = p.comprador_id
+              WHERE p.empresa_id = ? AND p.estado = 'en_ruta'
+              ORDER BY p.created_at DESC LIMIT 10",
+            [$empresaId]
+        );
+    }
+
+    public function countEntregadosHoy(int $empresaId): int
+    {
+        $row = $this->queryOne(
+            "SELECT COUNT(*) AS n FROM pedidos
+              WHERE empresa_id = ? AND estado = 'entregado' AND DATE(updated_at) = CURDATE()",
+            [$empresaId]
+        );
+        return (int)($row['n'] ?? 0);
+    }
+
+    public function countPedidosHoy(int $empresaId): int
+    {
+        $row = $this->queryOne(
+            "SELECT COUNT(*) AS n FROM pedidos
+              WHERE empresa_id = ? AND DATE(created_at) = CURDATE()",
+            [$empresaId]
+        );
+        return (int)($row['n'] ?? 0);
+    }
+
+    public function montoMes(int $empresaId): float
+    {
+        $row = $this->queryOne(
+            "SELECT COALESCE(SUM(total), 0) AS monto FROM pedidos
+              WHERE empresa_id = ? AND estado NOT IN ('cancelado')
+                AND YEAR(created_at) = YEAR(CURDATE()) AND MONTH(created_at) = MONTH(CURDATE())",
+            [$empresaId]
+        );
+        return (float)($row['monto'] ?? 0);
+    }
 }
