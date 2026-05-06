@@ -1,5 +1,5 @@
-# CarniHub — Plan v2.6.3
-**Versión:** 2.6.3 | **Fecha:** 2026-05-05 | **Stack:** PHP 8.3 · MySQL · Tailwind CDN · MVC sin framework
+# CarniHub — Plan v2.6.4
+**Versión:** 2.6.4 | **Fecha:** 2026-05-05 | **Stack:** PHP 8.3 · MySQL · Tailwind CDN · MVC sin framework
 
 ---
 
@@ -268,7 +268,7 @@ Login exitoso redirige según rol:
 | EmpresaUsuarioController | ✅ Funcional | admin_empresa | Crea supervisor/comprador/repartidor para su empresa |
 | EmpresaDashboardController | ✅ Funcional | admin_empresa | Dashboard del productor (ventas, stock, equipo) |
 | CatalogoController | ✅ Funcional | comprador | Catálogo con filtros, detalle de producto |
-| CuentaController | ✅ Funcional | Todos | Perfil, guardar datos, cambiar contraseña, avatar |
+| CuentaController | ✅ Funcional | Todos | Perfil, guardar datos, cambiar contraseña, avatar, guardarDireccion (compradores) |
 | CarritoController | ✅ Funcional | comprador | 4 pasos: productos → sucursales → resumen → confirmar |
 | PedidoController | ✅ Funcional | comprador, supervisor, admin_empresa | Historial, detalle, aprobación, tracking GPS, cancelar |
 | ConfigController | ✅ Completo | superadmin | general (logo+colores), apis (claves), correo (SMTP) |
@@ -279,7 +279,7 @@ Login exitoso redirige según rol:
 | EmpresaLogisticaController | ✅ Funcional | admin_empresa | Rutas de la empresa — fix query() protected aplicado |
 | SupervisorController | ⚠️ Esqueleto | supervisor | Panel dedicado — vistas pendientes |
 | CompradorController | ⚠️ Esqueleto | comprador | Portal de compras — vistas pendientes |
-| EmpresaPedidoController | ❌ Pendiente | admin_empresa | Pedidos de su empresa (consolidar) |
+| EmpresaPedidoController | ✅ Funcional | admin_empresa | Pedidos de su empresa: index, aprobar, rechazar, asignarEntrega, cambiarEstado, subirFotoEntrega, personalizado, guardarPersonalizado |
 | PanelReporteController | ❌ Pendiente | superadmin, admin | Reportes globales de plataforma (solo lectura) |
 | RecurrenteController | ❌ Pendiente | comprador, admin_empresa | Plantillas de pedido automático |
 | LimiteController | ❌ Pendiente | supervisor, admin_empresa | Límites de compra |
@@ -733,6 +733,64 @@ Empresa/Repartidor → "En camino" → en_ruta → sube foto entrega → entrega
 - [x] `detalle.php` — banner "En camino 🚚" para comprador cuando `estado = 'en_ruta'`:
   - Tipo de entrega, repartidor asignado (nombre), fecha estimada
 
+**K — Flujo de Pago Completo + Tipo de Entrega + Comprobante + Dirección ✅ COMPLETADO (2026-05-05)**
+> Bug crítico corregido: `CarritoController::confirmar()` no guardaba `metodo_pago` ni `tipo_entrega` en BD.
+> Todas las pantallas ahora guían al usuario paso a paso y mantienen el estado visible en todo momento.
+
+- [x] **Bug fix**: `CarritoController::confirmar()` — ahora guarda `metodo_pago`, `tipo_entrega`, `direccion_entrega`, `referencia_entrega`, `lat_entrega`, `lng_entrega` al crear el pedido
+- [x] `migrations/011_checkout_entrega_direccion.sql` — ADD columnas snapshot de dirección en `pedidos` (`direccion_entrega`, `referencia_entrega`, `lat_entrega`, `lng_entrega`) · ADD `lat` y `lng` en `empresas` para comparativa de ubicación
+- [x] `CarritoController::resumen()` — carga y pasa `$comprador` (usuario con dirección guardada) y `$empresa` al view paso3
+- [x] `CarritoController::confirmado()` — carga el pedido desde BD para pasarlo a paso4 (necesario para mostrar `tipo_entrega` en timeline)
+- [x] **`paso3.php` (resumen)** — reescrito completo:
+  - Selector visual de tipo de entrega con tarjetas interactivas: 🏭 "Recoger en bodega" / 🚚 "Envío a domicilio"
+  - Bloque **pickup**: muestra `empresas.direccion_fiscal` como punto de retiro
+  - Bloque **repartidor**: muestra dirección guardada del perfil con botón "Cambiar"; si no tiene, muestra campos editables
+  - JS: toggle visual de tarjetas + mostrar/ocultar bloques según selección
+  - `direccion_entrega` y `referencia_entrega` se envían al `confirmar()`
+- [x] **`paso4.php` (confirmado)** — reescrito con timeline "¿Qué sigue?":
+  - 4 pasos visuales: ✓ Pedido registrado · ⏳ Revisión del equipo · ○ Sube comprobante · ○ Entrega/Recoger
+  - Paso 4 se adapta al `tipo_entrega` del pedido (pickup vs. repartidor)
+- [x] **`perfil.php`** — nueva sección "Dirección de entrega" visible **solo para compradores** (`$rol === 'comprador'`):
+  - Campos: `direccion_entrega` (textarea), `referencia_entrega`, `lat_entrega`/`lng_entrega` (ocultos, para futuro mapa)
+- [x] **`CuentaController::guardarDireccion()`** — nuevo método; guarda `direccion_entrega`, `referencia_entrega`, `lat_entrega`, `lng_entrega` en `usuarios`; ruta `cuenta/guardarDireccion`
+- [x] **`detalle.php`** — reescrito con bloques contextuales por estado y rol:
+  - **Barra de progreso/timeline** con 5 estados: pendiente → aprobado → en preparación → en camino → entregado
+  - Estado **`pendiente`**: bloque azul "Tu pedido está en revisión"
+  - Estado **`confirmado`**: bloque upload comprobante (ya existía) + muestra tipo de entrega y método de pago
+  - Estado **`en_preparacion`**: bloque violeta; si pickup → muestra dirección fiscal de empresa; si repartidor → muestra dirección de entrega y aviso de repartidor próximo
+  - Estado **`en_ruta`**: banner naranja con repartidor + fecha estimada (ya existía, mantenido)
+  - Estado **`entregado`**: banner verde confirmación
+  - **Admin**: sección "Comprobante de pago" siempre visible — muestra preview de imagen o "Sin comprobante aún"
+  - Panel lateral: muestra `tipo_entrega`, `metodo_pago`, y bloque de dirección de entrega si aplica
+- [x] **`empresa_index.php`** — mejoras admin:
+  - Nuevo alert banner verde cuando hay pedidos con `foto_comprobante_path IS NOT NULL AND estado = 'en_preparacion'` (comprobantes pendientes de revisar)
+  - Badge `💳 Comprobante` visible y prominente en filas que tienen comprobante adjunto
+  - Botón **"✓ Recogido"** para pedidos `tipo_entrega='pickup'` en estado `en_preparacion`/`en_ruta` — confirma entrega sin requerir foto
+  - Botón **"📷 Entrega"** ahora solo aparece para pedidos con repartidor
+- [x] `PedidoModel::countConComprobantePendiente(int $empresaId)` — nuevo método para el badge admin
+- [x] `EmpresaPedidoController::index()` — agrega `$countConComprobante` para pasar al view
+
+**Flujo de pedido completo (post K)**
+```
+Comprador:
+  1. Carrito paso 3 → elige metodo_pago + tipo_entrega (pickup/repartidor) + dirección
+  2. Confirmar → pedido en BD con todos los campos guardados
+  3. paso4 → timeline "¿Qué sigue?" con 4 pasos claros
+
+Empresa (admin/supervisor):
+  4. Revisar pedido → asignar entrega + aprobar/rechazar
+  5. Si pickup: botón "✓ Recogido" cuando el cliente pasa a recoger (sin foto)
+  6. Si repartidor: asignar repartidor → repartidor sube foto de entrega → entregado
+
+Comprador:
+  3b. Si aprobado → detalle muestra bloque "Sube tu comprobante"
+  3c. Sube imagen de pago → estado en_preparacion
+  3d. Detalle muestra estado actual con instrucciones para cada paso
+
+Repartidor (ya existía desde 4C-1):
+  - confirmarEntrega() con firma digital + foto → pedido entregado
+```
+
 **F — Email Service (movido de prioridad — hacer cuando SMTP esté configurado en cPanel)**
 > El admin puede seguir viendo la contraseña generada como fallback mientras no haya SMTP activo.
 - [ ] `app/services/EmailService.php` con PHPMailer
@@ -986,4 +1044,4 @@ Todos se configuran desde `/config/apis` y `/config/correo` (solo visible para s
 
 ---
 
-*Última actualización: 2026-05-05 — v2.6.3 (Sprint 4C-1 J: catálogo reescrito con modal AJAX + precios en tiempo real + imágenes corregidas · CarritoController::agregarProducto nuevo endpoint · paso1.php oninput debounce · empresa_index.php: pickup oculta costo envío + Aprobar guarda entrega en un clic · detalle.php: banner "En camino" para comprador en en_ruta · plan.md: Sprint 4C-4 planificado con detalle producto + descuentos + límites)*
+*Última actualización: 2026-05-05 — v2.6.4 (Sprint 4C-1 K: flujo de pago completo — tipo_entrega + comprobante + dirección de entrega · Fix crítico: confirmar() ahora guarda metodo_pago y tipo_entrega · paso3 con tarjetas pickup/repartidor y dirección del comprador · paso4 con timeline "¿Qué sigue?" · perfil comprador con sección dirección de entrega · detalle con barra de progreso por 5 estados + bloques contextuales · empresa_index con badge comprobante + botón "Recogido" para pickup · migration 011 snapshot dirección en pedidos · EmpresaPedidoController ahora ✅ Funcional)*
