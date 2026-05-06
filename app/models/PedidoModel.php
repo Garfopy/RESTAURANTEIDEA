@@ -206,6 +206,15 @@ class PedidoModel extends BaseModel
         return (int)($row['n'] ?? 0);
     }
 
+    public function countConComprobantePendiente(int $empresaId): int
+    {
+        $row = $this->queryOne(
+            "SELECT COUNT(*) AS n FROM pedidos WHERE empresa_id = ? AND estado = 'en_preparacion' AND foto_comprobante_path IS NOT NULL",
+            [$empresaId]
+        );
+        return (int)($row['n'] ?? 0);
+    }
+
     public function pendientesAprobacion(int $empresaId): array
     {
         return $this->query(

@@ -10,32 +10,51 @@ $estadoConfig = [
 ];
 $est = $estadoConfig[$pedido['estado']] ?? ['label'=>$pedido['estado'],'bg'=>'#F3F4F6','color'=>'#374151'];
 $rol = $_SESSION['usuario']['rol_slug'] ?? '';
-$esComprador = in_array($rol, ['comprador'], true);
+$esComprador = $rol === 'comprador';
+$estadosOrden = ['pendiente','confirmado','en_preparacion','en_ruta','entregado'];
+$estadoActualIdx = array_search($pedido['estado'], $estadosOrden);
+$cancelado = $pedido['estado'] === 'cancelado';
 ?>
-<!-- Barra de estado -->
-<div style="background:#fff;border-radius:12px;border:1px solid #E5E7EB;padding:16px 20px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
+
+<?php if ($flash): ?>
+<div style="margin-bottom:16px;padding:12px 16px;border-radius:8px;font-size:.875rem;font-weight:500;
+  <?= $flash['type'] === 'success' ? 'background:#D1FAE5;color:#065F46;border:1px solid #A7F3D0' : 'background:#FEE2E2;color:#991B1B;border:1px solid #FECACA' ?>">
+  <?= htmlspecialchars($flash['message']) ?>
+</div>
+<?php endif; ?>
+
+<!-- Barra superior: folio + estado + totales + acciones -->
+<div style="background:#fff;border-radius:12px;border:1px solid #E5E7EB;padding:16px 20px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
   <div>
-    <div style="font-size:.8rem;color:#9CA3AF;margin-bottom:2px">Folio</div>
+    <div style="font-size:.78rem;color:#9CA3AF;margin-bottom:2px">Folio</div>
     <div style="font-size:1.3rem;font-weight:800;color:#111827;font-family:monospace"><?= htmlspecialchars($pedido['folio']) ?></div>
   </div>
   <div style="text-align:center">
-    <div style="font-size:.8rem;color:#9CA3AF;margin-bottom:2px">Estado</div>
+    <div style="font-size:.78rem;color:#9CA3AF;margin-bottom:2px">Estado</div>
     <span style="background:<?= $est['bg'] ?>;color:<?= $est['color'] ?>;padding:5px 16px;border-radius:999px;font-size:.875rem;font-weight:700">
       <?= $est['label'] ?>
     </span>
   </div>
+  <?php if (!empty($pedido['metodo_pago'])): ?>
   <div style="text-align:center">
-    <div style="font-size:.8rem;color:#9CA3AF;margin-bottom:2px">Subtotal</div>
+    <div style="font-size:.78rem;color:#9CA3AF;margin-bottom:2px">Pago</div>
+    <div style="font-size:.875rem;font-weight:600;color:#374151">
+      <?= ['transferencia'=>'Transferencia','tarjeta'=>'Tarjeta','credito'=>'Crédito'][$pedido['metodo_pago']] ?? ucfirst($pedido['metodo_pago']) ?>
+    </div>
+  </div>
+  <?php endif; ?>
+  <div style="text-align:center">
+    <div style="font-size:.78rem;color:#9CA3AF;margin-bottom:2px">Subtotal</div>
     <div style="font-size:1rem;font-weight:700;color:#374151">$<?= number_format($pedido['subtotal'], 2) ?></div>
   </div>
   <?php if (($pedido['costo_envio'] ?? 0) > 0): ?>
   <div style="text-align:center">
-    <div style="font-size:.8rem;color:#9CA3AF;margin-bottom:2px">Envío</div>
+    <div style="font-size:.78rem;color:#9CA3AF;margin-bottom:2px">Envío</div>
     <div style="font-size:1rem;font-weight:700;color:#374151">$<?= number_format($pedido['costo_envio'], 2) ?></div>
   </div>
   <?php endif; ?>
   <div style="text-align:center">
-    <div style="font-size:.8rem;color:#9CA3AF;margin-bottom:2px">Total</div>
+    <div style="font-size:.78rem;color:#9CA3AF;margin-bottom:2px">Total</div>
     <div style="font-size:1.3rem;font-weight:800;color:var(--color-primary)">$<?= number_format($pedido['total'], 2) ?></div>
   </div>
   <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -49,17 +68,109 @@ $esComprador = in_array($rol, ['comprador'], true);
   </div>
 </div>
 
-<?php if ($flash): ?>
-<div style="margin-bottom:16px;padding:12px 16px;border-radius:8px;font-size:.875rem;font-weight:500;
-  <?= $flash['type'] === 'success' ? 'background:#D1FAE5;color:#065F46;border:1px solid #A7F3D0' : 'background:#FEE2E2;color:#991B1B;border:1px solid #FECACA' ?>">
-  <?= htmlspecialchars($flash['message']) ?>
+<!-- Timeline de progreso (solo si no está cancelado) -->
+<?php if (!$cancelado): ?>
+<div style="background:#fff;border-radius:12px;border:1px solid #E5E7EB;padding:16px 20px;margin-bottom:16px;overflow-x:auto">
+  <div style="display:flex;align-items:center;min-width:420px">
+    <?php
+    $labelsTimeline = ['pendiente'=>'Pendiente','confirmado'=>'Aprobado','en_preparacion'=>'En preparación','en_ruta'=>'En camino','entregado'=>'Entregado'];
+    $iconosTimeline = ['pendiente'=>'📋','confirmado'=>'✓','en_preparacion'=>'📦','en_ruta'=>'🚚','entregado'=>'✅'];
+    $totalSteps = count($estadosOrden);
+    foreach ($estadosOrden as $si => $se):
+      $hecho  = ($estadoActualIdx !== false) && $si <= $estadoActualIdx;
+      $actual = ($estadoActualIdx !== false) && $si === $estadoActualIdx;
+    ?>
+    <div style="display:flex;flex-direction:column;align-items:center;flex:1;min-width:70px;position:relative">
+      <?php if ($si > 0): ?>
+      <div style="position:absolute;top:14px;left:-50%;width:100%;height:2px;background:<?= $hecho ? 'var(--color-primary)' : '#E5E7EB' ?>"></div>
+      <?php endif; ?>
+      <div style="width:28px;height:28px;border-radius:50%;background:<?= $hecho ? 'var(--color-primary)' : '#E5E7EB' ?>;display:flex;align-items:center;justify-content:center;font-size:.75rem;color:<?= $hecho ? '#fff' : '#9CA3AF' ?>;position:relative;z-index:1;border:2px solid <?= $actual ? 'var(--color-primary)' : ($hecho ? 'var(--color-primary)' : '#D1D5DB') ?>">
+        <?= $hecho ? ($actual && $se !== 'entregado' ? $iconosTimeline[$se] : '✓') : ($si+1) ?>
+      </div>
+      <div style="font-size:.68rem;font-weight:<?= $actual ? '700' : '500' ?>;color:<?= $actual ? 'var(--color-primary)' : ($hecho ? '#374151' : '#9CA3AF') ?>;text-align:center;margin-top:5px;white-space:nowrap">
+        <?= $labelsTimeline[$se] ?>
+      </div>
+    </div>
+    <?php endforeach; ?>
+  </div>
 </div>
 <?php endif; ?>
 
-<!-- Nota de la empresa (rechazo o aprobación) -->
+<!-- Nota de la empresa (rechazo o mensaje) -->
 <?php if (!empty($pedido['nota_empresa'])): ?>
 <div style="margin-bottom:16px;padding:12px 16px;background:#FEF3C7;border:1px solid #FCD34D;border-radius:8px;font-size:.875rem;color:#92400E">
   <strong>Mensaje de la empresa:</strong> <?= htmlspecialchars($pedido['nota_empresa']) ?>
+</div>
+<?php endif; ?>
+
+<!-- ── BLOQUES CONTEXTUALES SEGÚN ESTADO (comprador) ── -->
+
+<?php if ($esComprador && $pedido['estado'] === 'pendiente'): ?>
+<div style="margin-bottom:20px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:12px;padding:18px 20px">
+  <div style="font-weight:700;color:#1E40AF;font-size:.9rem;margin-bottom:6px">Tu pedido está en revisión</div>
+  <p style="font-size:.85rem;color:#1D4ED8;margin:0">
+    El supervisor o administrador de la empresa lo revisará pronto. Una vez aprobado, podrás subir tu comprobante de pago.
+  </p>
+</div>
+<?php endif; ?>
+
+<?php if ($esComprador && $pedido['estado'] === 'confirmado'): ?>
+<div style="margin-bottom:20px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:12px;padding:18px 20px">
+  <div style="font-weight:700;color:#1E40AF;font-size:.9rem;margin-bottom:6px">
+    Tu pedido fue aprobado — Envía tu comprobante de pago
+  </div>
+  <?php if (!empty($pedido['tipo_entrega'])): ?>
+  <p style="font-size:.85rem;color:#1D4ED8;margin:0 0 10px 0">
+    Tipo de entrega: <strong><?= $pedido['tipo_entrega'] === 'pickup' ? '🏭 Recoger en bodega' : '🚚 Envío a domicilio' ?></strong>
+    &nbsp;·&nbsp; Pago: <strong><?= ['transferencia'=>'Transferencia','tarjeta'=>'Tarjeta','credito'=>'Crédito'][$pedido['metodo_pago'] ?? ''] ?? '—' ?></strong>
+  </p>
+  <?php endif; ?>
+  <?php if (empty($pedido['foto_comprobante_path'])): ?>
+  <form method="POST" action="<?= BASE_URL ?>pedido/subirComprobante/<?= $pedido['id'] ?>" enctype="multipart/form-data">
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <input type="file" name="comprobante" accept="image/*,.pdf" required
+             style="flex:1;padding:8px;border:1px solid #93C5FD;border-radius:8px;font-size:.85rem;background:#fff">
+      <button type="submit" style="padding:9px 20px;background:#1D4ED8;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:.875rem;cursor:pointer;white-space:nowrap">
+        Enviar comprobante
+      </button>
+    </div>
+    <div style="font-size:.75rem;color:#6B7280;margin-top:6px">JPG, PNG, WEBP o PDF · Máx 5 MB</div>
+  </form>
+  <?php else: ?>
+  <div style="display:flex;align-items:center;gap:8px;color:#065F46;font-size:.875rem;font-weight:600">
+    ✓ Comprobante enviado — la empresa verificará el pago.
+    <a href="<?= htmlspecialchars($pedido['foto_comprobante_path']) ?>" target="_blank" style="color:#1D4ED8;margin-left:8px">Ver comprobante</a>
+  </div>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+
+<?php if ($esComprador && $pedido['estado'] === 'en_preparacion'): ?>
+<div style="margin-bottom:20px;background:#EDE9FE;border:1px solid #C4B5FD;border-radius:12px;padding:18px 20px">
+  <div style="font-weight:700;color:#5B21B6;font-size:.9rem;margin-bottom:6px">Tu pago fue verificado — Preparando tu pedido</div>
+  <?php if (($pedido['tipo_entrega'] ?? '') === 'pickup'): ?>
+  <p style="font-size:.85rem;color:#6D28D9;margin:0 0 10px 0">
+    Tu pedido será preparado para recoger en bodega. La empresa te avisará cuando esté listo.
+  </p>
+    <?php if (!empty($pedido['empresa_nombre'])): ?>
+    <div style="background:rgba(255,255,255,.6);border-radius:8px;padding:10px 14px;font-size:.83rem">
+      <div style="color:#5B21B6;font-weight:700;font-size:.7rem;margin-bottom:3px">PUNTO DE RETIRO</div>
+      <div style="color:#4C1D95;font-weight:600"><?= htmlspecialchars($pedido['empresa_nombre']) ?></div>
+      <?php
+        $empresaInfo = (new EmpresaModel())->find((int)$pedido['empresa_id']);
+        if (!empty($empresaInfo['direccion_fiscal'])): ?>
+      <div style="color:#6D28D9;margin-top:2px"><?= htmlspecialchars($empresaInfo['direccion_fiscal']) ?></div>
+      <?php endif; ?>
+    </div>
+    <?php endif; ?>
+  <?php else: ?>
+  <p style="font-size:.85rem;color:#6D28D9;margin:0">
+    Se asignará un repartidor para llevar tu pedido a la dirección registrada.
+    <?php if (!empty($pedido['direccion_entrega'])): ?>
+    <br><strong>Dirección:</strong> <?= htmlspecialchars($pedido['direccion_entrega']) ?>
+    <?php endif; ?>
+  </p>
+  <?php endif; ?>
 </div>
 <?php endif; ?>
 
@@ -73,19 +184,17 @@ $esComprador = in_array($rol, ['comprador'], true);
       <div style="font-size:.85rem;color:#B45309;margin-top:4px">
         Tu pedido <strong><?= htmlspecialchars($pedido['folio']) ?></strong> fue despachado y está siendo entregado.
       </div>
-      <?php if (!empty($pedido['tipo_entrega'])): ?>
       <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:12px">
         <div style="background:rgba(255,255,255,.6);border-radius:8px;padding:8px 14px;font-size:.82rem">
           <div style="color:#92400E;font-weight:700;font-size:.7rem;margin-bottom:2px">TIPO DE ENTREGA</div>
           <div style="color:#78350F;font-weight:600">
-            <?= $pedido['tipo_entrega'] === 'pickup' ? '🏭 Recoger en bodega' : '🚚 Envío a domicilio' ?>
+            <?= ($pedido['tipo_entrega'] ?? '') === 'pickup' ? '🏭 Recoger en bodega' : '🚚 Envío a domicilio' ?>
           </div>
         </div>
         <?php
         $repartidorNombre = null;
         if (!empty($pedido['repartidor_asignado_id'])) {
-            $usuarioModel = new UsuarioModel();
-            $rep = $usuarioModel->find((int)$pedido['repartidor_asignado_id']);
+            $rep = (new UsuarioModel())->find((int)$pedido['repartidor_asignado_id']);
             if ($rep) $repartidorNombre = trim(($rep['nombre'] ?? '') . ' ' . ($rep['apellido_paterno'] ?? ''));
         }
         ?>
@@ -102,35 +211,42 @@ $esComprador = in_array($rol, ['comprador'], true);
         </div>
         <?php endif; ?>
       </div>
-      <?php endif; ?>
     </div>
   </div>
 </div>
 <?php endif; ?>
 
-<!-- Comprobante de pago (solo comprador, solo si está confirmado) -->
-<?php if ($esComprador && $pedido['estado'] === 'confirmado'): ?>
-<div style="margin-bottom:20px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:12px;padding:18px 20px">
-  <div style="font-weight:700;color:#1E40AF;font-size:.9rem;margin-bottom:8px">Tu pedido fue aprobado — Envía tu comprobante de pago</div>
-  <p style="font-size:.85rem;color:#1D4ED8;margin:0 0 12px 0">
-    Tipo de entrega: <strong><?= $pedido['tipo_entrega'] === 'pickup' ? 'Recoger en bodega' : 'Envío a domicilio' ?></strong>
-    <?php if (!empty($pedido['repartidor_asignado_id'])): ?>· Repartidor asignado<?php endif; ?>
-  </p>
-  <?php if (empty($pedido['foto_comprobante_path'])): ?>
-  <form method="POST" action="<?= BASE_URL ?>pedido/subirComprobante/<?= $pedido['id'] ?>" enctype="multipart/form-data">
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-      <input type="file" name="comprobante" accept="image/*,.pdf" required
-             style="flex:1;padding:8px;border:1px solid #93C5FD;border-radius:8px;font-size:.85rem;background:#fff">
-      <button type="submit" style="padding:9px 20px;background:#1D4ED8;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:.875rem;cursor:pointer;white-space:nowrap">
-        Enviar comprobante
-      </button>
+<?php if ($esComprador && $pedido['estado'] === 'entregado'): ?>
+<div style="margin-bottom:20px;background:#D1FAE5;border:1px solid #A7F3D0;border-radius:12px;padding:16px 20px">
+  <div style="font-weight:700;color:#065F46;font-size:.9rem">✅ Tu pedido fue entregado</div>
+  <div style="font-size:.85rem;color:#047857;margin-top:4px">¡Gracias por tu compra! Si tienes alguna duda, contacta a la empresa.</div>
+</div>
+<?php endif; ?>
+
+<!-- ── ADMIN: comprobante de pago ── -->
+<?php if (!$esComprador): ?>
+<div style="margin-bottom:16px;background:#fff;border-radius:12px;border:1px solid #E5E7EB;padding:16px 20px">
+  <div style="font-weight:700;font-size:.85rem;color:#111827;margin-bottom:8px">Comprobante de pago</div>
+  <?php if (!empty($pedido['foto_comprobante_path'])): ?>
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <?php
+    $ext = strtolower(pathinfo($pedido['foto_comprobante_path'], PATHINFO_EXTENSION));
+    $esImagen = in_array($ext, ['jpg','jpeg','png','webp']);
+    ?>
+    <?php if ($esImagen): ?>
+    <a href="<?= htmlspecialchars($pedido['foto_comprobante_path']) ?>" target="_blank">
+      <img src="<?= htmlspecialchars($pedido['foto_comprobante_path']) ?>" alt="Comprobante"
+           style="width:90px;height:90px;object-fit:cover;border-radius:8px;border:1px solid #E5E7EB;cursor:pointer">
+    </a>
+    <?php endif; ?>
+    <div>
+      <div style="font-size:.85rem;font-weight:600;color:#059669">✓ Comprobante recibido</div>
+      <a href="<?= htmlspecialchars($pedido['foto_comprobante_path']) ?>" target="_blank"
+         style="font-size:.8rem;color:#1D4ED8">Ver / descargar comprobante →</a>
     </div>
-  </form>
-  <?php else: ?>
-  <div style="display:flex;align-items:center;gap:8px;color:#065F46;font-size:.875rem;font-weight:600">
-    ✓ Comprobante enviado — la empresa verificará el pago.
-    <a href="<?= $pedido['foto_comprobante_path'] ?>" target="_blank" style="color:#1D4ED8;margin-left:8px">Ver comprobante</a>
   </div>
+  <?php else: ?>
+  <div style="font-size:.85rem;color:#9CA3AF">Sin comprobante adjunto aún.</div>
   <?php endif; ?>
 </div>
 <?php endif; ?>
@@ -143,7 +259,6 @@ $esComprador = in_array($rol, ['comprador'], true);
         Productos (<?= count($pedido['items']) ?>)
       </div>
       <?php
-      // Detect if any item was price-adjusted
       $hayAjuste = false;
       foreach ($pedido['items'] as $item) {
           if (!empty($item['precio_original']) && abs((float)$item['precio_original'] - (float)$item['precio_unit']) > 0.001) {
@@ -235,7 +350,10 @@ $esComprador = in_array($rol, ['comprador'], true);
         'Fecha entrega' => $pedido['fecha_entrega'] ? date('d/m/Y', strtotime($pedido['fecha_entrega'])) : '—',
       ];
       if (!empty($pedido['tipo_entrega'])) {
-          $rows['Tipo entrega'] = $pedido['tipo_entrega'] === 'pickup' ? 'Recoger en bodega' : 'Envío por repartidor';
+          $rows['Tipo entrega'] = $pedido['tipo_entrega'] === 'pickup' ? '🏭 Recoger en bodega' : '🚚 Envío a domicilio';
+      }
+      if (!empty($pedido['metodo_pago'])) {
+          $rows['Método de pago'] = ['transferencia'=>'Transferencia','tarjeta'=>'Tarjeta','credito'=>'Crédito'][$pedido['metodo_pago']] ?? ucfirst($pedido['metodo_pago']);
       }
       if ($pedido['aprobador_nombre']) {
           $rows['Aprobado por'] = htmlspecialchars($pedido['aprobador_nombre']);
@@ -246,20 +364,22 @@ $esComprador = in_array($rol, ['comprador'], true);
         <span style="font-weight:600;color:#374151"><?= $v ?></span>
       </div>
       <?php endforeach; ?>
+
+      <?php if (!empty($pedido['direccion_entrega']) && ($pedido['tipo_entrega'] ?? '') === 'repartidor'): ?>
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid #F3F4F6">
+        <div style="font-size:.75rem;font-weight:700;color:#6B7280;margin-bottom:3px">DIRECCIÓN DE ENTREGA</div>
+        <div style="font-size:.83rem;color:#374151"><?= htmlspecialchars($pedido['direccion_entrega']) ?></div>
+        <?php if (!empty($pedido['referencia_entrega'])): ?>
+        <div style="font-size:.78rem;color:#6B7280;margin-top:2px"><?= htmlspecialchars($pedido['referencia_entrega']) ?></div>
+        <?php endif; ?>
+      </div>
+      <?php endif; ?>
     </div>
 
     <?php if ($pedido['notas']): ?>
     <div style="background:#FFFBEB;border:1px solid #FCD34D;border-radius:12px;padding:14px">
       <div style="font-weight:600;font-size:.8rem;color:#92400E;margin-bottom:6px">Notas del pedido</div>
       <p style="font-size:.85rem;color:#78350F;margin:0;white-space:pre-line"><?= htmlspecialchars($pedido['notas']) ?></p>
-    </div>
-    <?php endif; ?>
-
-    <?php if (!empty($pedido['foto_comprobante_path']) && !$esComprador): ?>
-    <div style="background:#F0FDF4;border:1px solid #A7F3D0;border-radius:12px;padding:14px">
-      <div style="font-weight:700;font-size:.8rem;color:#065F46;margin-bottom:8px">Comprobante de pago</div>
-      <a href="<?= htmlspecialchars($pedido['foto_comprobante_path']) ?>" target="_blank"
-         style="font-size:.85rem;color:#059669;font-weight:600">Ver comprobante →</a>
     </div>
     <?php endif; ?>
 

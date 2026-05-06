@@ -16,6 +16,8 @@ class CarritoController extends BaseController
     private ProductoModel $productoModel;
     private PedidoModel   $pedidoModel;
     private ComboModel    $comboModel;
+    private EmpresaModel  $empresaModel;
+    private UsuarioModel  $usuarioModel;
 
     public function __construct()
     {
@@ -24,6 +26,8 @@ class CarritoController extends BaseController
         $this->productoModel = new ProductoModel();
         $this->pedidoModel   = new PedidoModel();
         $this->comboModel    = new ComboModel();
+        $this->empresaModel  = new EmpresaModel();
+        $this->usuarioModel  = new UsuarioModel();
     }
 
     // ── Paso 1: Selección de productos ────────────────────────────
@@ -121,6 +125,9 @@ class CarritoController extends BaseController
 
         $total = array_sum(array_column($items, 'subtotal'));
 
+        $comprador = $this->usuarioModel->find($this->usuarioId());
+        $empresa   = $this->empresaModel->find($this->empresaId());
+
         $flash      = $this->getFlash();
         $meta       = $_SESSION['carrito']['meta'] ?? [];
         $pageTitle  = 'Hacer pedido — Paso 2: Resumen';
@@ -147,6 +154,15 @@ class CarritoController extends BaseController
 
         $fechaEntrega = trim($this->post('fecha_entrega', ''));
         $notas        = trim($this->post('notas', ''));
+        $tipoEntrega  = $this->post('tipo_entrega');
+        $metodoPago   = $this->post('metodo_pago');
+
+        if (!in_array($tipoEntrega, ['pickup', 'repartidor'], true)) {
+            $tipoEntrega = 'pickup';
+        }
+        if (!in_array($metodoPago, ['transferencia', 'tarjeta', 'credito'], true)) {
+            $metodoPago = 'transferencia';
+        }
 
         if (empty($fechaEntrega)) {
             $this->flash('error', 'Selecciona la fecha de entrega.');
@@ -173,8 +189,18 @@ class CarritoController extends BaseController
             'estado'              => 'pendiente',
             'requiere_aprobacion' => 0,
             'fecha_entrega'       => $fechaEntrega,
+            'metodo_pago'         => $metodoPago,
+            'tipo_entrega'        => $tipoEntrega,
             'notas'               => $notas ?: null,
         ];
+
+        if ($tipoEntrega === 'repartidor') {
+            $comprador = $this->usuarioModel->find($compradorId);
+            $pedidoData['direccion_entrega']  = trim($this->post('direccion_entrega', '')) ?: ($comprador['direccion_entrega'] ?? null);
+            $pedidoData['referencia_entrega'] = trim($this->post('referencia_entrega', '')) ?: ($comprador['referencia_entrega'] ?? null);
+            $pedidoData['lat_entrega']        = $comprador['lat_entrega'] ?? null;
+            $pedidoData['lng_entrega']        = $comprador['lng_entrega'] ?? null;
+        }
 
         try {
             $pedidoId = $this->pedidoModel->crear($pedidoData, $itemsDB);
@@ -205,6 +231,7 @@ class CarritoController extends BaseController
 
         unset($_SESSION['ultimo_folio'], $_SESSION['ultimo_pedido_id']);
 
+        $pedido     = $pedidoId ? $this->pedidoModel->find((int)$pedidoId) : null;
         $flash      = $this->getFlash();
         $pageTitle  = 'Pedido confirmado';
         $activeMenu = 'carrito';

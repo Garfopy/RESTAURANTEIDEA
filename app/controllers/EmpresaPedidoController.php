@@ -30,7 +30,8 @@ class EmpresaPedidoController extends BaseController
         $items      = $resultado['data'];
         $paginacion = $resultado;
 
-        $countPendientes = $this->pedidoModel->countPendientes($empresaId);
+        $countPendientes    = $this->pedidoModel->countPendientes($empresaId);
+        $countConComprobante = $this->pedidoModel->countConComprobantePendiente($empresaId);
 
         $usuarioModel = new UsuarioModel();
         $repartidores = $usuarioModel->getByRolEmpresa('repartidor', $empresaId);

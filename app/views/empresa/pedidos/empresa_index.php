@@ -20,11 +20,21 @@ $estados = [
 
 <!-- Badge de pedidos pendientes -->
 <?php if ($countPendientes > 0): ?>
-<div style="margin-bottom:16px;padding:12px 16px;background:#FEF3C7;border:1px solid #FCD34D;border-radius:10px;display:flex;align-items:center;gap:10px">
+<div style="margin-bottom:12px;padding:12px 16px;background:#FEF3C7;border:1px solid #FCD34D;border-radius:10px;display:flex;align-items:center;gap:10px">
   <span style="font-size:1.1rem">⚠️</span>
   <div>
     <strong style="color:#92400E"><?= $countPendientes ?> pedido(s) pendiente(s) de revisión</strong>
     <span style="font-size:.8rem;color:#B45309;display:block">Asigna tipo de entrega y aprueba o rechaza cada uno.</span>
+  </div>
+</div>
+<?php endif; ?>
+
+<?php if (!empty($countConComprobante) && $countConComprobante > 0): ?>
+<div style="margin-bottom:16px;padding:12px 16px;background:#ECFDF5;border:1px solid #A7F3D0;border-radius:10px;display:flex;align-items:center;gap:10px">
+  <span style="font-size:1.1rem">💳</span>
+  <div>
+    <strong style="color:#065F46"><?= $countConComprobante ?> pedido(s) con comprobante de pago adjunto</strong>
+    <span style="font-size:.8rem;color:#047857;display:block">Revisa el comprobante en el detalle del pedido y procesa la entrega.</span>
   </div>
 </div>
 <?php endif; ?>
@@ -89,8 +99,10 @@ $estados = [
           <span style="padding:3px 10px;border-radius:999px;background:<?= $est['bg'] ?>;color:<?= $est['tx'] ?>;font-size:.7rem;font-weight:700">
             <?= $est['label'] ?>
           </span>
-          <?php if ($tieneComprobante): ?>
-          <div style="font-size:.65rem;color:#059669;margin-top:2px;font-weight:600">✓ Comprobante</div>
+          <?php if ($tieneComprobante && in_array($p['estado'], ['en_preparacion','confirmado'], true)): ?>
+          <div style="margin-top:4px">
+            <span style="padding:2px 7px;border-radius:999px;background:#D1FAE5;color:#059669;font-size:.65rem;font-weight:700">💳 Comprobante</span>
+          </div>
           <?php endif; ?>
         </td>
         <td style="padding:10px 16px;text-align:center">
@@ -123,7 +135,17 @@ $estados = [
               Revisar
             </button>
             <?php endif; ?>
-            <?php if (in_array($p['estado'], ['en_preparacion','en_ruta','confirmado'], true)): ?>
+            <?php if (($p['tipo_entrega'] ?? '') === 'pickup' && in_array($p['estado'], ['en_preparacion','en_ruta'], true)): ?>
+            <form method="POST" action="<?= $baseUrl ?>empresa-pedido/cambiarEstado" style="display:inline"
+                  onsubmit="return confirm('¿Confirmar que el comprador recogió el pedido?')">
+              <input type="hidden" name="pedido_id" value="<?= $p['id'] ?>">
+              <input type="hidden" name="estado" value="entregado">
+              <button type="submit"
+                      style="padding:4px 8px;border:1px solid #10B981;border-radius:6px;color:#065F46;background:#D1FAE5;cursor:pointer;font-size:.72rem;font-weight:700;font-family:inherit">
+                ✓ Recogido
+              </button>
+            </form>
+            <?php elseif (in_array($p['estado'], ['en_preparacion','en_ruta','confirmado'], true)): ?>
             <button onclick="abrirSubirFoto(<?= $p['id'] ?>)"
                     style="padding:4px 8px;border:1px solid #10B981;border-radius:6px;color:#065F46;background:#D1FAE5;cursor:pointer;font-size:.72rem;font-weight:600;font-family:inherit">
               📷 Entrega
