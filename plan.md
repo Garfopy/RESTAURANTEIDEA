@@ -1,5 +1,5 @@
-# CarniHub — Plan v2.6.9
-**Versión:** 2.6.9 | **Fecha:** 2026-05-06 | **Stack:** PHP 8.3 · MySQL · Tailwind CDN · MVC sin framework
+# CarniHub — Plan v2.7.0
+**Versión:** 2.7.0 | **Fecha:** 2026-05-06 | **Stack:** PHP 8.3 · MySQL · Tailwind CDN · MVC sin framework
 
 ---
 
@@ -517,14 +517,21 @@ Login exitoso redirige según rol:
 
 **Bug 4 — Dashboard admin_empresa: botón "+ Nuevo pedido" incorrecto**
 - [x] Vista `empresa/dashboard.php` — eliminado botón "+ Nuevo pedido" (los pedidos los hace el comprador desde el catálogo)
+- [x] 6 Gráficas Propuestas:
 
-**Migraciones para aplicar en phpMyAdmin (si no se ha hecho reset completo):**
-```
-004_hotfix_4c0.sql   → suscripción demo empresa 1 (si ya corriste 003)
-005_productos_empresa_id.sql → ALTER TABLE productos ADD empresa_id
-```
+Ventas por mes (línea + barras) - últimos 6 meses
+Ventas diarias (área) - últimos 30 días
+Estados de pedidos (dona) - distribución últimos 30 días
+Usuarios por rol (barra horizontal) - equipo activo
+Top 5 productos (barra horizontal) - más vendidos 30 días
+Métodos de pago (barra vertical) - últimos 90 días
+Tecnología: Chart.js 4.4.0 desde CDN (compatible con tu arquitectura actual)
 
----
+Archivos a modificar:
+
+Controller: Agregar método para obtener datos de gráficas
+Layout: Cargar CDN de Chart.js
+Vista: Agregar gráficas en grid 2 columnas después de tabla pedidos
 
 ### Sprint 4S-3 — Landing pública + Super Admin: precios, incidencias y reportes SaaS
 > Prioridad menor que 4C-1/4C-2/4C-3. Hacer después de completar los portales de empresa, supervisor y comprador.
@@ -1062,4 +1069,4 @@ Todos se configuran desde `/config/apis` y `/config/correo` (solo visible para s
 
 ---
 
-*Última actualización: 2026-05-06 — v2.6.9 (Sprint 4C-2 mergeado a main — conflicto SupervisorController.php resuelto conservando versión completa del dashboard analytics)*
+*Última actualización: 2026-05-06 — v2.7.0 (dashboard-admin mergeado a main — catálogo empresa modernizado: cards hover, modales separados "Ver Precios" y "Agregar", imágenes reales Unsplash, animaciones CSS; EmpresaDashboardController con queries SQL completos de KPIs; fix definitivo BaseController::redirectSegunRol: supervisor → supervisor/dashboard, comprador → comprador/inicio, admin_empresa → empresa/dashboard — cada rol tiene su ruta dedicada)*

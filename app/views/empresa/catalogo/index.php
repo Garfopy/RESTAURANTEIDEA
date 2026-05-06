@@ -10,7 +10,77 @@ unset($prod);
 $rol          = $_SESSION['usuario']['rol_slug'] ?? '';
 $puedeComprar = in_array($rol, ['admin_empresa','comprador'], true);
 $totalCarrito = count($_SESSION['carrito']['items'] ?? []);
+
+// Helper para imágenes reales
+function getProductImageUrl($prod) {
+    // Si ya tiene imagen subida, usarla
+    if (!empty($prod['imagen'])) {
+        return htmlspecialchars($prod['imagen']);
+    }
+
+    // Mapeo de categorías a imágenes reales de Unsplash
+    $baseUrl = "https://images.unsplash.com/photo-";
+    $meatImages = [
+        'res'       => '1588347818579-a62e21b490b0?w=800&h=600&fit=crop&auto=format',
+        'cerdo'     => '1603048297172-c92544798d5a?w=800&h=600&fit=crop&auto=format',
+        'pollo'     => '1587593810167-a84920ea0781?w=800&h=600&fit=crop&auto=format',
+        'pescado'   => '1559847844-5315695dadae?w=800&h=600&fit=crop&auto=format',
+        'cordero'   => '1529692236671-f1f6cf9683ba?w=800&h=600&fit=crop&auto=format',
+        'embutidos' => '1589935512933-ac5c032fa7c8?w=800&h=600&fit=crop&auto=format',
+        'mariscos'  => '1615485736162-5bf79b76e4cc?w=800&h=600&fit=crop&auto=format',
+    ];
+
+    $categoryLower = strtolower($prod['categoria_nombre']);
+    foreach ($meatImages as $key => $imgId) {
+        if (strpos($categoryLower, $key) !== false) {
+            return $baseUrl . $imgId;
+        }
+    }
+
+    // Fallback genérico
+    return "https://source.unsplash.com/800x600/?raw+meat," . urlencode($prod['categoria_nombre']);
+}
 ?>
+
+<style>
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modalSlideUp {
+  from {
+    transform: translateY(40px) scale(.92);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .catalog-grid {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+
+  #modalVerPrecios > div,
+  #modalAgregar > div {
+    width: 96vw !important;
+  }
+}
+</style>
 
 <!-- Filtros -->
 <form method="GET" action="<?= BASE_URL ?>catalogo/index" style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:flex-end">
@@ -47,27 +117,33 @@ $totalCarrito = count($_SESSION['carrito']['items'] ?? []);
 <?php if (empty($productos)): ?>
 <div style="text-align:center;padding:40px;color:#6B7280">Sin productos disponibles.</div>
 <?php else: ?>
-<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px">
+<div class="catalog-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:20px">
   <?php foreach ($productos as $prod): ?>
-  <div style="background:#fff;border-radius:12px;border:1px solid #E5E7EB;overflow:hidden;display:flex;flex-direction:column">
+  <div style="background:#fff;border-radius:14px;border:1px solid #E5E7EB;overflow:hidden;display:flex;flex-direction:column;transition:all .25s ease;box-shadow:0 2px 8px rgba(0,0,0,.06);cursor:pointer"
+       onmouseenter="this.style.boxShadow='0 12px 32px rgba(0,0,0,.12)';this.style.transform='translateY(-6px)';this.style.borderColor='#D1D5DB'"
+       onmouseleave="this.style.boxShadow='0 2px 8px rgba(0,0,0,.06)';this.style.transform='translateY(0)';this.style.borderColor='#E5E7EB'">
     <!-- Imagen -->
-    <div style="height:140px;background:#F3F4F6;display:flex;align-items:center;justify-content:center;overflow:hidden">
-      <?php if (!empty($prod['imagen'])): ?>
-        <img src="<?= htmlspecialchars($prod['imagen']) ?>" alt="<?= htmlspecialchars($prod['nombre']) ?>" style="width:100%;height:100%;object-fit:cover">
-      <?php else: ?>
-        <span style="font-size:3rem">🥩</span>
-      <?php endif; ?>
+    <div style="height:200px;background:linear-gradient(135deg,#F9FAFB 0%,#F3F4F6 100%);display:flex;align-items:center;justify-content:center;overflow:hidden">
+      <img src="<?= getProductImageUrl($prod) ?>"
+           alt="<?= htmlspecialchars($prod['nombre']) ?>"
+           loading="lazy"
+           decoding="async"
+           style="width:100%;height:100%;object-fit:cover"
+           onerror="this.parentElement.innerHTML='<span style=\'font-size:4rem\'>🥩</span>'">
     </div>
     <!-- Info -->
-    <div style="padding:14px;flex:1">
+    <div style="padding:16px 18px;flex:1;display:flex;flex-direction:column">
       <div style="font-size:.75rem;color:#9CA3AF;margin-bottom:4px"><?= htmlspecialchars($prod['categoria_nombre']) ?></div>
       <div style="font-weight:700;font-size:.95rem;color:#111827;margin-bottom:4px"><?= htmlspecialchars($prod['nombre']) ?></div>
       <div style="font-size:.8rem;color:#6B7280;margin-bottom:10px"><?= htmlspecialchars($prod['presentacion']) ?></div>
-      <div style="font-size:1.1rem;font-weight:800;color:var(--color-primary)">
-        $<?= number_format($prod['precio_base'],2) ?> / <?= $prod['presentacion'] ?>
+      <div style="margin-top:auto">
+        <div style="font-size:1.25rem;font-weight:800;color:var(--color-primary)">
+          $<?= number_format($prod['precio_base'],2) ?>
+        </div>
+        <div style="font-size:.75rem;color:#9CA3AF;margin-top:1px">por <?= $prod['presentacion'] ?></div>
       </div>
       <?php if (!empty($prod['escalonados'])): ?>
-      <div style="font-size:.72rem;color:#059669;margin-top:3px;font-weight:600">✦ Descuentos por volumen</div>
+      <div style="font-size:.72rem;color:#059669;margin-top:6px;font-weight:600">✦ Descuentos por volumen</div>
       <?php endif; ?>
     </div>
     <!-- Acciones -->
@@ -77,19 +153,27 @@ $totalCarrito = count($_SESSION['carrito']['items'] ?? []);
         'nombre'      => $prod['nombre'],
         'presentacion'=> $prod['presentacion'],
         'precio_base' => (float)$prod['precio_base'],
-        'imagen'      => $prod['imagen'] ?? '',
+        'imagen'      => getProductImageUrl($prod),
         'categoria'   => $prod['categoria_nombre'],
         'escalonados' => $prod['escalonados'],
     ]);
     ?>
-    <div style="padding:12px 14px;border-top:1px solid #F3F4F6;display:flex;align-items:center;justify-content:space-between">
+    <div style="padding:12px 16px;border-top:1px solid #F3F4F6;display:flex;align-items:center;justify-content:space-between;gap:10px">
       <button onclick='verDetalleCatalogo(<?= $prodData ?>)'
-              style="font-size:.8rem;color:#6B7280;background:none;border:none;cursor:pointer;padding:0;text-decoration:underline;text-underline-offset:2px">
+              style="font-size:.85rem;color:#374151;background:#F9FAFB;border:1.5px solid #E5E7EB;cursor:pointer;padding:7px 14px;border-radius:7px;font-weight:600;transition:all .2s;display:inline-flex;align-items:center;gap:5px;font-family:inherit"
+              onmouseenter="this.style.background='#fff';this.style.borderColor='var(--color-primary)';this.style.color='var(--color-primary)'"
+              onmouseleave="this.style.background='#F9FAFB';this.style.borderColor='#E5E7EB';this.style.color='#374151'">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+          <path d="M9 12h6m-6 4h6"/>
+        </svg>
         Ver precios
       </button>
       <?php if ($puedeComprar): ?>
       <button onclick='abrirModalAgregar(<?= $prodData ?>)'
-              style="padding:6px 14px;background:var(--color-primary);color:#fff;border:none;border-radius:6px;font-size:.8rem;font-weight:600;cursor:pointer">
+              style="padding:8px 16px;background:var(--color-primary);color:#fff;border:none;border-radius:7px;font-size:.85rem;font-weight:700;cursor:pointer;transition:all .2s;font-family:inherit;white-space:nowrap"
+              onmouseenter="this.style.background='#A00D24';this.style.transform='translateY(-1px)'"
+              onmouseleave="this.style.background='var(--color-primary)';this.style.transform='translateY(0)'">
         + Agregar
       </button>
       <?php endif; ?>
@@ -99,61 +183,133 @@ $totalCarrito = count($_SESSION['carrito']['items'] ?? []);
 </div>
 <?php endif; ?>
 
+<!-- ═══════════════════════ Modal: Ver Precios (Solo información) ═══════════════════════ -->
+<div id="modalVerPrecios" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:2000;align-items:center;justify-content:center;animation:fadeIn .2s ease">
+  <div style="background:#fff;border-radius:16px;width:520px;max-width:96vw;max-height:92vh;overflow-y:auto;box-shadow:0 25px 70px rgba(0,0,0,.25);animation:modalSlideUp .3s ease">
+
+    <!-- Header con close button -->
+    <div style="padding:20px;border-bottom:1px solid #F3F4F6;display:flex;justify-content:space-between;align-items:start">
+      <div>
+        <div style="font-size:.75rem;color:#9CA3AF" id="modVerCategoria"></div>
+        <h3 id="modVerNombre" style="font-size:1.2rem;font-weight:800;color:#111827;margin:4px 0"></h3>
+      </div>
+      <button onclick="cerrarModalVerPrecios()" style="background:none;border:none;cursor:pointer;color:#9CA3AF;font-size:1.5rem;line-height:1;padding:0">&times;</button>
+    </div>
+
+    <!-- Imagen grande -->
+    <div id="modVerImg" style="height:220px;background:linear-gradient(135deg,#F9FAFB 0%,#F3F4F6 100%);display:flex;align-items:center;justify-content:center;overflow:hidden">
+      <span style="font-size:4.5rem">🥩</span>
+    </div>
+
+    <div style="padding:24px">
+      <!-- Presentación -->
+      <div style="background:#F9FAFB;border-radius:10px;padding:12px 16px;margin-bottom:16px">
+        <span style="font-size:.8rem;color:#6B7280">Presentación:</span>
+        <span id="modVerPresentacion" style="font-weight:700;color:#111827;margin-left:8px"></span>
+      </div>
+
+      <!-- Precio base destacado -->
+      <div style="background:#FEF2F2;border:2px solid var(--color-primary);border-radius:12px;padding:16px;margin-bottom:20px;text-align:center">
+        <div style="font-size:.85rem;color:#6B7280;margin-bottom:4px">Precio base</div>
+        <div id="modVerPrecioBase" style="font-size:1.8rem;font-weight:900;color:var(--color-primary)">$0.00</div>
+        <div id="modVerUnidad" style="font-size:.85rem;color:#9CA3AF;margin-top:2px"></div>
+      </div>
+
+      <!-- Tabla de precios por volumen -->
+      <div id="modVerTiersSection" style="display:none">
+        <div style="font-size:.9rem;font-weight:700;color:#374151;margin-bottom:10px;display:flex;align-items:center;gap:6px">
+          📊 Precios por volumen
+        </div>
+        <div id="modVerTiersTable" style="border:1px solid #E5E7EB;border-radius:10px;overflow:hidden;margin-bottom:16px"></div>
+
+        <!-- Info sobre descuentos -->
+        <div style="background:#D1FAE5;border:1px solid #A7F3D0;border-radius:8px;padding:12px 16px;font-size:.82rem;color:#065F46">
+          💡 <strong>Tip:</strong> A mayor cantidad, mejor precio por unidad
+        </div>
+      </div>
+
+      <!-- Sin descuentos -->
+      <div id="modVerSinTiers" style="display:none;text-align:center;color:#9CA3AF;font-size:.85rem;padding:20px 0">
+        Este producto tiene precio fijo
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div style="padding:20px;border-top:1px solid #F3F4F6">
+      <button onclick="cerrarModalVerPrecios()"
+              style="width:100%;padding:12px;background:#374151;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:.9rem;font-family:inherit;transition:all .2s"
+              onmouseenter="this.style.background='#1F2937'"
+              onmouseleave="this.style.background='#374151'">
+        Cerrar
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══════════════════════ Modal: Agregar al carrito ═══════════════════════ -->
-<div id="modalAgregar" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;align-items:center;justify-content:center">
+<div id="modalAgregar" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2001;align-items:center;justify-content:center">
   <div style="background:#fff;border-radius:14px;width:460px;max-width:96vw;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)">
 
-    <div id="modImg" style="height:140px;background:#F3F4F6;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:14px 14px 0 0">
+    <!-- Header con gradiente -->
+    <div style="background:linear-gradient(135deg,var(--color-primary) 0%,#A00D24 100%);padding:18px 20px;border-radius:14px 14px 0 0">
+      <div style="font-size:.75rem;color:rgba(255,255,255,.8)" id="modAgrCategoria"></div>
+      <h3 id="modAgrNombre" style="font-size:1.1rem;font-weight:800;color:#fff;margin:4px 0 0"></h3>
+    </div>
+
+    <!-- Imagen -->
+    <div id="modAgrImg" style="height:140px;background:#F3F4F6;display:flex;align-items:center;justify-content:center;overflow:hidden">
       <span style="font-size:4rem">🥩</span>
     </div>
 
     <div style="padding:20px">
-      <div style="font-size:.75rem;color:#9CA3AF" id="modCategoria"></div>
-      <h3 id="modNombre" style="font-size:1.1rem;font-weight:800;color:#111827;margin:4px 0 2px"></h3>
-      <div id="modPresentacion" style="font-size:.8rem;color:#6B7280;margin-bottom:14px"></div>
+      <div id="modAgrPresentacion" style="font-size:.8rem;color:#6B7280;margin-bottom:14px"></div>
 
       <!-- Precio estimado -->
       <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:12px 16px;margin-bottom:12px">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <span style="font-size:.8rem;color:#374151">Precio estimado:</span>
-          <span id="modPrecioEst" style="font-size:1.2rem;font-weight:800;color:var(--color-primary)">$0.00</span>
+          <span id="modAgrPrecioEst" style="font-size:1.2rem;font-weight:800;color:var(--color-primary)">$0.00</span>
         </div>
-        <div id="modSubtotalEst" style="text-align:right;font-size:.75rem;color:#6B7280;margin-top:2px"></div>
+        <div id="modAgrSubtotalEst" style="text-align:right;font-size:.75rem;color:#6B7280;margin-top:2px"></div>
       </div>
 
       <!-- Alerta de tramo -->
-      <div id="modAlertaTramo" style="display:none;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:.82rem;font-weight:600"></div>
+      <div id="modAgrAlertaTramo" style="display:none;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:.82rem;font-weight:600"></div>
 
       <!-- Precios por volumen -->
-      <div id="modTiersSection" style="display:none;margin-bottom:14px">
+      <div id="modAgrTiersSection" style="display:none;margin-bottom:14px">
         <div style="font-size:.78rem;font-weight:700;color:#374151;margin-bottom:6px">📊 Precios por volumen</div>
-        <div id="modTiersTable" style="font-size:.8rem;border:1px solid #E5E7EB;border-radius:8px;overflow:hidden"></div>
+        <div id="modAgrTiersTable" style="font-size:.8rem;border:1px solid #E5E7EB;border-radius:8px;overflow:hidden"></div>
       </div>
 
       <!-- Cantidad -->
       <div style="margin-bottom:16px">
         <label style="display:block;font-size:.8rem;font-weight:600;color:#374151;margin-bottom:6px">
-          Cantidad <span id="modUnidad" style="color:#9CA3AF;font-weight:400"></span>
+          Cantidad <span id="modAgrUnidad" style="color:#9CA3AF;font-weight:400"></span>
         </label>
-        <input type="number" id="modCantidad" min="0.5" step="0.5" placeholder="0"
-               style="width:100%;padding:11px 14px;border:2px solid #D1D5DB;border-radius:8px;font-size:1rem;text-align:center;box-sizing:border-box;outline:none"
+        <input type="number" id="modAgrCantidad" min="0.5" step="0.5" placeholder="0"
+               style="width:100%;padding:13px 16px;border:2px solid #D1D5DB;border-radius:8px;font-size:1.1rem;text-align:center;font-weight:600;box-sizing:border-box;outline:none;transition:all .2s"
                oninput="actualizarModalPrecio()"
-               onfocus="this.style.borderColor='var(--color-primary)'"
-               onblur="this.style.borderColor='#D1D5DB'">
+               onfocus="this.style.borderColor='var(--color-primary)';this.style.boxShadow='0 0 0 4px rgba(200,16,46,.08)'"
+               onblur="this.style.borderColor='#D1D5DB';this.style.boxShadow='none'">
       </div>
 
       <div style="display:flex;gap:10px">
         <button type="button" onclick="cerrarModalAgregar()"
-                style="flex:1;padding:11px;border:1px solid #D1D5DB;border-radius:8px;background:#fff;cursor:pointer;font-size:.875rem;color:#6B7280;font-family:inherit">
+                style="flex:1;padding:11px;border:1px solid #D1D5DB;border-radius:8px;background:#fff;cursor:pointer;font-size:.875rem;color:#6B7280;font-family:inherit;transition:all .2s"
+                onmouseenter="this.style.background='#F9FAFB'"
+                onmouseleave="this.style.background='#fff'">
           Cancelar
         </button>
         <button type="button" id="btnAgregarConfirmar" onclick="confirmarAgregar()"
-                style="flex:2;padding:11px;background:var(--color-primary);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:.875rem;font-family:inherit">
-          Agregar al pedido
+                style="flex:2;padding:12px;background:var(--color-primary);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:.9rem;font-family:inherit;transition:all .2s;box-shadow:0 4px 12px rgba(200,16,46,.25)"
+                onmouseenter="this.style.background='#A00D24';this.style.transform='translateY(-1px)';this.style.boxShadow='0 6px 16px rgba(200,16,46,.35)'"
+                onmouseleave="this.style.background='var(--color-primary)';this.style.transform='translateY(0)';this.style.boxShadow='0 4px 12px rgba(200,16,46,.25)'">
+          🛒 Agregar al pedido
         </button>
       </div>
 
-      <div id="modFeedback" style="display:none;margin-top:12px;padding:10px 14px;border-radius:8px;font-size:.85rem;text-align:center;border:1px solid transparent"></div>
+      <div id="modAgrFeedback" style="display:none;margin-top:12px;padding:10px 14px;border-radius:8px;font-size:.85rem;text-align:center;border:1px solid transparent"></div>
     </div>
   </div>
 </div>
@@ -163,27 +319,28 @@ const BASE_URL_CAT = '<?= BASE_URL ?>';
 let modalProducto = null;
 let debTimer = null;
 
+// ═══════════════ Modal "Agregar al carrito" ═══════════════
 function abrirModalAgregar(prod) {
   modalProducto = prod;
-  document.getElementById('modNombre').textContent       = prod.nombre;
-  document.getElementById('modCategoria').textContent    = prod.categoria || '';
-  document.getElementById('modPresentacion').textContent = prod.presentacion;
-  document.getElementById('modUnidad').textContent       = '(' + prod.presentacion + ')';
-  document.getElementById('modCantidad').value           = '';
-  document.getElementById('modFeedback').style.display   = 'none';
-  document.getElementById('modAlertaTramo').style.display = 'none';
-  document.getElementById('modSubtotalEst').textContent  = '';
-  document.getElementById('modPrecioEst').textContent    = '$' + prod.precio_base.toLocaleString('es-MX',{minimumFractionDigits:2}) + ' / ' + prod.presentacion;
+  document.getElementById('modAgrNombre').textContent       = prod.nombre;
+  document.getElementById('modAgrCategoria').textContent    = prod.categoria || '';
+  document.getElementById('modAgrPresentacion').textContent = prod.presentacion;
+  document.getElementById('modAgrUnidad').textContent       = '(' + prod.presentacion + ')';
+  document.getElementById('modAgrCantidad').value           = '';
+  document.getElementById('modAgrFeedback').style.display   = 'none';
+  document.getElementById('modAgrAlertaTramo').style.display = 'none';
+  document.getElementById('modAgrSubtotalEst').textContent  = '';
+  document.getElementById('modAgrPrecioEst').textContent    = '$' + prod.precio_base.toLocaleString('es-MX',{minimumFractionDigits:2}) + ' / ' + prod.presentacion;
   document.getElementById('btnAgregarConfirmar').style.display = 'block';
 
-  const imgDiv = document.getElementById('modImg');
+  const imgDiv = document.getElementById('modAgrImg');
   imgDiv.innerHTML = prod.imagen
     ? `<img src="${prod.imagen}" alt="${prod.nombre}" style="width:100%;height:100%;object-fit:cover">`
     : '<span style="font-size:4rem">🥩</span>';
 
   // Tiers
   if (prod.escalonados && prod.escalonados.length > 0) {
-    document.getElementById('modTiersSection').style.display = 'block';
+    document.getElementById('modAgrTiersSection').style.display = 'block';
     let html = '';
     prod.escalonados.forEach((t, i) => {
       const desde  = parseFloat(t.cantidad_min);
@@ -192,7 +349,7 @@ function abrirModalAgregar(prod) {
       const precio = parseFloat(t.precio);
       const ahorro = prod.precio_base - precio;
       const pct    = prod.precio_base > 0 ? ((ahorro / prod.precio_base)*100).toFixed(0) : 0;
-      html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 12px;${i>0?'border-top:1px solid #F3F4F6':''}" id="tier-${i}">
+      html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 12px;${i>0?'border-top:1px solid #F3F4F6':''}" id="tierAgr-${i}">
         <span style="color:#374151">${label}</span>
         <div style="text-align:right">
           <span style="font-weight:700;color:#111827">$${precio.toFixed(2)}</span>
@@ -200,20 +357,13 @@ function abrirModalAgregar(prod) {
         </div>
       </div>`;
     });
-    document.getElementById('modTiersTable').innerHTML = html;
+    document.getElementById('modAgrTiersTable').innerHTML = html;
   } else {
-    document.getElementById('modTiersSection').style.display = 'none';
+    document.getElementById('modAgrTiersSection').style.display = 'none';
   }
 
   document.getElementById('modalAgregar').style.display = 'flex';
-  setTimeout(() => document.getElementById('modCantidad').focus(), 100);
-}
-
-function verDetalleCatalogo(prod) {
-  abrirModalAgregar(prod);
-  <?php if (!$puedeComprar): ?>
-  document.getElementById('btnAgregarConfirmar').style.display = 'none';
-  <?php endif; ?>
+  setTimeout(() => document.getElementById('modAgrCantidad').focus(), 100);
 }
 
 function cerrarModalAgregar() {
@@ -224,11 +374,11 @@ function cerrarModalAgregar() {
 function actualizarModalPrecio() {
   if (!modalProducto) return;
   clearTimeout(debTimer);
-  const qty = parseFloat(document.getElementById('modCantidad').value) || 0;
+  const qty = parseFloat(document.getElementById('modAgrCantidad').value) || 0;
   if (qty <= 0) {
-    document.getElementById('modPrecioEst').textContent = '$' + modalProducto.precio_base.toLocaleString('es-MX',{minimumFractionDigits:2}) + ' / ' + modalProducto.presentacion;
-    document.getElementById('modSubtotalEst').textContent = '';
-    document.getElementById('modAlertaTramo').style.display = 'none';
+    document.getElementById('modAgrPrecioEst').textContent = '$' + modalProducto.precio_base.toLocaleString('es-MX',{minimumFractionDigits:2}) + ' / ' + modalProducto.presentacion;
+    document.getElementById('modAgrSubtotalEst').textContent = '';
+    document.getElementById('modAgrAlertaTramo').style.display = 'none';
     resaltarTier(null); return;
   }
   debTimer = setTimeout(() => {
@@ -250,10 +400,10 @@ function precioLocal(qty) {
 }
 
 function aplicarPrecio(qty, precio) {
-  document.getElementById('modPrecioEst').textContent = '$' + precio.toLocaleString('es-MX',{minimumFractionDigits:2}) + ' / ' + modalProducto.presentacion;
-  document.getElementById('modSubtotalEst').textContent = 'Subtotal: $' + (precio*qty).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2});
+  document.getElementById('modAgrPrecioEst').textContent = '$' + precio.toLocaleString('es-MX',{minimumFractionDigits:2}) + ' / ' + modalProducto.presentacion;
+  document.getElementById('modAgrSubtotalEst').textContent = 'Subtotal: $' + (precio*qty).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2});
 
-  const alerta = document.getElementById('modAlertaTramo');
+  const alerta = document.getElementById('modAgrAlertaTramo');
   let activoIdx = -1;
   if (modalProducto.escalonados) {
     modalProducto.escalonados.forEach((t, i) => {
@@ -288,19 +438,40 @@ function aplicarPrecio(qty, precio) {
 function resaltarTier(idx) {
   if (!modalProducto?.escalonados) return;
   modalProducto.escalonados.forEach((_, i) => {
-    const r = document.getElementById('tier-' + i);
-    if (r) { r.style.background = i === idx ? '#F0FDF4' : ''; r.style.fontWeight = i === idx ? '700' : ''; }
+    const r = document.getElementById('tierAgr-' + i);
+    if (r) {
+      r.style.transition = 'all .25s ease';
+      if (i === idx) {
+        r.style.background = '#F0FDF4';
+        r.style.fontWeight = '700';
+        r.style.transform = 'scale(1.02)';
+        r.style.boxShadow = '0 2px 8px rgba(5,150,105,.15)';
+      } else {
+        r.style.background = '';
+        r.style.fontWeight = '';
+        r.style.transform = 'scale(1)';
+        r.style.boxShadow = 'none';
+      }
+    }
   });
 }
 
 function confirmarAgregar() {
   if (!modalProducto) return;
-  const qty = parseFloat(document.getElementById('modCantidad').value) || 0;
-  if (qty <= 0) { document.getElementById('modCantidad').style.borderColor = '#DC2626'; document.getElementById('modCantidad').focus(); return; }
-  document.getElementById('modCantidad').style.borderColor = '#D1D5DB';
+  const qty = parseFloat(document.getElementById('modAgrCantidad').value) || 0;
+  if (qty <= 0) {
+    document.getElementById('modAgrCantidad').style.borderColor = '#DC2626';
+    document.getElementById('modAgrCantidad').focus();
+    return;
+  }
+  document.getElementById('modAgrCantidad').style.borderColor = '#D1D5DB';
 
   const btn = document.getElementById('btnAgregarConfirmar');
-  btn.disabled = true; btn.textContent = 'Agregando...';
+  btn.disabled = true;
+  btn.innerHTML = `<div style="display:inline-flex;align-items:center;gap:8px">
+    <div style="width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite"></div>
+    Agregando...
+  </div>`;
 
   const fd = new FormData();
   fd.append('producto_id', modalProducto.id);
@@ -309,29 +480,100 @@ function confirmarAgregar() {
   fetch(BASE_URL_CAT + 'carrito/agregarProducto', { method:'POST', body:fd })
     .then(r => r.json())
     .then(d => {
-      const fb = document.getElementById('modFeedback');
+      const fb = document.getElementById('modAgrFeedback');
       fb.style.display = 'block';
       if (d.ok) {
         fb.style.cssText = 'display:block;margin-top:12px;padding:10px 14px;border-radius:8px;font-size:.85rem;text-align:center;background:#D1FAE5;color:#065F46;border:1px solid #A7F3D0';
         fb.textContent = '✓ ' + d.msg;
         const badge = document.getElementById('cartBadge');
         if (badge) { badge.textContent = d.total_items; badge.style.display = 'inline'; }
-        document.getElementById('modCantidad').value = '';
-        document.getElementById('modSubtotalEst').textContent = '';
-        document.getElementById('modAlertaTramo').style.display = 'none';
-        document.getElementById('modPrecioEst').textContent = '$' + modalProducto.precio_base.toLocaleString('es-MX',{minimumFractionDigits:2}) + ' / ' + modalProducto.presentacion;
+        document.getElementById('modAgrCantidad').value = '';
+        document.getElementById('modAgrSubtotalEst').textContent = '';
+        document.getElementById('modAgrAlertaTramo').style.display = 'none';
+        document.getElementById('modAgrPrecioEst').textContent = '$' + modalProducto.precio_base.toLocaleString('es-MX',{minimumFractionDigits:2}) + ' / ' + modalProducto.presentacion;
+
+        // Success animation
+        btn.innerHTML = '✓ ¡Agregado!';
+        btn.style.background = '#10B981';
+        setTimeout(() => {
+          btn.disabled = false;
+          btn.innerHTML = '🛒 Agregar al pedido';
+          btn.style.background = 'var(--color-primary)';
+        }, 2000);
       } else {
         fb.style.cssText = 'display:block;margin-top:12px;padding:10px 14px;border-radius:8px;font-size:.85rem;text-align:center;background:#FEE2E2;color:#991B1B;border:1px solid #FECACA';
         fb.textContent = '✕ ' + d.msg;
+        btn.disabled = false;
+        btn.innerHTML = '🛒 Agregar al pedido';
       }
     })
     .catch(() => {
-      const fb = document.getElementById('modFeedback');
+      const fb = document.getElementById('modAgrFeedback');
       fb.style.cssText = 'display:block;margin-top:12px;padding:10px 14px;border-radius:8px;font-size:.85rem;text-align:center;background:#FEE2E2;color:#991B1B;border:1px solid #FECACA';
       fb.textContent = 'Error de conexión.';
-    })
-    .finally(() => { btn.disabled = false; btn.textContent = 'Agregar al pedido'; });
+      btn.disabled = false;
+      btn.innerHTML = '🛒 Agregar al pedido';
+    });
 }
 
-document.getElementById('modalAgregar').addEventListener('click', e => { if (e.target === document.getElementById('modalAgregar')) cerrarModalAgregar(); });
+document.getElementById('modalAgregar').addEventListener('click', e => {
+  if (e.target === document.getElementById('modalAgregar')) cerrarModalAgregar();
+});
+
+// ═══════════════ Modal "Ver Precios" (Solo información) ═══════════════
+function verDetalleCatalogo(prod) {
+  document.getElementById('modVerNombre').textContent = prod.nombre;
+  document.getElementById('modVerCategoria').textContent = prod.categoria || '';
+  document.getElementById('modVerPresentacion').textContent = prod.presentacion;
+  document.getElementById('modVerPrecioBase').textContent =
+    '$' + prod.precio_base.toLocaleString('es-MX',{minimumFractionDigits:2});
+  document.getElementById('modVerUnidad').textContent = 'por ' + prod.presentacion;
+
+  // Imagen
+  const imgDiv = document.getElementById('modVerImg');
+  imgDiv.innerHTML = prod.imagen
+    ? `<img src="${prod.imagen}" alt="${prod.nombre}" style="width:100%;height:100%;object-fit:cover" loading="lazy">`
+    : '<span style="font-size:4.5rem">🥩</span>';
+
+  // Tiers
+  if (prod.escalonados && prod.escalonados.length > 0) {
+    document.getElementById('modVerTiersSection').style.display = 'block';
+    document.getElementById('modVerSinTiers').style.display = 'none';
+
+    let html = '';
+    prod.escalonados.forEach((t, i) => {
+      const desde = parseFloat(t.cantidad_min);
+      const hasta = t.cantidad_max ? parseFloat(t.cantidad_max) : null;
+      const label = hasta ? `${desde}–${hasta} ${prod.presentacion}` : `${desde}+ ${prod.presentacion}`;
+      const precio = parseFloat(t.precio);
+      const ahorro = prod.precio_base - precio;
+      const pct = prod.precio_base > 0 ? ((ahorro / prod.precio_base)*100).toFixed(0) : 0;
+
+      html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;${i>0?'border-top:1px solid #E5E7EB':''}">
+        <div>
+          <div style="font-weight:700;color:#111827;font-size:.95rem">${label}</div>
+          ${ahorro>0.01?`<div style="font-size:.72rem;color:#059669;font-weight:600">Ahorro: ${pct}%</div>`:''}
+        </div>
+        <div style="text-align:right">
+          <div style="font-weight:800;color:var(--color-primary);font-size:1.05rem">$${precio.toFixed(2)}</div>
+          <div style="font-size:.7rem;color:#9CA3AF">por ${prod.presentacion}</div>
+        </div>
+      </div>`;
+    });
+    document.getElementById('modVerTiersTable').innerHTML = html;
+  } else {
+    document.getElementById('modVerTiersSection').style.display = 'none';
+    document.getElementById('modVerSinTiers').style.display = 'block';
+  }
+
+  document.getElementById('modalVerPrecios').style.display = 'flex';
+}
+
+function cerrarModalVerPrecios() {
+  document.getElementById('modalVerPrecios').style.display = 'none';
+}
+
+document.getElementById('modalVerPrecios').addEventListener('click', e => {
+  if (e.target === document.getElementById('modalVerPrecios')) cerrarModalVerPrecios();
+});
 </script>

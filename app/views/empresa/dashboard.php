@@ -95,4 +95,333 @@
   </table>
   <?php endif; ?>
 </div>
+
+<?php if (!empty($datosGraficas) && $rol !== 'comprador'): ?>
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- SECCIÓN DE GRÁFICAS DE MÉTRICAS -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<div style="margin-top:32px">
+  <h2 style="font-size:1.1rem;font-weight:700;color:#111827;margin-bottom:18px">📊 Métricas y Análisis</h2>
+
+  <!-- Fila 1: Ventas mensuales y diarias -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-bottom:16px">
+
+    <div style="background:#fff;border-radius:12px;border:1px solid #E5E7EB;padding:18px">
+      <h3 style="font-size:.9rem;font-weight:600;color:#374151;margin-bottom:12px">Ventas por Mes</h3>
+      <canvas id="chartVentasMes" style="max-height:280px"></canvas>
+    </div>
+
+    <div style="background:#fff;border-radius:12px;border:1px solid #E5E7EB;padding:18px">
+      <h3 style="font-size:.9rem;font-weight:600;color:#374151;margin-bottom:12px">Ventas Últimos 30 Días</h3>
+      <canvas id="chartVentasDia" style="max-height:280px"></canvas>
+    </div>
+  </div>
+
+  <!-- Fila 2: Estados y usuarios -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-bottom:16px">
+
+    <div style="background:#fff;border-radius:12px;border:1px solid #E5E7EB;padding:18px">
+      <h3 style="font-size:.9rem;font-weight:600;color:#374151;margin-bottom:12px">Estados de Pedidos</h3>
+      <canvas id="chartEstadosPedidos" style="max-height:280px"></canvas>
+    </div>
+
+    <div style="background:#fff;border-radius:12px;border:1px solid #E5E7EB;padding:18px">
+      <h3 style="font-size:.9rem;font-weight:600;color:#374151;margin-bottom:12px">Mi Equipo</h3>
+      <canvas id="chartUsuariosRol" style="max-height:280px"></canvas>
+    </div>
+  </div>
+
+  <!-- Fila 3: Productos y métodos de pago -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px">
+
+    <div style="background:#fff;border-radius:12px;border:1px solid #E5E7EB;padding:18px">
+      <h3 style="font-size:.9rem;font-weight:600;color:#374151;margin-bottom:12px">Top 5 Productos</h3>
+      <canvas id="chartTopProductos" style="max-height:280px"></canvas>
+    </div>
+
+    <div style="background:#fff;border-radius:12px;border:1px solid #E5E7EB;padding:18px">
+      <h3 style="font-size:.9rem;font-weight:600;color:#374151;margin-bottom:12px">Métodos de Pago</h3>
+      <canvas id="chartMetodosPago" style="max-height:280px"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════ -->
+<!-- SCRIPTS DE INICIALIZACIÓN DE CHART.JS -->
+<!-- ════════════════════════════════════════════════════════════════ -->
+<script>
+// Configuración global de Chart.js
+Chart.defaults.font.family = 'Inter, sans-serif';
+Chart.defaults.font.size = 12;
+Chart.defaults.color = '#6B7280';
+
+// Obtener color primario del sistema
+const colorPrimario = getComputedStyle(document.documentElement).getPropertyValue('--color-primary').trim() || '#C8102E';
+
+// Función para agregar transparencia a color hex
+function hexToRgba(hex, alpha) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// 1. GRÁFICA: Ventas por Mes (línea + barras)
+// ═══════════════════════════════════════════════════════════════════
+<?php
+$mesesLabels = !empty($datosGraficas['ventasMes']) ? json_encode(array_column($datosGraficas['ventasMes'], 'mes_corto')) : '[]';
+$mesesVentas = !empty($datosGraficas['ventasMes']) ? json_encode(array_map('floatval', array_column($datosGraficas['ventasMes'], 'ventas'))) : '[]';
+$mesesPedidos = !empty($datosGraficas['ventasMes']) ? json_encode(array_map('intval', array_column($datosGraficas['ventasMes'], 'total_pedidos'))) : '[]';
+?>
+new Chart(document.getElementById('chartVentasMes'), {
+  type: 'bar',
+  data: {
+    labels: <?= $mesesLabels ?>,
+    datasets: [
+      {
+        type: 'line',
+        label: 'Ventas ($)',
+        data: <?= $mesesVentas ?>,
+        borderColor: colorPrimario,
+        backgroundColor: hexToRgba(colorPrimario, 0.2),
+        borderWidth: 2,
+        tension: 0.3,
+        yAxisID: 'y',
+      },
+      {
+        type: 'bar',
+        label: 'Pedidos',
+        data: <?= $mesesPedidos ?>,
+        backgroundColor: '#3B82F6',
+        yAxisID: 'y1',
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: true,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: true, position: 'top' },
+      tooltip: {
+        callbacks: {
+          label: function(context) {
+            let label = context.dataset.label || '';
+            if (label) label += ': ';
+            if (context.dataset.yAxisID === 'y') {
+              label += '$' + context.parsed.y.toLocaleString('es-MX', {minimumFractionDigits: 2});
+            } else {
+              label += context.parsed.y;
+            }
+            return label;
+          }
+        }
+      }
+    },
+    scales: {
+      y: {
+        type: 'linear',
+        position: 'left',
+        ticks: { callback: v => '$' + v.toLocaleString('es-MX') },
+        title: { display: true, text: 'Ventas' }
+      },
+      y1: {
+        type: 'linear',
+        position: 'right',
+        grid: { drawOnChartArea: false },
+        title: { display: true, text: 'Pedidos' }
+      }
+    }
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// 2. GRÁFICA: Ventas por Día (área)
+// ═══════════════════════════════════════════════════════════════════
+<?php
+$diasLabels = !empty($datosGraficas['ventasDia']) ? json_encode(array_map(function($d) {
+  return date('d/m', strtotime($d['fecha']));
+}, $datosGraficas['ventasDia'])) : '[]';
+$diasVentas = !empty($datosGraficas['ventasDia']) ? json_encode(array_map('floatval', array_column($datosGraficas['ventasDia'], 'ventas'))) : '[]';
+?>
+new Chart(document.getElementById('chartVentasDia'), {
+  type: 'line',
+  data: {
+    labels: <?= $diasLabels ?>,
+    datasets: [{
+      label: 'Ventas',
+      data: <?= $diasVentas ?>,
+      fill: true,
+      backgroundColor: hexToRgba(colorPrimario, 0.3),
+      borderColor: colorPrimario,
+      borderWidth: 2,
+      tension: 0.4,
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: true,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: ctx => '$' + ctx.parsed.y.toLocaleString('es-MX', {minimumFractionDigits: 2})
+        }
+      }
+    },
+    scales: {
+      y: {
+        ticks: { callback: v => '$' + v.toLocaleString('es-MX') },
+        beginAtZero: true
+      }
+    }
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// 3. GRÁFICA: Estados de Pedidos (dona)
+// ═══════════════════════════════════════════════════════════════════
+<?php
+$estadosLabels = !empty($datosGraficas['estadosPedidos']) ? json_encode(array_map('ucfirst', array_map(function($e) {
+  return str_replace('_', ' ', $e);
+}, array_column($datosGraficas['estadosPedidos'], 'estado')))) : '[]';
+$estadosTotales = !empty($datosGraficas['estadosPedidos']) ? json_encode(array_map('intval', array_column($datosGraficas['estadosPedidos'], 'total'))) : '[]';
+$estadosColores = !empty($datosGraficas['estadosPedidos']) ? json_encode(array_map(function($e) {
+  $colores = [
+    'pendiente' => '#92400E',
+    'confirmado' => '#1E40AF',
+    'en_preparacion' => '#5B21B6',
+    'en_ruta' => '#065F46',
+    'entregado' => '#059669',
+    'cancelado' => '#991B1B'
+  ];
+  return $colores[$e['estado']] ?? '#6B7280';
+}, $datosGraficas['estadosPedidos'])) : '[]';
+?>
+new Chart(document.getElementById('chartEstadosPedidos'), {
+  type: 'doughnut',
+  data: {
+    labels: <?= $estadosLabels ?>,
+    datasets: [{
+      data: <?= $estadosTotales ?>,
+      backgroundColor: <?= $estadosColores ?>,
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: true,
+    plugins: {
+      legend: { position: 'right' },
+      tooltip: {
+        callbacks: {
+          label: ctx => ctx.label + ': ' + ctx.parsed + ' pedidos'
+        }
+      }
+    }
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// 4. GRÁFICA: Usuarios por Rol (barra horizontal)
+// ═══════════════════════════════════════════════════════════════════
+<?php
+$rolesLabels = !empty($datosGraficas['usuariosPorRol']) ? json_encode(array_column($datosGraficas['usuariosPorRol'], 'rol')) : '[]';
+$rolesTotales = !empty($datosGraficas['usuariosPorRol']) ? json_encode(array_map('intval', array_column($datosGraficas['usuariosPorRol'], 'total'))) : '[]';
+?>
+new Chart(document.getElementById('chartUsuariosRol'), {
+  type: 'bar',
+  data: {
+    labels: <?= $rolesLabels ?>,
+    datasets: [{
+      label: 'Usuarios activos',
+      data: <?= $rolesTotales ?>,
+      backgroundColor: [colorPrimario, '#3B82F6', '#059669'],
+    }]
+  },
+  options: {
+    indexAxis: 'y',
+    responsive: true,
+    maintainAspectRatio: true,
+    plugins: {
+      legend: { display: false },
+    },
+    scales: {
+      x: {
+        ticks: { stepSize: 1 },
+        beginAtZero: true
+      }
+    }
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// 5. GRÁFICA: Top Productos (barra horizontal)
+// ═══════════════════════════════════════════════════════════════════
+<?php
+$productosLabels = !empty($datosGraficas['topProductos']) ? json_encode(array_map(function($p) {
+  return $p['nombre'] . ' (' . $p['presentacion'] . ')';
+}, $datosGraficas['topProductos'])) : '[]';
+$productosTotales = !empty($datosGraficas['topProductos']) ? json_encode(array_map('floatval', array_column($datosGraficas['topProductos'], 'total_vendido'))) : '[]';
+?>
+new Chart(document.getElementById('chartTopProductos'), {
+  type: 'bar',
+  data: {
+    labels: <?= $productosLabels ?>,
+    datasets: [{
+      label: 'Cantidad vendida',
+      data: <?= $productosTotales ?>,
+      backgroundColor: '#10B981',
+    }]
+  },
+  options: {
+    indexAxis: 'y',
+    responsive: true,
+    maintainAspectRatio: true,
+    plugins: {
+      legend: { display: false },
+    },
+    scales: {
+      x: {
+        ticks: { callback: v => v.toLocaleString('es-MX', {minimumFractionDigits: 1}) },
+        beginAtZero: true
+      }
+    }
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// 6. GRÁFICA: Métodos de Pago (barra vertical)
+// ═══════════════════════════════════════════════════════════════════
+<?php
+$metodosLabels = !empty($datosGraficas['metodosPago']) ? json_encode(array_map('ucfirst', array_column($datosGraficas['metodosPago'], 'metodo_pago'))) : '[]';
+$metodosTotales = !empty($datosGraficas['metodosPago']) ? json_encode(array_map('intval', array_column($datosGraficas['metodosPago'], 'total'))) : '[]';
+?>
+new Chart(document.getElementById('chartMetodosPago'), {
+  type: 'bar',
+  data: {
+    labels: <?= $metodosLabels ?>,
+    datasets: [{
+      label: 'Pedidos',
+      data: <?= $metodosTotales ?>,
+      backgroundColor: ['#3B82F6', '#8B5CF6', '#F59E0B'],
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: true,
+    plugins: {
+      legend: { display: false },
+    },
+    scales: {
+      y: {
+        ticks: { stepSize: 1 },
+        beginAtZero: true
+      }
+    }
+  }
+});
+</script>
+<?php endif; ?>
+
 <?php endif; ?>
