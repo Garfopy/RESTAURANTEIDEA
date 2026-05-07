@@ -72,53 +72,36 @@ class PanelUsuarioController extends BaseController
 
         // Generar contraseña segura automáticamente
         $password = PasswordHelper::generar(14);
-
-        // Generar username FTP único
         $email = trim($this->post('email'));
-        $emailPrefix = explode('@', $email)[0];
-        $emailPrefix = preg_replace('/[^a-z0-9]/', '', strtolower($emailPrefix));
-        $emailPrefix = substr($emailPrefix, 0, 7); // Máximo 7 caracteres
-        $ftpUsername = 'carnihub_' . $emailPrefix . '_' . rand(1000, 9999);
-
-        // Verificar unicidad de FTP username
-        $db = Database::getInstance();
-        $stmt = $db->prepare("SELECT COUNT(*) FROM usuarios WHERE ftp_username = ?");
-        $stmt->execute([$ftpUsername]);
-        while ($stmt->fetchColumn() > 0) {
-            $ftpUsername = 'carnihub_' . $emailPrefix . '_' . rand(1000, 9999);
-            $stmt->execute([$ftpUsername]);
-        }
 
         // ── Iniciar transacción ──
+        $db = Database::getInstance();
         $db->beginTransaction();
 
         try {
-            // 1. Crear usuario FTP en cPanel
-            $cpanelService = new CpanelService();
-            $resultadoFTP  = $cpanelService->crearUsuarioFTP($ftpUsername, $password);
-
-            if (!$resultadoFTP['success']) {
-                throw new Exception('Error al crear usuario FTP: ' . $resultadoFTP['error']);
-            }
+            // 1. Generar token de verificación
+            $tokenVerificacion = bin2hex(random_bytes(32));
+            $tokenExpira = date('Y-m-d H:i:s', strtotime('+24 hours'));
 
             // 2. Crear usuario en BD
             $id = $this->usuarioModel->crear([
-                'nombre'           => trim($this->post('nombre')),
-                'apellido_paterno' => trim($this->post('apellido_paterno', '')),
-                'email'            => $email,
-                'telefono'         => trim($this->post('telefono', '')),
-                'rol_id'           => $rolRow['id'],
-                'empresa_id'       => $empresaId,
-                'activo'           => 1,
-                'ftp_username'     => $ftpUsername,
-                'ftp_creado'       => 1,
-                'created_by'       => $this->usuarioId(),
+                'nombre'              => trim($this->post('nombre')),
+                'apellido_paterno'    => trim($this->post('apellido_paterno', '')),
+                'email'               => $email,
+                'telefono'            => trim($this->post('telefono', '')),
+                'rol_id'              => $rolRow['id'],
+                'empresa_id'          => $empresaId,
+                'activo'              => 1,
+                'email_verificado'    => 0,
+                'token_verificacion'  => $tokenVerificacion,
+                'token_expira'        => $tokenExpira,
+                'created_by'          => $this->usuarioId(),
             ], $password);
 
-            // 3. Enviar email con credenciales
+            // 3. Enviar email con credenciales y link de verificación
             $emailService = new EmailService();
             $usuarioCreado = $this->usuarioModel->find($id);
-            $emailEnviado = $emailService->enviarCredenciales($usuarioCreado, $password, $ftpUsername);
+            $emailEnviado = $emailService->enviarCredenciales($usuarioCreado, $password, null, $tokenVerificacion);
 
             if (!$emailEnviado) {
                 error_log("[PanelUsuarioController] No se pudo enviar email a usuario ID: $id");
@@ -129,9 +112,9 @@ class PanelUsuarioController extends BaseController
             // 4. Commit transacción
             $db->commit();
 
-            $this->log('Crear usuario con FTP', 'usuarios', "ID: $id rol: $rolSlug FTP: $ftpUsername");
+            $this->log('Crear usuario', 'usuarios', "ID: $id rol: $rolSlug email: $email");
 
-            $mensaje = 'Usuario creado correctamente. Se ha enviado un correo con las credenciales.';
+            $mensaje = 'Usuario creado correctamente. Se ha enviado un correo con las credenciales y el link de verificación.';
             if (!$emailEnviado) {
                 $mensaje .= ' <strong>AVISO:</strong> No se pudo enviar el email. Credenciales: ' . htmlspecialchars($password);
             }
@@ -141,7 +124,7 @@ class PanelUsuarioController extends BaseController
         } catch (Exception $e) {
             $db->rollBack();
             error_log("[PanelUsuarioController] Error al crear usuario: " . $e->getMessage());
-            $this->flash('error', 'No se pudo crear el usuario. Verifica la configuración de cPanel.');
+            $this->flash('error', 'No se pudo crear el usuario: ' . $e->getMessage());
             $this->redirect('panel-usuario/nuevo');
         }
     }

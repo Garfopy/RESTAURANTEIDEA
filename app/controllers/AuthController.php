@@ -67,9 +67,15 @@ class AuthController extends BaseController
             $this->redirect('auth/login');
         }
 
-        // Cuenta pendiente de verificación
+        // Verificar que el email esté verificado
+        if (empty($usuario['email_verificado'])) {
+            $this->flash('error', 'Debes verificar tu email antes de iniciar sesión. Revisa tu bandeja de entrada (y spam) y haz clic en el link de verificación.');
+            $this->redirect('auth/login');
+        }
+
+        // Cuenta inactiva
         if (empty($usuario['activo'])) {
-            $this->flash('error', 'Tu cuenta no está activa. Revisa tu correo y haz clic en el enlace de verificación.');
+            $this->flash('error', 'Tu cuenta está desactivada. Contacta al administrador.');
             $this->redirect('auth/login');
         }
 
@@ -87,6 +93,55 @@ class AuthController extends BaseController
         $this->log('Login exitoso', 'auth');
 
         $this->redirectSegunRol($usuario['rol_slug']);
+    }
+
+    public function verificar(?string $p = null): void
+    {
+        $token = trim($_GET['token'] ?? '');
+
+        if (!$token) {
+            $this->flash('error', 'Token de verificación inválido.');
+            $this->redirect('auth/login');
+        }
+
+        $db = Database::getInstance();
+        $stmt = $db->prepare(
+            "SELECT id, email, nombre, apellido_paterno, token_expira
+             FROM usuarios
+             WHERE token_verificacion = ?
+               AND email_verificado = 0
+             LIMIT 1"
+        );
+        $stmt->execute([$token]);
+        $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$usuario) {
+            $this->flash('error', 'El link de verificación no es válido o ya fue usado.');
+            $this->redirect('auth/login');
+        }
+
+        // Verificar si el token expiró
+        $expira = strtotime($usuario['token_expira']);
+        if ($expira < time()) {
+            $this->flash('error', 'El link de verificación ha expirado. Contacta al administrador para reenviar el email.');
+            $this->redirect('auth/login');
+        }
+
+        // Marcar email como verificado
+        $stmt = $db->prepare(
+            "UPDATE usuarios
+             SET email_verificado = 1,
+                 token_verificacion = NULL,
+                 token_expira = NULL
+             WHERE id = ?"
+        );
+        $stmt->execute([$usuario['id']]);
+
+        $this->log('Email verificado', 'auth', "Usuario ID: {$usuario['id']}");
+
+        $nombreCompleto = $usuario['nombre'] . ' ' . $usuario['apellido_paterno'];
+        $this->flash('success', "¡Email verificado correctamente! Hola $nombreCompleto, ya puedes iniciar sesión.");
+        $this->redirect('auth/login');
     }
 
     public function logout(?string $p = null): void

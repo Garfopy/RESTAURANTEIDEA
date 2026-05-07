@@ -104,16 +104,26 @@ class ConfigController extends BaseController
     public function correo(?string $p = null): void
     {
         if ($this->isPost()) {
-            foreach (['smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_from'] as $c) {
+            $campos = [
+                'smtp_host',
+                'smtp_port',
+                'smtp_encryption',
+                'smtp_username',
+                'smtp_password',
+                'smtp_from_email',
+                'smtp_from_name'
+            ];
+
+            foreach ($campos as $c) {
                 $this->cfg->set($c, trim($this->post($c, '')));
             }
 
             $this->log('Guardar config correo', 'configuracion');
-            $this->flash('success', 'Configuración de correo guardada.');
+            $this->flash('success', 'Configuración de correo guardada correctamente.');
             $this->redirect('config/correo');
         }
 
-        $settings   = $this->asClave($this->cfg->getGrupo('correo'));
+        $settings   = $this->asClave($this->cfg->getGrupo('email'));
         $flash      = $this->getFlash();
         $pageTitle  = 'Configuración — Correo';
         $activeMenu = 'config';

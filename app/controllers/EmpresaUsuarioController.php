@@ -71,52 +71,35 @@ class EmpresaUsuarioController extends BaseController
         // Generar contraseña segura automáticamente
         $passwordTemporal = PasswordHelper::generar(14);
 
-        // Generar username FTP único
-        $emailPrefix = explode('@', $email)[0];
-        $emailPrefix = preg_replace('/[^a-z0-9]/', '', strtolower($emailPrefix));
-        $emailPrefix = substr($emailPrefix, 0, 7);
-        $ftpUsername = 'carnihub_' . $emailPrefix . '_' . rand(1000, 9999);
-
-        // Verificar unicidad
-        $db = Database::getInstance();
-        $stmt = $db->prepare("SELECT COUNT(*) FROM usuarios WHERE ftp_username = ?");
-        $stmt->execute([$ftpUsername]);
-        while ($stmt->fetchColumn() > 0) {
-            $ftpUsername = 'carnihub_' . $emailPrefix . '_' . rand(1000, 9999);
-            $stmt->execute([$ftpUsername]);
-        }
-
         // ── Iniciar transacción ──
+        $db = Database::getInstance();
         $db->beginTransaction();
 
         try {
-            // 1. Crear usuario FTP
-            $cpanelService = new CpanelService();
-            $resultadoFTP  = $cpanelService->crearUsuarioFTP($ftpUsername, $passwordTemporal);
-
-            if (!$resultadoFTP['success']) {
-                throw new Exception('Error al crear usuario FTP: ' . $resultadoFTP['error']);
-            }
+            // 1. Generar token de verificación
+            $tokenVerificacion = bin2hex(random_bytes(32));
+            $tokenExpira = date('Y-m-d H:i:s', strtotime('+24 hours'));
 
             // 2. Crear usuario en BD
             $usuarioId = $this->model->crear([
-                'nombre'           => $nombre,
-                'apellido_paterno' => $apellido,
-                'apellido_materno' => $apellidoM ?: null,
-                'email'            => $email,
-                'telefono'         => $telefono,
-                'rol_id'           => $rolId,
-                'empresa_id'       => $empresaId,
-                'activo'           => 1,
-                'ftp_username'     => $ftpUsername,
-                'ftp_creado'       => 1,
-                'created_by'       => $this->usuarioId(),
+                'nombre'              => $nombre,
+                'apellido_paterno'    => $apellido,
+                'apellido_materno'    => $apellidoM ?: null,
+                'email'               => $email,
+                'telefono'            => $telefono,
+                'rol_id'              => $rolId,
+                'empresa_id'          => $empresaId,
+                'activo'              => 1,
+                'email_verificado'    => 0,
+                'token_verificacion'  => $tokenVerificacion,
+                'token_expira'        => $tokenExpira,
+                'created_by'          => $this->usuarioId(),
             ], $passwordTemporal);
 
-            // 3. Enviar email con credenciales
+            // 3. Enviar email con credenciales y link de verificación
             $emailService = new EmailService();
             $usuarioCreado = $this->model->find($usuarioId);
-            $emailEnviado = $emailService->enviarCredenciales($usuarioCreado, $passwordTemporal, $ftpUsername);
+            $emailEnviado = $emailService->enviarCredenciales($usuarioCreado, $passwordTemporal, null, $tokenVerificacion);
 
             if (!$emailEnviado) {
                 error_log("[EmpresaUsuarioController] No se pudo enviar email a usuario ID: $usuarioId");
@@ -184,9 +167,9 @@ class EmpresaUsuarioController extends BaseController
             }
         }
 
-        $this->log('Crear usuario empresa con FTP', 'empresa_usuario', "Email: $email, Rol: $rolSlug, FTP: $ftpUsername");
+        $this->log('Crear usuario empresa', 'empresa_usuario', "Email: $email, Rol: $rolSlug");
 
-        $mensaje = 'Usuario agregado. Se ha enviado un correo con las credenciales de acceso.';
+        $mensaje = 'Usuario agregado. Se ha enviado un correo con las credenciales y el link de verificación.';
         if (!$emailEnviado) {
             $mensaje .= ' <strong>AVISO:</strong> No se pudo enviar el email. Contraseña: ' . htmlspecialchars($passwordTemporal);
         }
@@ -196,7 +179,7 @@ class EmpresaUsuarioController extends BaseController
         } catch (Exception $e) {
             $db->rollBack();
             error_log("[EmpresaUsuarioController] Error al crear usuario: " . $e->getMessage());
-            $this->flash('error', 'No se pudo crear el usuario. Verifica la configuración de cPanel.');
+            $this->flash('error', 'No se pudo crear el usuario: ' . $e->getMessage());
             $this->redirect('empresa-usuario/nuevo');
         }
     }
