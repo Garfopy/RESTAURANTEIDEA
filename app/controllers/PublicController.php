@@ -23,6 +23,9 @@ class PublicController extends BaseController
         $colorPrimary = $config->get('color_primary', '#C8102E');
         $contactEmail = $config->get('smtp_user',     'contacto@carnihub.mx');
 
+        $susModel = new SuscripcionModel();
+        $planes   = $susModel->getPlanesActivos();
+
         require ROOT_PATH . '/app/views/public/landing.php';
     }
 
