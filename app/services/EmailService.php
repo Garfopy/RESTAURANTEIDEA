@@ -167,6 +167,14 @@ class EmailService
         $ftpUser   = $data['ftp_user'] ? htmlspecialchars($data['ftp_user']) : null;
         $urlLogin  = htmlspecialchars($data['url_login']);
         $token     = $data['token'] ?? null;
+
+        // Debug logging
+        if (!$token) {
+            error_log("[EmailService] ADVERTENCIA: Token de verificación es NULL para $email");
+        } else {
+            error_log("[EmailService] Generando email con token de verificación para $email");
+        }
+
         $urlVerificar = $token ? BASE_URL . "auth/verificar?token=" . urlencode($token) : null;
 
         $ctaButton = $urlVerificar
