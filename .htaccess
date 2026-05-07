@@ -30,12 +30,14 @@ RewriteBase /carnihub/
       maps.gstatic.com; \
     connect-src 'self' \
       *.googleapis.com \
+      *.gstatic.com \
       *.firebaseio.com \
       *.firebasedatabase.app \
       wss://*.firebaseio.com \
       wss://*.firebasedatabase.app; \
     frame-src 'self' www.google.com; \
     object-src 'none'"
+  Header always set Permissions-Policy "geolocation=(self)"
 </IfModule>
 
 # Block direct file access to sensitive directories (but allow virtual routes like config/general)

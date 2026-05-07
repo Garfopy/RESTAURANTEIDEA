@@ -6,101 +6,154 @@
   <title>Entrega — <?= htmlspecialchars($pedido['folio']) ?></title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
-    * { box-sizing: border-box; }
-    body { background: #111827; color: #F9FAFB; font-family: 'Inter', sans-serif; min-height: 100vh; margin: 0; }
-    .header { background: #1F2937; padding: 14px 16px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #374151; }
-    .card { background: #1F2937; border-radius: 12px; padding: 16px; margin-bottom: 14px; }
-    label { display: block; font-size: .8rem; font-weight: 600; color: #D1D5DB; margin-bottom: 6px; }
-    .btn-green  { background: #059669; color: #fff; padding: 14px; border: none; border-radius: 10px; font-size: 1rem; font-weight: 700; cursor: pointer; width: 100%; }
-    .btn-yellow { background: #D97706; color: #fff; padding: 14px; border: none; border-radius: 10px; font-size: 1rem; font-weight: 700; cursor: pointer; width: 100%; }
-    .btn-red    { background: #C8102E; color: #fff; padding: 14px; border: none; border-radius: 10px; font-size: 1rem; font-weight: 700; cursor: pointer; width: 100%; }
-    .btn-gray   { background: #374151; color: #F9FAFB; padding: 12px; border: none; border-radius: 10px; font-size: .9rem; font-weight: 600; cursor: pointer; width: 100%; }
-    #gpsStatus { border-radius: 8px; padding: 10px 14px; font-size: .8rem; display: none; margin-bottom: 12px; }
-    #llegadaBtn { display: none; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0F172A; color: #F1F5F9; font-family: 'Inter', sans-serif; min-height: 100vh; }
+
+    .app-shell { max-width: 480px; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; background: #111827; }
+
+    .header {
+      background: #1E293B;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid #334155;
+      position: sticky; top: 0; z-index: 10;
+    }
+    .header-back { color: #94A3B8; text-decoration: none; font-size: 1.3rem; line-height: 1; padding: 4px; }
+    .header-title { font-weight: 800; font-size: .95rem; letter-spacing: -.01em; }
+    .header-sub   { font-size: .72rem; color: #94A3B8; margin-top: 1px; }
+    .badge-ruta { margin-left: auto; font-size: .7rem; padding: 4px 10px; border-radius: 999px; background: #78350F; color: #FCD34D; font-weight: 700; white-space: nowrap; }
+
+    .body { padding: 16px; flex: 1; display: flex; flex-direction: column; gap: 12px; }
+
+    .card { background: #1E293B; border-radius: 14px; padding: 16px; border: 1px solid #334155; }
+
+    /* GPS status bar */
+    #gpsStatus {
+      display: none;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: .82rem;
+      font-weight: 600;
+      background: #064E3B;
+      color: #6EE7B7;
+      border: 1px solid #065F46;
+    }
+    #gpsStatus.error { background: #431407; color: #FCA5A5; border-color: #7F1D1D; }
+
+    /* Dirección */
+    .dir-label { font-size: .68rem; font-weight: 700; color: #64748B; letter-spacing: .06em; margin-bottom: 4px; }
+    .dir-text  { font-size: .93rem; font-weight: 600; color: #F1F5F9; line-height: 1.4; }
+    .dir-ref   { font-size: .78rem; color: #94A3B8; margin-top: 3px; }
+    .dir-maps  { font-size: .75rem; color: #60A5FA; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; margin-top: 8px; }
+
+    .notas-box { background: #0F172A; border-radius: 8px; padding: 10px 12px; font-size: .82rem; color: #FCD34D; border-left: 3px solid #D97706; }
+
+    /* Pasos */
+    .step-label { font-size: .75rem; color: #64748B; font-weight: 600; text-align: center; margin-bottom: 8px; }
+
+    .btn { width: 100%; border: none; border-radius: 12px; font-size: .95rem; font-weight: 700; cursor: pointer; padding: 15px; transition: opacity .15s; }
+    .btn:active { opacity: .85; }
+    .btn-yellow { background: linear-gradient(135deg, #D97706, #F59E0B); color: #fff; }
+    .btn-green  { background: linear-gradient(135deg, #059669, #10B981); color: #fff; }
+    .btn-gray   { background: #1E293B; color: #94A3B8; border: 1px solid #334155; border-radius: 12px; }
+
+    #llegadaBtn  { display: none; }
     #entregaForm { display: none; }
+
+    label.field-label { display: block; font-size: .78rem; font-weight: 600; color: #94A3B8; margin-bottom: 6px; }
+    .file-input {
+      width: 100%; background: #0F172A; border: 1px solid #334155; border-radius: 8px;
+      padding: 10px; color: #F1F5F9; font-size: .82rem;
+    }
+
+    .flash-ok  { background: #064E3B; color: #6EE7B7; border: 1px solid #065F46; border-radius: 10px; padding: 12px 14px; font-size: .85rem; font-weight: 600; }
+    .flash-err { background: #7F1D1D; color: #FCA5A5; border: 1px solid #991B1B; border-radius: 10px; padding: 12px 14px; font-size: .85rem; font-weight: 600; }
   </style>
 </head>
 <body>
 
-<div class="header">
-  <a href="<?= BASE_URL ?>repartidor/inicio" style="color:#9CA3AF;text-decoration:none;font-size:1.4rem">&larr;</a>
-  <div>
-    <div style="font-weight:800;font-size:.95rem"><?= htmlspecialchars($pedido['folio']) ?></div>
-    <div style="font-size:.75rem;color:#9CA3AF"><?= htmlspecialchars($pedido['empresa_nombre']) ?></div>
+<div class="app-shell">
+
+  <div class="header">
+    <a href="<?= BASE_URL ?>repartidor/inicio" class="header-back">&larr;</a>
+    <div>
+      <div class="header-title"><?= htmlspecialchars($pedido['folio']) ?></div>
+      <div class="header-sub"><?= htmlspecialchars($pedido['empresa_nombre']) ?></div>
+    </div>
+    <span class="badge-ruta">En camino</span>
   </div>
-  <span style="margin-left:auto;font-size:.72rem;padding:4px 12px;border-radius:999px;background:#78350F;color:#FCD34D;font-weight:600">En camino</span>
-</div>
 
-<div style="padding:16px">
+  <div class="body">
 
-  <?php if (!empty($flash)): ?>
-  <div style="padding:12px;border-radius:8px;margin-bottom:12px;<?= $flash['type']==='error' ? 'background:#7F1D1D;color:#FCA5A5' : 'background:#064E3B;color:#6EE7B7' ?>">
-    <?= htmlspecialchars($flash['message']) ?>
-  </div>
-  <?php endif; ?>
+    <?php if (!empty($flash)): ?>
+    <div class="<?= $flash['type']==='error' ? 'flash-err' : 'flash-ok' ?>">
+      <?= htmlspecialchars($flash['message']) ?>
+    </div>
+    <?php endif; ?>
 
-  <!-- Info del pedido -->
-  <div class="card">
-    <?php if (!empty($pedido['direccion_entrega'])): ?>
-    <div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:10px">
-      <span style="font-size:1.1rem;flex-shrink:0">📍</span>
-      <div>
-        <div style="font-size:.78rem;color:#9CA3AF;margin-bottom:2px">DIRECCIÓN DE ENTREGA</div>
-        <div style="font-size:.9rem;font-weight:600"><?= htmlspecialchars($pedido['direccion_entrega']) ?></div>
-        <?php if (!empty($pedido['referencia_entrega'])): ?>
-        <div style="font-size:.78rem;color:#9CA3AF;margin-top:3px"><?= htmlspecialchars($pedido['referencia_entrega']) ?></div>
-        <?php endif; ?>
-        <a href="https://maps.google.com/?q=<?= urlencode($pedido['direccion_entrega']) ?>" target="_blank"
-           style="font-size:.75rem;color:#60A5FA;font-weight:600;display:inline-block;margin-top:4px">
-          Abrir en Maps ↗
-        </a>
+    <!-- Destino -->
+    <div class="card">
+      <div class="dir-label">📍 DIRECCIÓN DE ENTREGA</div>
+      <?php if (!empty($pedido['direccion_entrega'])): ?>
+      <div class="dir-text"><?= htmlspecialchars($pedido['direccion_entrega']) ?></div>
+      <?php if (!empty($pedido['referencia_entrega'])): ?>
+      <div class="dir-ref"><?= htmlspecialchars($pedido['referencia_entrega']) ?></div>
+      <?php endif; ?>
+      <a href="https://maps.google.com/?q=<?= urlencode($pedido['direccion_entrega']) ?>"
+         target="_blank" class="dir-maps">
+        Abrir en Google Maps ↗
+      </a>
+      <?php else: ?>
+      <div style="font-size:.85rem;color:#64748B">Sin dirección registrada</div>
+      <?php endif; ?>
+      <?php if (!empty($pedido['notas'])): ?>
+      <div class="notas-box" style="margin-top:12px">📝 <?= htmlspecialchars($pedido['notas']) ?></div>
+      <?php endif; ?>
+    </div>
+
+    <!-- Estado GPS -->
+    <div id="gpsStatus">
+      <span id="gpsLabel">⏳ Activando GPS...</span>
+    </div>
+
+    <!-- Paso 1: He llegado -->
+    <div id="llegadaBtn">
+      <div class="step-label">¿Ya llegaste al destino?</div>
+      <button class="btn btn-yellow" onclick="marcarLlegada()">
+        📍 &nbsp;He llegado al destino
+      </button>
+    </div>
+
+    <!-- Paso 2: Foto de entrega -->
+    <div id="entregaForm">
+      <div class="card">
+        <div style="font-weight:700;font-size:.95rem;margin-bottom:6px">📷 Registrar entrega</div>
+        <p style="font-size:.8rem;color:#94A3B8;margin-bottom:14px;line-height:1.5">
+          Toma una foto como evidencia. El pedido quedará marcado como <strong style="color:#6EE7B7">ENTREGADO</strong>.
+        </p>
+        <form method="POST"
+              action="<?= BASE_URL ?>repartidor/confirmarEntregaDirecta/<?= $pedido['id'] ?>"
+              enctype="multipart/form-data">
+          <label class="field-label">Foto de evidencia *</label>
+          <input type="file" name="foto" accept="image/*" capture="environment" required
+                 class="file-input" style="margin-bottom:14px">
+          <button type="submit" class="btn btn-green"
+                  onclick="return confirm('¿Confirmar entrega? El pedido se marcará como ENTREGADO.')">
+            ✅ &nbsp;Confirmar entrega
+          </button>
+        </form>
       </div>
     </div>
-    <?php endif; ?>
-    <?php if (!empty($pedido['notas'])): ?>
-    <div style="background:#111827;border-radius:6px;padding:8px;font-size:.8rem;color:#FCD34D">
-      📝 Notas: <?= htmlspecialchars($pedido['notas']) ?>
-    </div>
-    <?php endif; ?>
-  </div>
 
-  <!-- Estado GPS -->
-  <div id="gpsStatus" style="background:#064E3B;color:#6EE7B7">
-    <span id="gpsLabel">⏳ Activando GPS...</span>
-  </div>
+    <a href="<?= BASE_URL ?>repartidor/inicio" class="btn btn-gray"
+       style="display:block;text-align:center;text-decoration:none;padding:13px">
+      ← Volver al inicio
+    </a>
 
-  <!-- Paso 1: Botón "Llegué al destino" -->
-  <div id="llegadaBtn" class="card" style="text-align:center">
-    <div style="font-size:.8rem;color:#9CA3AF;margin-bottom:10px">¿Ya llegaste al destino?</div>
-    <button class="btn-yellow" onclick="marcarLlegada()">
-      📍 He llegado al destino
-    </button>
-  </div>
-
-  <!-- Paso 2: Formulario de evidencia de entrega -->
-  <div id="entregaForm">
-    <div class="card">
-      <div style="font-weight:700;margin-bottom:12px;font-size:.95rem">📷 Registrar entrega</div>
-      <p style="font-size:.82rem;color:#9CA3AF;margin-bottom:14px">Toma una foto como evidencia de que el pedido fue entregado. Esta acción marcará el pedido como completado.</p>
-      <form method="POST" action="<?= BASE_URL ?>repartidor/confirmarEntregaDirecta/<?= $pedido['id'] ?>"
-            enctype="multipart/form-data" id="fotoForm">
-        <div style="margin-bottom:12px">
-          <label>Foto de evidencia *</label>
-          <input type="file" name="foto" accept="image/*" capture="environment" required
-                 style="width:100%;background:#374151;border:1px solid #4B5563;border-radius:8px;padding:10px;color:#F9FAFB;font-size:.85rem">
-        </div>
-        <button type="submit" class="btn-green"
-                onclick="return confirm('¿Confirmar la entrega? El pedido se marcará como ENTREGADO.')">
-          ✅ Confirmar entrega
-        </button>
-      </form>
-    </div>
-  </div>
-
-  <a href="<?= BASE_URL ?>repartidor/inicio" class="btn-gray" style="display:block;text-align:center;text-decoration:none;margin-top:8px">
-    ← Volver al inicio
-  </a>
-</div>
+  </div><!-- /.body -->
+</div><!-- /.app-shell -->
 
 <?php if ($firebaseActivo): ?>
 <script type="module">
@@ -108,21 +161,25 @@
   import { getDatabase, ref, set, onDisconnect } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
   const firebaseConfig = <?= json_encode($firebaseConfig) ?>;
-  const app = initializeApp(firebaseConfig);
-  const db  = getDatabase(app);
+  const app      = initializeApp(firebaseConfig);
+  const db       = getDatabase(app);
   const pedidoId = <?= (int)$pedido['id'] ?>;
   const trackRef = ref(db, 'tracking/' + pedidoId);
 
-  // Limpiar tracking al desconectar
   onDisconnect(trackRef).remove();
 
-  document.getElementById('gpsStatus').style.display = 'block';
+  const gpsEl    = document.getElementById('gpsStatus');
+  const gpsLabel = document.getElementById('gpsLabel');
+  const llegBtn  = document.getElementById('llegadaBtn');
+
+  gpsEl.style.display = 'block';
 
   if (navigator.geolocation) {
     navigator.geolocation.watchPosition(
       pos => {
-        document.getElementById('gpsLabel').textContent = '✅ GPS activo — enviando ubicación';
-        document.getElementById('llegadaBtn').style.display = 'block';
+        gpsEl.classList.remove('error');
+        gpsLabel.textContent = '✅ GPS activo — enviando ubicación';
+        llegBtn.style.display = 'block';
         set(trackRef, {
           lat: pos.coords.latitude,
           lng: pos.coords.longitude,
@@ -132,14 +189,16 @@
         });
       },
       err => {
-        document.getElementById('gpsLabel').textContent = '⚠ GPS no disponible';
-        document.getElementById('llegadaBtn').style.display = 'block';
+        gpsEl.classList.add('error');
+        gpsLabel.textContent = '⚠ GPS no disponible — el botón sigue activo';
+        llegBtn.style.display = 'block';
       },
       { enableHighAccuracy: true, maximumAge: 15000, timeout: 10000 }
     );
   } else {
-    document.getElementById('gpsLabel').textContent = '⚠ GPS no soportado';
-    document.getElementById('llegadaBtn').style.display = 'block';
+    gpsEl.classList.add('error');
+    gpsLabel.textContent = '⚠ GPS no soportado en este dispositivo';
+    llegBtn.style.display = 'block';
   }
 
   window.marcarLlegada = function() {
@@ -151,19 +210,30 @@
 </script>
 <?php else: ?>
 <script>
-  // Sin Firebase: mostrar botones de todos modos
   document.getElementById('llegadaBtn').style.display = 'block';
 
   if (navigator.geolocation) {
-    document.getElementById('gpsStatus').style.display = 'block';
-    navigator.geolocation.watchPosition(pos => {
-      document.getElementById('gpsLabel').textContent = '✅ GPS activo';
-      fetch('<?= BASE_URL ?>api/actualizarTracking', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ pedido_id: <?= (int)$pedido['id'] ?>, lat: pos.coords.latitude, lng: pos.coords.longitude })
-      });
-    }, null, { enableHighAccuracy: true, maximumAge: 15000, timeout: 10000 });
+    const gpsEl = document.getElementById('gpsStatus');
+    gpsEl.style.display = 'block';
+    navigator.geolocation.watchPosition(
+      pos => {
+        document.getElementById('gpsLabel').textContent = '✅ GPS activo';
+        fetch('<?= BASE_URL ?>api/actualizarTracking', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            pedido_id: <?= (int)$pedido['id'] ?>,
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude
+          })
+        });
+      },
+      err => {
+        document.getElementById('gpsLabel').textContent = '⚠ GPS no disponible';
+        gpsEl.classList.add('error');
+      },
+      { enableHighAccuracy: true, maximumAge: 15000, timeout: 10000 }
+    );
   }
 
   window.marcarLlegada = function() {
