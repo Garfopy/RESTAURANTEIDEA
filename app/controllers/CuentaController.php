@@ -147,10 +147,42 @@ class CuentaController extends BaseController
         }
 
         // Actualizar contraseña en BD
-        $model->update($this->usuarioId(), ['password' => password_hash($nuevo, PASSWORD_BCRYPT)]);
+        $db = Database::getInstance();
+        $stmt = $db->prepare("UPDATE usuarios SET password = ? WHERE id = ?");
+        $stmt->execute([password_hash($nuevo, PASSWORD_BCRYPT), $this->usuarioId()]);
+
+        // Marcar primer login como completado
+        $stmt = $db->prepare("UPDATE usuarios SET primer_login_completado = 1 WHERE id = ?");
+        $stmt->execute([$this->usuarioId()]);
+        $_SESSION['usuario']['primer_login_completado'] = 1;
+
         $this->log('Cambiar contraseña', 'cuenta');
 
         $this->flash('success', 'Contraseña actualizada correctamente.');
         $this->redirect('cuenta/perfil');
+    }
+
+    /**
+     * Marca el primer login como completado (el usuario decidió "recordar después")
+     */
+    public function dismissFirstLogin(?string $p = null): void
+    {
+        $this->requireAuth();
+
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            exit;
+        }
+
+        $usuarioId = $_SESSION['usuario']['id'];
+
+        $db = Database::getInstance();
+        $stmt = $db->prepare("UPDATE usuarios SET primer_login_completado = 1 WHERE id = ?");
+        $stmt->execute([$usuarioId]);
+
+        // Actualizar sesión
+        $_SESSION['usuario']['primer_login_completado'] = 1;
+
+        echo json_encode(['success' => true]);
     }
 }

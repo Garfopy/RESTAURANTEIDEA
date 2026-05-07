@@ -19,19 +19,37 @@ class EmailService
     private string $smtpFromName;
     private bool $configured;
 
+    // Cache estático para evitar múltiples consultas DB por request
+    private static ?array $configCache = null;
+
     public function __construct()
     {
-        $db = Database::getInstance();
-        $get = fn(string $k, string $default = '') =>
-            $db->query("SELECT valor FROM global_settings WHERE clave = '$k' LIMIT 1")->fetchColumn() ?: $default;
+        // Cargar configuración una sola vez por request
+        if (self::$configCache === null) {
+            $db = Database::getInstance();
+            $get = fn(string $k, string $default = '') =>
+                $db->query("SELECT valor FROM global_settings WHERE clave = '$k' LIMIT 1")->fetchColumn() ?: $default;
 
-        $this->smtpHost       = $get('smtp_host');
-        $this->smtpPort       = $get('smtp_port', '587');
-        $this->smtpEncryption = $get('smtp_encryption', 'tls');
-        $this->smtpUsername   = $get('smtp_username');
-        $this->smtpPassword   = $get('smtp_password');
-        $this->smtpFromEmail  = $get('smtp_from_email') ?: $this->smtpUsername;
-        $this->smtpFromName   = $get('smtp_from_name', 'CarniHub');
+            self::$configCache = [
+                'host'       => $get('smtp_host'),
+                'port'       => $get('smtp_port', '587'),
+                'encryption' => $get('smtp_encryption', 'tls'),
+                'username'   => $get('smtp_username'),
+                'password'   => $get('smtp_password'),
+                'from_email' => $get('smtp_from_email'),
+                'from_name'  => $get('smtp_from_name', 'CarniHub'),
+            ];
+
+            self::$configCache['from_email'] = self::$configCache['from_email'] ?: self::$configCache['username'];
+        }
+
+        $this->smtpHost       = self::$configCache['host'];
+        $this->smtpPort       = self::$configCache['port'];
+        $this->smtpEncryption = self::$configCache['encryption'];
+        $this->smtpUsername   = self::$configCache['username'];
+        $this->smtpPassword   = self::$configCache['password'];
+        $this->smtpFromEmail  = self::$configCache['from_email'];
+        $this->smtpFromName   = self::$configCache['from_name'];
 
         // Verificar si la configuración está completa
         $this->configured = !empty($this->smtpHost)
@@ -74,6 +92,18 @@ class EmailService
             $mail->Username   = $this->smtpUsername;
             $mail->Password   = $this->smtpPassword;
             $mail->Port       = (int)$this->smtpPort;
+
+            // Timeout de 10 segundos para conexión SMTP
+            $mail->Timeout = 10;
+
+            // Opciones SSL/TLS optimizadas para cPanel
+            $mail->SMTPOptions = [
+                'ssl' => [
+                    'verify_peer'       => false,
+                    'verify_peer_name'  => false,
+                    'allow_self_signed' => true
+                ]
+            ];
 
             // Configurar cifrado
             if ($this->smtpEncryption === 'tls') {

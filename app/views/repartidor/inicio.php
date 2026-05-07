@@ -40,6 +40,43 @@
   </div>
   <?php endif; ?>
 
+  <!-- Banner de cambio de contraseña (primer login) -->
+  <?php if (!empty($flash) && $flash['type'] === 'first_login'): ?>
+  <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 16px 20px; border-radius: 12px; margin-bottom: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+    <div style="display: flex; flex-direction: column; gap: 12px;">
+      <div>
+        <div style="font-weight: 700; font-size: 1rem; margin-bottom: 6px;">
+          🔐 Actualiza tu contraseña
+        </div>
+        <div style="opacity: 0.95; font-size: 0.85rem;">
+          <?= htmlspecialchars($flash['message']) ?>
+        </div>
+      </div>
+      <div style="display: flex; gap: 10px;">
+        <a href="<?= BASE_URL ?>cuenta/perfil"
+           style="background: white; color: #667eea; padding: 10px 18px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 0.9rem; flex: 1; text-align: center;">
+          Cambiar contraseña
+        </a>
+        <button onclick="dismissFirstLoginBanner(<?= $_SESSION['usuario']['id'] ?>)"
+                style="background: rgba(255,255,255,0.2); color: white; border: none; padding: 10px 18px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.9rem; flex: 1;">
+          Después
+        </button>
+      </div>
+    </div>
+  </div>
+  <script>
+  function dismissFirstLoginBanner(userId) {
+      fetch('<?= BASE_URL ?>cuenta/dismissFirstLogin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: userId })
+      }).then(() => {
+          location.reload();
+      });
+  }
+  </script>
+  <?php endif; ?>
+
   <h1 style="font-size:1.1rem;font-weight:800;margin-bottom:4px">Entregas de hoy</h1>
   <p style="font-size:.8rem;color:#9CA3AF;margin-bottom:16px"><?= date('d \d\e F \d\e Y') ?></p>
 

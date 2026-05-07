@@ -3,6 +3,47 @@
 // Variables: $rol, $totalPedidos, $gastomMes, $pedidosRecientes, $pendientesAprobacion
 ?>
 
+<!-- Banner de cambio de contraseña (primer login) -->
+<?php if (!empty($flash) && $flash['type'] === 'first_login'): ?>
+<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px 24px; border-radius: 12px; margin-bottom: 24px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+        <div style="flex: 1;">
+            <div style="font-weight: 600; font-size: 1.1rem; margin-bottom: 8px;">
+                🔐 Actualiza tu contraseña
+            </div>
+            <div style="opacity: 0.95; font-size: 0.9rem;">
+                <?= htmlspecialchars($flash['message']) ?>
+            </div>
+        </div>
+        <div style="display: flex; gap: 12px; align-items: center;">
+            <a href="<?= BASE_URL ?>cuenta/perfil"
+               style="background: white; color: #667eea; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: 600; white-space: nowrap; transition: transform 0.2s;"
+               onmouseover="this.style.transform='scale(1.05)'"
+               onmouseout="this.style.transform='scale(1)'">
+                Cambiar contraseña
+            </a>
+            <button onclick="dismissFirstLoginBanner(<?= $_SESSION['usuario']['id'] ?>)"
+                    style="background: rgba(255,255,255,0.2); color: white; border: none; padding: 10px 16px; border-radius: 8px; cursor: pointer; font-weight: 600; white-space: nowrap;"
+                    onmouseover="this.style.background='rgba(255,255,255,0.3)'"
+                    onmouseout="this.style.background='rgba(255,255,255,0.2)'">
+                Recordar después
+            </button>
+        </div>
+    </div>
+</div>
+<script>
+function dismissFirstLoginBanner(userId) {
+    fetch('<?= BASE_URL ?>cuenta/dismissFirstLogin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId })
+    }).then(() => {
+        location.reload();
+    });
+}
+</script>
+<?php endif; ?>
+
 <?php if ($rol === 'comprador'): ?>
 <!-- Vista comprador: ir directo al catálogo -->
 <div style="background:#fff;border-radius:12px;padding:32px;text-align:center;border:1px solid #E5E7EB">

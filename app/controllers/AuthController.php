@@ -92,6 +92,11 @@ class AuthController extends BaseController
 
         $this->log('Login exitoso', 'auth');
 
+        // Verificar si es primer login después de verificación
+        if ($usuario['email_verificado'] && empty($usuario['primer_login_completado'])) {
+            $this->flash('first_login', '¡Bienvenido! Te recomendamos cambiar tu contraseña para mayor seguridad.');
+        }
+
         $this->redirectSegunRol($usuario['rol_slug']);
     }
 
