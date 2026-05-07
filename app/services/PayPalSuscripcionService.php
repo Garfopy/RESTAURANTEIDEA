@@ -97,7 +97,7 @@ class PayPalSuscripcionService
         string $nombre,
         string $ciclo,
         float  $precio,
-        string $moneda = 'USD'
+        string $moneda = 'MXN'
     ): string {
         $intervalUnit = $ciclo === 'anual' ? 'YEAR' : 'MONTH';
         $data = $this->request('POST', '/v1/billing/plans', [
@@ -127,7 +127,7 @@ class PayPalSuscripcionService
 
     // ── Sincronizar todos los planes locales con PayPal ───────────────────────
     // Solo crea planes que aún no tienen ID; reutiliza el producto si ya existe.
-    public function sincronizarPlanes(array $planes, string $moneda = 'USD'): array
+    public function sincronizarPlanes(array $planes, string $moneda = 'MXN'): array
     {
         $config    = new ConfigModel();
         $productId = $config->get('paypal_product_id', '');
