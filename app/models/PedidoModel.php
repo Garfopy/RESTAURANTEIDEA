@@ -494,24 +494,32 @@ class PedidoModel extends BaseModel
 
     private function logEstado(int $pedidoId, string $estado): void
     {
-        $usuarioId = $_SESSION['usuario']['id'] ?? null;
-        $this->execute(
-            'INSERT INTO pedido_historial (pedido_id, estado, usuario_id) VALUES (?, ?, ?)',
-            [$pedidoId, $estado, $usuarioId]
-        );
+        try {
+            $usuarioId = $_SESSION['usuario']['id'] ?? null;
+            $this->execute(
+                'INSERT INTO pedido_historial (pedido_id, estado, usuario_id) VALUES (?, ?, ?)',
+                [$pedidoId, $estado, $usuarioId]
+            );
+        } catch (\Throwable $e) {
+            // tabla aún no migrada — no bloquear la operación principal
+        }
     }
 
     public function getHistorial(int $id): array
     {
-        return $this->query(
-            "SELECT ph.estado, ph.created_at,
-                    CONCAT(COALESCE(u.nombre,''), ' ', COALESCE(u.apellido_paterno,'')) AS usuario_nombre
-               FROM pedido_historial ph
-               LEFT JOIN usuarios u ON u.id = ph.usuario_id
-              WHERE ph.pedido_id = ?
-              ORDER BY ph.created_at ASC",
-            [$id]
-        );
+        try {
+            return $this->query(
+                "SELECT ph.estado, ph.created_at,
+                        CONCAT(COALESCE(u.nombre,''), ' ', COALESCE(u.apellido_paterno,'')) AS usuario_nombre
+                   FROM pedido_historial ph
+                   LEFT JOIN usuarios u ON u.id = ph.usuario_id
+                  WHERE ph.pedido_id = ?
+                  ORDER BY ph.created_at ASC",
+                [$id]
+            );
+        } catch (\Throwable $e) {
+            return [];
+        }
     }
 
     public function listadoConfirmadosPorEmpresa(int $empresaId): array

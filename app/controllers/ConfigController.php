@@ -83,14 +83,7 @@ class ConfigController extends BaseController
             $this->redirect('config/apis');
         }
 
-        $settings = array_merge(
-            $this->asClave($this->cfg->getGrupo('apis')),
-            $this->asClave($this->cfg->getGrupo('notificaciones')),
-            $this->asClave($this->cfg->getGrupo('gps')),
-            $this->asClave($this->cfg->getGrupo('facturacion')),
-            $this->asClave($this->cfg->getGrupo('pagos')),
-            $this->asClave($this->cfg->getGrupo('iot'))
-        );
+        $settings = $this->cfg->getAll();
         $flash      = $this->getFlash();
         $pageTitle  = 'Configuración — APIs y servicios';
         $activeMenu = 'config';
