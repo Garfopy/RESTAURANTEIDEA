@@ -248,4 +248,118 @@ $iniciales = strtoupper(mb_substr($usuario['nombre'] ?? 'U', 0, 1) . mb_substr($
   <?php endif; ?>
   <?php endif; ?>
 
+  <?php if (in_array($rol ?? '', ['admin_empresa', 'supervisor'], true)): ?>
+  <?php
+  $empresaDataPerfil = $_SESSION['empresa'] ?? [];
+  $configModelEmp    = new ConfigModel();
+  $gmKeyEmp          = $configModelEmp->get('google_maps_key', '');
+  ?>
+  <!-- Dirección de la empresa (supervisores y admin_empresa) -->
+  <div style="background:#fff;border-radius:12px;border:1px solid #E5E7EB;padding:24px;margin-top:16px">
+    <h2 style="font-size:.95rem;font-weight:700;margin-bottom:4px;color:#111827">Dirección de la empresa</h2>
+    <p style="font-size:.8rem;color:#6B7280;margin-bottom:16px">
+      Esta dirección se usa como <strong>punto de origen</strong> para calcular rutas de entrega y el costo de envío automáticamente.
+      <?php if (empty($empresaDataPerfil['direccion_fiscal'])): ?>
+      <strong style="color:#DC2626">⚠ Sin dirección registrada — algunos cálculos de ruta no funcionarán.</strong>
+      <?php endif; ?>
+    </p>
+    <form method="POST" action="<?= BASE_URL ?>empresa/guardarDireccion">
+      <div style="margin-bottom:12px">
+        <label class="form-label">Dirección completa de la empresa</label>
+        <?php if ($gmKeyEmp): ?>
+        <input type="text" id="emp-dir-input" name="direccion_fiscal" class="form-control"
+               placeholder="Busca la dirección con Google Maps..."
+               value="<?= htmlspecialchars($empresaDataPerfil['direccion_fiscal'] ?? '') ?>"
+               autocomplete="off">
+        <?php else: ?>
+        <input type="text" name="direccion_fiscal" class="form-control"
+               placeholder="Calle, número, colonia, ciudad..."
+               value="<?= htmlspecialchars($empresaDataPerfil['direccion_fiscal'] ?? '') ?>">
+        <?php endif; ?>
+      </div>
+
+      <?php if ($gmKeyEmp): ?>
+      <div id="mapa-emp-container" style="border-radius:10px;overflow:hidden;height:220px;margin-bottom:12px;border:1px solid #E5E7EB;display:<?= (!empty($empresaDataPerfil['lat'])) ? 'block' : 'none' ?>">
+        <div id="mapa-emp" style="width:100%;height:100%"></div>
+      </div>
+      <p id="mapa-emp-hint" style="font-size:.75rem;color:#6B7280;margin-bottom:12px;display:<?= (!empty($empresaDataPerfil['lat'])) ? 'none' : 'block' ?>">
+        Escribe la dirección para ver el mapa y confirmar la ubicación exacta.
+      </p>
+      <?php endif; ?>
+
+      <?php if (!empty($empresaDataPerfil['lat']) && !empty($empresaDataPerfil['lng'])): ?>
+      <div style="margin-bottom:12px;font-size:.78rem;color:#059669">
+        ✓ Ubicación GPS guardada (<?= number_format((float)$empresaDataPerfil['lat'],5) ?>, <?= number_format((float)$empresaDataPerfil['lng'],5) ?>)
+      </div>
+      <?php endif; ?>
+
+      <input type="hidden" name="lat" id="emp-lat" value="<?= htmlspecialchars($empresaDataPerfil['lat'] ?? '') ?>">
+      <input type="hidden" name="lng" id="emp-lng" value="<?= htmlspecialchars($empresaDataPerfil['lng'] ?? '') ?>">
+
+      <button type="submit" style="padding:9px 20px;background:var(--color-primary);color:#fff;border:none;border-radius:8px;font-weight:600;font-size:.875rem;cursor:pointer">
+        Guardar dirección
+      </button>
+    </form>
+  </div>
+
+  <?php if ($gmKeyEmp): ?>
+  <script>
+  (function() {
+    var mapEmp = null, markerEmp = null;
+    var initLatEmp = parseFloat('<?= (float)($empresaDataPerfil['lat'] ?? 0) ?>') || null;
+    var initLngEmp = parseFloat('<?= (float)($empresaDataPerfil['lng'] ?? 0) ?>') || null;
+
+    window.initGoogleMapsEmpresa = function() {
+      var center = (initLatEmp && initLngEmp) ? { lat: initLatEmp, lng: initLngEmp } : { lat: 19.4326, lng: -99.1332 };
+      mapEmp = new google.maps.Map(document.getElementById('mapa-emp'), {
+        center: center, zoom: (initLatEmp && initLngEmp) ? 16 : 12,
+        mapTypeControl: false, streetViewControl: false
+      });
+      if (initLatEmp && initLngEmp) {
+        markerEmp = new google.maps.Marker({ position: center, map: mapEmp, draggable: true });
+        markerEmp.addListener('dragend', actualizarCoordsEmp);
+        document.getElementById('mapa-emp-container').style.display = 'block';
+      }
+      mapEmp.addListener('click', function(e) {
+        var pos = e.latLng;
+        if (markerEmp) { markerEmp.setPosition(pos); } else {
+          markerEmp = new google.maps.Marker({ position: pos, map: mapEmp, draggable: true });
+          markerEmp.addListener('dragend', actualizarCoordsEmp);
+        }
+        actualizarCoordsEmp();
+      });
+      var autocomplete = new google.maps.places.Autocomplete(
+        document.getElementById('emp-dir-input'),
+        { componentRestrictions: { country: 'mx' }, fields: ['geometry', 'formatted_address'] }
+      );
+      autocomplete.addListener('place_changed', function() {
+        var place = autocomplete.getPlace();
+        if (!place.geometry) return;
+        var pos = place.geometry.location;
+        mapEmp.setCenter(pos); mapEmp.setZoom(16);
+        if (markerEmp) { markerEmp.setPosition(pos); } else {
+          markerEmp = new google.maps.Marker({ position: pos, map: mapEmp, draggable: true });
+          markerEmp.addListener('dragend', actualizarCoordsEmp);
+        }
+        document.getElementById('emp-lat').value = pos.lat().toFixed(7);
+        document.getElementById('emp-lng').value = pos.lng().toFixed(7);
+        document.getElementById('mapa-emp-container').style.display = 'block';
+        var hint = document.getElementById('mapa-emp-hint');
+        if (hint) hint.style.display = 'none';
+      });
+    };
+    function actualizarCoordsEmp() {
+      if (!markerEmp) return;
+      var pos = markerEmp.getPosition();
+      document.getElementById('emp-lat').value = pos.lat().toFixed(7);
+      document.getElementById('emp-lng').value = pos.lng().toFixed(7);
+    }
+  })();
+  </script>
+  <script async defer
+    src="https://maps.googleapis.com/maps/api/js?key=<?= htmlspecialchars($gmKeyEmp) ?>&libraries=places&callback=initGoogleMapsEmpresa">
+  </script>
+  <?php endif; ?>
+  <?php endif; ?>
+
 </div>

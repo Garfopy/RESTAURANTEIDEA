@@ -174,9 +174,13 @@ $cancelado = $pedido['estado'] === 'cancelado';
     <div style="font-size:.75rem;color:#6B7280;margin-top:6px">JPG, PNG, WEBP o PDF · Máx 5 MB</div>
   </form>
   <?php else: ?>
-  <div style="display:flex;align-items:center;gap:8px;color:#065F46;font-size:.875rem;font-weight:600">
-    ✓ Comprobante enviado — la empresa verificará el pago.
-    <a href="<?= htmlspecialchars($pedido['foto_comprobante_path']) ?>" target="_blank" style="color:#1D4ED8;margin-left:8px">Ver comprobante</a>
+  <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:rgba(255,255,255,.7);border-radius:8px;flex-wrap:wrap">
+    <span style="font-size:1.2rem">⏳</span>
+    <div>
+      <div style="font-size:.88rem;font-weight:700;color:#1E40AF">Comprobante enviado — en espera de validación</div>
+      <div style="font-size:.8rem;color:#3B82F6">La empresa revisará tu comprobante y confirmará el pago pronto.</div>
+    </div>
+    <a href="<?= htmlspecialchars($pedido['foto_comprobante_path']) ?>" target="_blank" style="color:#1D4ED8;font-size:.8rem;font-weight:600;white-space:nowrap">Ver comprobante →</a>
   </div>
   <?php endif; ?>
 </div>
@@ -306,29 +310,56 @@ $cancelado = $pedido['estado'] === 'cancelado';
 
   <?php elseif (in_array($pedido['estado'], ['confirmado','en_preparacion'], true) && !empty($pedido['foto_comprobante_path'])): ?>
   <div style="padding:12px 14px;background:#DBEAFE;border:1px solid #BFDBFE;border-radius:10px;font-size:.85rem;color:#1E40AF;margin-bottom:12px">
-    <strong>Comprobante de pago recibido.</strong>
-    Revisa la imagen del comprobante arriba. Si el pago es correcto, confírmalo para continuar con la entrega.
+    <strong>💳 Comprobante de pago recibido.</strong>
+    Revisa la imagen arriba. Si el pago es correcto, confírmalo para mover el pedido a <strong>En preparación</strong>.
     <?php if (($pedido['tipo_entrega'] ?? '') === 'pickup'): ?>
-    <br><span style="font-size:.8rem;opacity:.8">El pedido quedará listo para que el comprador lo recoja.</span>
+    <br><span style="font-size:.8rem;opacity:.8">Después podrás marcar "Listo para recoger" cuando el pedido esté preparado.</span>
     <?php else: ?>
-    <br><span style="font-size:.8rem;opacity:.8">El pedido pasará a "En camino" para el repartidor asignado.</span>
+    <br><span style="font-size:.8rem;opacity:.8">Tú o el repartidor marcarán "En camino" cuando el pedido salga.</span>
     <?php endif; ?>
   </div>
   <form method="POST" action="<?= BASE_URL ?>empresa-pedido/cambiarEstado"
-        onsubmit="return confirm('¿Confirmar el pago y continuar con la entrega?')">
+        onsubmit="return confirm('¿Confirmar el pago y mover a En preparación?')">
     <input type="hidden" name="pedido_id" value="<?= $pedido['id'] ?>">
-    <input type="hidden" name="estado" value="en_ruta">
+    <input type="hidden" name="estado" value="en_preparacion">
     <button type="submit"
-            style="width:100%;padding:12px;background:#1D4ED8;color:#fff;border:none;border-radius:9px;font-weight:700;cursor:pointer;font-size:.9rem">
-      💳 Confirmar pago y continuar
+            style="width:100%;padding:12px;background:#1D4ED8;color:#fff;border:none;border-radius:9px;font-weight:700;cursor:pointer;font-size:.9rem;margin-bottom:8px">
+      ✅ Confirmar pago recibido → En preparación
     </button>
   </form>
 
-  <?php elseif (in_array($pedido['estado'], ['confirmado','en_preparacion'], true) && empty($pedido['foto_comprobante_path'])): ?>
+  <?php elseif ($pedido['estado'] === 'confirmado' && empty($pedido['foto_comprobante_path'])): ?>
   <div style="padding:12px 14px;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:10px;font-size:.85rem;color:#6B7280">
-    <strong>Esperando comprobante de pago.</strong>
-    El comprador recibirá una notificación para subir su comprobante. Cuando lo suba, aparecerá aquí para que puedas confirmarlo.
+    <strong>⏳ Esperando comprobante de pago.</strong>
+    El comprador verá la opción para subir su comprobante. Cuando lo suba, aparecerá aquí para que puedas confirmarlo.
   </div>
+
+  <?php elseif ($pedido['estado'] === 'en_preparacion' && empty($pedido['foto_comprobante_path'])): ?>
+  <div style="padding:12px 14px;background:#EDE9FE;border:1px solid #C4B5FD;border-radius:10px;font-size:.85rem;color:#5B21B6;margin-bottom:12px">
+    <strong>📦 Pedido en preparación.</strong>
+    El pago fue confirmado. Cuando el pedido esté listo para salir, márcalo como "En camino".
+  </div>
+  <?php if (($pedido['tipo_entrega'] ?? '') !== 'pickup'): ?>
+  <form method="POST" action="<?= BASE_URL ?>empresa-pedido/cambiarEstado"
+        onsubmit="return confirm('¿Marcar como En camino? Esto indica que el repartidor ya salió con el pedido.')">
+    <input type="hidden" name="pedido_id" value="<?= $pedido['id'] ?>">
+    <input type="hidden" name="estado" value="en_ruta">
+    <button type="submit"
+            style="width:100%;padding:12px;background:#D97706;color:#fff;border:none;border-radius:9px;font-weight:700;cursor:pointer;font-size:.9rem;margin-bottom:8px">
+      🚚 Marcar en camino
+    </button>
+  </form>
+  <?php else: ?>
+  <form method="POST" action="<?= BASE_URL ?>empresa-pedido/cambiarEstado"
+        onsubmit="return confirm('¿Marcar como listo para que el comprador recoja?')">
+    <input type="hidden" name="pedido_id" value="<?= $pedido['id'] ?>">
+    <input type="hidden" name="estado" value="en_ruta">
+    <button type="submit"
+            style="width:100%;padding:12px;background:#059669;color:#fff;border:none;border-radius:9px;font-weight:700;cursor:pointer;font-size:.9rem;margin-bottom:8px">
+      ✓ Listo para recoger
+    </button>
+  </form>
+  <?php endif; ?>
 
   <?php elseif ($pedido['estado'] === 'en_ruta' && ($pedido['tipo_entrega'] ?? '') === 'pickup'): ?>
   <div style="padding:12px 14px;background:#F0FDF4;border:1px solid #A7F3D0;border-radius:10px;font-size:.85rem;color:#065F46;margin-bottom:12px">
@@ -496,45 +527,79 @@ $cancelado = $pedido['estado'] === 'cancelado';
     <?php endif; ?>
 
     <?php if (!empty($pedido['sucursales']) && ($pedido['tipo_entrega'] ?? '') === 'repartidor'): ?>
+    <?php
+    // Cargar info de empresa y clave de Maps
+    if (!isset($empresaInfo)) {
+        $empresaInfo = (new EmpresaModel())->find((int)$pedido['empresa_id']);
+    }
+    $gmKeyDetalle = (new ConfigModel())->get('google_maps_key', '');
+    $empLat   = !empty($empresaInfo['lat'])  ? (float)$empresaInfo['lat']  : null;
+    $empLng   = !empty($empresaInfo['lng'])  ? (float)$empresaInfo['lng']  : null;
+    $empDir   = $empresaInfo['direccion_fiscal'] ?? '';
+    $empNom   = $empresaInfo['razon_social'] ?? 'Empresa';
+
+    // Construir arrays de waypoints para Maps
+    $wpCoords = [];
+    foreach ($pedido['sucursales'] as $ps) {
+        $wpCoords[] = (!empty($ps['lat']) && !empty($ps['lng']))
+            ? (float)$ps['lat'] . ',' . (float)$ps['lng']
+            : urlencode($ps['direccion']);
+    }
+    $originMaps = ($empLat && $empLng) ? "$empLat,$empLng" : ($empDir ? urlencode($empDir) : '');
+    $destMaps   = !empty($wpCoords)    ? array_pop($wpCoords) : null;
+    $wpsMiddle  = $wpCoords;
+
+    if ($originMaps && $destMaps) {
+        $mapsUrl = 'https://www.google.com/maps/dir/' . $originMaps;
+        foreach ($wpsMiddle as $wp) { $mapsUrl .= '/' . $wp; }
+        $mapsUrl .= '/' . $destMaps;
+    } else { $mapsUrl = null; }
+
+    // Embed URL
+    if ($gmKeyDetalle && $originMaps && $destMaps) {
+        $embedWps = implode('|', array_merge($wpsMiddle));
+        $embedUrl = 'https://www.google.com/maps/embed/v1/directions?key=' . urlencode($gmKeyDetalle)
+            . '&origin=' . $originMaps
+            . '&destination=' . $destMaps
+            . ($embedWps ? '&waypoints=' . $embedWps : '')
+            . '&mode=driving&language=es';
+    } else { $embedUrl = null; }
+    ?>
     <!-- ── Panel paradas de entrega ─────────────────────────────── -->
     <div style="background:#fff;border-radius:12px;border:1px solid #E5E7EB;overflow:hidden;margin-bottom:16px">
       <div style="padding:14px 16px;border-bottom:1px solid #F3F4F6;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
         <div>
           <span style="font-weight:700;font-size:.9rem;color:#111827">📍 Paradas de entrega</span>
-          <div style="font-size:.75rem;color:#9CA3AF;margin-top:1px"><?= count($pedido['sucursales']) ?> parada<?= count($pedido['sucursales'])>1?'s':'' ?> — el repartidor visita cada una</div>
+          <div style="font-size:.75rem;color:#9CA3AF;margin-top:1px"><?= count($pedido['sucursales']) ?> parada<?= count($pedido['sucursales'])>1?'s':'' ?> — el repartidor visita cada una desde el origen</div>
         </div>
-        <?php
-        // Botón Google Maps ruta (empresa → todas las paradas)
-        // Cargar dirección de la empresa si no está cargada aún
-        if (!isset($empresaInfo)) {
-            $empresaInfo = (new EmpresaModel())->find((int)$pedido['empresa_id']);
-        }
-        $waypoints = [];
-        foreach ($pedido['sucursales'] as $ps) {
-            if (!empty($ps['lat']) && !empty($ps['lng'])) {
-                $waypoints[] = (float)$ps['lat'] . ',' . (float)$ps['lng'];
-            } else {
-                $waypoints[] = urlencode($ps['direccion']);
-            }
-        }
-        // Usar empresa como origen de la ruta
-        if (!empty($empresaInfo['lat']) && !empty($empresaInfo['lng'])) {
-            $origin = (float)$empresaInfo['lat'] . ',' . (float)$empresaInfo['lng'];
-        } elseif (!empty($empresaInfo['direccion_fiscal'])) {
-            $origin = urlencode($empresaInfo['direccion_fiscal']);
-        } else {
-            $origin = !empty($waypoints) ? array_shift($waypoints) : null;
-        }
-        $dest = !empty($waypoints) ? array_pop($waypoints) : null;
-        if ($origin && $dest):
-          $wps    = implode('/', $waypoints);
-          $mapsUrl = 'https://www.google.com/maps/dir/' . $origin . '/' . ($wps ? $wps . '/' : '') . $dest;
-        ?>
+        <?php if ($mapsUrl): ?>
         <a href="<?= htmlspecialchars($mapsUrl) ?>" target="_blank" rel="noopener"
            style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;background:#4285F4;color:#fff;border-radius:8px;font-size:.8rem;font-weight:700;text-decoration:none">
           🗺 Ver ruta en Maps
         </a>
         <?php endif; ?>
+      </div>
+
+      <!-- Origen: empresa -->
+      <div style="padding:12px 16px;border-bottom:1px solid #F3F4F6;background:#F9FAFB">
+        <div style="display:flex;align-items:flex-start;gap:10px">
+          <div style="flex-shrink:0;width:24px;height:24px;border-radius:50%;background:#374151;color:#fff;font-size:.65rem;font-weight:700;display:flex;align-items:center;justify-content:center">O</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:.88rem;font-weight:700;color:#111827">Origen: <?= htmlspecialchars($empNom) ?></div>
+            <div style="font-size:.78rem;color:#6B7280">📍 <?= htmlspecialchars($empDir ?: 'Sin dirección registrada') ?></div>
+            <?php if (!$empDir && !$esComprador): ?>
+            <div style="font-size:.74rem;color:#DC2626;margin-top:2px">⚠ Registra la dirección de la empresa en tu perfil para calcular rutas correctamente.</div>
+            <?php endif; ?>
+          </div>
+          <?php if ($empLat && $empLng): ?>
+          <a href="https://maps.google.com/?q=<?= $empLat ?>,<?= $empLng ?>" target="_blank" rel="noopener"
+             style="font-size:.72rem;color:#4285F4;text-decoration:none;font-weight:600;white-space:nowrap">Maps ↗</a>
+          <?php elseif ($empDir): ?>
+          <a href="https://maps.google.com/?q=<?= urlencode($empDir) ?>" target="_blank" rel="noopener"
+             style="font-size:.72rem;color:#4285F4;text-decoration:none;font-weight:600;white-space:nowrap">Maps ↗</a>
+          <?php endif; ?>
+          <span style="font-size:.7rem;padding:3px 10px;border-radius:999px;background:#F3F4F6;color:#374151;font-weight:600;white-space:nowrap">Salida</span>
+        </div>
       </div>
 
       <?php foreach ($pedido['sucursales'] as $i => $ps):
@@ -590,6 +655,20 @@ $cancelado = $pedido['estado'] === 'cancelado';
         </div>
       </div>
       <?php endforeach; ?>
+
+      <!-- Google Maps embed -->
+      <?php if ($embedUrl): ?>
+      <div style="border-top:1px solid #F3F4F6">
+        <iframe src="<?= htmlspecialchars($embedUrl) ?>" width="100%" height="260"
+                style="border:0;display:block" allowfullscreen loading="lazy"
+                referrerpolicy="no-referrer-when-downgrade"></iframe>
+      </div>
+      <?php elseif ($mapsUrl): ?>
+      <div style="padding:10px 16px;background:#F9FAFB;text-align:center">
+        <a href="<?= htmlspecialchars($mapsUrl) ?>" target="_blank" rel="noopener"
+           style="font-size:.8rem;color:#4285F4;font-weight:600">Ver ruta completa en Google Maps →</a>
+      </div>
+      <?php endif; ?>
 
       <?php if (!$esComprador && !in_array($pedido['estado'], ['entregado','cancelado'], true)): ?>
       <!-- Formulario: asignar costos de envío por parada -->

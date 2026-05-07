@@ -39,6 +39,9 @@ class EmpresaPedidoController extends BaseController
         $empresaModel = new EmpresaModel();
         $empresaInfo  = $empresaModel->find($empresaId);
 
+        $configModel  = new ConfigModel();
+        $gmKey        = $configModel->get('google_maps_key', '');
+
         $flash      = $this->getFlash();
         $pageTitle  = 'Pedidos';
         $activeMenu = 'pedidos';

@@ -161,8 +161,9 @@ class PedidoModel extends BaseModel
 
     public function subirComprobante(int $id, string $path): void
     {
+        // Solo guarda la ruta; el admin valida manualmente → en_preparacion
         $this->execute(
-            "UPDATE pedidos SET foto_comprobante_path = ?, estado = 'en_preparacion' WHERE id = ?",
+            "UPDATE pedidos SET foto_comprobante_path = ? WHERE id = ? AND estado = 'confirmado'",
             [$path, $id]
         );
     }
@@ -248,7 +249,7 @@ class PedidoModel extends BaseModel
     public function countConComprobantePendiente(int $empresaId): int
     {
         $row = $this->queryOne(
-            "SELECT COUNT(*) AS n FROM pedidos WHERE empresa_id = ? AND estado = 'en_preparacion' AND foto_comprobante_path IS NOT NULL",
+            "SELECT COUNT(*) AS n FROM pedidos WHERE empresa_id = ? AND estado = 'confirmado' AND foto_comprobante_path IS NOT NULL",
             [$empresaId]
         );
         return (int)($row['n'] ?? 0);
