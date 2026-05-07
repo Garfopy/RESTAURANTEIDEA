@@ -202,62 +202,111 @@ class AuthController extends BaseController
             $db->beginTransaction();
 
             $datosEmpresa = json_decode($registro['datos_empresa'], true);
-            error_log("[AuthController::verificar] Creando empresa: {$datosEmpresa['razon_social']}");
+            error_log("[AuthController::verificar] Procesando empresa: {$datosEmpresa['razon_social']}");
 
-            // 1. Crear empresa
-            $stmtEmpresa = $db->prepare(
-                "INSERT INTO empresas (razon_social, rfc, telefono, email, suscripcion_estado, activo)
-                 VALUES (?, ?, ?, ?, 'activo', 1)"
+            // 1. Verificar si la empresa ya existe (por RFC o email)
+            $stmtCheck = $db->prepare(
+                "SELECT id FROM empresas WHERE rfc = ? OR email = ? LIMIT 1"
             );
-            $stmtEmpresa->execute([
-                $datosEmpresa['razon_social'],
-                $datosEmpresa['rfc'],
-                $datosEmpresa['telefono'] ?? '',
-                $registro['email'],
-            ]);
-            $empresaId = $db->lastInsertId();
-            error_log("[AuthController::verificar] Empresa creada con ID: $empresaId");
+            $stmtCheck->execute([$datosEmpresa['rfc'], $registro['email']]);
+            $empresaExistente = $stmtCheck->fetch(PDO::FETCH_ASSOC);
 
-            // 2. Crear suscripción
-            $stmtSus = $db->prepare(
-                "INSERT INTO suscripciones
-                 (empresa_id, plan_id, estado, ciclo, fecha_inicio, paypal_subscription_id, paypal_status)
-                 VALUES (?, ?, 'activo', ?, CURDATE(), ?, ?)"
+            if ($empresaExistente) {
+                $empresaId = $empresaExistente['id'];
+                error_log("[AuthController::verificar] Empresa ya existe con ID: $empresaId");
+            } else {
+                // Crear nueva empresa
+                $stmtEmpresa = $db->prepare(
+                    "INSERT INTO empresas (razon_social, rfc, telefono, email, suscripcion_estado, activo)
+                     VALUES (?, ?, ?, ?, 'activo', 1)"
+                );
+                $stmtEmpresa->execute([
+                    $datosEmpresa['razon_social'],
+                    $datosEmpresa['rfc'],
+                    $datosEmpresa['telefono'] ?? '',
+                    $registro['email'],
+                ]);
+                $empresaId = $db->lastInsertId();
+                error_log("[AuthController::verificar] Empresa creada con ID: $empresaId");
+            }
+
+            // 2. Verificar/crear suscripción
+            $stmtCheckSus = $db->prepare(
+                "SELECT id FROM suscripciones WHERE empresa_id = ? LIMIT 1"
             );
-            $stmtSus->execute([
-                $empresaId,
-                $registro['plan_id'],
-                $registro['ciclo'],
-                $registro['paypal_subscription_id'],
-                $registro['paypal_status'],
-            ]);
-            error_log("[AuthController::verificar] Suscripción creada");
+            $stmtCheckSus->execute([$empresaId]);
+            $suscripcionExistente = $stmtCheckSus->fetch(PDO::FETCH_ASSOC);
 
-            // 3. Crear usuario admin_empresa
-            $nombrePartes = explode(' ', $datosEmpresa['razon_social'], 2);
-            $nombre = $nombrePartes[0];
-            $apellido = $nombrePartes[1] ?? '';
+            if ($suscripcionExistente) {
+                error_log("[AuthController::verificar] Suscripción ya existe para empresa $empresaId");
+                // Actualizar suscripción existente
+                $stmtUpdateSus = $db->prepare(
+                    "UPDATE suscripciones
+                     SET plan_id = ?, estado = 'activo', ciclo = ?,
+                         paypal_subscription_id = ?, paypal_status = ?
+                     WHERE empresa_id = ?"
+                );
+                $stmtUpdateSus->execute([
+                    $registro['plan_id'],
+                    $registro['ciclo'],
+                    $registro['paypal_subscription_id'],
+                    $registro['paypal_status'],
+                    $empresaId,
+                ]);
+            } else {
+                // Crear nueva suscripción
+                $stmtSus = $db->prepare(
+                    "INSERT INTO suscripciones
+                     (empresa_id, plan_id, estado, ciclo, fecha_inicio, paypal_subscription_id, paypal_status)
+                     VALUES (?, ?, 'activo', ?, CURDATE(), ?, ?)"
+                );
+                $stmtSus->execute([
+                    $empresaId,
+                    $registro['plan_id'],
+                    $registro['ciclo'],
+                    $registro['paypal_subscription_id'],
+                    $registro['paypal_status'],
+                ]);
+                error_log("[AuthController::verificar] Suscripción creada");
+            }
 
-            // Obtener rol admin_empresa
-            $stmtRol = $db->prepare("SELECT id FROM roles WHERE slug = 'admin_empresa' LIMIT 1");
-            $stmtRol->execute();
-            $rolId = $stmtRol->fetchColumn();
-
-            $stmtUser = $db->prepare(
-                "INSERT INTO usuarios
-                 (empresa_id, rol_id, nombre, apellido_paterno, email, password, email_verificado, primer_login_completado, activo)
-                 VALUES (?, ?, ?, ?, ?, ?, 1, 0, 1)"
+            // 3. Verificar/crear usuario admin_empresa
+            $stmtCheckUser = $db->prepare(
+                "SELECT id FROM usuarios WHERE email = ? LIMIT 1"
             );
-            $stmtUser->execute([
-                $empresaId,
-                $rolId,
-                $nombre,
-                $apellido,
-                $registro['email'],
-                $registro['password_hash'],
-            ]);
-            $usuarioId = $db->lastInsertId();
-            error_log("[AuthController::verificar] Usuario admin_empresa creado con ID: $usuarioId");
+            $stmtCheckUser->execute([$registro['email']]);
+            $usuarioExistente = $stmtCheckUser->fetch(PDO::FETCH_ASSOC);
+
+            if ($usuarioExistente) {
+                $usuarioId = $usuarioExistente['id'];
+                error_log("[AuthController::verificar] Usuario ya existe con ID: $usuarioId");
+            } else {
+                // Crear nuevo usuario
+                $nombrePartes = explode(' ', $datosEmpresa['razon_social'], 2);
+                $nombre = $nombrePartes[0];
+                $apellido = $nombrePartes[1] ?? '';
+
+                // Obtener rol admin_empresa
+                $stmtRol = $db->prepare("SELECT id FROM roles WHERE slug = 'admin_empresa' LIMIT 1");
+                $stmtRol->execute();
+                $rolId = $stmtRol->fetchColumn();
+
+                $stmtUser = $db->prepare(
+                    "INSERT INTO usuarios
+                     (empresa_id, rol_id, nombre, apellido_paterno, email, password, email_verificado, primer_login_completado, activo)
+                     VALUES (?, ?, ?, ?, ?, ?, 1, 0, 1)"
+                );
+                $stmtUser->execute([
+                    $empresaId,
+                    $rolId,
+                    $nombre,
+                    $apellido,
+                    $registro['email'],
+                    $registro['password_hash'],
+                ]);
+                $usuarioId = $db->lastInsertId();
+                error_log("[AuthController::verificar] Usuario admin_empresa creado con ID: $usuarioId");
+            }
 
             // 4. Marcar registro como completado
             $regModel->marcarCompletado($registro['id']);
