@@ -42,7 +42,7 @@ class PublicController extends BaseController
     }
 
     // GET planes/registro?plan=pro&ciclo=mensual
-    public function registroInicio(?string $p = null): void
+    public function registro(?string $p = null): void
     {
         $planSlug = $this->get('plan', '');
         $ciclo    = $this->get('ciclo', 'mensual');
@@ -75,7 +75,7 @@ class PublicController extends BaseController
     }
 
     // POST planes/checkout
-    public function registroCheckout(?string $p = null): void
+    public function checkout(?string $p = null): void
     {
         if (!$this->isPost()) {
             $this->redirect('planes');
@@ -194,7 +194,7 @@ class PublicController extends BaseController
     }
 
     // GET planes/retorno?subscription_id=I-XXX
-    public function registroRetorno(?string $p = null): void
+    public function retorno(?string $p = null): void
     {
         $paypalSubId = $this->get('subscription_id', '');
 
@@ -271,7 +271,7 @@ class PublicController extends BaseController
     }
 
     // GET planes/cancelado
-    public function registroCancelado(?string $p = null): void
+    public function cancelado(?string $p = null): void
     {
         // Eliminar registro pendiente si existe en sesión
         if (isset($_SESSION['registro_pendiente_id'])) {
@@ -328,7 +328,7 @@ class PublicController extends BaseController
         $accion = $this->post('accion', '');
 
         if ($accion === 'cancelar') {
-            $this->registroCancelado();
+            $this->cancelado();
             return;
         }
 
