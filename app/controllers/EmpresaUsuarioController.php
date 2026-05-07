@@ -68,24 +68,49 @@ class EmpresaUsuarioController extends BaseController
             $this->redirect('empresa-usuario/nuevo');
         }
 
-        // Generar contraseña temporal
-        $passwordTemporal = 'Ch' . rand(1000, 9999) . '!';
+        // Generar contraseña segura automáticamente
+        $passwordTemporal = PasswordHelper::generar(14);
 
-        $usuarioId = $this->model->crear([
-            'nombre'           => $nombre,
-            'apellido_paterno' => $apellido,
-            'apellido_materno' => $apellidoM ?: null,
-            'email'            => $email,
-            'telefono'         => $telefono,
-            'rol_id'           => $rolId,
-            'empresa_id'       => $empresaId,
-            'activo'           => 1,
-            'created_by'       => $this->usuarioId(),
-        ], $passwordTemporal);
+        // ── Iniciar transacción ──
+        $db = Database::getInstance();
+        $db->beginTransaction();
 
-        // Detectar el slug del rol recién creado
-        $rolInfo = $this->model->getRolPorId($rolId);
-        $rolSlug = $rolInfo['slug'] ?? '';
+        try {
+            // 1. Generar token de verificación
+            $tokenVerificacion = bin2hex(random_bytes(32));
+            $tokenExpira = date('Y-m-d H:i:s', strtotime('+24 hours'));
+
+            // 2. Crear usuario en BD
+            $usuarioId = $this->model->crear([
+                'nombre'              => $nombre,
+                'apellido_paterno'    => $apellido,
+                'apellido_materno'    => $apellidoM ?: null,
+                'email'               => $email,
+                'telefono'            => $telefono,
+                'rol_id'              => $rolId,
+                'empresa_id'          => $empresaId,
+                'activo'              => 1,
+                'email_verificado'    => 0,
+                'token_verificacion'  => $tokenVerificacion,
+                'token_expira'        => $tokenExpira,
+                'created_by'          => $this->usuarioId(),
+            ], $passwordTemporal);
+
+            // 3. Enviar email con credenciales y link de verificación
+            $emailService = new EmailService();
+            $usuarioCreado = $this->model->find($usuarioId);
+            $emailEnviado = $emailService->enviarCredenciales($usuarioCreado, $passwordTemporal, null, $tokenVerificacion);
+
+            if (!$emailEnviado) {
+                error_log("[EmpresaUsuarioController] No se pudo enviar email a usuario ID: $usuarioId");
+            }
+
+            // 4. Commit transacción
+            $db->commit();
+
+            // Detectar el slug del rol recién creado
+            $rolInfo = $this->model->getRolPorId($rolId);
+            $rolSlug = $rolInfo['slug'] ?? '';
 
         // Si es comprador: guardar dirección en usuario + crear sucursal de entrega
         if ($rolSlug === 'comprador') {
@@ -144,8 +169,19 @@ class EmpresaUsuarioController extends BaseController
 
         $this->log('Crear usuario empresa', 'empresa_usuario', "Email: $email, Rol: $rolSlug");
 
-        $this->flash('success', "Usuario creado. Contraseña temporal: <strong>$passwordTemporal</strong> — comunícala al usuario.");
+        $mensaje = 'Usuario agregado. Se ha enviado un correo con las credenciales y el link de verificación.';
+        if (!$emailEnviado) {
+            $mensaje .= ' <strong>AVISO:</strong> No se pudo enviar el email. Contraseña: ' . htmlspecialchars($passwordTemporal);
+        }
+        $this->flash('success', $mensaje);
         $this->redirect('empresa-usuario/index');
+
+        } catch (Exception $e) {
+            $db->rollBack();
+            error_log("[EmpresaUsuarioController] Error al crear usuario: " . $e->getMessage());
+            $this->flash('error', 'No se pudo crear el usuario: ' . $e->getMessage());
+            $this->redirect('empresa-usuario/nuevo');
+        }
     }
 
     public function editar(?string $id = null): void

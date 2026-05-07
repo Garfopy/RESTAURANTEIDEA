@@ -204,6 +204,57 @@ function toggleVis(id) {
     </div>
   </div>
 
+  <!-- cPanel FTP Management -->
+  <div style="background:#fff;border-radius:12px;border:1px solid #E5E7EB;padding:20px;margin-bottom:24px">
+    <h3 style="font-size:.85rem;font-weight:700;color:#111827;margin-bottom:14px;display:flex;align-items:center;gap:8px">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+      cPanel FTP (Gestión automática de usuarios FTP)
+    </h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+      <div>
+        <label class="form-label">Host cPanel (con puerto)</label>
+        <input type="text" name="cpanel_host" value="<?= $s('cpanel_host') ?>"
+               class="form-control" placeholder="cpanel.tudominio.com:2083">
+        <p style="font-size:.75rem;color:#6B7280;margin-top:4px">Usa puerto 2083 (HTTPS) o 2082 (HTTP)</p>
+      </div>
+      <div>
+        <label class="form-label">Usuario principal de cPanel</label>
+        <input type="text" name="cpanel_username" value="<?= $s('cpanel_username') ?>"
+               class="form-control" placeholder="usuario_cpanel">
+      </div>
+    </div>
+    <div style="margin-bottom:14px">
+      <label class="form-label">API Token (Security > Manage API Tokens)</label>
+      <div style="display:flex">
+        <input type="password" id="cpanel_token" name="cpanel_token"
+               value="<?= $s('cpanel_token') ?>"
+               class="form-control" style="border-radius:6px 0 0 6px;border-right:none;font-family:monospace;font-size:.85rem">
+        <button type="button" onclick="toggleVis('cpanel_token')"
+                style="padding:0 12px;border:1px solid #E5E7EB;border-left:none;border-radius:0 6px 6px 0;background:#F9FAFB;cursor:pointer;font-size:.8rem;color:#6B7280;white-space:nowrap">Ver</button>
+      </div>
+      <p style="font-size:.75rem;color:#6B7280;margin-top:4px">
+        ⚠️ <strong>Importante:</strong> Generar token con permisos SOLO de "FTP" desde cPanel > Security > Manage API Tokens
+      </p>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px">
+      <div>
+        <label class="form-label">Dominio principal</label>
+        <input type="text" name="cpanel_domain" value="<?= $s('cpanel_domain') ?>"
+               class="form-control" placeholder="tudominio.com">
+      </div>
+      <div>
+        <label class="form-label">Directorio base FTP</label>
+        <input type="text" name="cpanel_ftp_dir" value="<?= $s('cpanel_ftp_dir', '/public_html/uploads/usuarios/') ?>"
+               class="form-control">
+      </div>
+      <div>
+        <label class="form-label">Cuota por usuario (MB)</label>
+        <input type="number" name="cpanel_ftp_quota" value="<?= $s('cpanel_ftp_quota', '500') ?>"
+               class="form-control" min="50" max="10000">
+      </div>
+    </div>
+  </div>
+
   <div style="display:flex;align-items:center;gap:12px">
     <button type="submit" style="padding:10px 24px;background:var(--color-primary);color:#fff;border:none;border-radius:8px;font-weight:600;font-size:.875rem;cursor:pointer">
       Guardar APIs

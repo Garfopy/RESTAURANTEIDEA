@@ -16,6 +16,11 @@ define('ROOT_PATH', __DIR__);
 require_once ROOT_PATH . '/config/config.php';
 require_once ROOT_PATH . '/config/database.php';
 
+// ── Composer autoload ─────────────────────────────────────────────────────────
+if (file_exists(ROOT_PATH . '/vendor/autoload.php')) {
+    require_once ROOT_PATH . '/vendor/autoload.php';
+}
+
 // ── Session ───────────────────────────────────────────────────────────────────
 session_name(SESSION_NAME);
 session_start();
@@ -82,7 +87,7 @@ $routes = [
 ];
 
 // ── Auth guard ────────────────────────────────────────────────────────────────
-$publicPaths = ['auth/login', 'auth/dologin', 'auth/index', 'planes/index', 'suscripcion/webhook', 'landing/landing'];
+$publicPaths = ['auth/login', 'auth/dologin', 'auth/index', 'auth/verificar', 'planes/index', 'suscripcion/webhook', 'landing/landing'];
 
 $currentPath = strtolower($ctrlSlug . '/' . $action);
 
@@ -134,6 +139,9 @@ foreach (glob(ROOT_PATH . '/app/models/*.php') as $model) {
 }
 foreach (glob(ROOT_PATH . '/app/services/*.php') as $service) {
     require_once $service;
+}
+foreach (glob(ROOT_PATH . '/app/helpers/*.php') as $helper) {
+    require_once $helper;
 }
 
 require_once ROOT_PATH . '/app/controllers/BaseController.php';

@@ -70,25 +70,63 @@ class PanelUsuarioController extends BaseController
             $this->redirect('panel-usuario/nuevo');
         }
 
-        $password = $this->post('password');
-        if (strlen($password) < 6) {
-            $this->flash('error', 'La contraseña debe tener al menos 6 caracteres.');
+        // Generar contraseña segura automáticamente
+        $password = PasswordHelper::generar(14);
+        $email = trim($this->post('email'));
+
+        // ── Iniciar transacción ──
+        $db = Database::getInstance();
+        $db->beginTransaction();
+
+        try {
+            // 1. Generar token de verificación
+            $tokenVerificacion = bin2hex(random_bytes(32));
+            $tokenExpira = date('Y-m-d H:i:s', strtotime('+24 hours'));
+
+            // 2. Crear usuario en BD
+            $id = $this->usuarioModel->crear([
+                'nombre'              => trim($this->post('nombre')),
+                'apellido_paterno'    => trim($this->post('apellido_paterno', '')),
+                'email'               => $email,
+                'telefono'            => trim($this->post('telefono', '')),
+                'rol_id'              => $rolRow['id'],
+                'empresa_id'          => $empresaId,
+                'activo'              => 1,
+                'email_verificado'    => 0,
+                'token_verificacion'  => $tokenVerificacion,
+                'token_expira'        => $tokenExpira,
+                'created_by'          => $this->usuarioId(),
+            ], $password);
+
+            // 3. Enviar email con credenciales y link de verificación
+            $emailService = new EmailService();
+            $usuarioCreado = $this->usuarioModel->find($id);
+            $emailEnviado = $emailService->enviarCredenciales($usuarioCreado, $password, null, $tokenVerificacion);
+
+            if (!$emailEnviado) {
+                error_log("[PanelUsuarioController] No se pudo enviar email a usuario ID: $id");
+                // NO hacer rollback, el usuario ya está creado
+                // Admin puede reenviar email manualmente o compartir credenciales
+            }
+
+            // 4. Commit transacción
+            $db->commit();
+
+            $this->log('Crear usuario', 'usuarios', "ID: $id rol: $rolSlug email: $email");
+
+            $mensaje = 'Usuario creado correctamente. Se ha enviado un correo con las credenciales y el link de verificación.';
+            if (!$emailEnviado) {
+                $mensaje .= ' <strong>AVISO:</strong> No se pudo enviar el email. Credenciales: ' . htmlspecialchars($password);
+            }
+            $this->flash('success', $mensaje);
+            $this->redirect('panel-usuario/index');
+
+        } catch (Exception $e) {
+            $db->rollBack();
+            error_log("[PanelUsuarioController] Error al crear usuario: " . $e->getMessage());
+            $this->flash('error', 'No se pudo crear el usuario: ' . $e->getMessage());
             $this->redirect('panel-usuario/nuevo');
         }
-
-        $id = $this->usuarioModel->crear([
-            'nombre'           => trim($this->post('nombre')),
-            'apellido_paterno' => trim($this->post('apellido_paterno', '')),
-            'email'            => trim($this->post('email')),
-            'telefono'         => trim($this->post('telefono', '')),
-            'rol_id'           => $rolRow['id'],
-            'empresa_id'       => $empresaId,
-            'activo'           => 1,
-        ], $password);
-
-        $this->log('Crear usuario', 'usuarios', "ID: $id rol: $rolSlug");
-        $this->flash('success', 'Usuario creado. Contraseña: ' . htmlspecialchars($password));
-        $this->redirect('panel-usuario/index');
     }
 
     public function editar(?string $p = null): void

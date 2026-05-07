@@ -67,9 +67,15 @@ class AuthController extends BaseController
             $this->redirect('auth/login');
         }
 
-        // Cuenta pendiente de verificación
+        // Verificar que el email esté verificado
+        if (empty($usuario['email_verificado'])) {
+            $this->flash('error', 'Debes verificar tu email antes de iniciar sesión. Revisa tu bandeja de entrada (y spam) y haz clic en el link de verificación.');
+            $this->redirect('auth/login');
+        }
+
+        // Cuenta inactiva
         if (empty($usuario['activo'])) {
-            $this->flash('error', 'Tu cuenta no está activa. Revisa tu correo y haz clic en el enlace de verificación.');
+            $this->flash('error', 'Tu cuenta está desactivada. Contacta al administrador.');
             $this->redirect('auth/login');
         }
 
@@ -86,7 +92,76 @@ class AuthController extends BaseController
 
         $this->log('Login exitoso', 'auth');
 
+        // Verificar si es primer login después de verificación
+        if ($usuario['email_verificado'] && empty($usuario['primer_login_completado'])) {
+            $this->flash('first_login', '¡Bienvenido! Te recomendamos cambiar tu contraseña para mayor seguridad.');
+        }
+
         $this->redirectSegunRol($usuario['rol_slug']);
+    }
+
+    public function verificar(?string $p = null): void
+    {
+        $token = trim($_GET['token'] ?? '');
+
+        error_log("[AuthController::verificar] Iniciando verificación. Token presente: " . ($token ? 'SÍ' : 'NO'));
+
+        if (!$token) {
+            error_log("[AuthController::verificar] ERROR: Token vacío o no proporcionado");
+            $this->flash('error', 'Token de verificación inválido.');
+            $this->redirect('auth/login');
+        }
+
+        $db = Database::getInstance();
+        $stmt = $db->prepare(
+            "SELECT id, email, nombre, apellido_paterno, token_expira, email_verificado
+             FROM usuarios
+             WHERE token_verificacion = ?
+             LIMIT 1"
+        );
+        $stmt->execute([$token]);
+        $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$usuario) {
+            error_log("[AuthController::verificar] ERROR: Usuario no encontrado con token: " . substr($token, 0, 10) . "...");
+            $this->flash('error', 'El link de verificación no es válido o ya fue usado.');
+            $this->redirect('auth/login');
+        }
+
+        error_log("[AuthController::verificar] Usuario encontrado: {$usuario['email']} (ID: {$usuario['id']})");
+
+        // Verificar si ya está verificado
+        if ($usuario['email_verificado']) {
+            error_log("[AuthController::verificar] Email ya verificado previamente para: {$usuario['email']}");
+            $nombreCompleto = $usuario['nombre'] . ' ' . $usuario['apellido_paterno'];
+            $this->flash('success', "Tu email ya está verificado, $nombreCompleto. Puedes iniciar sesión.");
+            $this->redirect('auth/login');
+        }
+
+        // Verificar si el token expiró
+        $expira = strtotime($usuario['token_expira']);
+        if ($expira < time()) {
+            error_log("[AuthController::verificar] ERROR: Token expirado para: {$usuario['email']}");
+            $this->flash('error', 'El link de verificación ha expirado. Contacta al administrador para reenviar el email.');
+            $this->redirect('auth/login');
+        }
+
+        // Marcar email como verificado
+        $stmt = $db->prepare(
+            "UPDATE usuarios
+             SET email_verificado = 1,
+                 token_verificacion = NULL,
+                 token_expira = NULL
+             WHERE id = ?"
+        );
+        $stmt->execute([$usuario['id']]);
+
+        error_log("[AuthController::verificar] Email verificado exitosamente para: {$usuario['email']}");
+        $this->log('Email verificado', 'auth', "Usuario ID: {$usuario['id']}");
+
+        $nombreCompleto = $usuario['nombre'] . ' ' . $usuario['apellido_paterno'];
+        $this->flash('success', "¡Email verificado correctamente! Hola $nombreCompleto, ya puedes iniciar sesión.");
+        $this->redirect('auth/login');
     }
 
     public function logout(?string $p = null): void

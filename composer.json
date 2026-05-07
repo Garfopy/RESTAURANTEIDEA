@@ -1,0 +1,14 @@
+{
+  "name": "carnihub/carnihub",
+  "description": "CarniHub - Sistema de gestión para distribuidores de carne",
+  "type": "project",
+  "require": {
+    "php": ">=8.0",
+    "phpmailer/phpmailer": "^6.9"
+  },
+  "autoload": {
+    "psr-4": {
+      "App\\": "app/"
+    }
+  }
+}
