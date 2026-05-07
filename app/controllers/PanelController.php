@@ -20,7 +20,7 @@ class PanelController extends BaseController
 
         // KPIs globales
         $totalEmpresas  = (int)$db->query('SELECT COUNT(*) FROM empresas WHERE activo = 1')->fetchColumn();
-        $totalUsuarios  = (int)$db->query('SELECT COUNT(*) FROM usuarios WHERE activo = 1 AND rol_id > 2')->fetchColumn();
+        $totalUsuarios  = (int)$db->query('SELECT COUNT(*) FROM usuarios WHERE activo = 1 AND rol_id > 1')->fetchColumn();
         $pedidosMes     = (int)$db->query("SELECT COUNT(*) FROM pedidos WHERE MONTH(created_at) = MONTH(NOW()) AND YEAR(created_at) = YEAR(NOW())")->fetchColumn();
         $ventasMes      = (float)$db->query("SELECT COALESCE(SUM(total),0) FROM pedidos WHERE estado != 'cancelado' AND MONTH(created_at) = MONTH(NOW()) AND YEAR(created_at) = YEAR(NOW())")->fetchColumn();
 

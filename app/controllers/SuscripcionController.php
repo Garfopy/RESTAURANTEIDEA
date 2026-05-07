@@ -47,24 +47,36 @@ class SuscripcionController extends BaseController
         require ROOT_PATH . '/app/views/panel/layouts/main.php';
     }
 
-    // POST suscripcion/guardarConfig
-    public function guardarConfig(?string $p = null): void
+    // POST suscripcion/sincronizarPlanes
+    public function sincronizarPlanes(?string $p = null): void
     {
         if (!$this->isPost()) $this->redirect('suscripcion/configurar');
         if (!$this->esSuperAdmin()) {
-            $this->flash('error', 'Solo el superadmin puede configurar PayPal.');
+            $this->flash('error', 'Solo el superadmin puede sincronizar planes.');
             $this->redirect('suscripcion/configurar');
         }
-        $model = new SuscripcionModel();
-        $planes = $model->getPlanesActivos();
-        foreach ($planes as $plan) {
-            $planId = $this->post('paypal_plan_' . $plan['id'], '');
-            if ($planId !== '') {
-                $model->guardarPaypalPlanId($plan['id'], trim($planId));
+
+        try {
+            $model     = new SuscripcionModel();
+            $planes    = $model->getPlanesActivos();
+            $paypal    = new PayPalSuscripcionService();
+            $resultado = $paypal->sincronizarPlanes($planes);
+
+            foreach ($resultado as $planId => $ids) {
+                if (!empty($ids['mensual'])) {
+                    $model->guardarPaypalPlanId($planId, $ids['mensual']);
+                }
+                if (!empty($ids['anual'])) {
+                    $model->guardarPaypalPlanIdAnual($planId, $ids['anual']);
+                }
             }
+
+            $this->log('Sincronizar planes PayPal', 'suscripcion');
+            $this->flash('success', 'Planes sincronizados con PayPal correctamente.');
+        } catch (\Throwable $e) {
+            $this->flash('error', 'Error al sincronizar con PayPal: ' . $e->getMessage());
         }
-        $this->log('Configurar PayPal planes', 'suscripcion');
-        $this->flash('success', 'IDs de PayPal guardados.');
+
         $this->redirect('suscripcion/configurar');
     }
 

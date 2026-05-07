@@ -45,17 +45,17 @@ abstract class BaseController
             $rol === 'supervisor'                                      => $this->redirect('supervisor/dashboard'),
             $rol === 'comprador'                                       => $this->redirect('comprador/inicio'),
             $rol === 'admin_empresa'                                   => $this->redirect('empresa/dashboard'),
-            in_array($rol, ['superadmin', 'admin'], true)             => $this->redirect('panel/dashboard'),
+            $rol === 'superadmin'                                      => $this->redirect('panel/dashboard'),
             default                                                    => $this->redirect('auth/login'),
         };
     }
 
     // ── Protección de acceso ──────────────────────────────────────
 
-    /** Solo superadmin y admin de plataforma */
+    /** Solo superadmin (panel de plataforma) */
     protected function requireAdmin(): void
     {
-        $this->requireRole(['superadmin', 'admin']);
+        $this->requireRole(['superadmin']);
     }
 
     /** Solo superadmin (configuración global, crear admins) */

@@ -24,7 +24,7 @@ class SuscripcionModel extends BaseModel
             'SELECT s.*, p.slug AS plan_slug, p.nombre AS plan_nombre,
                     p.precio_mensual, p.precio_anual,
                     p.max_usuarios, p.max_productos, p.max_pedidos_mes, p.max_sucursales,
-                    p.features, p.paypal_plan_id
+                    p.features, p.paypal_plan_id, p.paypal_plan_id_anual
              FROM suscripciones s
              JOIN planes_saas p ON p.id = s.plan_id
              WHERE s.empresa_id = ?',
@@ -191,6 +191,14 @@ class SuscripcionModel extends BaseModel
     {
         $this->execute(
             'UPDATE planes_saas SET paypal_plan_id = ? WHERE id = ?',
+            [$paypalPlanId, $planSaasId]
+        );
+    }
+
+    public function guardarPaypalPlanIdAnual(int $planSaasId, string $paypalPlanId): void
+    {
+        $this->execute(
+            'UPDATE planes_saas SET paypal_plan_id_anual = ? WHERE id = ?',
             [$paypalPlanId, $planSaasId]
         );
     }

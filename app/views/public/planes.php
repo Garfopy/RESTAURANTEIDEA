@@ -120,7 +120,9 @@
     </ul>
 
     <!-- CTA -->
-    <a href="mailto:<?= htmlspecialchars($contactEmail) ?>?subject=Quiero el plan <?= urlencode($pl['nombre']) ?>"
+    <a href="<?= BASE_URL ?>planes/registro?plan=<?= urlencode($pl['slug']) ?>&ciclo=mensual"
+       class="btn-plan"
+       data-plan="<?= htmlspecialchars($pl['slug']) ?>"
        style="display:block;text-align:center;padding:13px;background:<?= $es_destacado ? 'var(--color-primary)' : '#111827' ?>;color:#fff;border-radius:10px;text-decoration:none;font-weight:700;font-size:.875rem">
       Empezar con <?= htmlspecialchars($pl['nombre']) ?>
     </a>
@@ -146,6 +148,12 @@ function toggleCiclo(ciclo) {
     btnM.style.cssText += ';background:var(--color-primary);color:#fff';
     btnA.style.cssText += ';background:transparent;color:#6B7280';
   }
+
+  // Actualizar links de los botones de CTA
+  document.querySelectorAll('.btn-plan').forEach(btn => {
+    const plan = btn.getAttribute('data-plan');
+    btn.href = '<?= BASE_URL ?>planes/registro?plan=' + encodeURIComponent(plan) + '&ciclo=' + ciclo;
+  });
 }
 </script>
 </body>

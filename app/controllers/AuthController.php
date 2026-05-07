@@ -122,46 +122,248 @@ class AuthController extends BaseController
         $stmt->execute([$token]);
         $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        if (!$usuario) {
-            error_log("[AuthController::verificar] ERROR: Usuario no encontrado con token: " . substr($token, 0, 10) . "...");
+        // Si encontramos un usuario existente, procesar verificación normal
+        if ($usuario) {
+            error_log("[AuthController::verificar] Usuario encontrado: {$usuario['email']} (ID: {$usuario['id']})");
+
+            // Verificar si ya está verificado
+            if ($usuario['email_verificado']) {
+                error_log("[AuthController::verificar] Email ya verificado previamente para: {$usuario['email']}");
+                $nombreCompleto = $usuario['nombre'] . ' ' . $usuario['apellido_paterno'];
+                $this->flash('success', "Tu email ya está verificado, $nombreCompleto. Puedes iniciar sesión.");
+                $this->redirect('auth/login');
+            }
+
+            // Verificar si el token expiró
+            $expira = strtotime($usuario['token_expira']);
+            if ($expira < time()) {
+                error_log("[AuthController::verificar] ERROR: Token expirado para: {$usuario['email']}");
+                $this->flash('error', 'El link de verificación ha expirado. Contacta al administrador para reenviar el email.');
+                $this->redirect('auth/login');
+            }
+
+            // Marcar email como verificado
+            $stmt = $db->prepare(
+                "UPDATE usuarios
+                 SET email_verificado = 1,
+                     token_verificacion = NULL,
+                     token_expira = NULL
+                 WHERE id = ?"
+            );
+            $stmt->execute([$usuario['id']]);
+
+            error_log("[AuthController::verificar] Email verificado exitosamente para: {$usuario['email']}");
+            $this->log('Email verificado', 'auth', "Usuario ID: {$usuario['id']}");
+
+            $nombreCompleto = $usuario['nombre'] . ' ' . $usuario['apellido_paterno'];
+            $this->flash('success', "¡Email verificado correctamente! Hola $nombreCompleto, ya puedes iniciar sesión.");
+            $this->redirect('auth/login');
+        }
+
+        // Si no es un usuario existente, buscar en registros pendientes
+        error_log("[AuthController::verificar] Usuario no encontrado en tabla usuarios, buscando en registros pendientes...");
+
+        require_once ROOT_PATH . '/app/models/RegistroPendienteModel.php';
+        $regModel = new RegistroPendienteModel();
+        $registro = $regModel->getByToken($token);
+
+        if (!$registro) {
+            error_log("[AuthController::verificar] ERROR: No se encontró registro pendiente con token");
             $this->flash('error', 'El link de verificación no es válido o ya fue usado.');
             $this->redirect('auth/login');
         }
 
-        error_log("[AuthController::verificar] Usuario encontrado: {$usuario['email']} (ID: {$usuario['id']})");
+        error_log("[AuthController::verificar] Registro pendiente encontrado: {$registro['email']} (ID: {$registro['id']})");
 
-        // Verificar si ya está verificado
-        if ($usuario['email_verificado']) {
-            error_log("[AuthController::verificar] Email ya verificado previamente para: {$usuario['email']}");
-            $nombreCompleto = $usuario['nombre'] . ' ' . $usuario['apellido_paterno'];
-            $this->flash('success', "Tu email ya está verificado, $nombreCompleto. Puedes iniciar sesión.");
+        // Verificar si ya fue completado
+        if ($registro['estado'] === 'completado') {
+            error_log("[AuthController::verificar] Registro ya completado: {$registro['email']}");
+
+            // Buscar usuario existente e iniciar sesión automáticamente
+            $userModel = new UsuarioModel();
+            $usuarioExistente = $userModel->getByEmail($registro['email']);
+
+            if ($usuarioExistente && $usuarioExistente['email_verificado']) {
+                // Obtener datos completos del usuario
+                $db = Database::getInstance();
+                $stmtUsuarioCompleto = $db->prepare(
+                    "SELECT u.*, r.slug AS rol_slug, r.nombre AS rol_nombre, e.razon_social AS empresa_nombre
+                     FROM usuarios u
+                     INNER JOIN roles r ON r.id = u.rol_id
+                     LEFT JOIN empresas e ON e.id = u.empresa_id
+                     WHERE u.id = ?
+                     LIMIT 1"
+                );
+                $stmtUsuarioCompleto->execute([$usuarioExistente['id']]);
+                $usuarioCompleto = $stmtUsuarioCompleto->fetch(PDO::FETCH_ASSOC);
+
+                if ($usuarioCompleto) {
+                    $_SESSION['usuario'] = $usuarioCompleto;
+                    $this->log('Login automático desde link de verificación ya usado', 'auth', "Usuario ID: {$usuarioExistente['id']}");
+                    error_log("[AuthController::verificar] Login automático para usuario ya verificado");
+                    $this->flash('success', '¡Bienvenido de vuelta! Tu cuenta ya estaba activada.');
+                    $this->redirect('empresa/');
+                }
+            }
+
+            $this->flash('success', 'Tu cuenta ya fue activada. Puedes iniciar sesión.');
             $this->redirect('auth/login');
         }
 
-        // Verificar si el token expiró
-        $expira = strtotime($usuario['token_expira']);
+        // Verificar token expirado
+        $expira = strtotime($registro['token_expira']);
         if ($expira < time()) {
-            error_log("[AuthController::verificar] ERROR: Token expirado para: {$usuario['email']}");
-            $this->flash('error', 'El link de verificación ha expirado. Contacta al administrador para reenviar el email.');
+            error_log("[AuthController::verificar] ERROR: Token de registro expirado para: {$registro['email']}");
+            $this->flash('error', 'El link de verificación ha expirado. Contacta a soporte.');
             $this->redirect('auth/login');
         }
 
-        // Marcar email como verificado
-        $stmt = $db->prepare(
-            "UPDATE usuarios
-             SET email_verificado = 1,
-                 token_verificacion = NULL,
-                 token_expira = NULL
-             WHERE id = ?"
-        );
-        $stmt->execute([$usuario['id']]);
+        // Verificar que el pago esté confirmado
+        if (empty($registro['paypal_subscription_id']) || $registro['estado'] !== 'pendiente_verificacion') {
+            error_log("[AuthController::verificar] ERROR: Pago no confirmado para registro: {$registro['email']}");
+            $this->flash('error', 'El pago aún no ha sido confirmado. Intenta más tarde.');
+            $this->redirect('auth/login');
+        }
 
-        error_log("[AuthController::verificar] Email verificado exitosamente para: {$usuario['email']}");
-        $this->log('Email verificado', 'auth', "Usuario ID: {$usuario['id']}");
+        // Procesar la creación de empresa y usuario
+        try {
+            $db->beginTransaction();
 
-        $nombreCompleto = $usuario['nombre'] . ' ' . $usuario['apellido_paterno'];
-        $this->flash('success', "¡Email verificado correctamente! Hola $nombreCompleto, ya puedes iniciar sesión.");
-        $this->redirect('auth/login');
+            $datosEmpresa = json_decode($registro['datos_empresa'], true);
+            error_log("[AuthController::verificar] Procesando empresa: {$datosEmpresa['razon_social']}");
+
+            // 1. Verificar si la empresa ya existe (por RFC o email)
+            $stmtCheck = $db->prepare(
+                "SELECT id FROM empresas WHERE rfc = ? OR email = ? LIMIT 1"
+            );
+            $stmtCheck->execute([$datosEmpresa['rfc'], $registro['email']]);
+            $empresaExistente = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+
+            if ($empresaExistente) {
+                $empresaId = $empresaExistente['id'];
+                error_log("[AuthController::verificar] Empresa ya existe con ID: $empresaId");
+            } else {
+                // Crear nueva empresa
+                $stmtEmpresa = $db->prepare(
+                    "INSERT INTO empresas (razon_social, rfc, telefono, email, suscripcion_estado, activo)
+                     VALUES (?, ?, ?, ?, 'activo', 1)"
+                );
+                $stmtEmpresa->execute([
+                    $datosEmpresa['razon_social'],
+                    $datosEmpresa['rfc'],
+                    $datosEmpresa['telefono'] ?? '',
+                    $registro['email'],
+                ]);
+                $empresaId = $db->lastInsertId();
+                error_log("[AuthController::verificar] Empresa creada con ID: $empresaId");
+            }
+
+            // 2. Verificar/crear suscripción
+            $stmtCheckSus = $db->prepare(
+                "SELECT id FROM suscripciones WHERE empresa_id = ? LIMIT 1"
+            );
+            $stmtCheckSus->execute([$empresaId]);
+            $suscripcionExistente = $stmtCheckSus->fetch(PDO::FETCH_ASSOC);
+
+            if ($suscripcionExistente) {
+                error_log("[AuthController::verificar] Suscripción ya existe para empresa $empresaId");
+                // Actualizar suscripción existente
+                $stmtUpdateSus = $db->prepare(
+                    "UPDATE suscripciones
+                     SET plan_id = ?, estado = 'activo', ciclo = ?,
+                         paypal_subscription_id = ?, paypal_status = ?
+                     WHERE empresa_id = ?"
+                );
+                $stmtUpdateSus->execute([
+                    $registro['plan_id'],
+                    $registro['ciclo'],
+                    $registro['paypal_subscription_id'],
+                    $registro['paypal_status'],
+                    $empresaId,
+                ]);
+            } else {
+                // Crear nueva suscripción
+                $stmtSus = $db->prepare(
+                    "INSERT INTO suscripciones
+                     (empresa_id, plan_id, estado, ciclo, fecha_inicio, paypal_subscription_id, paypal_status)
+                     VALUES (?, ?, 'activo', ?, CURDATE(), ?, ?)"
+                );
+                $stmtSus->execute([
+                    $empresaId,
+                    $registro['plan_id'],
+                    $registro['ciclo'],
+                    $registro['paypal_subscription_id'],
+                    $registro['paypal_status'],
+                ]);
+                error_log("[AuthController::verificar] Suscripción creada");
+            }
+
+            // 3. Verificar/crear usuario admin_empresa
+            $stmtCheckUser = $db->prepare(
+                "SELECT id FROM usuarios WHERE email = ? LIMIT 1"
+            );
+            $stmtCheckUser->execute([$registro['email']]);
+            $usuarioExistente = $stmtCheckUser->fetch(PDO::FETCH_ASSOC);
+
+            if ($usuarioExistente) {
+                $usuarioId = $usuarioExistente['id'];
+                error_log("[AuthController::verificar] Usuario ya existe con ID: $usuarioId");
+            } else {
+                // Crear nuevo usuario
+                $nombrePartes = explode(' ', $datosEmpresa['razon_social'], 2);
+                $nombre = $nombrePartes[0];
+                $apellido = $nombrePartes[1] ?? '';
+
+                // Obtener rol admin_empresa
+                $stmtRol = $db->prepare("SELECT id FROM roles WHERE slug = 'admin_empresa' LIMIT 1");
+                $stmtRol->execute();
+                $rolId = $stmtRol->fetchColumn();
+
+                $stmtUser = $db->prepare(
+                    "INSERT INTO usuarios
+                     (empresa_id, rol_id, nombre, apellido_paterno, email, password, email_verificado, primer_login_completado, activo)
+                     VALUES (?, ?, ?, ?, ?, ?, 1, 0, 1)"
+                );
+                $stmtUser->execute([
+                    $empresaId,
+                    $rolId,
+                    $nombre,
+                    $apellido,
+                    $registro['email'],
+                    $registro['password_hash'],
+                ]);
+                $usuarioId = $db->lastInsertId();
+                error_log("[AuthController::verificar] Usuario admin_empresa creado con ID: $usuarioId");
+            }
+
+            // 4. Marcar registro como completado (solo si aún no está completado)
+            if ($registro['estado'] !== 'completado') {
+                $regModel->marcarCompletado($registro['id']);
+                error_log("[AuthController::verificar] Registro marcado como completado");
+            } else {
+                error_log("[AuthController::verificar] Registro ya estaba completado");
+            }
+
+            $db->commit();
+            error_log("[AuthController::verificar] Registro completado exitosamente para: {$registro['email']}");
+
+            // 5. Redirigir al login (sin iniciar sesión automáticamente)
+            $this->log('Registro completado - Redirección a login', 'auth', "Usuario ID: $usuarioId, Empresa ID: $empresaId");
+
+            // Limpiar cualquier sesión activa para que el usuario vea el login
+            unset($_SESSION['usuario'], $_SESSION['empresa']);
+
+            error_log("[AuthController::verificar] Registro completado, redirigiendo a login");
+            $this->flash('success', '¡Tu cuenta ha sido activada correctamente! Inicia sesión con tus credenciales.');
+            $this->redirect('auth/login');
+
+        } catch (\Throwable $e) {
+            $db->rollBack();
+            error_log("[AuthController::verificar] ERROR al crear cuenta: " . $e->getMessage());
+            error_log("[AuthController::verificar] Stack trace: " . $e->getTraceAsString());
+            $this->flash('error', 'Error al crear tu cuenta. Contacta a soporte con código: REG-' . $registro['id']);
+            $this->redirect('auth/login');
+        }
     }
 
     public function logout(?string $p = null): void

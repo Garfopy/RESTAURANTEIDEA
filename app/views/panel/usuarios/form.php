@@ -109,7 +109,8 @@ $accion    = $esEdicion
 function toggleEmpresa(rol) {
   const campo = document.getElementById('campo-empresa');
   if (campo) {
-    campo.style.opacity = rol === 'admin' ? '.5' : '1';
+    // Ya no hay rol 'admin', solo 'admin_empresa' requiere empresa_id
+    campo.style.opacity = (rol === 'admin_empresa') ? '1' : '0.5';
   }
 }
 </script>
