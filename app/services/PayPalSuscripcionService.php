@@ -79,6 +79,93 @@ class PayPalSuscripcionService
         return $decoded;
     }
 
+    // ── Crear producto en el catálogo PayPal ──────────────────────────────────
+    public function crearProducto(string $nombre, string $descripcion): string
+    {
+        $data = $this->request('POST', '/v1/catalog/products', [
+            'name'        => $nombre,
+            'description' => $descripcion,
+            'type'        => 'SERVICE',
+            'category'    => 'SOFTWARE',
+        ]);
+        return $data['id'] ?? '';
+    }
+
+    // ── Crear plan de facturación PayPal ──────────────────────────────────────
+    public function crearPlanBilling(
+        string $productId,
+        string $nombre,
+        string $ciclo,
+        float  $precio,
+        string $moneda = 'USD'
+    ): string {
+        $intervalUnit = $ciclo === 'anual' ? 'YEAR' : 'MONTH';
+        $data = $this->request('POST', '/v1/billing/plans', [
+            'product_id'     => $productId,
+            'name'           => $nombre,
+            'status'         => 'ACTIVE',
+            'billing_cycles' => [[
+                'frequency'      => ['interval_unit' => $intervalUnit, 'interval_count' => 1],
+                'tenure_type'    => 'REGULAR',
+                'sequence'       => 1,
+                'total_cycles'   => 0,
+                'pricing_scheme' => [
+                    'fixed_price' => [
+                        'value'         => number_format($precio, 2, '.', ''),
+                        'currency_code' => $moneda,
+                    ],
+                ],
+            ]],
+            'payment_preferences' => [
+                'auto_bill_outstanding'     => true,
+                'setup_fee_failure_action'  => 'CONTINUE',
+                'payment_failure_threshold' => 3,
+            ],
+        ]);
+        return $data['id'] ?? '';
+    }
+
+    // ── Sincronizar todos los planes locales con PayPal ───────────────────────
+    // Solo crea planes que aún no tienen ID; reutiliza el producto si ya existe.
+    public function sincronizarPlanes(array $planes, string $moneda = 'USD'): array
+    {
+        $config    = new ConfigModel();
+        $productId = $config->get('paypal_product_id', '');
+
+        if (!$productId) {
+            $productId = $this->crearProducto(
+                'CarniHub SaaS',
+                'Plataforma de gestión para carnicerías'
+            );
+            $config->set('paypal_product_id', $productId);
+        }
+
+        $resultado = [];
+        foreach ($planes as $plan) {
+            $ids = [];
+            if (empty($plan['paypal_plan_id'])) {
+                $ids['mensual'] = $this->crearPlanBilling(
+                    $productId,
+                    $plan['nombre'] . ' — Mensual',
+                    'mensual',
+                    (float)$plan['precio_mensual'],
+                    $moneda
+                );
+            }
+            if (empty($plan['paypal_plan_id_anual'])) {
+                $ids['anual'] = $this->crearPlanBilling(
+                    $productId,
+                    $plan['nombre'] . ' — Anual',
+                    'anual',
+                    (float)$plan['precio_anual'],
+                    $moneda
+                );
+            }
+            $resultado[$plan['id']] = $ids;
+        }
+        return $resultado;
+    }
+
     // ── Crear suscripción ─────────────────────────────────────────────────────
     public function crearSuscripcion(
         string $paypalPlanId,

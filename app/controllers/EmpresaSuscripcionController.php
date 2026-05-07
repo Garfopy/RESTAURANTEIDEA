@@ -46,6 +46,7 @@ class EmpresaSuscripcionController extends BaseController
         if (!$this->isPost()) $this->redirect('empresa-suscripcion/planes');
 
         $planSlug = $this->post('plan_slug', '');
+        $ciclo    = $this->post('ciclo', 'mensual');
         $model    = new SuscripcionModel();
         $planData = $model->getPlanPorSlug($planSlug);
 
@@ -54,7 +55,7 @@ class EmpresaSuscripcionController extends BaseController
             $this->redirect('empresa-suscripcion/planes');
         }
 
-        if (empty($planData['paypal_plan_id'])) {
+        if (empty($planData['paypal_plan_id']) && empty($planData['paypal_plan_id_anual'])) {
             $this->flash('error', 'Este plan aún no tiene configurado el pago con PayPal. Contacta a soporte.');
             $this->redirect('empresa-suscripcion/planes');
         }
@@ -63,8 +64,12 @@ class EmpresaSuscripcionController extends BaseController
             $returnUrl = BASE_URL . 'empresa-suscripcion/retorno';
             $cancelUrl = BASE_URL . 'empresa-suscripcion/cancelado';
 
+            $paypalPlanId = ($ciclo === 'anual' && !empty($planData['paypal_plan_id_anual']))
+                ? $planData['paypal_plan_id_anual']
+                : $planData['paypal_plan_id'];
+
             $paypal   = new PayPalSuscripcionService();
-            $resultado = $paypal->crearSuscripcion($planData['paypal_plan_id'], $returnUrl, $cancelUrl);
+            $resultado = $paypal->crearSuscripcion($paypalPlanId, $returnUrl, $cancelUrl);
 
             // Guardar suscripcion en BD con estado pendiente
             $empresaId = $this->empresaId();

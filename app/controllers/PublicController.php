@@ -113,7 +113,7 @@ class PublicController extends BaseController
 
         if (!$plan || !$plan['activo']) {
             $errores[] = 'Plan no válido o no disponible.';
-        } elseif (empty($plan['paypal_plan_id']) && !$modoPrueba) {
+        } elseif (empty($plan['paypal_plan_id']) && empty($plan['paypal_plan_id_anual']) && !$modoPrueba) {
             $errores[] = 'Plan no disponible para registro en línea.';
         }
 
@@ -173,7 +173,10 @@ class PublicController extends BaseController
                 $cancelUrl = BASE_URL . 'planes/cancelado';
 
                 $paypal    = new PayPalSuscripcionService();
-                $resultado = $paypal->crearSuscripcion($plan['paypal_plan_id'], $returnUrl, $cancelUrl);
+                $paypalPlanId = ($ciclo === 'anual' && !empty($plan['paypal_plan_id_anual']))
+                    ? $plan['paypal_plan_id_anual']
+                    : $plan['paypal_plan_id'];
+                $resultado = $paypal->crearSuscripcion($paypalPlanId, $returnUrl, $cancelUrl);
 
                 // Guardar ID de PayPal en el registro
                 $regModel->actualizarPaypalStatus($regId, $resultado['status'], $resultado['id']);
