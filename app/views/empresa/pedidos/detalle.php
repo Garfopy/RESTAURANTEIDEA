@@ -300,10 +300,29 @@ function tiempoTranscurrido(string $desde, string $hasta): string {
       </div>
     </div>
   </div>
+  <?php if (($pedido['tipo_entrega'] ?? '') === 'repartidor'): ?>
+  <div style="margin-top:14px;border-top:1px solid rgba(245,158,11,.3);padding-top:14px">
+    <a href="<?= BASE_URL ?>pedido/tracking/<?= $pedido['id'] ?>"
+       style="display:inline-flex;align-items:center;gap:8px;background:#D97706;color:#fff;text-decoration:none;padding:10px 20px;border-radius:10px;font-size:.875rem;font-weight:700">
+      📍 Ver seguimiento en tiempo real
+    </a>
+  </div>
+  <?php endif; ?>
 </div>
 <?php endif; ?>
 
-<?php if ($esComprador && $pedido['estado'] === 'entregado'): ?>
+<!-- Banner "En ruta" para ADMIN/SUPERVISOR con acceso al tracking -->
+<?php if (!$esComprador && $pedido['estado'] === 'en_ruta' && ($pedido['tipo_entrega'] ?? '') === 'repartidor'): ?>
+<div style="margin-bottom:20px;background:#FFF7ED;border:1px solid #FED7AA;border-radius:12px;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+  <div style="font-size:.9rem;color:#9A3412">
+    🚚 <strong>Pedido en ruta</strong> — el repartidor está en camino a la entrega.
+  </div>
+  <a href="<?= BASE_URL ?>pedido/tracking/<?= $pedido['id'] ?>"
+     style="display:inline-flex;align-items:center;gap:8px;background:#C8102E;color:#fff;text-decoration:none;padding:9px 18px;border-radius:9px;font-size:.85rem;font-weight:700">
+    📍 Ver seguimiento GPS
+  </a>
+</div>
+<?php endif; ?>
 <div style="margin-bottom:20px;background:#D1FAE5;border:1px solid #A7F3D0;border-radius:12px;padding:16px 20px">
   <div style="font-weight:700;color:#065F46;font-size:.9rem">✅ Tu pedido fue entregado</div>
   <div style="font-size:.85rem;color:#047857;margin-top:4px">¡Gracias por tu compra! Si tienes alguna duda, contacta a la empresa.</div>
