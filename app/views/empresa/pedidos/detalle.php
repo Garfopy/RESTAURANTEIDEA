@@ -323,6 +323,7 @@ function tiempoTranscurrido(string $desde, string $hasta): string {
   </a>
 </div>
 <?php endif; ?>
+<?php if ($esComprador && $pedido['estado'] === 'entregado'): ?>
 <div style="margin-bottom:20px;background:#D1FAE5;border:1px solid #A7F3D0;border-radius:12px;padding:16px 20px">
   <div style="font-weight:700;color:#065F46;font-size:.9rem">✅ Tu pedido fue entregado</div>
   <div style="font-size:.85rem;color:#047857;margin-top:4px">¡Gracias por tu compra! Si tienes alguna duda, contacta a la empresa.</div>
