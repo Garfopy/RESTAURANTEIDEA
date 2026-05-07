@@ -178,6 +178,34 @@ class AuthController extends BaseController
         // Verificar si ya fue completado
         if ($registro['estado'] === 'completado') {
             error_log("[AuthController::verificar] Registro ya completado: {$registro['email']}");
+
+            // Buscar usuario existente e iniciar sesión automáticamente
+            $userModel = new UsuarioModel();
+            $usuarioExistente = $userModel->getByEmail($registro['email']);
+
+            if ($usuarioExistente && $usuarioExistente['email_verificado']) {
+                // Obtener datos completos del usuario
+                $db = Database::getInstance();
+                $stmtUsuarioCompleto = $db->prepare(
+                    "SELECT u.*, r.slug AS rol_slug, r.nombre AS rol_nombre, e.razon_social AS empresa_nombre
+                     FROM usuarios u
+                     INNER JOIN roles r ON r.id = u.rol_id
+                     LEFT JOIN empresas e ON e.id = u.empresa_id
+                     WHERE u.id = ?
+                     LIMIT 1"
+                );
+                $stmtUsuarioCompleto->execute([$usuarioExistente['id']]);
+                $usuarioCompleto = $stmtUsuarioCompleto->fetch(PDO::FETCH_ASSOC);
+
+                if ($usuarioCompleto) {
+                    $_SESSION['usuario'] = $usuarioCompleto;
+                    $this->log('Login automático desde link de verificación ya usado', 'auth', "Usuario ID: {$usuarioExistente['id']}");
+                    error_log("[AuthController::verificar] Login automático para usuario ya verificado");
+                    $this->flash('success', '¡Bienvenido de vuelta! Tu cuenta ya estaba activada.');
+                    $this->redirect('empresa/');
+                }
+            }
+
             $this->flash('success', 'Tu cuenta ya fue activada. Puedes iniciar sesión.');
             $this->redirect('auth/login');
         }
@@ -308,8 +336,13 @@ class AuthController extends BaseController
                 error_log("[AuthController::verificar] Usuario admin_empresa creado con ID: $usuarioId");
             }
 
-            // 4. Marcar registro como completado
-            $regModel->marcarCompletado($registro['id']);
+            // 4. Marcar registro como completado (solo si aún no está completado)
+            if ($registro['estado'] !== 'completado') {
+                $regModel->marcarCompletado($registro['id']);
+                error_log("[AuthController::verificar] Registro marcado como completado");
+            } else {
+                error_log("[AuthController::verificar] Registro ya estaba completado");
+            }
 
             $db->commit();
             error_log("[AuthController::verificar] Registro completado exitosamente para: {$registro['email']}");
