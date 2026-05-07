@@ -11,9 +11,25 @@ $estadoConfig = [
 $est = $estadoConfig[$pedido['estado']] ?? ['label'=>$pedido['estado'],'bg'=>'#F3F4F6','color'=>'#374151'];
 $rol = $_SESSION['usuario']['rol_slug'] ?? '';
 $esComprador = $rol === 'comprador';
+$esRepartidor = $rol === 'repartidor';
 $estadosOrden = ['pendiente','confirmado','en_preparacion','en_ruta','entregado'];
 $estadoActualIdx = array_search($pedido['estado'], $estadosOrden);
 $cancelado = $pedido['estado'] === 'cancelado';
+$tipoEntrega = $pedido['tipo_entrega'] ?? '';
+$esEnvioRepartidor = $tipoEntrega === 'repartidor';
+
+// Historial de estados indexado por estado (el más reciente si hay duplicados)
+$historialPorEstado = ['pendiente' => ['created_at' => $pedido['created_at']]];
+foreach ($historial ?? [] as $h) {
+    $historialPorEstado[$h['estado']] = $h;
+}
+
+function tiempoTranscurrido(string $desde, string $hasta): string {
+    $mins = (int)round((strtotime($hasta) - strtotime($desde)) / 60);
+    if ($mins < 60)   return $mins . ' min';
+    if ($mins < 1440) return round($mins / 60, 1) . ' h';
+    return round($mins / 1440, 1) . ' días';
+}
 ?>
 
 <?php if ($flash): ?>
@@ -71,7 +87,7 @@ $cancelado = $pedido['estado'] === 'cancelado';
 <!-- Timeline de progreso (solo si no está cancelado) -->
 <?php if (!$cancelado): ?>
 <div style="background:#fff;border-radius:12px;border:1px solid #E5E7EB;padding:16px 20px;margin-bottom:16px;overflow-x:auto">
-  <div style="display:flex;align-items:center;min-width:420px">
+  <div style="display:flex;align-items:flex-start;min-width:420px">
     <?php
     $labelsTimeline = ['pendiente'=>'Pendiente','confirmado'=>'Aprobado','en_preparacion'=>'En preparación','en_ruta'=>'En camino','entregado'=>'Entregado'];
     $iconosTimeline = ['pendiente'=>'📋','confirmado'=>'✓','en_preparacion'=>'📦','en_ruta'=>'🚚','entregado'=>'✅'];
@@ -79,10 +95,25 @@ $cancelado = $pedido['estado'] === 'cancelado';
     foreach ($estadosOrden as $si => $se):
       $hecho  = ($estadoActualIdx !== false) && $si <= $estadoActualIdx;
       $actual = ($estadoActualIdx !== false) && $si === $estadoActualIdx;
+      $tsEstado = $historialPorEstado[$se]['created_at'] ?? null;
+      // Elapsed time between this state and the previous
+      $tiempoLabel = '';
+      if ($si > 0 && $hecho) {
+          $prevEstado = $estadosOrden[$si - 1];
+          $tsPrev = $historialPorEstado[$prevEstado]['created_at'] ?? null;
+          if ($tsPrev && $tsEstado) {
+              $tiempoLabel = tiempoTranscurrido($tsPrev, $tsEstado);
+          }
+      }
     ?>
     <div style="display:flex;flex-direction:column;align-items:center;flex:1;min-width:70px;position:relative">
       <?php if ($si > 0): ?>
       <div style="position:absolute;top:14px;left:-50%;width:100%;height:2px;background:<?= $hecho ? 'var(--color-primary)' : '#E5E7EB' ?>"></div>
+      <?php if ($tiempoLabel): ?>
+      <div style="position:absolute;top:17px;left:-50%;width:100%;text-align:center;font-size:.6rem;color:<?= $hecho ? 'var(--color-primary)' : '#9CA3AF' ?>;font-weight:600;white-space:nowrap;pointer-events:none">
+        <?= htmlspecialchars($tiempoLabel) ?>
+      </div>
+      <?php endif; ?>
       <?php endif; ?>
       <div style="width:28px;height:28px;border-radius:50%;background:<?= $hecho ? 'var(--color-primary)' : '#E5E7EB' ?>;display:flex;align-items:center;justify-content:center;font-size:.75rem;color:<?= $hecho ? '#fff' : '#9CA3AF' ?>;position:relative;z-index:1;border:2px solid <?= $actual ? 'var(--color-primary)' : ($hecho ? 'var(--color-primary)' : '#D1D5DB') ?>">
         <?= $hecho ? ($actual && $se !== 'entregado' ? $iconosTimeline[$se] : '✓') : ($si+1) ?>
@@ -90,6 +121,11 @@ $cancelado = $pedido['estado'] === 'cancelado';
       <div style="font-size:.68rem;font-weight:<?= $actual ? '700' : '500' ?>;color:<?= $actual ? 'var(--color-primary)' : ($hecho ? '#374151' : '#9CA3AF') ?>;text-align:center;margin-top:5px;white-space:nowrap">
         <?= $labelsTimeline[$se] ?>
       </div>
+      <?php if ($tsEstado && $hecho): ?>
+      <div style="font-size:.58rem;color:#9CA3AF;text-align:center;white-space:nowrap;margin-top:2px">
+        <?= date('d/m H:i', strtotime($tsEstado)) ?>
+      </div>
+      <?php endif; ?>
     </div>
     <?php endforeach; ?>
   </div>
@@ -188,8 +224,17 @@ $cancelado = $pedido['estado'] === 'cancelado';
 
 <?php if ($esComprador && $pedido['estado'] === 'en_preparacion'): ?>
 <div style="margin-bottom:20px;background:#EDE9FE;border:1px solid #C4B5FD;border-radius:12px;padding:18px 20px">
+  <?php if ($esEnvioRepartidor): ?>
+  <div style="font-weight:700;color:#5B21B6;font-size:.9rem;margin-bottom:6px">Tu pago fue verificado — Esperando partida del repartidor</div>
+  <p style="font-size:.85rem;color:#6D28D9;margin:0">
+    Tu pedido está listo. El repartidor iniciará el viaje en la fecha programada.
+    <?php if (!empty($pedido['fecha_entrega'])): ?>
+    <br><strong>Fecha de entrega:</strong> <?= date('d/m/Y', strtotime($pedido['fecha_entrega'])) ?>
+    <?php endif; ?>
+  </p>
+  <?php else: ?>
   <div style="font-weight:700;color:#5B21B6;font-size:.9rem;margin-bottom:6px">Tu pago fue verificado — Preparando tu pedido</div>
-  <?php if (($pedido['tipo_entrega'] ?? '') === 'pickup'): ?>
+  <?php if ($tipoEntrega === 'pickup'): ?>
   <p style="font-size:.85rem;color:#6D28D9;margin:0 0 10px 0">
     Tu pedido será preparado para recoger en bodega. La empresa te avisará cuando esté listo.
   </p>
@@ -211,6 +256,7 @@ $cancelado = $pedido['estado'] === 'cancelado';
     <br><strong>Dirección:</strong> <?= htmlspecialchars($pedido['direccion_entrega']) ?>
     <?php endif; ?>
   </p>
+  <?php endif; ?>
   <?php endif; ?>
 </div>
 <?php endif; ?>
@@ -308,14 +354,14 @@ $cancelado = $pedido['estado'] === 'cancelado';
     </div>
   </div>
 
-  <?php elseif (in_array($pedido['estado'], ['confirmado','en_preparacion'], true) && !empty($pedido['foto_comprobante_path'])): ?>
+  <?php elseif ($pedido['estado'] === 'confirmado' && !empty($pedido['foto_comprobante_path'])): ?>
   <div style="padding:12px 14px;background:#DBEAFE;border:1px solid #BFDBFE;border-radius:10px;font-size:.85rem;color:#1E40AF;margin-bottom:12px">
     <strong>💳 Comprobante de pago recibido.</strong>
     Revisa la imagen arriba. Si el pago es correcto, confírmalo para mover el pedido a <strong>En preparación</strong>.
-    <?php if (($pedido['tipo_entrega'] ?? '') === 'pickup'): ?>
+    <?php if ($tipoEntrega === 'pickup'): ?>
     <br><span style="font-size:.8rem;opacity:.8">Después podrás marcar "Listo para recoger" cuando el pedido esté preparado.</span>
     <?php else: ?>
-    <br><span style="font-size:.8rem;opacity:.8">Tú o el repartidor marcarán "En camino" cuando el pedido salga.</span>
+    <br><span style="font-size:.8rem;opacity:.8">El repartidor marcará "Empezar viaje" cuando el pedido salga.</span>
     <?php endif; ?>
   </div>
   <form method="POST" action="<?= BASE_URL ?>empresa-pedido/cambiarEstado"
@@ -334,22 +380,29 @@ $cancelado = $pedido['estado'] === 'cancelado';
     El comprador verá la opción para subir su comprobante. Cuando lo suba, aparecerá aquí para que puedas confirmarlo.
   </div>
 
-  <?php elseif ($pedido['estado'] === 'en_preparacion' && empty($pedido['foto_comprobante_path'])): ?>
+  <?php elseif ($pedido['estado'] === 'en_preparacion' && $esEnvioRepartidor): ?>
   <div style="padding:12px 14px;background:#EDE9FE;border:1px solid #C4B5FD;border-radius:10px;font-size:.85rem;color:#5B21B6;margin-bottom:12px">
-    <strong>📦 Pedido en preparación.</strong>
-    El pago fue confirmado. Cuando el pedido esté listo para salir, márcalo como "En camino".
+    <strong>📦 Pago verificado — Esperando partida del repartidor.</strong>
+    El pedido está listo. El repartidor iniciará el viaje cuando tenga el pedido en sus manos.
+    <?php if (!empty($pedido['fecha_entrega'])): ?>
+    <br><span style="font-size:.8rem;opacity:.8">Fecha de entrega programada: <strong><?= date('d/m/Y', strtotime($pedido['fecha_entrega'])) ?></strong></span>
+    <?php endif; ?>
   </div>
-  <?php if (($pedido['tipo_entrega'] ?? '') !== 'pickup'): ?>
   <form method="POST" action="<?= BASE_URL ?>empresa-pedido/cambiarEstado"
-        onsubmit="return confirm('¿Marcar como En camino? Esto indica que el repartidor ya salió con el pedido.')">
+        onsubmit="return confirm('¿Marcar manualmente como En camino?')">
     <input type="hidden" name="pedido_id" value="<?= $pedido['id'] ?>">
     <input type="hidden" name="estado" value="en_ruta">
     <button type="submit"
             style="width:100%;padding:12px;background:#D97706;color:#fff;border:none;border-radius:9px;font-weight:700;cursor:pointer;font-size:.9rem;margin-bottom:8px">
-      🚚 Marcar en camino
+      🚚 Marcar en camino (manual)
     </button>
   </form>
-  <?php else: ?>
+
+  <?php elseif ($pedido['estado'] === 'en_preparacion'): ?>
+  <div style="padding:12px 14px;background:#EDE9FE;border:1px solid #C4B5FD;border-radius:10px;font-size:.85rem;color:#5B21B6;margin-bottom:12px">
+    <strong>📦 Pedido en preparación.</strong>
+    El pago fue confirmado. Cuando el pedido esté listo para que el comprador lo recoja, márcalo.
+  </div>
   <form method="POST" action="<?= BASE_URL ?>empresa-pedido/cambiarEstado"
         onsubmit="return confirm('¿Marcar como listo para que el comprador recoja?')">
     <input type="hidden" name="pedido_id" value="<?= $pedido['id'] ?>">
@@ -359,7 +412,6 @@ $cancelado = $pedido['estado'] === 'cancelado';
       ✓ Listo para recoger
     </button>
   </form>
-  <?php endif; ?>
 
   <?php elseif ($pedido['estado'] === 'en_ruta' && ($pedido['tipo_entrega'] ?? '') === 'pickup'): ?>
   <div style="padding:12px 14px;background:#F0FDF4;border:1px solid #A7F3D0;border-radius:10px;font-size:.85rem;color:#065F46;margin-bottom:12px">

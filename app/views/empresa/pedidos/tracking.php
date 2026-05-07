@@ -82,49 +82,65 @@ $progreso = $barraEstados[$estadoPedido] ?? 0;
 var pedidoId    = <?= (int)$pedido['id'] ?>;
 var hayTracking = <?= $hayTracking ? 'true' : 'false' ?>;
 
-// Coordenadas iniciales
 var initLat = <?= $hayTracking ? $tracking['lat_actual'] : ($sucursalLat ?? '19.4326') ?>;
 var initLng = <?= $hayTracking ? $tracking['lng_actual'] : ($sucursalLng ?? '-99.1332') ?>;
 
 var mapa = L.map('mapa').setView([initLat, initLng], 14);
-
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '© OpenStreetMap contributors',
-  maxZoom: 19
+  attribution: '© OpenStreetMap contributors', maxZoom: 19
 }).addTo(mapa);
 
-// Icono repartidor
 var iconoRepartidor = L.divIcon({
   className: '',
   html: '<div style="background:var(--color-primary,#C8102E);color:#fff;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:18px;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3)">🚚</div>',
-  iconSize: [36, 36],
-  iconAnchor: [18, 18],
+  iconSize: [36,36], iconAnchor: [18,18],
 });
-
-// Icono sucursal
 var iconoSucursal = L.divIcon({
   className: '',
   html: '<div style="background:#1E40AF;color:#fff;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:16px;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3)">📦</div>',
-  iconSize: [32, 32],
-  iconAnchor: [16, 32],
+  iconSize: [32,32], iconAnchor: [16,32],
 });
 
 var marcadorRepartidor = null;
-var marcadorSucursal   = null;
-
 <?php if ($hayTracking): ?>
 marcadorRepartidor = L.marker([<?= $tracking['lat_actual'] ?>, <?= $tracking['lng_actual'] ?>], {icon: iconoRepartidor})
-  .addTo(mapa)
-  .bindPopup('Repartidor: <?= htmlspecialchars($tracking['repartidor_nombre'] ?? '') ?>');
+  .addTo(mapa).bindPopup('Repartidor: <?= htmlspecialchars($tracking['repartidor_nombre'] ?? '') ?>');
 <?php endif; ?>
-
 <?php if ($sucursalLat && $sucursalLng): ?>
-marcadorSucursal = L.marker([<?= $sucursalLat ?>, <?= $sucursalLng ?>], {icon: iconoSucursal})
-  .addTo(mapa)
-  .bindPopup('Destino: <?= htmlspecialchars($tracking['sucursal_nombre'] ?? '') ?>');
+L.marker([<?= $sucursalLat ?>, <?= $sucursalLng ?>], {icon: iconoSucursal})
+  .addTo(mapa).bindPopup('Destino: <?= htmlspecialchars($tracking['sucursal_nombre'] ?? '') ?>');
 <?php endif; ?>
+</script>
 
-// Polling AJAX cada 5 segundos cuando hay tracking activo
+<?php if (!empty($firebaseActivo)): ?>
+<script type="module">
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+  import { getDatabase, ref, onValue } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+
+  const app = initializeApp(<?= json_encode($firebaseConfig) ?>);
+  const db  = getDatabase(app);
+
+  onValue(ref(db, 'tracking/<?= (int)$pedido['id'] ?>'), snap => {
+    const d = snap.val();
+    if (!d || !d.lat || !d.lng) return;
+    const pos = [d.lat, d.lng];
+    if (window.marcadorRepartidor) {
+      window.marcadorRepartidor.setLatLng(pos);
+      window.mapa.panTo(pos);
+    } else {
+      window.marcadorRepartidor = window.L.marker(pos, {icon: window.iconoRepartidor})
+        .addTo(window.mapa).bindPopup('🚚 Repartidor en camino');
+    }
+    if (d.llegado) {
+      document.getElementById('llegadoAlert') && (document.getElementById('llegadoAlert').style.display = 'block');
+    }
+  });
+</script>
+<div id="llegadoAlert" style="display:none;margin-top:12px;padding:12px 16px;background:#D1FAE5;border:1px solid #A7F3D0;border-radius:8px;font-size:.875rem;color:#065F46;font-weight:600">
+  ✅ El repartidor ha llegado al destino. Esperando confirmación de entrega.
+</div>
+<?php else: ?>
+<script>
 <?php if ($hayTracking): ?>
 function actualizarMapa() {
   fetch('<?= BASE_URL ?>api/tracking/' + pedidoId)
@@ -132,22 +148,12 @@ function actualizarMapa() {
     .then(d => {
       if (!d.lat || !d.lng) return;
       var pos = [d.lat, d.lng];
-      if (marcadorRepartidor) {
-        marcadorRepartidor.setLatLng(pos);
-      } else {
-        marcadorRepartidor = L.marker(pos, {icon: iconoRepartidor}).addTo(mapa);
-      }
-      if (d.eta !== null) {
-        document.querySelector('[data-eta]') && (document.querySelector('[data-eta]').textContent = d.eta + ' min');
-      }
-      if (d.estado === 'entregado') {
-        clearInterval(pollingInterval);
-        location.reload();
-      }
-    })
-    .catch(() => {});
+      if (marcadorRepartidor) { marcadorRepartidor.setLatLng(pos); }
+      else { marcadorRepartidor = L.marker(pos, {icon: iconoRepartidor}).addTo(mapa); }
+      if (d.estado === 'entregado') { clearInterval(pollingInterval); location.reload(); }
+    }).catch(() => {});
 }
-
 var pollingInterval = setInterval(actualizarMapa, 5000);
 <?php endif; ?>
 </script>
+<?php endif; ?>

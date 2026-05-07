@@ -52,6 +52,7 @@ class PedidoController extends BaseController
         }
 
         $pedido = $this->model->conDetalle($pedidoId);
+        $historial = $this->model->getHistorial($pedidoId);
 
         $flash      = $this->getFlash();
         $pageTitle  = 'Pedido ' . $pedido['folio'];
@@ -148,6 +149,16 @@ class PedidoController extends BaseController
 
         $pedido   = $this->model->conDetalle($pedidoId);
         $tracking = $this->model->getTrackingActivo($pedidoId);
+
+        $cfgModel = new ConfigModel();
+        $firebaseConfig = [
+            'apiKey'      => $cfgModel->get('firebase_api_key', ''),
+            'authDomain'  => $cfgModel->get('firebase_auth_domain', ''),
+            'databaseURL' => $cfgModel->get('firebase_database_url', ''),
+            'projectId'   => $cfgModel->get('firebase_project_id', ''),
+            'appId'       => $cfgModel->get('firebase_app_id', ''),
+        ];
+        $firebaseActivo = !empty($firebaseConfig['apiKey']) && !empty($firebaseConfig['databaseURL']);
 
         $flash      = $this->getFlash();
         $pageTitle  = 'Seguimiento — ' . $pedido['folio'];

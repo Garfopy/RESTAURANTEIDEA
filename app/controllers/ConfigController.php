@@ -71,6 +71,8 @@ class ConfigController extends BaseController
                 'paypal_client_id', 'paypal_secret', 'paypal_mode',
                 'shelly_api_url', 'shelly_auth_key',
                 'hikvision_host', 'hikvision_user', 'hikvision_pass',
+                'firebase_api_key', 'firebase_auth_domain',
+                'firebase_database_url', 'firebase_project_id', 'firebase_app_id',
             ];
             foreach ($campos as $c) {
                 $this->cfg->set($c, trim($this->post($c, '')));

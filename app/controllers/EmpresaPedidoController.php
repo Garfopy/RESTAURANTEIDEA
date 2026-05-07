@@ -98,7 +98,7 @@ class EmpresaPedidoController extends BaseController
 
         $this->log('Cambiar estado pedido', 'pedidos', "Pedido $pedidoId → $estado. $nota");
         $this->flash('success', 'Estado del pedido actualizado.');
-        $this->redirect('empresa-pedido');
+        $this->redirect('pedido/detalle/' . $pedidoId);
     }
 
     // Asignar tipo de entrega + repartidor + costo envío

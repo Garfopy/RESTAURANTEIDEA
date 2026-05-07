@@ -143,6 +143,7 @@ class PedidoModel extends BaseModel
                   WHERE id = ?",
                 [$aprobadoPorId, $nuevoSubtotal, $nuevoSubtotal, $id]
             );
+            $this->logEstado($id, 'confirmado');
 
             $this->db->commit();
         } catch (\Throwable $e) {
@@ -157,6 +158,7 @@ class PedidoModel extends BaseModel
             "UPDATE pedidos SET estado = 'cancelado', nota_empresa = ? WHERE id = ?",
             [$nota ?: null, $id]
         );
+        $this->logEstado($id, 'cancelado');
     }
 
     public function subirComprobante(int $id, string $path): void
@@ -174,6 +176,7 @@ class PedidoModel extends BaseModel
             "UPDATE pedidos SET foto_entrega_path = ?, estado = 'entregado' WHERE id = ?",
             [$path, $id]
         );
+        $this->logEstado($id, 'entregado');
     }
 
     public function listadoEmpresa(int $empresaId, array $filtros = [], int $page = 1): array
@@ -341,23 +344,27 @@ class PedidoModel extends BaseModel
 
     public function aprobar(int $id, int $aprobadoPor): bool
     {
-        return $this->execute(
+        $ok = $this->execute(
             "UPDATE pedidos
                 SET estado = 'confirmado', aprobado_por = ?, aprobado_at = NOW()
               WHERE id = ? AND estado = 'pendiente' AND requiere_aprobacion = 1",
             [$aprobadoPor, $id]
         );
+        if ($ok) $this->logEstado($id, 'confirmado');
+        return $ok;
     }
 
     public function rechazar(int $id, int $rechazadoPor, string $motivo): bool
     {
-        return $this->execute(
+        $ok = $this->execute(
             "UPDATE pedidos
                 SET estado = 'cancelado', aprobado_por = ?, aprobado_at = NOW(),
                     notas = CONCAT(COALESCE(notas,''), IF(notas IS NULL OR notas='','','\n'), 'Rechazado: ', ?)
               WHERE id = ? AND estado = 'pendiente'",
             [$rechazadoPor, $motivo, $id]
         );
+        if ($ok) $this->logEstado($id, 'cancelado');
+        return $ok;
     }
 
     public function getTrackingActivo(int $pedidoId): ?array
@@ -480,9 +487,30 @@ class PedidoModel extends BaseModel
         $validos = ['pendiente', 'confirmado', 'en_preparacion', 'en_ruta', 'entregado', 'cancelado'];
         if (!in_array($estado, $validos, true)) return false;
 
-        return $this->execute(
-            'UPDATE pedidos SET estado = ? WHERE id = ?',
-            [$estado, $id]
+        $ok = $this->execute('UPDATE pedidos SET estado = ? WHERE id = ?', [$estado, $id]);
+        if ($ok) $this->logEstado($id, $estado);
+        return $ok;
+    }
+
+    private function logEstado(int $pedidoId, string $estado): void
+    {
+        $usuarioId = $_SESSION['usuario']['id'] ?? null;
+        $this->execute(
+            'INSERT INTO pedido_historial (pedido_id, estado, usuario_id) VALUES (?, ?, ?)',
+            [$pedidoId, $estado, $usuarioId]
+        );
+    }
+
+    public function getHistorial(int $id): array
+    {
+        return $this->query(
+            "SELECT ph.estado, ph.created_at,
+                    CONCAT(COALESCE(u.nombre,''), ' ', COALESCE(u.apellido_paterno,'')) AS usuario_nombre
+               FROM pedido_historial ph
+               LEFT JOIN usuarios u ON u.id = ph.usuario_id
+              WHERE ph.pedido_id = ?
+              ORDER BY ph.created_at ASC",
+            [$id]
         );
     }
 

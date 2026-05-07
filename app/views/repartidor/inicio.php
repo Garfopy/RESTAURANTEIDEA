@@ -43,7 +43,50 @@
   <h1 style="font-size:1.1rem;font-weight:800;margin-bottom:4px">Entregas de hoy</h1>
   <p style="font-size:.8rem;color:#9CA3AF;margin-bottom:16px"><?= date('d \d\e F \d\e Y') ?></p>
 
-  <?php if (!$rutaHoy): ?>
+  <?php if (!empty($pedidosDirectos)): ?>
+  <!-- Pedidos directos asignados -->
+  <div style="margin-bottom:20px">
+    <div style="font-size:.72rem;font-weight:700;color:#9CA3AF;letter-spacing:.05em;margin-bottom:8px">PEDIDOS ASIGNADOS DIRECTAMENTE</div>
+    <?php foreach ($pedidosDirectos as $pd): ?>
+    <div class="card" style="margin-bottom:12px">
+      <div style="padding:16px;border-left:4px solid <?= $pd['estado']==='en_ruta' ? '#F59E0B' : '#6D28D9' ?>">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+          <div>
+            <div style="font-weight:700;font-size:.95rem;font-family:monospace"><?= htmlspecialchars($pd['folio']) ?></div>
+            <div style="font-size:.8rem;color:#9CA3AF;margin-top:2px"><?= htmlspecialchars($pd['empresa_nombre']) ?></div>
+          </div>
+          <?php if ($pd['estado']==='en_ruta'): ?>
+          <span class="badge" style="background:#78350F;color:#FCD34D">En camino</span>
+          <?php else: ?>
+          <span class="badge" style="background:#3B0764;color:#E9D5FF">Listo para salir</span>
+          <?php endif; ?>
+        </div>
+        <?php if (!empty($pd['direccion_entrega'])): ?>
+        <div style="font-size:.8rem;color:#D1D5DB;margin-bottom:8px">📍 <?= htmlspecialchars($pd['direccion_entrega']) ?></div>
+        <?php endif; ?>
+        <?php if (!empty($pd['fecha_entrega'])): ?>
+        <div style="font-size:.75rem;color:#9CA3AF;margin-bottom:10px">📅 Entrega: <?= date('d/m/Y', strtotime($pd['fecha_entrega'])) ?></div>
+        <?php endif; ?>
+
+        <?php if ($pd['estado'] === 'en_preparacion'): ?>
+        <form method="POST" action="<?= BASE_URL ?>repartidor/iniciarViaje/<?= $pd['id'] ?>"
+              onsubmit="return confirm('¿Iniciar el viaje para el pedido <?= htmlspecialchars($pd['folio']) ?>?')">
+          <button type="submit" class="btn-primary" style="font-size:.9rem;padding:12px">
+            🚀 Empezar viaje
+          </button>
+        </form>
+        <?php else: ?>
+        <a href="<?= BASE_URL ?>repartidor/pedidoDirecto/<?= $pd['id'] ?>" class="btn-primary" style="font-size:.9rem;padding:12px">
+          📍 Ver entrega en curso
+        </a>
+        <?php endif; ?>
+      </div>
+    </div>
+    <?php endforeach; ?>
+  </div>
+  <?php endif; ?>
+
+  <?php if (!$rutaHoy && empty($pedidosDirectos)): ?>
     <div style="text-align:center;padding:40px 20px;color:#6B7280">
       <div style="font-size:2.5rem;margin-bottom:12px">📦</div>
       <p style="font-weight:600">No tienes entregas asignadas para hoy.</p>
@@ -51,7 +94,7 @@
       <a href="<?= BASE_URL ?>repartidor/historial" class="btn-secondary" style="margin-top:20px;display:inline-block;width:auto;padding:10px 24px">Ver historial</a>
     </div>
 
-  <?php else: ?>
+  <?php elseif ($rutaHoy): ?>
     <!-- Resumen de ruta -->
     <div class="card" style="padding:14px 16px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center">
       <div>
