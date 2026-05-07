@@ -350,6 +350,9 @@ class AuthController extends BaseController
             // 5. Redirigir al login (sin iniciar sesión automáticamente)
             $this->log('Registro completado - Redirección a login', 'auth', "Usuario ID: $usuarioId, Empresa ID: $empresaId");
 
+            // Limpiar cualquier sesión activa para que el usuario vea el login
+            unset($_SESSION['usuario'], $_SESSION['empresa']);
+
             error_log("[AuthController::verificar] Registro completado, redirigiendo a login");
             $this->flash('success', '¡Tu cuenta ha sido activada correctamente! Inicia sesión con tus credenciales.');
             $this->redirect('auth/login');
