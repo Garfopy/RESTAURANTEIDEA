@@ -82,7 +82,7 @@ class PayPalSuscripcionService
     // ── Crear producto en el catálogo PayPal ──────────────────────────────────
     public function crearProducto(string $nombre, string $descripcion): string
     {
-        $data = $this->request('POST', '/v1/catalog/products', [
+        $data = $this->request('POST', '/v1/catalogs/products', [
             'name'        => $nombre,
             'description' => $descripcion,
             'type'        => 'SERVICE',

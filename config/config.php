@@ -34,6 +34,9 @@ define('UPLOAD_URL',    BASE_URL  . 'public/uploads/');
 // Pagination
 define('PER_PAGE', 20);
 
+// PayPal — false = flujo real (sandbox o live según credenciales configuradas)
+define('PAYPAL_TEST_MODE', false);
+
 // Google Maps Places API key (agregar en cPanel o aquí directamente)
 // Obtener en: https://console.cloud.google.com → APIs → Maps JavaScript API + Places API
 define('GOOGLE_MAPS_KEY', getenv('GOOGLE_MAPS_KEY') ?: '');
