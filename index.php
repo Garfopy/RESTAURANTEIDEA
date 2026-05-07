@@ -87,7 +87,21 @@ $routes = [
 ];
 
 // ── Auth guard ────────────────────────────────────────────────────────────────
-$publicPaths = ['auth/login', 'auth/dologin', 'auth/index', 'auth/verificar', 'planes/index', 'suscripcion/webhook', 'landing/landing'];
+$publicPaths = [
+    'auth/login',
+    'auth/dologin',
+    'auth/index',
+    'auth/verificar',
+    'planes/index',
+    'planes/registroinicio',
+    'planes/registrocheckout',
+    'planes/registroretorno',
+    'planes/registrocancelado',
+    'planes/simularpago',
+    'planes/aprobarpagotest',
+    'suscripcion/webhook',
+    'landing/landing'
+];
 
 $currentPath = strtolower($ctrlSlug . '/' . $action);
 
