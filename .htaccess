@@ -27,10 +27,13 @@ RewriteBase /carnihub/
     img-src 'self' data: blob: \
       *.googleapis.com \
       *.gstatic.com \
-      maps.gstatic.com; \
+      maps.gstatic.com \
+      *.openstreetmap.org \
+      *.tile.openstreetmap.org; \
     connect-src 'self' \
       *.googleapis.com \
       *.gstatic.com \
+      unpkg.com \
       *.firebaseio.com \
       *.firebasedatabase.app \
       wss://*.firebaseio.com \
