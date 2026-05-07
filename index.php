@@ -87,7 +87,7 @@ $routes = [
 ];
 
 // ── Auth guard ────────────────────────────────────────────────────────────────
-$publicPaths = ['auth/login', 'auth/dologin', 'auth/index', 'planes/index', 'suscripcion/webhook', 'landing/landing'];
+$publicPaths = ['auth/login', 'auth/dologin', 'auth/index', 'auth/verificar', 'planes/index', 'suscripcion/webhook', 'landing/landing'];
 
 $currentPath = strtolower($ctrlSlug . '/' . $action);
 
