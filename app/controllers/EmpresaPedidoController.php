@@ -275,9 +275,26 @@ class EmpresaPedidoController extends BaseController
         $this->redirect('empresa-pedido');
     }
 
-    // Helper privado: procesa upload de foto de entrega
-    private function _procesarFotoEntrega(int $pedidoId): void
+    // Asignar costos de envío por parada (pedido multi-sucursal)
+    public function asignarCostoEnvio(?string $p = null): void
     {
+        if (!$this->isPost()) {
+            $this->redirect('empresa-pedido');
+        }
+        $pedidoId = (int)$this->post('pedido_id');
+        if ($pedidoId <= 0 || !$this->pedidoModel->verificarPertenece($pedidoId, $this->empresaId())) {
+            $this->flash('error', 'Pedido no encontrado.');
+            $this->redirect('empresa-pedido');
+        }
+        $envios = (array)($_POST['envio'] ?? []);
+        $this->pedidoModel->asignarCostosEnvioParadas($pedidoId, $envios);
+        $this->log('Asignar costo envío paradas', 'pedidos', "Pedido $pedidoId — " . json_encode($envios));
+        $this->flash('success', 'Costos de envío guardados.');
+        $this->redirect('pedido/detalle/' . $pedidoId);
+    }
+
+    // Helper privado: procesa upload de foto de entrega
+    private function _procesarFotoEntrega(int $pedidoId): void    {
         $dir     = $_SERVER['DOCUMENT_ROOT'] . '/public/uploads/evidencias/';
         $ext     = strtolower(pathinfo($_FILES['foto']['name'], PATHINFO_EXTENSION));
         $allowed = ['jpg', 'jpeg', 'png', 'webp'];

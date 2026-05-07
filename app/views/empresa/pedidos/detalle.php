@@ -93,6 +93,43 @@ $cancelado = $pedido['estado'] === 'cancelado';
     </div>
     <?php endforeach; ?>
   </div>
+
+  <?php
+  // Sub-timeline de paradas cuando hay multi-destino
+  $tieneParadas = !empty($pedido['sucursales']) && ($pedido['tipo_entrega'] ?? '') === 'repartidor';
+  $estadosBloq = ['en_ruta', 'entregado'];
+  if ($tieneParadas && in_array($pedido['estado'], array_merge($estadosBloq, ['en_preparacion', 'confirmado']), true)):
+  ?>
+  <div style="margin-top:14px;padding-top:12px;border-top:1px dashed #E5E7EB">
+    <div style="font-size:.72rem;font-weight:700;color:#6B7280;margin-bottom:8px;letter-spacing:.05em">PARADAS DE ENTREGA</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px">
+      <?php foreach ($pedido['sucursales'] as $i => $ps):
+        $psEst = $ps['estado'] ?? 'pendiente';
+        $psChip = ['pendiente'=>['bg'=>'#F3F4F6','c'=>'#6B7280','label'=>'Pendiente'],
+                   'entregado'=>['bg'=>'#D1FAE5','c'=>'#065F46','label'=>'✓ Entregado'],
+                   'parcial'  =>['bg'=>'#FEF3C7','c'=>'#92400E','label'=>'Parcial'],
+                   'rechazado'=>['bg'=>'#FEE2E2','c'=>'#991B1B','label'=>'Rechazado']][$psEst]
+                  ?? ['bg'=>'#F3F4F6','c'=>'#6B7280','label'=>$psEst];
+      ?>
+      <div style="display:flex;align-items:center;gap:8px;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px;padding:7px 12px">
+        <div style="width:20px;height:20px;border-radius:50%;background:<?= $psEst==='entregado' ? '#059669' : 'var(--color-primary)' ?>;color:#fff;font-size:.65rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <?= $psEst==='entregado' ? '✓' : ($i+1) ?>
+        </div>
+        <div>
+          <div style="font-size:.8rem;font-weight:700;color:#111827"><?= htmlspecialchars($ps['sucursal_nombre']) ?></div>
+          <div style="font-size:.72rem;color:#6B7280"><?= htmlspecialchars($ps['direccion']) ?></div>
+        </div>
+        <span style="font-size:.7rem;padding:2px 8px;border-radius:999px;background:<?= $psChip['bg'] ?>;color:<?= $psChip['c'] ?>;font-weight:600;white-space:nowrap">
+          <?= $psChip['label'] ?>
+        </span>
+        <?php if (($ps['costo_envio_sucursal'] ?? 0) > 0): ?>
+        <span style="font-size:.72rem;color:#374151;font-weight:600">$<?= number_format($ps['costo_envio_sucursal'], 2) ?></span>
+        <?php endif; ?>
+      </div>
+      <?php endforeach; ?>
+    </div>
+  </div>
+  <?php endif; ?>
 </div>
 <?php endif; ?>
 
@@ -457,6 +494,125 @@ $cancelado = $pedido['estado'] === 'cancelado';
            style="max-width:100%;border-radius:8px;border:1px solid #E5E7EB">
     </div>
     <?php endif; ?>
+
+    <?php if (!empty($pedido['sucursales']) && ($pedido['tipo_entrega'] ?? '') === 'repartidor'): ?>
+    <!-- ── Panel paradas de entrega ─────────────────────────────── -->
+    <div style="background:#fff;border-radius:12px;border:1px solid #E5E7EB;overflow:hidden;margin-bottom:16px">
+      <div style="padding:14px 16px;border-bottom:1px solid #F3F4F6;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <div>
+          <span style="font-weight:700;font-size:.9rem;color:#111827">📍 Paradas de entrega</span>
+          <div style="font-size:.75rem;color:#9CA3AF;margin-top:1px"><?= count($pedido['sucursales']) ?> parada<?= count($pedido['sucursales'])>1?'s':'' ?> — el repartidor visita cada una</div>
+        </div>
+        <?php
+        // Botón Google Maps ruta (todas las paradas)
+        $waypoints = [];
+        foreach ($pedido['sucursales'] as $ps) {
+            if (!empty($ps['lat']) && !empty($ps['lng'])) {
+                $waypoints[] = (float)$ps['lat'] . ',' . (float)$ps['lng'];
+            } else {
+                $waypoints[] = urlencode($ps['direccion']);
+            }
+        }
+        if (count($waypoints) >= 2):
+          $origin = array_shift($waypoints);
+          $dest   = array_pop($waypoints);
+          $wps    = implode('|', $waypoints);
+          $mapsUrl = 'https://www.google.com/maps/dir/' . $origin . '/' . ($wps ? $wps . '/' : '') . $dest;
+        ?>
+        <a href="<?= htmlspecialchars($mapsUrl) ?>" target="_blank" rel="noopener"
+           style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;background:#4285F4;color:#fff;border-radius:8px;font-size:.8rem;font-weight:700;text-decoration:none">
+          🗺 Ver ruta en Maps
+        </a>
+        <?php endif; ?>
+      </div>
+
+      <?php foreach ($pedido['sucursales'] as $i => $ps):
+        $psEst = $ps['estado'] ?? 'pendiente';
+        $psChip = ['pendiente'=>['bg'=>'#FEF3C7','c'=>'#92400E','label'=>'Pendiente entrega'],
+                   'entregado'=>['bg'=>'#D1FAE5','c'=>'#065F46','label'=>'✓ Entregado'],
+                   'parcial'  =>['bg'=>'#DBEAFE','c'=>'#1E40AF','label'=>'Parcial'],
+                   'rechazado'=>['bg'=>'#FEE2E2','c'=>'#991B1B','label'=>'Rechazado']][$psEst]
+                  ?? ['bg'=>'#F3F4F6','c'=>'#6B7280','label'=>$psEst];
+      ?>
+      <div style="padding:14px 16px;border-bottom:1px solid #F9FAFB">
+        <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;flex-wrap:wrap">
+          <div style="flex-shrink:0;width:24px;height:24px;border-radius:50%;background:var(--color-primary);color:#fff;font-size:.75rem;font-weight:700;display:flex;align-items:center;justify-content:center">
+            <?= $i+1 ?>
+          </div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:.9rem;font-weight:700;color:#111827"><?= htmlspecialchars($ps['sucursal_nombre']) ?></div>
+            <div style="font-size:.78rem;color:#6B7280">📍 <?= htmlspecialchars($ps['direccion']) ?></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span style="font-size:.72rem;padding:3px 10px;border-radius:999px;background:<?= $psChip['bg'] ?>;color:<?= $psChip['c'] ?>;font-weight:600">
+              <?= $psChip['label'] ?>
+            </span>
+            <?php if (!empty($ps['lat']) && !empty($ps['lng'])): ?>
+            <a href="https://maps.google.com/?q=<?= (float)$ps['lat'] ?>,<?= (float)$ps['lng'] ?>" target="_blank" rel="noopener"
+               style="font-size:.72rem;color:#4285F4;text-decoration:none;font-weight:600">Maps ↗</a>
+            <?php endif; ?>
+          </div>
+        </div>
+
+        <?php if (!empty($ps['items'])): ?>
+        <div style="margin-left:34px;margin-bottom:8px">
+          <div style="font-size:.72rem;font-weight:700;color:#6B7280;margin-bottom:4px">PRODUCTOS ASIGNADOS</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px">
+            <?php foreach ($ps['items'] as $psi): ?>
+            <span style="background:#F3F4F6;border-radius:6px;padding:4px 10px;font-size:.78rem;color:#374151">
+              <?= htmlspecialchars($psi['producto_nombre']) ?>
+              <span style="font-weight:700"> <?= number_format($psi['cantidad'], 2) ?> <?= htmlspecialchars($psi['presentacion']) ?></span>
+              <span style="color:#9CA3AF"> · $<?= number_format($psi['subtotal'], 2) ?></span>
+            </span>
+            <?php endforeach; ?>
+          </div>
+        </div>
+        <?php endif; ?>
+
+        <div style="margin-left:34px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span style="font-size:.78rem;color:#6B7280">Costo envío esta parada:</span>
+          <?php if (($ps['costo_envio_sucursal'] ?? 0) > 0): ?>
+          <span style="font-size:.85rem;font-weight:700;color:#374151">$<?= number_format($ps['costo_envio_sucursal'], 2) ?></span>
+          <?php else: ?>
+          <span style="font-size:.78rem;color:#9CA3AF;font-style:italic">Sin asignar</span>
+          <?php endif; ?>
+        </div>
+      </div>
+      <?php endforeach; ?>
+
+      <?php if (!$esComprador && !in_array($pedido['estado'], ['entregado','cancelado'], true)): ?>
+      <!-- Formulario: asignar costos de envío por parada -->
+      <div style="padding:14px 16px;background:#F9FAFB">
+        <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:10px">Asignar costo de envío por parada</div>
+        <form method="POST" action="<?= BASE_URL ?>empresa-pedido/asignarCostoEnvio">
+          <input type="hidden" name="pedido_id" value="<?= $pedido['id'] ?>">
+          <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">
+            <?php foreach ($pedido['sucursales'] as $i => $ps): ?>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+              <div style="width:20px;height:20px;border-radius:50%;background:var(--color-primary);color:#fff;font-size:.65rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0"><?= $i+1 ?></div>
+              <span style="flex:1;font-size:.82rem;color:#374151;font-weight:600;min-width:120px"><?= htmlspecialchars($ps['sucursal_nombre']) ?></span>
+              <div style="display:flex;align-items:center;gap:4px">
+                <span style="font-size:.82rem;color:#6B7280">$</span>
+                <input type="number" name="envio[<?= $ps['id'] ?>]"
+                       value="<?= number_format((float)($ps['costo_envio_sucursal'] ?? 0), 2) ?>"
+                       min="0" step="0.01" placeholder="0.00"
+                       style="width:90px;padding:6px 8px;border:1px solid #D1D5DB;border-radius:6px;font-size:.85rem;text-align:right">
+              </div>
+            </div>
+            <?php endforeach; ?>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <button type="submit"
+                    style="padding:8px 20px;background:#059669;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:.85rem">
+              💾 Guardar costos de envío
+            </button>
+            <span style="font-size:.75rem;color:#9CA3AF">El total se suma al pedido automáticamente</span>
+          </div>
+        </form>
+      </div>
+      <?php endif; ?>
+    </div>
+    <?php endif; ?>
   </div>
 
   <!-- Panel lateral -->
@@ -485,7 +641,20 @@ $cancelado = $pedido['estado'] === 'cancelado';
       </div>
       <?php endforeach; ?>
 
-      <?php if (!empty($pedido['direccion_entrega']) && ($pedido['tipo_entrega'] ?? '') === 'repartidor'): ?>
+      <?php if (!empty($pedido['sucursales']) && ($pedido['tipo_entrega'] ?? '') === 'repartidor'): ?>
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid #F3F4F6">
+        <div style="font-size:.75rem;font-weight:700;color:#6B7280;margin-bottom:6px">PARADAS DE ENTREGA (<?= count($pedido['sucursales']) ?>)</div>
+        <?php foreach ($pedido['sucursales'] as $i => $ps): ?>
+        <div style="display:flex;gap:6px;margin-bottom:6px;align-items:flex-start">
+          <div style="flex-shrink:0;width:18px;height:18px;border-radius:50%;background:var(--color-primary);color:#fff;font-size:.6rem;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:2px"><?= $i+1 ?></div>
+          <div>
+            <div style="font-size:.83rem;font-weight:700;color:#374151"><?= htmlspecialchars($ps['sucursal_nombre']) ?></div>
+            <div style="font-size:.75rem;color:#6B7280"><?= htmlspecialchars($ps['direccion']) ?></div>
+          </div>
+        </div>
+        <?php endforeach; ?>
+      </div>
+      <?php elseif (!empty($pedido['direccion_entrega']) && ($pedido['tipo_entrega'] ?? '') === 'repartidor'): ?>
       <div style="margin-top:10px;padding-top:10px;border-top:1px solid #F3F4F6">
         <div style="font-size:.75rem;font-weight:700;color:#6B7280;margin-bottom:3px">DIRECCIÓN DE ENTREGA</div>
         <div style="font-size:.83rem;color:#374151"><?= htmlspecialchars($pedido['direccion_entrega']) ?></div>

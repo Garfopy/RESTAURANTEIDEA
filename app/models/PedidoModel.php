@@ -313,12 +313,27 @@ class PedidoModel extends BaseModel
         );
 
         $pedido['sucursales'] = $this->query(
-            'SELECT ps.*, s.nombre AS sucursal_nombre, s.direccion
+            'SELECT ps.*, s.nombre AS sucursal_nombre, s.direccion, s.lat, s.lng
                FROM pedido_sucursal ps
                JOIN sucursales s ON s.id = ps.sucursal_id
-              WHERE ps.pedido_id = ?',
+              WHERE ps.pedido_id = ?
+              ORDER BY ps.id ASC',
             [$id]
         );
+
+        // Distribución de productos por parada
+        foreach ($pedido['sucursales'] as &$ps) {
+            $ps['items'] = $this->query(
+                'SELECT psd.cantidad, psd.precio_unit, psd.subtotal,
+                        pr.nombre AS producto_nombre, pr.presentacion
+                   FROM pedido_sucursal_detalle psd
+                   JOIN productos pr ON pr.id = psd.producto_id
+                  WHERE psd.pedido_sucursal_id = ?
+                  ORDER BY pr.nombre',
+                [$ps['id']]
+            );
+        }
+        unset($ps);
 
         return $pedido;
     }
@@ -656,6 +671,25 @@ class PedidoModel extends BaseModel
               ORDER BY p.created_at DESC
               LIMIT $limite",
             [$empresaId]
+        );
+    }
+
+    public function asignarCostosEnvioParadas(int $pedidoId, array $envios): void
+    {
+        if (empty($envios)) return;
+        $totalEnvio = 0.0;
+        foreach ($envios as $psId => $costo) {
+            $psId   = (int)$psId;
+            $costo  = round(max(0.0, (float)$costo), 2);
+            $this->execute(
+                'UPDATE pedido_sucursal SET costo_envio_sucursal = ? WHERE id = ? AND pedido_id = ?',
+                [$costo, $psId, $pedidoId]
+            );
+            $totalEnvio += $costo;
+        }
+        $this->execute(
+            'UPDATE pedidos SET costo_envio = ?, total = subtotal + ? WHERE id = ?',
+            [$totalEnvio, $totalEnvio, $pedidoId]
         );
     }
 }

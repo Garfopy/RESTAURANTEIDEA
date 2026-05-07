@@ -945,10 +945,20 @@ OPCIÓN B: Traccar (para GPS hardware físico — futuro)
 > Si la empresa ya tiene GPS hardware + Traccar → integrar en Sprint 4D+ con la REST API.
 > Implementación real del tracker va en Sprint 4D (ver más abajo).
 
-#### Pendiente Sprint 4C-3+ — Vista admin paradas del pedido
-- [ ] `empresa_index.php` / `detalle.php` — tab "Paradas" cuando hay pedido_sucursal (lista de sucursales con estado por parada)
-- [ ] `RepartidorController::marcarEntregaSucursal()` — repartidor marca cada parada como entregada
-- [ ] Timeline con nodo por sucursal en historial del pedido (comprador)
+#### Sprint 4C-3+ — Vista admin paradas + distribución validada ✅ COMPLETADO (2026-05-07)
+- [x] `detalle.php` — Panel "Paradas de entrega": lista todas las sucursales con estado (chip), productos asignados por parada, enlace Maps ↗ por parada, botón "Ver ruta en Maps" (multi-waypoint Google Maps)
+- [x] `detalle.php` — Admin: formulario inline para asignar `costo_envio_sucursal` por parada → actualiza `pedidos.costo_envio` automáticamente
+- [x] `detalle.php` — Sidebar comprador: en lugar de una dirección, lista todas las paradas numeradas (nombre + dirección)
+- [x] `detalle.php` — Sub-timeline de paradas bajo el stepper principal: muestra estado por sucursal (Pendiente/Entregado/Parcial) cuando hay multi-destino
+- [x] `EmpresaPedidoController::asignarCostoEnvio()` — acción POST para guardar costos por parada
+- [x] `PedidoModel::asignarCostosEnvioParadas()` — UPDATE pedido_sucursal + recalcula pedidos.total
+- [x] `PedidoModel::conDetalle()` — ahora también trae `items` (distribución por parada) de `pedido_sucursal_detalle`
+- [x] `paso3.php` — Validación distribución DURA: no negativos (clamp a 0), tope por celda (no puede exceder restante del producto), toast de advertencia al exceder, modal de bloqueo al enviar si Restante ≠ 0
+- [x] `paso3.php` — Hint dinámico: "✅ Distribución completa" cuando todo suma correcto
+
+#### Pendiente 4C-3+ — Marcar paradas individualmente (repartidor)
+- [ ] `RepartidorController::marcarEntregaSucursal()` — repartidor marca cada parada como entregada desde su portal
+- [ ] `EmpresaPedidoController::marcarParadaEntregada()` — admin también puede marcar parada desde detalle
 
 ### Sprint 4C-4 — Detalle de producto + Descuentos en pedidos (pendiente)
 - [ ] **Página de detalle de producto** (`/catalogo/detalle/{id}` o modal expandido):
@@ -1148,4 +1158,4 @@ Todos se configuran desde `/config/apis` y `/config/correo` (solo visible para s
 
 ---
 
-*Última actualización: 2026-05-07 — v2.9.0 (Sprint 4C-3 completado: checkout multi-parada, tabla de distribución kg×sucursal, guardarDistribucion en BD, Maps embed con pin, plan.md v2.9.0)*
+*Última actualización: 2026-05-07 — v2.9.1 (Sprint 4C-3+ completado: paradas en detalle admin+comprador, distribución validada, asignarCostosEnvio, ruta Maps, sub-timeline)*

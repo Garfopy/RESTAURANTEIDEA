@@ -77,15 +77,33 @@ $gmKey = $configModel->get('google_maps_key', '');
       <div style="padding:14px 16px;border-bottom:1px solid #F3F4F6;display:flex;justify-content:space-between;align-items:center">
         <div>
           <span style="font-weight:700;font-size:.9rem;color:#111827">Distribución por sucursal</span>
-          <div style="font-size:.75rem;color:#9CA3AF;margin-top:1px">Indica cuántos kg/piezas van a cada parada</div>
+          <div style="font-size:.75rem;color:#9CA3AF;margin-top:1px">Indica cuántos kg/piezas van a cada parada — la suma debe ser igual al total</div>
         </div>
         <span id="dist-badge" style="font-size:.72rem;font-weight:600;padding:3px 10px;border-radius:999px;background:#F3F4F6;color:#6B7280"></span>
       </div>
       <div style="overflow-x:auto">
         <table id="tabla-dist" style="width:100%;border-collapse:collapse;font-size:.85rem"></table>
       </div>
-      <div style="padding:10px 16px;font-size:.72rem;color:#9CA3AF;border-top:1px solid #F3F4F6">
-        Los precios de mayoreo se calculan sobre el total del pedido completo. Si dejas campos en blanco, todo va a la primera parada.
+      <div id="dist-hint" style="padding:10px 16px;font-size:.72rem;color:#9CA3AF;border-top:1px solid #F3F4F6">
+        💡 Los precios de mayoreo se calculan sobre el total del pedido. La suma por producto debe igualar el total pedido.
+      </div>
+    </div>
+    <!-- Toast notificación (exceso/advertencia distribución) -->
+    <div id="toast-dist" style="display:none;position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#B45309;color:#fff;padding:12px 20px;border-radius:10px;font-size:.875rem;font-weight:600;z-index:9999;max-width:440px;width:90%;text-align:center;box-shadow:0 6px 20px rgba(0,0,0,.25)"></div>
+    <!-- Modal error distribución (bloquea envío) -->
+    <div id="modal-dist" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:10000;align-items:center;justify-content:center;padding:16px">
+      <div style="background:#fff;border-radius:16px;padding:28px 24px;max-width:420px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+        <div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:18px">
+          <div style="font-size:2.2rem;flex-shrink:0;line-height:1">⚠️</div>
+          <div>
+            <div id="modal-dist-title" style="font-size:1rem;font-weight:700;color:#111827;margin-bottom:6px">Distribución incompleta</div>
+            <div id="modal-dist-body" style="font-size:.875rem;color:#6B7280;line-height:1.6"></div>
+          </div>
+        </div>
+        <button onclick="document.getElementById('modal-dist').style.display='none'"
+                style="width:100%;padding:11px;background:var(--color-primary);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:.9rem">
+          Corregir distribución
+        </button>
       </div>
     </div>
     <?php endif; ?>
@@ -524,7 +542,7 @@ var SUCURSALES_MAP = <?= $_sucMapJs ?>;
     paradasEmpty.style.display = hayParadas ? 'none' : '';
   }
 
-  // Validar al enviar: al menos una parada si es repartidor
+  // Validar al enviar: al menos una parada + distribución completa
   document.getElementById('form-pedido').addEventListener('submit', function(e) {
     var te = document.querySelector('[name="tipo_entrega"]:checked');
     if (!te || te.value !== 'repartidor') return;
@@ -535,6 +553,32 @@ var SUCURSALES_MAP = <?= $_sucMapJs ?>;
       paradasEmpty.textContent = 'Añade al menos una parada de entrega antes de confirmar';
       paradasEmpty.style.display = '';
       paradasEmpty.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    // Validar distribución completa
+    var bloqueD = document.getElementById('bloque-dist');
+    if (!bloqueD || bloqueD.style.display === 'none') return;
+    var errores = [];
+    CART_ITEMS.forEach(function(item) {
+      var celda = document.querySelector('.celda-rest[data-prodid="' + item.id + '"]');
+      if (!celda) return;
+      var rest = parseFloat(celda.textContent) || 0;
+      if (Math.abs(rest) >= 0.005) {
+        var msg = rest > 0
+          ? 'Faltan <strong>' + rest.toFixed(2) + ' ' + (item.presentacion||'') + '</strong> por asignar'
+          : 'Excede en <strong>' + Math.abs(rest).toFixed(2) + ' ' + (item.presentacion||'') + '</strong>';
+        errores.push('• ' + item.nombre + ': ' + msg);
+      }
+    });
+    if (errores.length > 0) {
+      e.preventDefault();
+      var m = document.getElementById('modal-dist');
+      document.getElementById('modal-dist-title').textContent = 'Distribución incompleta';
+      document.getElementById('modal-dist-body').innerHTML =
+        'Revisa estos productos antes de confirmar:<br><br>' + errores.join('<br>') +
+        '<br><br>La suma de cada producto debe ser igual al total del pedido.';
+      m.style.display = 'flex';
+      document.getElementById('bloque-dist').scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   });
 
@@ -564,6 +608,16 @@ var SUCURSALES_MAP = <?= $_sucMapJs ?>;
   };
 
   // ── Distribución por sucursal ─────────────────────────────────────────
+  var _toastTimer = null;
+  function mostrarToast(msg) {
+    var t = document.getElementById('toast-dist');
+    if (!t) return;
+    t.textContent = msg;
+    t.style.display = 'block';
+    clearTimeout(_toastTimer);
+    _toastTimer = setTimeout(function() { t.style.display = 'none'; }, 3500);
+  }
+
   function renderDistribucion() {
     var bloqueD = document.getElementById('bloque-dist');
     if (!bloqueD || typeof CART_ITEMS === 'undefined') return;
@@ -592,7 +646,7 @@ var SUCURSALES_MAP = <?= $_sucMapJs ?>;
     html += '<th style="padding:10px 10px;text-align:center;color:#6B7280;font-weight:600">Total</th>';
     paradasIds.forEach(function(sid, idx) {
       var nom = (SUCURSALES_MAP && SUCURSALES_MAP[sid]) ? SUCURSALES_MAP[sid] : ('Parada ' + (idx + 1));
-      html += '<th style="padding:10px 8px;text-align:center;color:#6B7280;font-weight:600;min-width:100px">' + htmlEsc(nom) + '</th>';
+      html += '<th style="padding:10px 8px;text-align:center;color:#6B7280;font-weight:600;min-width:110px">' + htmlEsc(nom) + '</th>';
     });
     html += '<th style="padding:10px 10px;text-align:center;color:#6B7280;font-weight:600;white-space:nowrap">Restante</th>';
     html += '</tr></thead>';
@@ -611,20 +665,42 @@ var SUCURSALES_MAP = <?= $_sucMapJs ?>;
                 '<input type="number" form="form-pedido" ' +
                 'name="dist[' + item.id + '][' + sid + ']" ' +
                 'value="' + htmlEsc(defVal) + '" ' +
-                'min="0" step="0.01" ' +
-                'class="dist-input" data-prodid="' + item.id + '" data-sucid="' + sid + '" data-total="' + item.cantidad + '" ' +
-                'style="width:88px;padding:6px 8px;border:1px solid #D1D5DB;border-radius:6px;font-size:.85rem;text-align:right;box-sizing:border-box">' +
+                'min="0" max="' + item.cantidad + '" step="0.01" ' +
+                'class="dist-input" data-prodid="' + item.id + '" data-sucid="' + sid + '" data-total="' + item.cantidad + '" data-nombre="' + htmlEsc(item.nombre) + '" ' +
+                'style="width:90px;padding:6px 8px;border:1.5px solid #D1D5DB;border-radius:6px;font-size:.85rem;text-align:right;box-sizing:border-box;transition:border-color .15s,background .15s">' +
                 '</td>';
       });
       html += '<td class="celda-rest" data-prodid="' + item.id + '" ' +
-              'style="padding:10px;text-align:center;font-size:.8rem;font-weight:700;color:#D97706">' + nf(item.cantidad) + '</td>';
+              'style="padding:10px;text-align:center;font-size:.82rem;font-weight:700;color:#D97706">' + nf(item.cantidad) + '</td>';
       html += '</tr>';
     });
     html += '</tbody>';
     tabla.innerHTML = html;
 
     tabla.querySelectorAll('.dist-input').forEach(function(inp) {
-      inp.addEventListener('input', function() { actualizarRestante(parseInt(this.dataset.prodid)); });
+      inp.addEventListener('input', function() {
+        var prodId = parseInt(this.dataset.prodid);
+        var total  = parseFloat(this.dataset.total) || 0;
+        var val    = parseFloat(this.value);
+        if (isNaN(val) || val < 0) { this.value = '0.00'; val = 0; }
+
+        // Sumar los otros inputs del mismo producto
+        var sumOtros = 0;
+        document.querySelectorAll('.dist-input[data-prodid="' + prodId + '"]').forEach(function(other) {
+          if (other !== inp) sumOtros += parseFloat(other.value) || 0;
+        });
+        var maxPermitido = Math.max(0, Math.round((total - sumOtros) * 1000) / 1000);
+        if (val > maxPermitido + 0.004) {
+          mostrarToast('⚠ No puedes asignar más de ' + nf(maxPermitido) + ' en esta celda — el total de ' + this.dataset.nombre + ' es ' + nf(total) + '.');
+          this.value = nf(maxPermitido);
+          this.style.borderColor = '#F59E0B';
+          this.style.background  = '#FFFBEB';
+        } else {
+          this.style.borderColor = '#D1D5DB';
+          this.style.background  = '';
+        }
+        actualizarRestante(prodId);
+      });
     });
     CART_ITEMS.forEach(function(item) { actualizarRestante(item.id); });
   }
@@ -634,12 +710,38 @@ var SUCURSALES_MAP = <?= $_sucMapJs ?>;
     if (!inputs.length) return;
     var total  = parseFloat(inputs[0].dataset.total) || 0;
     var suma   = 0;
-    inputs.forEach(function(inp) { suma += parseFloat(inp.value) || 0; });
+    inputs.forEach(function(inp) {
+      var v = parseFloat(inp.value) || 0;
+      if (v < 0) { inp.value = '0.00'; v = 0; }
+      suma += v;
+    });
     var rest   = Math.round((total - suma) * 1000) / 1000;
     var celda  = document.querySelector('.celda-rest[data-prodid="' + prodId + '"]');
     if (!celda) return;
     celda.textContent = nf(rest);
-    celda.style.color = Math.abs(rest) < 0.001 ? '#059669' : (rest > 0 ? '#D97706' : '#DC2626');
+    if (Math.abs(rest) < 0.005) {
+      celda.style.color = '#059669'; // verde — distribuido todo
+    } else if (rest > 0) {
+      celda.style.color = '#D97706'; // naranja — falta asignar
+    } else {
+      celda.style.color = '#DC2626'; // rojo — excedido (no debería ocurrir por el clamp)
+    }
+    // Actualizar hint con resumen
+    var todoBien = true;
+    CART_ITEMS.forEach(function(item) {
+      var c = document.querySelector('.celda-rest[data-prodid="' + item.id + '"]');
+      if (c && Math.abs(parseFloat(c.textContent) || 0) >= 0.005) todoBien = false;
+    });
+    var hint = document.getElementById('dist-hint');
+    if (hint) {
+      if (todoBien) {
+        hint.innerHTML = '✅ Distribución completa. Puedes confirmar el pedido.';
+        hint.style.color = '#059669';
+      } else {
+        hint.innerHTML = '💡 Los precios de mayoreo se calculan sobre el total del pedido. La suma por producto debe igualar el total pedido.';
+        hint.style.color = '#9CA3AF';
+      }
+    }
   }
 
   function nf(v) { return parseFloat(v).toFixed(2); }
