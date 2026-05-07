@@ -48,11 +48,11 @@ class UsuarioModel extends BaseModel
         );
     }
 
-    /** Roles que superadmin/admin pueden crear */
+    /** Roles que superadmin puede crear (solo admin_empresa) */
     public function rolesPermitidosPorAdmin(): array
     {
         return $this->query(
-            "SELECT * FROM roles WHERE slug IN ('admin','admin_empresa')"
+            "SELECT * FROM roles WHERE slug = 'admin_empresa'"
         );
     }
 

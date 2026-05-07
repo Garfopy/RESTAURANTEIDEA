@@ -113,7 +113,7 @@ if (!isset($_SESSION['usuario']) && !in_array($currentPath, $publicPaths, true))
 // ── Redirect root to correct portal ──────────────────────────────────────────
 if ($ctrlSlug === 'auth' && $action === 'index' && isset($_SESSION['usuario'])) {
     $rol = $_SESSION['usuario']['rol_slug'] ?? '';
-    if (in_array($rol, ['superadmin', 'admin'], true)) {
+    if ($rol === 'superadmin') {
         header('Location: ' . BASE_URL . 'panel/dashboard'); exit;
     }
     if ($rol === 'admin_empresa') {

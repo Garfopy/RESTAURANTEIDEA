@@ -23,7 +23,7 @@ class CuentaController extends BaseController
         $content = ob_get_clean();
 
         // Elegir layout según rol
-        if (in_array($rol, ['superadmin', 'admin'], true)) {
+        if ($rol === 'superadmin') {
             require ROOT_PATH . '/app/views/panel/layouts/main.php';
         } elseif ($rol === 'repartidor') {
             // Repartidor usa su propio layout
