@@ -976,6 +976,50 @@ OPCIÓN B: Traccar (para GPS hardware físico — futuro)
 - [ ] `RepartidorController::marcarEntregaSucursal()` — repartidor marca cada parada como entregada desde su portal
 - [ ] `EmpresaPedidoController::marcarParadaEntregada()` — admin también puede marcar parada desde detalle
 
+#### Sprint 4C-3-GPS — Firebase Tracking GPS en Tiempo Real ✅ COMPLETADO (2026-05-07)
+> Repartidor envía posición GPS desde el navegador del celular. Admin empresa y comprador ven el mapa en tiempo real vía Firebase Realtime Database o polling AJAX como fallback.
+
+**Backend:**
+- [x] `migrations/004_pedido_historial.sql` — tabla `pedido_historial` para timeline de cambios de estado con timestamps y usuario_id
+- [x] `PedidoModel::logEstado()` — registra cada cambio de estado (try/catch: graceful si tabla no existe en producción aún)
+- [x] `PedidoModel::getHistorial()` — retorna historial ordenado con nombre de usuario (try/catch para tabla inexistente)
+- [x] `RepartidorController::iniciarViaje()` — POST: cambia `en_preparacion → en_ruta`, redirige a `pedidoDirecto`
+- [x] `RepartidorController::pedidoDirecto()` — carga Firebase config desde `ConfigModel`, renderiza vista mobile
+- [x] `RepartidorController::confirmarEntregaDirecta()` — POST: sube foto evidencia → `subirFotoEntrega()` → estado `entregado`
+- [x] `RepartidorController::inicio()` — incluye `$pedidosDirectos` (via `repartidor_asignado_id`)
+- [x] `PedidoController::tracking()` — carga Firebase config; accesible para admin, supervisor y comprador de la misma empresa
+- [x] `ConfigController::apis()` — 5 campos Firebase en el formulario; usa `getAll()` para leer sin depender del campo `grupo` en BD
+- [x] `.htaccess` CSP: `connect-src *.gstatic.com *.firebaseio.com *.firebasedatabase.app wss://...`; `script-src *.gstatic.com`
+- [x] `.htaccess`: `Permissions-Policy: geolocation=(self)` — permite GPS sin bloqueos del servidor
+
+**Frontend — Repartidor (`pedido_directo.php`):**
+- [x] App mobile-first: `max-width 480px` centrado, dark theme Navy (#111827), tarjetas con borde sutil
+- [x] Firebase ES module: `import { getDatabase, ref, set, onDisconnect }` desde `gstatic` CDN
+- [x] `navigator.geolocation.watchPosition()` → escribe `{lat, lng, accuracy, ts, llegado}` en `tracking/{pedidoId}` de Firebase
+- [x] `onDisconnect(trackRef).remove()` — limpieza automática si el repartidor cierra el browser
+- [x] Fallback sin Firebase: AJAX POST a `/api/actualizarTracking` por cada update GPS
+- [x] Mini-mapa Leaflet (azul): muestra posición propia (punto azul pulsante + ripple) + pin de destino (rojo) + trail de ruta
+- [x] "He llegado al destino" → `llegado: true` en Firebase → muestra formulario de foto
+- [x] Foto de entrega → POST a `repartidor/confirmarEntregaDirecta/{id}` → estado `entregado`
+
+**Frontend — Empresa/Comprador (`tracking.php`):**
+- [x] Marcador repartidor animado: punto rojo 52×52px con efecto ripple circular + pulsación CSS (`@keyframes ripple, pulse-dot`)
+- [x] Trail polyline rojo punteado: acumula posiciones → dibuja ruta recorrida en tiempo real
+- [x] `actualizarPosicion(lat, lng)` — función central que mueve marcador + extiende trail + panTo
+- [x] Firebase `onValue` listener → actualiza en tiempo real (≤1 s de latencia)
+- [x] Fallback polling AJAX cada 5 s cuando Firebase no configurado
+- [x] Indicador de estado de conexión (punto verde/amarillo + texto)
+- [x] Alerta "El repartidor ha llegado" cuando `llegado=true` en Firebase
+
+**UX Pedidos:**
+- [x] `detalle.php` — formulario "Asignar costo de envío por parada" solo visible hasta `en_preparacion`; se oculta automáticamente cuando el pedido pasa a `en_ruta` o posterior
+
+**Pendiente de producción:**
+- [ ] Ejecutar `migrations/004_pedido_historial.sql` en BD de producción para activar historial de estados
+- [ ] Configurar Firebase en CarniHub superadmin → Config → APIs (5 campos: apiKey, authDomain, databaseURL, projectId, appId)
+- [ ] Reglas Firebase Realtime DB: `{ "rules": { "tracking": { ".read": true, ".write": true } } }`
+- [ ] URL Firebase DB: `https://carnihub-4e750-default-rtdb.firebaseio.com`
+
 ### Sprint 4C-4 — Detalle de producto + Descuentos en pedidos (pendiente)
 - [ ] **Página de detalle de producto** (`/catalogo/detalle/{id}` o modal expandido):
   - [ ] Foto ampliada, descripción completa, tabla de precios escalonados, precio especial del comprador si aplica
@@ -1174,4 +1218,4 @@ Todos se configuran desde `/config/apis` y `/config/correo` (solo visible para s
 
 ---
 
-*Última actualización: 2026-05-07 — v2.9.2 (Sprint 4C-3++: botones +/- en checkout, alertas de descuento por tramo, ahorro en ticket, paradas en modal admin con Maps desde empresa, guardar dirección empresa)*
+*Última actualización: 2026-05-07 — v2.9.3 (Sprint 4C-3-GPS: Firebase tracking tiempo real, marcador animado + trail, mini-mapa repartidor, pedido_historial, Permissions-Policy geolocation)*

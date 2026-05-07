@@ -722,8 +722,8 @@ function tiempoTranscurrido(string $desde, string $hasta): string {
       </div>
       <?php endif; ?>
 
-      <?php if (!$esComprador && !in_array($pedido['estado'], ['entregado','cancelado'], true)): ?>
-      <!-- Formulario: asignar costos de envío por parada -->
+      <?php if (!$esComprador && in_array($pedido['estado'], ['pendiente','confirmado','en_preparacion'], true)): ?>
+      <!-- Formulario: asignar costos de envío por parada (solo antes de despachar) -->
       <div style="padding:14px 16px;background:#F9FAFB">
         <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:10px">Asignar costo de envío por parada</div>
         <form method="POST" action="<?= BASE_URL ?>empresa-pedido/asignarCostoEnvio">

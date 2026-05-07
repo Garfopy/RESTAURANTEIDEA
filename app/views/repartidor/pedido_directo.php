@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Entrega — <?= htmlspecialchars($pedido['folio']) ?></title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { background: #0F172A; color: #F1F5F9; font-family: 'Inter', sans-serif; min-height: 100vh; }
@@ -70,6 +71,18 @@
 
     .flash-ok  { background: #064E3B; color: #6EE7B7; border: 1px solid #065F46; border-radius: 10px; padding: 12px 14px; font-size: .85rem; font-weight: 600; }
     .flash-err { background: #7F1D1D; color: #FCA5A5; border: 1px solid #991B1B; border-radius: 10px; padding: 12px 14px; font-size: .85rem; font-weight: 600; }
+
+    /* mini mapa repartidor */
+    #mapaContainer { display: none; border-radius: 14px; overflow: hidden; border: 1px solid #334155; }
+    #mapaRepartidor { height: 210px; width: 100%; }
+    @keyframes rippleR {
+      0%   { transform: scale(.6); opacity: .8; }
+      100% { transform: scale(2.8); opacity: 0; }
+    }
+    @keyframes pulseR {
+      0%, 100% { transform: scale(1); }
+      50%       { transform: scale(1.15); }
+    }
   </style>
 </head>
 <body>
@@ -111,6 +124,11 @@
       <?php if (!empty($pedido['notas'])): ?>
       <div class="notas-box" style="margin-top:12px">📝 <?= htmlspecialchars($pedido['notas']) ?></div>
       <?php endif; ?>
+    </div>
+
+    <!-- Mini-mapa de posición -->
+    <div id="mapaContainer">
+      <div id="mapaRepartidor"></div>
     </div>
 
     <!-- Estado GPS -->
@@ -155,6 +173,62 @@
   </div><!-- /.body -->
 </div><!-- /.app-shell -->
 
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// Mini-mapa del repartidor
+var _destLat = <?= (!empty($pedido['lat_entrega'])  ? (float)$pedido['lat_entrega']  : 'null') ?>;
+var _destLng = <?= (!empty($pedido['lng_entrega'])   ? (float)$pedido['lng_entrega']  : 'null') ?>;
+var _emLat   = <?= (!empty($pedido['empresa_lat'])   ? (float)$pedido['empresa_lat']  : 'null') ?>;
+var _emLng   = <?= (!empty($pedido['empresa_lng'])   ? (float)$pedido['empresa_lng']  : 'null') ?>;
+
+var _mapaR          = null;
+var _marcadorPropio = null;
+var _routeR         = null;
+var _histR          = [];
+
+var _iconoPropio = null; // se crea solo cuando Leaflet ya está cargado
+
+function _initMapa(lat, lng) {
+  if (!_iconoPropio) {
+    _iconoPropio = L.divIcon({
+      className: '',
+      html: '<div style="position:relative;width:44px;height:44px;display:flex;align-items:center;justify-content:center">'
+          + '<div style="position:absolute;inset:0;border-radius:50%;background:#3B82F6;opacity:.22;animation:rippleR 2s ease-out infinite"></div>'
+          + '<div style="position:relative;z-index:1;background:#3B82F6;color:#fff;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;font-size:15px;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.5);animation:pulseR 2s ease-in-out infinite">📍</div>'
+          + '</div>',
+      iconSize: [44, 44], iconAnchor: [22, 22],
+    });
+  }
+  var cont = document.getElementById('mapaContainer');
+  if (cont) cont.style.display = 'block';
+  if (!_mapaR) {
+    _mapaR = L.map('mapaRepartidor').setView([lat, lng], 15);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap', maxZoom: 19
+    }).addTo(_mapaR);
+    // Pin de destino
+    var dLat = _destLat || _emLat;
+    var dLng = _destLng || _emLng;
+    if (dLat && dLng) {
+      L.marker([dLat, dLng], {icon: L.divIcon({
+        className: '',
+        html: '<div style="background:#C8102E;color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.4)">📦</div>',
+        iconSize: [28,28], iconAnchor: [14,14],
+      })}).addTo(_mapaR).bindPopup('Destino de entrega');
+    }
+    _marcadorPropio = L.marker([lat, lng], {icon: _iconoPropio}).addTo(_mapaR).bindPopup('Tu posición');
+  } else {
+    _marcadorPropio.setLatLng([lat, lng]);
+    _mapaR.panTo([lat, lng]);
+  }
+  _histR.push([lat, lng]);
+  if (_histR.length > 1) {
+    if (_routeR) { _routeR.setLatLngs(_histR); }
+    else { _routeR = L.polyline(_histR, {color:'#3B82F6', weight:3, opacity:.6, dashArray:'6,4'}).addTo(_mapaR); }
+  }
+}
+</script>
+
 <?php if ($firebaseActivo): ?>
 <script type="module">
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
@@ -180,6 +254,7 @@
         gpsEl.classList.remove('error');
         gpsLabel.textContent = '✅ GPS activo — enviando ubicación';
         llegBtn.style.display = 'block';
+        _initMapa(pos.coords.latitude, pos.coords.longitude);
         set(trackRef, {
           lat: pos.coords.latitude,
           lng: pos.coords.longitude,
@@ -218,6 +293,7 @@
     navigator.geolocation.watchPosition(
       pos => {
         document.getElementById('gpsLabel').textContent = '✅ GPS activo';
+        _initMapa(pos.coords.latitude, pos.coords.longitude);
         fetch('<?= BASE_URL ?>api/actualizarTracking', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
