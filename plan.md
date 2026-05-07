@@ -953,8 +953,24 @@ OPCIÓN B: Traccar (para GPS hardware físico — futuro)
 - [x] `EmpresaPedidoController::asignarCostoEnvio()` — acción POST para guardar costos por parada
 - [x] `PedidoModel::asignarCostosEnvioParadas()` — UPDATE pedido_sucursal + recalcula pedidos.total
 - [x] `PedidoModel::conDetalle()` — ahora también trae `items` (distribución por parada) de `pedido_sucursal_detalle`
-- [x] `paso3.php` — Validación distribución DURA: no negativos (clamp a 0), tope por celda (no puede exceder restante del producto), toast de advertencia al exceder, modal de bloqueo al enviar si Restante ≠ 0
-- [x] `paso3.php` — Hint dinámico: "✅ Distribución completa" cuando todo suma correcto
+- [x] `paso3.php` — Validación distribución DURA: no negativos (clamp a 0), tope por celda, toast de advertencia al exceder, modal bloqueo si Restante ≠ 0
+- [x] `paso3.php` — Hint dinámico "✅ Distribución completa" cuando todo suma correcto
+
+#### Sprint 4C-3++ — UX checkout + admin + dirección empresa ✅ COMPLETADO (2026-05-07)
+- [x] `paso1.php` — Botones +/- junto al input de cantidad (incremento 0.5 kg)
+- [x] `paso1.php` — Alerta en cada fila: "Agrega X kg más → $Y/kg" cuando hay tramo mejor disponible
+- [x] `paso1.php` — Precio actualizado en tiempo real: tachado del precio base + precio en verde cuando aplica descuento
+- [x] `paso1.php` — Sección "Ahorro por volumen" en el ticket lateral cuando el precio es menor que base
+- [x] `paso1.php` — Panel de alertas globales bajo el ticket: una alerta por producto que tiene siguiente tramo accesible
+- [x] `empresa_index.php` — Modal "Revisar pedido": sección "Paradas de entrega" cargada vía AJAX (todas las paradas con estado)
+- [x] `empresa_index.php` — Botón "Ver ruta en Maps" en el modal con empresa como origen de la ruta
+- [x] `empresa_index.php` — Tabla de productos en modal ahora muestra precio tachado + descuento cuando hubo ajuste
+- [x] `detalle.php` — "Ver ruta en Maps" usa empresa como punto de origen (empresa.lat/lng → primera parada → ... → última)
+- [x] `EmpresaDashboardController::guardarDireccion()` — guarda `direccion_fiscal`, `lat`, `lng` en la tabla `empresas`
+- [x] `empresa/dashboard.php` — Botón "📍 Dirección de la empresa" abre modal con formulario de dirección + coordenadas
+- [x] `PedidoModel::getSucursalesPedido()` — nuevo método público para obtener paradas de un pedido
+- [x] `EmpresaPedidoController::itemsJson()` — ahora retorna `{items, sucursales}` en lugar de solo items
+- [x] `EmpresaPedidoController::index()` — pasa `$empresaInfo` a la vista para usar coords como origen en Maps
 
 #### Pendiente 4C-3+ — Marcar paradas individualmente (repartidor)
 - [ ] `RepartidorController::marcarEntregaSucursal()` — repartidor marca cada parada como entregada desde su portal
@@ -1158,4 +1174,4 @@ Todos se configuran desde `/config/apis` y `/config/correo` (solo visible para s
 
 ---
 
-*Última actualización: 2026-05-07 — v2.9.1 (Sprint 4C-3+ completado: paradas en detalle admin+comprador, distribución validada, asignarCostosEnvio, ruta Maps, sub-timeline)*
+*Última actualización: 2026-05-07 — v2.9.2 (Sprint 4C-3++: botones +/- en checkout, alertas de descuento por tramo, ahorro en ticket, paradas en modal admin con Maps desde empresa, guardar dirección empresa)*

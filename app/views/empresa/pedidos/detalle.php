@@ -504,7 +504,11 @@ $cancelado = $pedido['estado'] === 'cancelado';
           <div style="font-size:.75rem;color:#9CA3AF;margin-top:1px"><?= count($pedido['sucursales']) ?> parada<?= count($pedido['sucursales'])>1?'s':'' ?> — el repartidor visita cada una</div>
         </div>
         <?php
-        // Botón Google Maps ruta (todas las paradas)
+        // Botón Google Maps ruta (empresa → todas las paradas)
+        // Cargar dirección de la empresa si no está cargada aún
+        if (!isset($empresaInfo)) {
+            $empresaInfo = (new EmpresaModel())->find((int)$pedido['empresa_id']);
+        }
         $waypoints = [];
         foreach ($pedido['sucursales'] as $ps) {
             if (!empty($ps['lat']) && !empty($ps['lng'])) {
@@ -513,10 +517,17 @@ $cancelado = $pedido['estado'] === 'cancelado';
                 $waypoints[] = urlencode($ps['direccion']);
             }
         }
-        if (count($waypoints) >= 2):
-          $origin = array_shift($waypoints);
-          $dest   = array_pop($waypoints);
-          $wps    = implode('|', $waypoints);
+        // Usar empresa como origen de la ruta
+        if (!empty($empresaInfo['lat']) && !empty($empresaInfo['lng'])) {
+            $origin = (float)$empresaInfo['lat'] . ',' . (float)$empresaInfo['lng'];
+        } elseif (!empty($empresaInfo['direccion_fiscal'])) {
+            $origin = urlencode($empresaInfo['direccion_fiscal']);
+        } else {
+            $origin = !empty($waypoints) ? array_shift($waypoints) : null;
+        }
+        $dest = !empty($waypoints) ? array_pop($waypoints) : null;
+        if ($origin && $dest):
+          $wps    = implode('/', $waypoints);
           $mapsUrl = 'https://www.google.com/maps/dir/' . $origin . '/' . ($wps ? $wps . '/' : '') . $dest;
         ?>
         <a href="<?= htmlspecialchars($mapsUrl) ?>" target="_blank" rel="noopener"

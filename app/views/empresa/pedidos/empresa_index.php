@@ -1,5 +1,9 @@
 <?php
 $baseUrl = BASE_URL;
+// Empresa origin for Maps route
+$empresaLat  = $empresaInfo['lat']  ?? null;
+$empresaLng  = $empresaInfo['lng']  ?? null;
+$empresaDir  = $empresaInfo['direccion_fiscal'] ?? '';
 $estados = [
     'pendiente'      => ['label'=>'Pendiente',       'bg'=>'#FEF3C7','tx'=>'#92400E'],
     'confirmado'     => ['label'=>'Confirmado',       'bg'=>'#DBEAFE','tx'=>'#1E40AF'],
@@ -264,6 +268,18 @@ $estados = [
       <div id="revProdTotal" style="display:none;text-align:right;font-size:.95rem;font-weight:800;color:var(--color-primary);margin-top:6px;padding-top:6px;border-top:2px solid #E5E7EB"></div>
     </div>
 
+    <!-- Paradas de entrega (AJAX) -->
+    <div id="revParadasBox" style="display:none;margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="font-size:.85rem;font-weight:700;color:#111827">📍 Paradas de entrega</div>
+        <a id="revMapsBtn" href="#" target="_blank" rel="noopener"
+           style="display:none;padding:6px 12px;background:#4285F4;color:#fff;border-radius:6px;font-size:.75rem;font-weight:700;text-decoration:none">
+          🗺 Ver ruta en Maps
+        </a>
+      </div>
+      <div id="revParadasLista"></div>
+    </div>
+
     <!-- Ajuste de precios (AJAX) -->
     <div id="preciosSection" style="display:none;margin-bottom:14px">
       <div style="font-size:.82rem;font-weight:700;color:#374151;margin-bottom:6px">
@@ -472,54 +488,106 @@ function abrirRevision(data) {
 
   fetch(BASE_URL + 'empresa-pedido/itemsJson/' + data.id)
     .then(r => r.json())
-    .then(items => {
+    .then(resp => {
       loading.style.display = 'none';
-      if (!items || items.length === 0) return;
+      const items      = resp.items      || resp || [];
+      const sucursales = resp.sucursales || [];
 
-      let html = '<table style="width:100%;border-collapse:collapse;font-size:.83rem">';
-      html += '<thead><tr style="background:#F9FAFB">' +
-        '<th style="padding:7px 10px;text-align:left;color:#6B7280;font-weight:600">Producto</th>' +
-        '<th style="padding:7px 10px;text-align:center;color:#6B7280;font-weight:600">Cant.</th>' +
-        '<th style="padding:7px 10px;text-align:right;color:#6B7280;font-weight:600">P. unit.</th>' +
-        '<th style="padding:7px 10px;text-align:right;color:#6B7280;font-weight:600">Subtotal</th>' +
-        '</tr></thead><tbody>';
-      let subtotal = 0;
-      items.forEach(item => {
-        subtotal += parseFloat(item.subtotal);
-        html += `<tr style="border-top:1px solid #F3F4F6">
-          <td style="padding:7px 10px;font-weight:600;color:#111827">${item.producto_nombre}
-            <div style="font-size:.72rem;color:#9CA3AF;font-weight:400">${item.presentacion}</div>
-          </td>
-          <td style="padding:7px 10px;text-align:center;color:#374151">${parseFloat(item.cantidad).toFixed(2)}</td>
-          <td style="padding:7px 10px;text-align:right;color:#374151">$${parseFloat(item.precio_unit).toFixed(2)}</td>
-          <td style="padding:7px 10px;text-align:right;font-weight:700;color:#111827">$${parseFloat(item.subtotal).toFixed(2)}</td>
-        </tr>`;
-      });
-      html += '</tbody></table>';
-      tabla.innerHTML = html;
-      tabla.style.display = 'block';
-      totalEl.textContent = 'TOTAL: $' + subtotal.toFixed(2);
-      totalEl.style.display = 'block';
+      if (items.length > 0) {
+        let html = '<table style="width:100%;border-collapse:collapse;font-size:.83rem">';
+        html += '<thead><tr style="background:#F9FAFB">' +
+          '<th style="padding:7px 10px;text-align:left;color:#6B7280;font-weight:600">Producto</th>' +
+          '<th style="padding:7px 10px;text-align:center;color:#6B7280;font-weight:600">Cant.</th>' +
+          '<th style="padding:7px 10px;text-align:right;color:#6B7280;font-weight:600">P. unit.</th>' +
+          '<th style="padding:7px 10px;text-align:right;color:#6B7280;font-weight:600">Subtotal</th>' +
+          '</tr></thead><tbody>';
+        let subtotal = 0;
+        items.forEach(item => {
+          subtotal += parseFloat(item.subtotal);
+          const descuento = item.precio_original && parseFloat(item.precio_original) > parseFloat(item.precio_unit)
+            ? ` <span style="text-decoration:line-through;color:#9CA3AF;font-size:.7rem">$${parseFloat(item.precio_original).toFixed(2)}</span>` : '';
+          html += `<tr style="border-top:1px solid #F3F4F6">
+            <td style="padding:7px 10px;font-weight:600;color:#111827">${item.producto_nombre}
+              <div style="font-size:.72rem;color:#9CA3AF;font-weight:400">${item.presentacion}</div>
+            </td>
+            <td style="padding:7px 10px;text-align:center;color:#374151">${parseFloat(item.cantidad).toFixed(2)}</td>
+            <td style="padding:7px 10px;text-align:right;color:#374151">${descuento} $${parseFloat(item.precio_unit).toFixed(2)}</td>
+            <td style="padding:7px 10px;text-align:right;font-weight:700;color:#111827">$${parseFloat(item.subtotal).toFixed(2)}</td>
+          </tr>`;
+        });
+        html += '</tbody></table>';
+        tabla.innerHTML = html;
+        tabla.style.display = 'block';
+        totalEl.textContent = 'TOTAL: $' + subtotal.toFixed(2);
+        totalEl.style.display = 'block';
 
-      // Ajuste de precios
-      precSec.style.display = 'block';
-      items.forEach(item => {
-        const row = document.createElement('div');
-        row.style.cssText = 'display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:8px;border-bottom:1px solid #F3F4F6';
-        row.innerHTML = `
-          <div>
-            <div style="font-weight:600;color:#111827">${item.producto_nombre}</div>
-            <div style="font-size:.75rem;color:#9CA3AF">${item.cantidad} ${item.presentacion} × $${parseFloat(item.precio_unit).toFixed(2)} = $${parseFloat(item.subtotal).toFixed(2)}</div>
-          </div>
-          <div style="display:flex;align-items:center;gap:6px">
-            <span style="font-size:.72rem;color:#9CA3AF">Nuevo precio:</span>
-            <input type="number" name="ajustes[${item.id}]" form="formAprobar"
-                   min="0.01" max="${item.precio_unit}" step="0.01"
-                   placeholder="${parseFloat(item.precio_unit).toFixed(2)}"
-                   style="width:90px;padding:5px 8px;border:1px solid #D1D5DB;border-radius:6px;font-size:.85rem;text-align:right">
+        precSec.style.display = 'block';
+        items.forEach(item => {
+          const row = document.createElement('div');
+          row.style.cssText = 'display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:8px;border-bottom:1px solid #F3F4F6';
+          row.innerHTML = `
+            <div>
+              <div style="font-weight:600;color:#111827">${item.producto_nombre}</div>
+              <div style="font-size:.75rem;color:#9CA3AF">${item.cantidad} ${item.presentacion} × $${parseFloat(item.precio_unit).toFixed(2)} = $${parseFloat(item.subtotal).toFixed(2)}</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="font-size:.72rem;color:#9CA3AF">Nuevo precio:</span>
+              <input type="number" name="ajustes[${item.id}]" form="formAprobar"
+                     min="0.01" max="${item.precio_unit}" step="0.01"
+                     placeholder="${parseFloat(item.precio_unit).toFixed(2)}"
+                     style="width:90px;padding:5px 8px;border:1px solid #D1D5DB;border-radius:6px;font-size:.85rem;text-align:right">
+            </div>`;
+          itemsCont.appendChild(row);
+        });
+      }
+
+      // Paradas de entrega
+      const paradasBox  = document.getElementById('revParadasBox');
+      const paradasList = document.getElementById('revParadasLista');
+      const mapsBtn     = document.getElementById('revMapsBtn');
+      if (sucursales.length > 0 && data.tipo_entrega === 'repartidor') {
+        paradasBox.style.display = 'block';
+        const estadoChip = {
+          pendiente: 'background:#FEF3C7;color:#92400E',
+          entregado: 'background:#D1FAE5;color:#065F46',
+          parcial:   'background:#DBEAFE;color:#1E40AF',
+          rechazado: 'background:#FEE2E2;color:#991B1B',
+        };
+        let phml = '';
+        sucursales.forEach((s, i) => {
+          const chip = estadoChip[s.estado] || 'background:#F3F4F6;color:#6B7280';
+          phml += `<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid #F3F4F6">
+            <div style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:var(--color-primary);color:#fff;font-size:.7rem;font-weight:700;display:flex;align-items:center;justify-content:center">${i+1}</div>
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:600;font-size:.85rem;color:#111827">${s.sucursal_nombre}</div>
+              <div style="font-size:.75rem;color:#6B7280">📍 ${s.direccion || '—'}</div>
+            </div>
+            <span style="font-size:.7rem;padding:2px 8px;border-radius:999px;font-weight:600;${chip}">${s.estado || 'pendiente'}</span>
           </div>`;
-        itemsCont.appendChild(row);
-      });
+        });
+        paradasList.innerHTML = phml;
+
+        // Construir URL de Google Maps con empresa como origen
+        const empLat  = <?= json_encode($empresaLat) ?>;
+        const empLng  = <?= json_encode($empresaLng) ?>;
+        const empDir  = <?= json_encode($empresaDir) ?>;
+        const origin  = empLat && empLng ? empLat + ',' + empLng : encodeURIComponent(empDir || '');
+        const waypts  = sucursales.slice(0, -1).map(s =>
+          s.lat && s.lng ? s.lat + ',' + s.lng : encodeURIComponent(s.direccion)
+        );
+        const last    = sucursales[sucursales.length - 1];
+        const dest    = last.lat && last.lng ? last.lat + ',' + last.lng : encodeURIComponent(last.direccion);
+        if (origin && dest) {
+          let url = 'https://www.google.com/maps/dir/' + origin;
+          waypts.forEach(w => { url += '/' + w; });
+          url += '/' + dest;
+          mapsBtn.href = url;
+          mapsBtn.style.display = 'inline-flex';
+        }
+      } else {
+        paradasBox.style.display = 'none';
+        mapsBtn.style.display = 'none';
+      }
     })
     .catch(() => { loading.style.display = 'none'; });
 }

@@ -36,6 +36,9 @@ class EmpresaPedidoController extends BaseController
         $usuarioModel = new UsuarioModel();
         $repartidores = $usuarioModel->getByRolEmpresa('repartidor', $empresaId);
 
+        $empresaModel = new EmpresaModel();
+        $empresaInfo  = $empresaModel->find($empresaId);
+
         $flash      = $this->getFlash();
         $pageTitle  = 'Pedidos';
         $activeMenu = 'pedidos';
@@ -57,7 +60,10 @@ class EmpresaPedidoController extends BaseController
             return;
         }
 
-        echo json_encode($this->pedidoModel->getItemsPedido($pedidoId));
+        echo json_encode([
+            'items'      => $this->pedidoModel->getItemsPedido($pedidoId),
+            'sucursales' => $this->pedidoModel->getSucursalesPedido($pedidoId),
+        ]);
     }
 
     // Cambiar estado de un pedido (modal rápido)
