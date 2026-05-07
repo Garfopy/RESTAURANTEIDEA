@@ -1,5 +1,5 @@
-# CarniHub — Plan v2.8.0
-**Versión:** 2.8.0 | **Fecha:** 2026-05-06 | **Stack:** PHP 8.3 · MySQL · Tailwind CDN · MVC sin framework
+# CarniHub — Plan v2.9.0
+**Versión:** 2.9.0 | **Fecha:** 2026-05-07 | **Stack:** PHP 8.3 · MySQL · Tailwind CDN · MVC sin framework
 
 ---
 
@@ -880,8 +880,13 @@ Modal "Entrada rápida IA" en /empresa-inventario
 - [x] `paso3.php` — "+ Otra dirección" (solo 1, manual con Autocomplete Google Maps)
 - [x] `paso3.php` — costo de envío visible "La empresa lo asigna" (se fija al aprobar el pedido)
 - [x] `paso3.php` — métodos de pago: solo `transferencia` y `efectivo`
+- [x] `paso3.php` — **tabla de distribución por sucursal**: productos × sucursales con kg asignables, indicador "Restante" en tiempo real (verde=0, naranja>0, rojo<0), input editable en celda, preserva valores al agregar/quitar paradas; sólo visible con tipo_entrega=repartidor y al menos 1 parada
+- [x] `paso3.php` — inputs distribución con `form="form-pedido"` (fuera del `<form>`, columna izquierda) + inyección PHP→JS de CART_ITEMS y SUCURSALES_MAP
 - [x] `CarritoController::confirmar()` — acepta `sucursales_ids[]` (array multi-parada), pasa a `PedidoModel::crear()`, dirección del pedido = primera parada
+- [x] `CarritoController::confirmar()` — llama `guardarDistribucion($pedidoId, $_POST['dist'])` si hay paradas y distribución
+- [x] `PedidoModel::guardarDistribucion()` — inserta en `pedido_sucursal_detalle` usando `precio_unit` de `pedido_detalle` (respeta precio mayorista calculado sobre total del pedido)
 - [x] `perfil.php` — Google Maps Autocomplete + mapa interactivo para guardar lat/lng
+- [x] `comprador/sucursales/index.php` — Maps embed URL `place` (muestra pin), botón "Maps ↗" flotante sobre iframe, fallback por dirección si no hay coords
 
 **Pendiente de producción:**
 - [ ] Correr `migrations/012_sucursales_comprador.sql` en BD de producción
@@ -1143,4 +1148,4 @@ Todos se configuran desde `/config/apis` y `/config/correo` (solo visible para s
 
 ---
 
-*Última actualización: 2026-05-06 — v2.9.0 (Sprint 4C-3 completado: checkout multi-parada (picker + anti-duplicados + validación), arquitectura GPS Firebase vs Traccar documentada, Google Maps setup completo)*
+*Última actualización: 2026-05-07 — v2.9.0 (Sprint 4C-3 completado: checkout multi-parada, tabla de distribución kg×sucursal, guardarDistribucion en BD, Maps embed con pin, plan.md v2.9.0)*

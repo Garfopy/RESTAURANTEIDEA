@@ -78,22 +78,28 @@ $porcentaje    = $ilimitado ? 0 : min(100, round($usadas / $maxSucursales * 100)
 
     <!-- Coordenadas / mapa -->
     <?php if (!empty($s['lat']) && !empty($s['lng'])): ?>
-    <div style="border-radius:8px;overflow:hidden;height:120px;background:#F3F4F6">
+    <div style="border-radius:8px;overflow:hidden;height:140px;background:#F3F4F6;position:relative">
       <?php if (!empty($gmKey)): ?>
       <iframe
         style="width:100%;height:100%;border:0;display:block"
         loading="lazy"
         allowfullscreen
         referrerpolicy="no-referrer-when-downgrade"
-        src="https://www.google.com/maps/embed/v1/view?key=<?= htmlspecialchars($gmKey) ?>&center=<?= (float)$s['lat'] ?>,<?= (float)$s['lng'] ?>&zoom=15">
+        src="https://www.google.com/maps/embed/v1/place?key=<?= htmlspecialchars($gmKey) ?>&q=<?= (float)$s['lat'] ?>,<?= (float)$s['lng'] ?>&zoom=16">
       </iframe>
-      <?php else: ?>
-      <a href="https://www.google.com/maps?q=<?= (float)$s['lat'] ?>,<?= (float)$s['lng'] ?>" target="_blank"
-         style="display:flex;align-items:center;justify-content:center;height:100%;font-size:.8rem;color:var(--color-primary);text-decoration:none;gap:4px">
-        📍 Ver en Google Maps
-      </a>
       <?php endif; ?>
+      <!-- Botón "Ver en Maps" flotante sobre el mapa -->
+      <a href="https://maps.google.com/?q=<?= (float)$s['lat'] ?>,<?= (float)$s['lng'] ?>" target="_blank" rel="noopener"
+         style="position:absolute;top:8px;right:8px;background:#fff;border:1px solid #D1D5DB;border-radius:6px;padding:4px 10px;font-size:.72rem;font-weight:700;color:#374151;text-decoration:none;box-shadow:0 1px 4px rgba(0,0,0,.15)">
+        Maps ↗
+      </a>
     </div>
+    <?php elseif (!empty($s['direccion'])): ?>
+    <!-- Sin coords: link de texto a búsqueda por dirección -->
+    <a href="https://maps.google.com/?q=<?= urlencode($s['direccion']) ?>" target="_blank" rel="noopener"
+       style="display:flex;align-items:center;justify-content:center;height:48px;background:#F9FAFB;border:1px dashed #D1D5DB;border-radius:8px;font-size:.8rem;color:var(--color-primary);text-decoration:none;gap:4px">
+      📍 Ver en Google Maps
+    </a>
     <?php endif; ?>
 
     <?php if (!empty($s['telefono'])): ?>

@@ -247,6 +247,13 @@ class CarritoController extends BaseController
 
         try {
             $pedidoId = $this->pedidoModel->crear($pedidoData, $itemsDB, $sucursalesIds);
+
+            // Guardar distribución de kg por producto × sucursal
+            $distData = $_POST['dist'] ?? [];
+            if (!empty($distData) && !empty($sucursalesIds)) {
+                $this->pedidoModel->guardarDistribucion($pedidoId, $distData);
+            }
+
             $pedido   = $this->pedidoModel->find($pedidoId);
 
             $this->log('crear_pedido', 'carrito', "Pedido {$pedido['folio']} creado");

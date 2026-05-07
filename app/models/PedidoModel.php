@@ -56,6 +56,45 @@ class PedidoModel extends BaseModel
         }
     }
 
+    public function guardarDistribucion(int $pedidoId, array $distPost): void
+    {
+        // $distPost = ['prod_id' => ['suc_id' => cantidad, ...], ...]
+        if (empty($distPost)) return;
+
+        $psRows = $this->query(
+            'SELECT id, sucursal_id FROM pedido_sucursal WHERE pedido_id = ?', [$pedidoId]
+        );
+        $psMap = [];
+        foreach ($psRows as $r) { $psMap[(int)$r['sucursal_id']] = (int)$r['id']; }
+        if (empty($psMap)) return;
+
+        $pdRows = $this->query(
+            'SELECT id, producto_id, precio_unit FROM pedido_detalle WHERE pedido_id = ?', [$pedidoId]
+        );
+        $pdMap = [];
+        foreach ($pdRows as $r) { $pdMap[(int)$r['producto_id']] = ['id' => (int)$r['id'], 'precio' => (float)$r['precio_unit']]; }
+
+        foreach ($distPost as $prodId => $sucDist) {
+            $prodId = (int)$prodId;
+            if (!isset($pdMap[$prodId])) continue;
+            $pdId  = $pdMap[$prodId]['id'];
+            $precio = $pdMap[$prodId]['precio'];
+
+            foreach ($sucDist as $sucId => $cantidad) {
+                $sucId   = (int)$sucId;
+                $cantidad = (float)str_replace(',', '.', $cantidad);
+                if ($cantidad <= 0 || !isset($psMap[$sucId])) continue;
+
+                $this->execute(
+                    'INSERT INTO pedido_sucursal_detalle
+                       (pedido_sucursal_id, pedido_detalle_id, producto_id, cantidad, precio_unit, subtotal)
+                     VALUES (?, ?, ?, ?, ?, ?)',
+                    [$psMap[$sucId], $pdId, $prodId, $cantidad, $precio, round($precio * $cantidad, 2)]
+                );
+            }
+        }
+    }
+
     public function asignarEntrega(int $id, string $tipo, ?int $repartidorId, float $costoEnvio, string $notaEmpresa = ''): void
     {
         $this->execute(

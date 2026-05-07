@@ -69,10 +69,27 @@ $gmKey = $configModel->get('google_maps_key', '');
           </tr>
         </tfoot>
       </table>
-    </div>
-  </div>
+    </div><!-- /products card -->
 
-  <!-- Panel de confirmación -->
+    <!-- ── Distribución por sucursal ───────────────────────────────────── -->
+    <?php if (!empty($misSucursales)): ?>
+    <div id="bloque-dist" style="display:none;background:#fff;border-radius:12px;border:1px solid #E5E7EB;overflow:hidden;margin-bottom:16px">
+      <div style="padding:14px 16px;border-bottom:1px solid #F3F4F6;display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <span style="font-weight:700;font-size:.9rem;color:#111827">Distribución por sucursal</span>
+          <div style="font-size:.75rem;color:#9CA3AF;margin-top:1px">Indica cuántos kg/piezas van a cada parada</div>
+        </div>
+        <span id="dist-badge" style="font-size:.72rem;font-weight:600;padding:3px 10px;border-radius:999px;background:#F3F4F6;color:#6B7280"></span>
+      </div>
+      <div style="overflow-x:auto">
+        <table id="tabla-dist" style="width:100%;border-collapse:collapse;font-size:.85rem"></table>
+      </div>
+      <div style="padding:10px 16px;font-size:.72rem;color:#9CA3AF;border-top:1px solid #F3F4F6">
+        Los precios de mayoreo se calculan sobre el total del pedido completo. Si dejas campos en blanco, todo va a la primera parada.
+      </div>
+    </div>
+    <?php endif; ?>
+  </div><!-- /left column -->
   <form method="POST" action="<?= BASE_URL ?>carrito/confirmar" id="form-pedido">
     <div style="background:#fff;border-radius:12px;border:1px solid #E5E7EB;padding:20px">
       <h3 style="font-size:.95rem;font-weight:700;color:#111827;margin-bottom:16px">Datos del pedido</h3>
@@ -311,6 +328,23 @@ $gmKey = $configModel->get('google_maps_key', '');
   </form>
 </div>
 
+<?php
+// Datos para JS: productos del carrito + mapa id→nombre de sucursales
+$_cartJs = json_encode(array_values(array_map(function($it) {
+    return ['id'=>(int)$it['producto_id'],'nombre'=>$it['nombre'],'presentacion'=>$it['presentacion']??'','cantidad'=>(float)$it['cantidad'],'precio'=>(float)$it['precio']];
+}, $items)));
+$_sucMapJs = '{}';
+if (!empty($misSucursales)) {
+    $_m = [];
+    foreach ($misSucursales as $_s) { $_m[(int)$_s['id']] = $_s['nombre']; }
+    $_sucMapJs = json_encode($_m);
+}
+?>
+<script>
+var CART_ITEMS    = <?= $_cartJs ?>;
+var SUCURSALES_MAP = <?= $_sucMapJs ?>;
+</script>
+
 <script>
 (function () {
   var primary = getComputedStyle(document.documentElement).getPropertyValue('--color-primary').trim() || '#DC2626';
@@ -329,6 +363,7 @@ $gmKey = $configModel->get('google_maps_key', '');
     var bDir    = document.getElementById('bloque-direccion');
     if (bPickup) bPickup.style.display = (val === 'pickup')     ? '' : 'none';
     if (bDir)    bDir.style.display    = (val === 'repartidor') ? '' : 'none';
+    renderDistribucion();
   }
   document.querySelectorAll('[name="tipo_entrega"]').forEach(function(r) {
     r.addEventListener('change', actualizarCards);
@@ -388,6 +423,7 @@ $gmKey = $configModel->get('google_maps_key', '');
       agregarParadaUI(id, nombre, dir, lat, lng);
       actualizarDropdown();
       sincronizarHiddens();
+      renderDistribucion();
       dropdown.style.display = 'none';
     });
   });
@@ -457,6 +493,7 @@ $gmKey = $configModel->get('google_maps_key', '');
     actualizarDropdown();
     sincronizarHiddens();
     actualizarEmptyState();
+    renderDistribucion();
   }
 
   function actualizarDropdown() {
@@ -525,6 +562,95 @@ $gmKey = $configModel->get('google_maps_key', '');
       if (lngEl) lngEl.value = pos.lng().toFixed(7);
     });
   };
+
+  // ── Distribución por sucursal ─────────────────────────────────────────
+  function renderDistribucion() {
+    var bloqueD = document.getElementById('bloque-dist');
+    if (!bloqueD || typeof CART_ITEMS === 'undefined') return;
+
+    var teVal = document.querySelector('[name="tipo_entrega"]:checked');
+    if (!teVal || teVal.value !== 'repartidor' || paradasIds.length < 1) {
+      bloqueD.style.display = 'none';
+      return;
+    }
+    bloqueD.style.display = '';
+
+    var tabla  = document.getElementById('tabla-dist');
+    var badge  = document.getElementById('dist-badge');
+    if (badge) badge.textContent = paradasIds.length + ' parada' + (paradasIds.length > 1 ? 's' : '');
+
+    // Guardar valores actuales antes de re-render
+    var prevVals = {};
+    tabla.querySelectorAll('.dist-input').forEach(function(inp) {
+      var key = inp.dataset.prodid + '_' + inp.dataset.sucid;
+      prevVals[key] = inp.value;
+    });
+
+    // Cabecera
+    var html = '<thead><tr style="background:#F9FAFB">';
+    html += '<th style="padding:10px 16px;text-align:left;color:#6B7280;font-weight:600;white-space:nowrap">Producto</th>';
+    html += '<th style="padding:10px 10px;text-align:center;color:#6B7280;font-weight:600">Total</th>';
+    paradasIds.forEach(function(sid, idx) {
+      var nom = (SUCURSALES_MAP && SUCURSALES_MAP[sid]) ? SUCURSALES_MAP[sid] : ('Parada ' + (idx + 1));
+      html += '<th style="padding:10px 8px;text-align:center;color:#6B7280;font-weight:600;min-width:100px">' + htmlEsc(nom) + '</th>';
+    });
+    html += '<th style="padding:10px 10px;text-align:center;color:#6B7280;font-weight:600;white-space:nowrap">Restante</th>';
+    html += '</tr></thead>';
+
+    // Filas de productos
+    html += '<tbody>';
+    CART_ITEMS.forEach(function(item) {
+      html += '<tr style="border-top:1px solid #F3F4F6">';
+      html += '<td style="padding:10px 16px;font-weight:600;color:#111827">' + htmlEsc(item.nombre) +
+              '<div style="font-size:.72rem;color:#9CA3AF;font-weight:400">' + htmlEsc(item.presentacion) + '</div></td>';
+      html += '<td style="padding:10px;text-align:center;color:#374151;font-weight:700">' + nf(item.cantidad) + '</td>';
+      paradasIds.forEach(function(sid, idx) {
+        var key    = item.id + '_' + sid;
+        var defVal = (prevVals[key] !== undefined) ? prevVals[key] : (idx === 0 ? item.cantidad.toFixed(2) : '0.00');
+        html += '<td style="padding:6px 6px;text-align:center">' +
+                '<input type="number" form="form-pedido" ' +
+                'name="dist[' + item.id + '][' + sid + ']" ' +
+                'value="' + htmlEsc(defVal) + '" ' +
+                'min="0" step="0.01" ' +
+                'class="dist-input" data-prodid="' + item.id + '" data-sucid="' + sid + '" data-total="' + item.cantidad + '" ' +
+                'style="width:88px;padding:6px 8px;border:1px solid #D1D5DB;border-radius:6px;font-size:.85rem;text-align:right;box-sizing:border-box">' +
+                '</td>';
+      });
+      html += '<td class="celda-rest" data-prodid="' + item.id + '" ' +
+              'style="padding:10px;text-align:center;font-size:.8rem;font-weight:700;color:#D97706">' + nf(item.cantidad) + '</td>';
+      html += '</tr>';
+    });
+    html += '</tbody>';
+    tabla.innerHTML = html;
+
+    tabla.querySelectorAll('.dist-input').forEach(function(inp) {
+      inp.addEventListener('input', function() { actualizarRestante(parseInt(this.dataset.prodid)); });
+    });
+    CART_ITEMS.forEach(function(item) { actualizarRestante(item.id); });
+  }
+
+  function actualizarRestante(prodId) {
+    var inputs = document.querySelectorAll('.dist-input[data-prodid="' + prodId + '"]');
+    if (!inputs.length) return;
+    var total  = parseFloat(inputs[0].dataset.total) || 0;
+    var suma   = 0;
+    inputs.forEach(function(inp) { suma += parseFloat(inp.value) || 0; });
+    var rest   = Math.round((total - suma) * 1000) / 1000;
+    var celda  = document.querySelector('.celda-rest[data-prodid="' + prodId + '"]');
+    if (!celda) return;
+    celda.textContent = nf(rest);
+    celda.style.color = Math.abs(rest) < 0.001 ? '#059669' : (rest > 0 ? '#D97706' : '#DC2626');
+  }
+
+  function nf(v) { return parseFloat(v).toFixed(2); }
+
+  function htmlEsc(str) {
+    var d = document.createElement('div');
+    d.appendChild(document.createTextNode(str));
+    return d.innerHTML;
+  }
+
+  renderDistribucion();
 })();
 </script>
 
