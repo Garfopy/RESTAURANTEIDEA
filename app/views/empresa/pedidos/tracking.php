@@ -38,23 +38,36 @@ $progreso = $barraEstados[$estadoPedido] ?? 0;
     <div style="width:<?= $progreso ?>%;background:var(--color-primary);height:100%;border-radius:999px;transition:width .5s ease"></div>
   </div>
 
-  <?php if (!empty($tracking)): ?>
   <div style="display:flex;gap:20px;margin-top:12px;flex-wrap:wrap">
+    <?php if (!empty($tracking['repartidor_nombre'])): ?>
     <div style="font-size:.85rem">
       <span style="color:#6B7280">Repartidor: </span>
-      <strong><?= htmlspecialchars($tracking['repartidor_nombre'] ?? '—') ?></strong>
+      <strong><?= htmlspecialchars($tracking['repartidor_nombre']) ?></strong>
     </div>
+    <?php endif; ?>
     <div style="font-size:.85rem">
       <span style="color:#6B7280">ETA: </span>
-      <strong><?= $tracking['eta_minutos'] ? $tracking['eta_minutos'] . ' min' : '—' ?></strong>
+      <strong id="etaDisplay"><?= !empty($tracking['eta_minutos']) ? $tracking['eta_minutos'] . ' min' : '—' ?></strong>
     </div>
+    <?php if (!empty($tracking['sucursal_nombre'])): ?>
     <div style="font-size:.85rem">
       <span style="color:#6B7280">Destino: </span>
-      <strong><?= htmlspecialchars($tracking['sucursal_nombre'] ?? '—') ?></strong>
+      <strong><?= htmlspecialchars($tracking['sucursal_nombre']) ?></strong>
     </div>
+    <?php endif; ?>
+    <?php if ($estadoPedido === 'en_ruta'): ?>
+    <div style="font-size:.75rem;color:#9CA3AF;margin-left:auto" id="posCount"></div>
+    <?php endif; ?>
   </div>
-  <?php endif; ?>
 </div>
+
+<!-- Leyenda del mapa -->
+<?php if ($estadoPedido === 'en_ruta' || $hayTracking): ?>
+<div style="display:flex;gap:16px;flex-wrap:wrap;font-size:.72rem;color:#6B7280;margin-bottom:8px;align-items:center">
+  <span><span style="display:inline-block;width:24px;height:3px;background:#3B82F6;vertical-align:middle;border-radius:2px;margin-right:4px"></span>Ruta al destino</span>
+  <span><span style="display:inline-block;width:24px;height:3px;background:#C8102E;vertical-align:middle;border-radius:2px;border-bottom:2px dashed #C8102E;margin-right:4px"></span>Recorrido</span>
+</div>
+<?php endif; ?>
 
 <!-- Estado de conexión -->
 <div id="estadoConexion" style="display:none;align-items:center;gap:8px;font-size:.78rem;color:#6B7280;margin-bottom:10px">
@@ -73,18 +86,18 @@ $progreso = $barraEstados[$estadoPedido] ?? 0;
 </div>
 
 <?php if (!$hayTracking): ?>
-<div style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:12px;padding:20px;text-align:center;color:#6B7280;font-size:.875rem;margin-bottom:16px">
+<div id="sinTracking" style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:12px;padding:20px;text-align:center;color:#6B7280;font-size:.875rem;margin-bottom:16px">
   <?php if ($estadoPedido === 'entregado'): ?>
     <span style="font-size:1.5rem">✅</span><br>Este pedido ya fue entregado.
   <?php elseif (in_array($estadoPedido, ['pendiente','confirmado'], true)): ?>
     <span style="font-size:1.5rem">⏳</span><br>El rastreo estará disponible cuando el repartidor inicie la entrega.
   <?php else: ?>
-    <span style="font-size:1.5rem">📍</span><br>El repartidor aún no ha activado el rastreo GPS.
+    <span style="font-size:1.5rem">📍</span><br>El repartidor aún no ha activado el rastreo GPS. <span style="font-size:.8rem">Se actualizará automáticamente.</span>
   <?php endif; ?>
 </div>
 <?php endif; ?>
 
-<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-top:4px">
   <a href="<?= BASE_URL ?>pedido/detalle/<?= $pedido['id'] ?>"
      style="padding:9px 18px;background:#F3F4F6;color:#374151;border-radius:8px;text-decoration:none;font-weight:600;font-size:.875rem">
     ← Ver detalle
@@ -96,7 +109,10 @@ $progreso = $barraEstados[$estadoPedido] ?? 0;
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-var pedidoId = <?= (int)$pedido['id'] ?>;
+var BASE_URL  = '<?= BASE_URL ?>';
+var pedidoId  = <?= (int)$pedido['id'] ?>;
+var destLat   = <?= $sucursalLat ? (float)$sucursalLat : 'null' ?>;
+var destLng   = <?= $sucursalLng ? (float)$sucursalLng : 'null' ?>;
 
 var initLat = <?= $hayTracking ? (float)$tracking['lat_actual'] : ($sucursalLat ? (float)$sucursalLat : 19.4326) ?>;
 var initLng = <?= $hayTracking ? (float)$tracking['lng_actual'] : ($sucursalLng ? (float)$sucursalLng : -99.1332) ?>;
@@ -106,7 +122,6 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '© OpenStreetMap contributors', maxZoom: 19
 }).addTo(mapa);
 
-// Marcador repartidor: punto rojo pulsante con ripple
 var iconoRepartidor = L.divIcon({
   className: '',
   html: '<div style="position:relative;width:52px;height:52px;display:flex;align-items:center;justify-content:center">'
@@ -124,6 +139,8 @@ var iconoSucursal = L.divIcon({
 var marcadorRepartidor = null;
 var posicionesRuta     = [];
 var routeLine          = null;
+var routeGuideLine     = null;
+var lastRouteFetch     = 0;
 
 // Destino fijo
 <?php if ($sucursalLat && $sucursalLng): ?>
@@ -138,7 +155,60 @@ marcadorRepartidor = L.marker([<?= (float)$tracking['lat_actual'] ?>, <?= (float
 posicionesRuta.push([<?= (float)$tracking['lat_actual'] ?>, <?= (float)$tracking['lng_actual'] ?>]);
 <?php endif; ?>
 
-// Centraliza la lógica de actualización del marcador + trail
+// Pre-cargar historial de posiciones para mostrar el recorrido completo
+fetch(BASE_URL + 'api/historialTracking/' + pedidoId)
+  .then(function(r) { return r.json(); })
+  .then(function(pts) {
+    if (!pts || !pts.length) return;
+    var hist = [];
+    pts.forEach(function(p) {
+      if (p.lat && p.lng) hist.push([parseFloat(p.lat), parseFloat(p.lng)]);
+    });
+    if (!hist.length) return;
+    // Solo precargar si no hay posición live en el mapa todavía
+    if (posicionesRuta.length === 0) {
+      posicionesRuta = hist.slice();
+      if (posicionesRuta.length > 1) {
+        routeLine = L.polyline(posicionesRuta, {color: '#C8102E', weight: 3, opacity: .5, dashArray: '8,5'}).addTo(mapa);
+      }
+      if (!marcadorRepartidor) {
+        var last = posicionesRuta[posicionesRuta.length - 1];
+        marcadorRepartidor = L.marker(last, {icon: iconoRepartidor}).addTo(mapa).bindPopup('🚚 Última posición registrada');
+        mapa.setView(last, 15);
+        var st = document.getElementById('sinTracking');
+        if (st) st.style.display = 'none';
+      }
+    }
+    var cntEl = document.getElementById('posCount');
+    if (cntEl) cntEl.textContent = pts.length + ' puntos registrados';
+  })
+  .catch(function() {});
+
+// Trazar ruta de conducción al destino (OSRM, throttle 30 s)
+function actualizarRutaOSRM(lat, lng) {
+  if (!destLat || !destLng) return;
+  var now = Date.now();
+  if (now - lastRouteFetch < 30000) return;
+  lastRouteFetch = now;
+  fetch('https://router.project-osrm.org/route/v1/driving/' + lng + ',' + lat
+      + ';' + destLng + ',' + destLat + '?overview=full&geometries=geojson')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data.routes || !data.routes[0]) return;
+      var coords = data.routes[0].geometry.coordinates.map(function(c) { return [c[1], c[0]]; });
+      if (routeGuideLine) {
+        routeGuideLine.setLatLngs(coords);
+      } else {
+        routeGuideLine = L.polyline(coords, {color: '#3B82F6', weight: 4, opacity: .65}).addTo(mapa);
+        routeGuideLine.bringToBack();
+      }
+      var durMin = Math.round(data.routes[0].duration / 60);
+      var etaEl = document.getElementById('etaDisplay');
+      if (etaEl && durMin >= 0) etaEl.textContent = durMin + ' min';
+    })
+    .catch(function() {});
+}
+
 function actualizarPosicion(lat, lng) {
   var pos = [lat, lng];
   posicionesRuta.push(pos);
@@ -158,6 +228,11 @@ function actualizarPosicion(lat, lng) {
       }).addTo(mapa);
     }
   }
+  // Ocultar mensaje "sin GPS" cuando llega la primera posición
+  var st = document.getElementById('sinTracking');
+  if (st) st.style.display = 'none';
+  // Actualizar ruta al destino
+  actualizarRutaOSRM(lat, lng);
 }
 
 function setConexion(ok, txt) {
@@ -194,10 +269,10 @@ function setConexion(ok, txt) {
 </script>
 <?php else: ?>
 <script>
-<?php if ($hayTracking): ?>
+<?php if ($estadoPedido === 'en_ruta'): ?>
 setConexion(true, 'Actualizando cada 5 segundos...');
 function pollingTracking() {
-  fetch('<?= BASE_URL ?>api/tracking/' + pedidoId)
+  fetch(BASE_URL + 'api/tracking/' + pedidoId)
     .then(r => r.json())
     .then(d => {
       if (!d.lat || !d.lng) return;

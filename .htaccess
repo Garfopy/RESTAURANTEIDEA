@@ -34,6 +34,7 @@ RewriteBase /carnihub/
       *.googleapis.com \
       *.gstatic.com \
       unpkg.com \
+      router.project-osrm.org \
       *.firebaseio.com \
       *.firebasedatabase.app \
       wss://*.firebaseio.com \

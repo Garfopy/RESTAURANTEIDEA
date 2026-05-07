@@ -151,6 +151,52 @@ class ApiController extends BaseController
         $this->json(['ok' => true]);
     }
 
+    /** POST /api/guardarPosicion — guarda posición GPS en historial (cada ~60 s) */
+    public function guardarPosicion(?string $p = null): void
+    {
+        $this->requireRepartidor();
+
+        $body     = json_decode(file_get_contents('php://input'), true) ?? [];
+        $pedidoId = (int)($body['pedido_id'] ?? 0);
+        $lat      = (float)($body['lat'] ?? 0);
+        $lng      = (float)($body['lng'] ?? 0);
+
+        if (!$pedidoId || !$lat || !$lng) {
+            $this->json(['ok' => false, 'error' => 'Datos incompletos'], 400);
+        }
+
+        try {
+            Database::getInstance()
+                ->prepare('INSERT INTO tracking_posiciones (pedido_id, lat, lng) VALUES (?, ?, ?)')
+                ->execute([$pedidoId, $lat, $lng]);
+            $this->json(['ok' => true]);
+        } catch (\Throwable $e) {
+            $this->json(['ok' => false]);
+        }
+    }
+
+    /** GET /api/historialTracking/{pedido_id} — devuelve trail para la vista de tracking */
+    public function historialTracking(?string $pedidoId = null): void
+    {
+        $this->requireAuth();
+        $pedidoId = (int)$pedidoId;
+        if (!$pedidoId) {
+            $this->json([]);
+        }
+
+        try {
+            $db   = Database::getInstance();
+            $stmt = $db->prepare(
+                'SELECT lat, lng, ts FROM tracking_posiciones
+                  WHERE pedido_id = ? ORDER BY ts ASC LIMIT 300'
+            );
+            $stmt->execute([$pedidoId]);
+            $this->json($stmt->fetchAll());
+        } catch (\Throwable $e) {
+            $this->json([]);
+        }
+    }
+
     // ── Fórmula Haversine (distancia entre dos coordenadas en km) ─
     private function haversine(float $lat1, float $lng1, float $lat2, float $lng2): float
     {

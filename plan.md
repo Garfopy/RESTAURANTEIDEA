@@ -1,5 +1,5 @@
-# CarniHub — Plan v2.9.0
-**Versión:** 2.9.0 | **Fecha:** 2026-05-07 | **Stack:** PHP 8.3 · MySQL · Tailwind CDN · MVC sin framework
+# CarniHub — Plan v2.9.4
+**Versión:** 2.9.4 | **Fecha:** 2026-05-07 | **Stack:** PHP 8.3 · MySQL · Tailwind CDN · MVC sin framework
 
 ---
 
@@ -977,10 +977,11 @@ OPCIÓN B: Traccar (para GPS hardware físico — futuro)
 - [ ] `EmpresaPedidoController::marcarParadaEntregada()` — admin también puede marcar parada desde detalle
 
 #### Sprint 4C-3-GPS — Firebase Tracking GPS en Tiempo Real ✅ COMPLETADO (2026-05-07)
-> Repartidor envía posición GPS desde el navegador del celular. Admin empresa y comprador ven el mapa en tiempo real vía Firebase Realtime Database o polling AJAX como fallback.
+> Repartidor envía posición GPS desde el navegador del celular. Admin empresa y comprador ven el mapa en tiempo real vía Firebase Realtime Database o polling AJAX como fallback. Incluye ruta OSRM, historial permanente de posiciones y corrección de todos los errores CSP/GPS.
 
 **Backend:**
 - [x] `migrations/004_pedido_historial.sql` — tabla `pedido_historial` para timeline de cambios de estado con timestamps y usuario_id
+- [x] `migrations/013_tracking_posiciones.sql` — tabla `tracking_posiciones` (pedido_id, lat, lng, ts) para historial GPS permanente; índice compuesto `(pedido_id, ts)`
 - [x] `PedidoModel::logEstado()` — registra cada cambio de estado (try/catch: graceful si tabla no existe en producción aún)
 - [x] `PedidoModel::getHistorial()` — retorna historial ordenado con nombre de usuario (try/catch para tabla inexistente)
 - [x] `RepartidorController::iniciarViaje()` — POST: cambia `en_preparacion → en_ruta`, redirige a `pedidoDirecto`
@@ -989,7 +990,9 @@ OPCIÓN B: Traccar (para GPS hardware físico — futuro)
 - [x] `RepartidorController::inicio()` — incluye `$pedidosDirectos` (via `repartidor_asignado_id`)
 - [x] `PedidoController::tracking()` — carga Firebase config; accesible para admin, supervisor y comprador de la misma empresa
 - [x] `ConfigController::apis()` — 5 campos Firebase en el formulario; usa `getAll()` para leer sin depender del campo `grupo` en BD
-- [x] `.htaccess` CSP: `connect-src *.gstatic.com *.firebaseio.com *.firebasedatabase.app wss://...`; `script-src *.gstatic.com`
+- [x] `ApiController::guardarPosicion()` — POST `/api/guardarPosicion`: guarda lat/lng en `tracking_posiciones` (llamado cada 60 s desde el repartidor)
+- [x] `ApiController::historialTracking({id})` — GET `/api/historialTracking/{pedido_id}`: devuelve hasta 300 puntos para pre-cargar el trail en la vista de tracking
+- [x] `.htaccess` CSP: `connect-src *.gstatic.com *.firebaseio.com *.firebasedatabase.app wss://... router.project-osrm.org`; `script-src *.gstatic.com`
 - [x] `.htaccess`: `Permissions-Policy: geolocation=(self)` — permite GPS sin bloqueos del servidor
 
 **Frontend — Repartidor (`pedido_directo.php`):**
@@ -998,6 +1001,7 @@ OPCIÓN B: Traccar (para GPS hardware físico — futuro)
 - [x] `navigator.geolocation.watchPosition()` → escribe `{lat, lng, accuracy, ts, llegado}` en `tracking/{pedidoId}` de Firebase
 - [x] `onDisconnect(trackRef).remove()` — limpieza automática si el repartidor cierra el browser
 - [x] Fallback sin Firebase: AJAX POST a `/api/actualizarTracking` por cada update GPS
+- [x] Historial DB: variables `_ultimaLat/_ultimaLng` actualizadas en cada fix GPS; `setInterval` cada 60 s → POST `/api/guardarPosicion` → `tracking_posiciones`
 - [x] Mini-mapa Leaflet (azul): muestra posición propia (punto azul pulsante + ripple) + pin de destino (rojo) + trail de ruta
 - [x] "He llegado al destino" → `llegado: true` en Firebase → muestra formulario de foto
 - [x] Foto de entrega → POST a `repartidor/confirmarEntregaDirecta/{id}` → estado `entregado`
@@ -1005,17 +1009,32 @@ OPCIÓN B: Traccar (para GPS hardware físico — futuro)
 **Frontend — Empresa/Comprador (`tracking.php`):**
 - [x] Marcador repartidor animado: punto rojo 52×52px con efecto ripple circular + pulsación CSS (`@keyframes ripple, pulse-dot`)
 - [x] Trail polyline rojo punteado: acumula posiciones → dibuja ruta recorrida en tiempo real
-- [x] `actualizarPosicion(lat, lng)` — función central que mueve marcador + extiende trail + panTo
+- [x] Pre-carga historial: al cargar la página → `fetch(api/historialTracking/{id})` → seed del trail con todos los puntos guardados en `tracking_posiciones`; si no hay marcador live, lo crea en la última posición conocida y oculta el aviso "sin GPS"
+- [x] Ruta de conducción OSRM (polyline azul sólida): `fetch(router.project-osrm.org/route/v1/driving/...)` con throttle 30 s; `bringToBack()` para no tapar el trail rojo ni el marcador
+- [x] ETA dinámico desde OSRM: `data.routes[0].duration` (segundos → minutos) → actualiza `#etaDisplay` en tiempo real
+- [x] `id="sinTracking"` en aviso "sin GPS": oculto automáticamente en `actualizarPosicion()` y en el callback del historial — resuelve el bug donde `$hayTracking` (basado en BD) era `false` aunque Firebase ya tuviera datos live
+- [x] Leyenda del mapa: azul = ruta al destino, rojo punteado = recorrido realizado
+- [x] `#posCount`: muestra cuántos puntos históricos se cargaron desde la BD
+- [x] `actualizarPosicion(lat, lng)` — función central que mueve marcador + extiende trail + panTo + oculta sinTracking + lanza OSRM
 - [x] Firebase `onValue` listener → actualiza en tiempo real (≤1 s de latencia)
-- [x] Fallback polling AJAX cada 5 s cuando Firebase no configurado
+- [x] Polling AJAX cada 5 s como fallback cuando Firebase no configurado (activado solo si `estadoPedido === 'en_ruta'`)
 - [x] Indicador de estado de conexión (punto verde/amarillo + texto)
 - [x] Alerta "El repartidor ha llegado" cuando `llegado=true` en Firebase
 
 **UX Pedidos:**
 - [x] `detalle.php` — formulario "Asignar costo de envío por parada" solo visible hasta `en_preparacion`; se oculta automáticamente cuando el pedido pasa a `en_ruta` o posterior
 
+**Bugs corregidos:**
+- [x] `pedido_historial` tabla faltante en producción → `logEstado()` y `getHistorial()` envueltos en try/catch
+- [x] Firebase API fields no visibles tras guardar → `ConfigController::apis()` usaba `getGrupo('apis')` que retornaba vacío si la columna `grupo` era NULL; corregido usando `getAll()`
+- [x] GPS bloqueado por `Permissions-Policy: geolocation=()` del outer `.htaccess` (proyecto hermano en mismo servidor) → inner `.htaccess` usa `Header always set Permissions-Policy "geolocation=(self)"`
+- [x] Mapa tiles en gris: `img-src` faltaba `*.openstreetmap.org *.tile.openstreetmap.org`
+- [x] Firebase CDN bloqueado: `script-src` faltaba `www.gstatic.com *.gstatic.com`
+- [x] Aviso "sin GPS" persistente aunque Firebase recibía datos: corregido con `id="sinTracking"` + ocultación JS en primer fix recibido
+
 **Pendiente de producción:**
 - [ ] Ejecutar `migrations/004_pedido_historial.sql` en BD de producción para activar historial de estados
+- [ ] Ejecutar `migrations/013_tracking_posiciones.sql` en BD de producción para activar historial de posiciones GPS
 - [ ] Configurar Firebase en CarniHub superadmin → Config → APIs (5 campos: apiKey, authDomain, databaseURL, projectId, appId)
 - [ ] Reglas Firebase Realtime DB: `{ "rules": { "tracking": { ".read": true, ".write": true } } }`
 - [ ] URL Firebase DB: `https://carnihub-4e750-default-rtdb.firebaseio.com`
@@ -1218,4 +1237,4 @@ Todos se configuran desde `/config/apis` y `/config/correo` (solo visible para s
 
 ---
 
-*Última actualización: 2026-05-07 — v2.9.3 (Sprint 4C-3-GPS: Firebase tracking tiempo real, marcador animado + trail, mini-mapa repartidor, pedido_historial, Permissions-Policy geolocation)*
+*Última actualización: 2026-05-07 — v2.9.4 (Sprint 4C-3-GPS v2: ruta OSRM, historial tracking_posiciones, fix sinTracking JS, ETA desde OSRM, 60s DB logging repartidor)*

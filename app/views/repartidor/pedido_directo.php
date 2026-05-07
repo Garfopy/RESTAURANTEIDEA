@@ -175,6 +175,9 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
+var BASE_URL  = '<?= BASE_URL ?>';
+var pedidoId  = <?= (int)$pedido['id'] ?>;
+
 // Mini-mapa del repartidor
 var _destLat = <?= (!empty($pedido['lat_entrega'])  ? (float)$pedido['lat_entrega']  : 'null') ?>;
 var _destLng = <?= (!empty($pedido['lng_entrega'])   ? (float)$pedido['lng_entrega']  : 'null') ?>;
@@ -227,6 +230,19 @@ function _initMapa(lat, lng) {
     else { _routeR = L.polyline(_histR, {color:'#3B82F6', weight:3, opacity:.6, dashArray:'6,4'}).addTo(_mapaR); }
   }
 }
+
+// Guardar posición en DB cada 60 s para historial de recorrido
+var _ultimaLat = null, _ultimaLng = null;
+function _guardarPosDB(lat, lng) {
+  fetch(BASE_URL + 'api/guardarPosicion', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({pedido_id: pedidoId, lat: lat, lng: lng})
+  }).catch(function() {});
+}
+setInterval(function() {
+  if (_ultimaLat && _ultimaLng) _guardarPosDB(_ultimaLat, _ultimaLng);
+}, 60000);
 </script>
 
 <?php if ($firebaseActivo): ?>
@@ -254,6 +270,8 @@ function _initMapa(lat, lng) {
         gpsEl.classList.remove('error');
         gpsLabel.textContent = '✅ GPS activo — enviando ubicación';
         llegBtn.style.display = 'block';
+        _ultimaLat = pos.coords.latitude;
+        _ultimaLng = pos.coords.longitude;
         _initMapa(pos.coords.latitude, pos.coords.longitude);
         set(trackRef, {
           lat: pos.coords.latitude,
@@ -293,6 +311,8 @@ function _initMapa(lat, lng) {
     navigator.geolocation.watchPosition(
       pos => {
         document.getElementById('gpsLabel').textContent = '✅ GPS activo';
+        _ultimaLat = pos.coords.latitude;
+        _ultimaLng = pos.coords.longitude;
         _initMapa(pos.coords.latitude, pos.coords.longitude);
         fetch('<?= BASE_URL ?>api/actualizarTracking', {
           method: 'POST',
