@@ -123,6 +123,14 @@
       Ir al inicio de sesión
     </a>
 
+    <?php if (isset($verifyUrl)): ?>
+    <!-- Link directo para pruebas en sandbox -->
+    <div style="margin-top:16px;padding:14px 16px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;font-size:.8rem;color:#166534;text-align:left">
+      <strong>Sandbox / Pruebas:</strong> Si el email no llega, usa este link directamente:<br>
+      <a href="<?= htmlspecialchars($verifyUrl) ?>" style="color:#166534;word-break:break-all"><?= htmlspecialchars($verifyUrl) ?></a>
+    </div>
+    <?php endif; ?>
+
     <!-- Help Text -->
     <div style="font-size:.8rem;color:#9CA3AF;margin-top:20px">
       ¿No recibiste el correo? Revisa tu carpeta de spam o correo no deseado.

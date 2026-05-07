@@ -209,15 +209,15 @@ class PublicController extends BaseController
         $modoPrueba = isset($_SESSION['test_mode']) || strpos($paypalSubId, 'TEST-SUB-') === 0;
 
         try {
-            // En modo prueba, no validar con PayPal API
+            // Validar con PayPal API (aceptar cualquier estado post-aprobación)
             if (!$modoPrueba) {
-                // Validar pago con PayPal
                 $paypal = new PayPalSuscripcionService();
                 $data   = $paypal->obtenerSuscripcion($paypalSubId);
                 $status = $data['status'] ?? '';
 
-                if (!in_array($status, ['ACTIVE', 'APPROVED'], true)) {
-                    $this->flash('error', 'El pago aún no ha sido confirmado por PayPal.');
+                // APPROVAL_PENDING es válido: el usuario acaba de aprobar en PayPal
+                if (!in_array($status, ['ACTIVE', 'APPROVED', 'APPROVAL_PENDING'], true)) {
+                    $this->flash('error', 'El pago no fue confirmado por PayPal (estado: ' . $status . ').');
                     $this->redirect('planes');
                 }
             }
@@ -231,27 +231,30 @@ class PublicController extends BaseController
                 $this->redirect('planes');
             }
 
-            // Generar contraseña temporal y token de verificación
-            require_once ROOT_PATH . '/app/helpers/PasswordHelper.php';
-            $passwordPlano = PasswordHelper::generar(14);
-            $passwordHash  = password_hash($passwordPlano, PASSWORD_BCRYPT);
-            $token         = bin2hex(random_bytes(32));
-
-            // Actualizar registro con token y contraseña
-            $regModel->actualizarTokenYPassword($registro['id'], $token, $passwordHash);
+            // Evitar reprocesar si ya tiene token generado
+            if (!empty($registro['token_verificacion']) && $registro['estado'] === 'pendiente_verificacion') {
+                $token         = $registro['token_verificacion'];
+                $passwordPlano = null; // ya fue enviado antes
+            } else {
+                require_once ROOT_PATH . '/app/helpers/PasswordHelper.php';
+                $passwordPlano = PasswordHelper::generar(14);
+                $passwordHash  = password_hash($passwordPlano, PASSWORD_BCRYPT);
+                $token         = bin2hex(random_bytes(32));
+                $regModel->actualizarTokenYPassword($registro['id'], $token, $passwordHash);
+            }
 
             // Enviar email de verificación
-            $datosEmpresa = json_decode($registro['datos_empresa'], true);
-
-            require_once ROOT_PATH . '/app/services/EmailService.php';
-            $emailService = new EmailService();
-
-            $usuario = [
-                'email'  => $registro['email'],
-                'nombre' => $datosEmpresa['razon_social'] ?? 'Usuario',
-            ];
-
-            $emailService->enviarCredenciales($usuario, $passwordPlano, null, $token);
+            if ($passwordPlano !== null) {
+                $datosEmpresa = json_decode($registro['datos_empresa'], true);
+                require_once ROOT_PATH . '/app/services/EmailService.php';
+                $emailService = new EmailService();
+                $emailService->enviarCredenciales(
+                    ['email' => $registro['email'], 'nombre' => $datosEmpresa['razon_social'] ?? 'Usuario'],
+                    $passwordPlano,
+                    null,
+                    $token
+                );
+            }
 
             // Limpiar sesión
             unset($_SESSION['registro_pendiente_id']);
@@ -263,6 +266,7 @@ class PublicController extends BaseController
             $appLogo      = $config->get('app_logo', '');
             $colorPrimary = $config->get('color_primary', '#C8102E');
             $email        = $registro['email'];
+            $verifyUrl    = BASE_URL . 'auth/verificar?token=' . $token;
 
             require ROOT_PATH . '/app/views/public/registro_confirmacion.php';
 
