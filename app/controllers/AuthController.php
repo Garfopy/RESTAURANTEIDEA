@@ -347,24 +347,12 @@ class AuthController extends BaseController
             $db->commit();
             error_log("[AuthController::verificar] Registro completado exitosamente para: {$registro['email']}");
 
-            // 5. Iniciar sesión automáticamente
-            $stmtUsuarioCompleto = $db->prepare(
-                "SELECT u.*, r.slug AS rol_slug, r.nombre AS rol_nombre, e.razon_social AS empresa_nombre
-                 FROM usuarios u
-                 INNER JOIN roles r ON r.id = u.rol_id
-                 LEFT JOIN empresas e ON e.id = u.empresa_id
-                 WHERE u.id = ?
-                 LIMIT 1"
-            );
-            $stmtUsuarioCompleto->execute([$usuarioId]);
-            $usuarioCompleto = $stmtUsuarioCompleto->fetch(PDO::FETCH_ASSOC);
+            // 5. Redirigir al login (sin iniciar sesión automáticamente)
+            $this->log('Registro completado - Redirección a login', 'auth', "Usuario ID: $usuarioId, Empresa ID: $empresaId");
 
-            $_SESSION['usuario'] = $usuarioCompleto;
-            $this->log('Registro completado y login automático', 'auth', "Usuario ID: $usuarioId, Empresa ID: $empresaId");
-
-            error_log("[AuthController::verificar] Sesión iniciada, redirigiendo a dashboard");
-            $this->flash('success', '¡Bienvenido a ' . APP_NAME . '! Tu cuenta ha sido activada correctamente.');
-            $this->redirect('empresa/');
+            error_log("[AuthController::verificar] Registro completado, redirigiendo a login");
+            $this->flash('success', '¡Tu cuenta ha sido activada correctamente! Inicia sesión con tus credenciales.');
+            $this->redirect('auth/login');
 
         } catch (\Throwable $e) {
             $db->rollBack();
