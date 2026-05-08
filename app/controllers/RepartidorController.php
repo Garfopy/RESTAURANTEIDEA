@@ -65,6 +65,26 @@ class RepartidorController extends BaseController
         $stmtDirectos->execute([$repartidorId]);
         $pedidosDirectos = $stmtDirectos->fetchAll();
 
+        // Agregar sucursales a cada pedido directo para mostrar progreso en inicio
+        if (!empty($pedidosDirectos)) {
+            $ids = implode(',', array_map('intval', array_column($pedidosDirectos, 'id')));
+            $stmtSucs = $db->query(
+                "SELECT ps.pedido_id, ps.foto_entrega_path, s.nombre AS sucursal_nombre
+                   FROM pedido_sucursal ps
+                   JOIN sucursales s ON s.id = ps.sucursal_id
+                  WHERE ps.pedido_id IN ($ids)
+                  ORDER BY ps.id ASC"
+            );
+            $sucsPorPedido = [];
+            foreach ($stmtSucs->fetchAll() as $row) {
+                $sucsPorPedido[$row['pedido_id']][] = $row;
+            }
+            foreach ($pedidosDirectos as &$pd) {
+                $pd['sucursales'] = $sucsPorPedido[$pd['id']] ?? [];
+            }
+            unset($pd);
+        }
+
         $flash     = $this->getFlash();
         $pageTitle = 'Mis entregas de hoy';
 

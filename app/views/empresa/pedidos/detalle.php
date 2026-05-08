@@ -413,22 +413,15 @@ function tiempoTranscurrido(string $desde, string $hasta): string {
   </div>
 
   <?php elseif ($pedido['estado'] === 'en_preparacion' && $esEnvioRepartidor): ?>
-  <div style="padding:12px 14px;background:#EDE9FE;border:1px solid #C4B5FD;border-radius:10px;font-size:.85rem;color:#5B21B6;margin-bottom:12px">
-    <strong>📦 Pago verificado — Esperando partida del repartidor.</strong>
-    El pedido está listo. El repartidor iniciará el viaje cuando tenga el pedido en sus manos.
-    <?php if (!empty($pedido['fecha_entrega'])): ?>
-    <br><span style="font-size:.8rem;opacity:.8">Fecha de entrega programada: <strong><?= date('d/m/Y', strtotime($pedido['fecha_entrega'])) ?></strong></span>
-    <?php endif; ?>
+  <div style="padding:14px 16px;background:#EDE9FE;border:1px solid #C4B5FD;border-radius:10px;font-size:.85rem;color:#5B21B6;margin-bottom:8px">
+    <div style="font-weight:700;margin-bottom:4px">📦 Pedido verificado — esperando que el repartidor inicie el viaje</div>
+    <div style="font-size:.82rem;color:#6D28D9">
+      El pedido está listo. El repartidor verá el pedido en su app y pulsará <strong>"Empezar viaje"</strong> cuando lo tenga en sus manos.
+      <?php if (!empty($pedido['fecha_entrega'])): ?>
+      <br><span style="opacity:.85">Entrega programada: <strong><?= date('d/m/Y', strtotime($pedido['fecha_entrega'])) ?></strong></span>
+      <?php endif; ?>
+    </div>
   </div>
-  <form method="POST" action="<?= BASE_URL ?>empresa-pedido/cambiarEstado"
-        onsubmit="return confirm('¿Marcar manualmente como En camino?')">
-    <input type="hidden" name="pedido_id" value="<?= $pedido['id'] ?>">
-    <input type="hidden" name="estado" value="en_ruta">
-    <button type="submit"
-            style="width:100%;padding:12px;background:#D97706;color:#fff;border:none;border-radius:9px;font-weight:700;cursor:pointer;font-size:.9rem;margin-bottom:8px">
-      🚚 Marcar en camino (manual)
-    </button>
-  </form>
 
   <?php elseif ($pedido['estado'] === 'en_preparacion'): ?>
   <div style="padding:12px 14px;background:#EDE9FE;border:1px solid #C4B5FD;border-radius:10px;font-size:.85rem;color:#5B21B6;margin-bottom:12px">
@@ -461,22 +454,10 @@ function tiempoTranscurrido(string $desde, string $hasta): string {
   </form>
 
   <?php elseif ($pedido['estado'] === 'en_ruta'): ?>
-  <div style="padding:12px 14px;background:#FEF3C7;border:1px solid #FCD34D;border-radius:10px;font-size:.85rem;color:#92400E;margin-bottom:12px">
-    <strong>Pedido en camino.</strong>
-    El repartidor asignado entregará el pedido y subirá la foto de evidencia. Si necesitas registrarlo manualmente, usa el formulario de abajo.
+  <div style="padding:14px 16px;background:#FEF9C3;border:1px solid #FDE047;border-radius:10px;font-size:.85rem;color:#713F12;margin-bottom:12px">
+    <div style="font-weight:700;margin-bottom:4px">🚚 Pedido en camino con el repartidor</div>
+    <div style="font-size:.82rem">El repartidor entrega cada sucursal y sube la foto de evidencia desde su app. No se requiere acción manual.</div>
   </div>
-  <form method="POST" action="<?= BASE_URL ?>empresa-pedido/subirFotoEntrega/<?= $pedido['id'] ?>"
-        enctype="multipart/form-data">
-    <div style="display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap">
-      <input type="file" name="foto" accept="image/*" capture="environment"
-             style="flex:1;padding:8px;border:1px solid #D1D5DB;border-radius:8px;font-size:.82rem;background:#fff;min-width:160px">
-      <button type="submit"
-              style="padding:10px 18px;background:#059669;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;white-space:nowrap;font-size:.85rem">
-        📷 Registrar entrega
-      </button>
-    </div>
-    <div style="font-size:.72rem;color:#9CA3AF;margin-top:4px">JPG, PNG o WEBP · Al guardar, el pedido se marca como <strong>Entregado</strong></div>
-  </form>
 
   <?php elseif ($pedido['estado'] === 'entregado'): ?>
   <div style="padding:12px 14px;background:#D1FAE5;border:1px solid #A7F3D0;border-radius:10px;font-size:.85rem;color:#065F46">
@@ -754,37 +735,6 @@ function tiempoTranscurrido(string $desde, string $hasta): string {
       </div>
       <?php endif; ?>
 
-      <?php if (!$esComprador && in_array($pedido['estado'], ['pendiente','confirmado','en_preparacion'], true)): ?>
-      <!-- Formulario: asignar costos de envío por parada (solo antes de despachar) -->
-      <div style="padding:14px 16px;background:#F9FAFB">
-        <div style="font-size:.8rem;font-weight:700;color:#374151;margin-bottom:10px">Asignar costo de envío por parada</div>
-        <form method="POST" action="<?= BASE_URL ?>empresa-pedido/asignarCostoEnvio">
-          <input type="hidden" name="pedido_id" value="<?= $pedido['id'] ?>">
-          <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">
-            <?php foreach ($pedido['sucursales'] as $i => $ps): ?>
-            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-              <div style="width:20px;height:20px;border-radius:50%;background:var(--color-primary);color:#fff;font-size:.65rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0"><?= $i+1 ?></div>
-              <span style="flex:1;font-size:.82rem;color:#374151;font-weight:600;min-width:120px"><?= htmlspecialchars($ps['sucursal_nombre']) ?></span>
-              <div style="display:flex;align-items:center;gap:4px">
-                <span style="font-size:.82rem;color:#6B7280">$</span>
-                <input type="number" name="envio[<?= $ps['id'] ?>]"
-                       value="<?= number_format((float)($ps['costo_envio_sucursal'] ?? 0), 2) ?>"
-                       min="0" step="0.01" placeholder="0.00"
-                       style="width:90px;padding:6px 8px;border:1px solid #D1D5DB;border-radius:6px;font-size:.85rem;text-align:right">
-              </div>
-            </div>
-            <?php endforeach; ?>
-          </div>
-          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-            <button type="submit"
-                    style="padding:8px 20px;background:#059669;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:.85rem">
-              💾 Guardar costos de envío
-            </button>
-            <span style="font-size:.75rem;color:#9CA3AF">El total se suma al pedido automáticamente</span>
-          </div>
-        </form>
-      </div>
-      <?php endif; ?>
     </div>
     <?php endif; ?>
   </div>
