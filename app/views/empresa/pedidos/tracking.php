@@ -138,9 +138,13 @@ var iconoSucursal = L.divIcon({
 
 var marcadorRepartidor = null;
 var posicionesRuta     = [];
-var routeLine          = null;
-var routeGuideLine     = null;
+var routeLine          = null;   // fallback raw polyline
+var snappedLine        = null;   // road-snapped trail (OSRM match)
+var routeGuideLine     = null;   // route TO destination (OSRM route)
 var lastRouteFetch     = 0;
+var rawBuffer          = [];     // points pending a match call
+var lastMatchedAt      = 0;
+var matchPending       = false;
 
 // Destino fijo
 <?php if ($sucursalLat && $sucursalLng): ?>
@@ -155,6 +159,53 @@ marcadorRepartidor = L.marker([<?= (float)$tracking['lat_actual'] ?>, <?= (float
 posicionesRuta.push([<?= (float)$tracking['lat_actual'] ?>, <?= (float)$tracking['lng_actual'] ?>]);
 <?php endif; ?>
 
+// ── OSRM Map Matching — ajusta el trail a calles reales ──────────────────────
+// Llama al endpoint /match que "snapa" puntos GPS a la red vial
+function snapTrail(points) {
+  if (points.length < 2 || matchPending) return;
+  // Tomar máx 100 puntos (límite OSRM público); muestrear si hay más
+  var pts = points;
+  if (pts.length > 100) {
+    var step = Math.floor(pts.length / 99);
+    var sampled = [];
+    for (var i = 0; i < pts.length - 1; i += step) sampled.push(pts[i]);
+    sampled.push(pts[pts.length - 1]);
+    pts = sampled;
+  }
+  var coords = pts.map(function(p) { return p[1] + ',' + p[0]; }).join(';');
+  matchPending = true;
+  fetch('https://router.project-osrm.org/match/v1/driving/' + coords
+      + '?overview=full&geometries=geojson&tidy=true')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      matchPending = false;
+      if (!data.matchings || !data.matchings.length) { drawRawTrail(); return; }
+      var matched = [];
+      data.matchings.forEach(function(m) {
+        m.geometry.coordinates.forEach(function(c) { matched.push([c[1], c[0]]); });
+      });
+      if (!matched.length) { drawRawTrail(); return; }
+      if (snappedLine) {
+        snappedLine.setLatLngs(matched);
+      } else {
+        snappedLine = L.polyline(matched, {color: '#C8102E', weight: 3, opacity: .75, dashArray: '8,5'}).addTo(mapa);
+        if (routeLine) { mapa.removeLayer(routeLine); routeLine = null; }
+      }
+      rawBuffer = [];
+      lastMatchedAt = Date.now();
+    })
+    .catch(function() { matchPending = false; drawRawTrail(); });
+}
+
+function drawRawTrail() {
+  if (posicionesRuta.length < 2) return;
+  if (routeLine) {
+    routeLine.setLatLngs(posicionesRuta);
+  } else {
+    routeLine = L.polyline(posicionesRuta, {color: '#C8102E', weight: 2, opacity: .5, dashArray: '6,4'}).addTo(mapa);
+  }
+}
+
 // Pre-cargar historial de posiciones para mostrar el recorrido completo
 fetch(BASE_URL + 'api/historialTracking/' + pedidoId)
   .then(function(r) { return r.json(); })
@@ -165,12 +216,10 @@ fetch(BASE_URL + 'api/historialTracking/' + pedidoId)
       if (p.lat && p.lng) hist.push([parseFloat(p.lat), parseFloat(p.lng)]);
     });
     if (!hist.length) return;
-    // Solo precargar si no hay posición live en el mapa todavía
     if (posicionesRuta.length === 0) {
       posicionesRuta = hist.slice();
-      if (posicionesRuta.length > 1) {
-        routeLine = L.polyline(posicionesRuta, {color: '#C8102E', weight: 3, opacity: .5, dashArray: '8,5'}).addTo(mapa);
-      }
+      // Snap historial a calles reales
+      if (hist.length >= 2) { snapTrail(hist); lastMatchedAt = Date.now(); }
       if (!marcadorRepartidor) {
         var last = posicionesRuta[posicionesRuta.length - 1];
         marcadorRepartidor = L.marker(last, {icon: iconoRepartidor}).addTo(mapa).bindPopup('🚚 Última posición registrada');
@@ -184,7 +233,7 @@ fetch(BASE_URL + 'api/historialTracking/' + pedidoId)
   })
   .catch(function() {});
 
-// Trazar ruta de conducción al destino (OSRM, throttle 30 s)
+// ── Ruta de conducción al destino (OSRM /route, throttle 30 s) ───────────────
 function actualizarRutaOSRM(lat, lng) {
   if (!destLat || !destLng) return;
   var now = Date.now();
@@ -212,6 +261,8 @@ function actualizarRutaOSRM(lat, lng) {
 function actualizarPosicion(lat, lng) {
   var pos = [lat, lng];
   posicionesRuta.push(pos);
+  rawBuffer.push(pos);
+
   if (marcadorRepartidor) {
     marcadorRepartidor.setLatLng(pos);
     mapa.panTo(pos);
@@ -219,19 +270,20 @@ function actualizarPosicion(lat, lng) {
     marcadorRepartidor = L.marker(pos, {icon: iconoRepartidor})
       .addTo(mapa).bindPopup('🚚 Repartidor en camino').openPopup();
   }
-  if (posicionesRuta.length > 1) {
-    if (routeLine) {
-      routeLine.setLatLngs(posicionesRuta);
-    } else {
-      routeLine = L.polyline(posicionesRuta, {
-        color: '#C8102E', weight: 3, opacity: .6, dashArray: '8,5'
-      }).addTo(mapa);
-    }
+
+  // Actualizar trail: snap a calles cuando hay ≥5 puntos nuevos o ≥45 s
+  var now = Date.now();
+  var shouldSnap = rawBuffer.length >= 5 || (rawBuffer.length >= 2 && now - lastMatchedAt > 45000);
+  if (shouldSnap) {
+    snapTrail(posicionesRuta);
+  } else {
+    drawRawTrail(); // provisional hasta tener suficientes puntos
   }
-  // Ocultar mensaje "sin GPS" cuando llega la primera posición
+
+  // Ocultar aviso "sin GPS"
   var st = document.getElementById('sinTracking');
   if (st) st.style.display = 'none';
-  // Actualizar ruta al destino
+  // Ruta de conducción al destino
   actualizarRutaOSRM(lat, lng);
 }
 

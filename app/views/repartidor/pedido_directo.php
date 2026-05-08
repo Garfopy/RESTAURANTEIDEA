@@ -233,6 +233,17 @@ function _initMapa(lat, lng) {
 
 // Guardar posición en DB cada 60 s para historial de recorrido
 var _ultimaLat = null, _ultimaLng = null;
+var _lastSentLat = null, _lastSentLng = null;
+
+// Distancia Haversine en metros — filtra jitter GPS
+function _distM(la1, lo1, la2, lo2) {
+  var R = 6371000;
+  var dLa = (la2-la1) * Math.PI/180, dLo = (lo2-lo1) * Math.PI/180;
+  var a = Math.sin(dLa/2)*Math.sin(dLa/2)
+        + Math.cos(la1*Math.PI/180)*Math.cos(la2*Math.PI/180)*Math.sin(dLo/2)*Math.sin(dLo/2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
 function _guardarPosDB(lat, lng) {
   fetch(BASE_URL + 'api/guardarPosicion', {
     method: 'POST',
@@ -267,16 +278,24 @@ setInterval(function() {
   if (navigator.geolocation) {
     navigator.geolocation.watchPosition(
       pos => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        const acc = Math.round(pos.coords.accuracy);
+
         gpsEl.classList.remove('error');
-        gpsLabel.textContent = '✅ GPS activo — enviando ubicación';
+        gpsLabel.textContent = '✅ GPS activo — precisión: ' + acc + ' m';
         llegBtn.style.display = 'block';
-        _ultimaLat = pos.coords.latitude;
-        _ultimaLng = pos.coords.longitude;
-        _initMapa(pos.coords.latitude, pos.coords.longitude);
+
+        // Filtro de distancia: ignorar si no se movió más de 10 m (evita jitter GPS)
+        if (_lastSentLat !== null && _distM(_lastSentLat, _lastSentLng, lat, lng) < 10) return;
+        _lastSentLat = lat; _lastSentLng = lng;
+        _ultimaLat = lat; _ultimaLng = lng;
+
+        _initMapa(lat, lng);
         set(trackRef, {
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          accuracy: pos.coords.accuracy,
+          lat: lat,
+          lng: lng,
+          accuracy: acc,
           ts: Date.now(),
           llegado: window._llegado || false
         });
@@ -310,17 +329,23 @@ setInterval(function() {
     gpsEl.style.display = 'block';
     navigator.geolocation.watchPosition(
       pos => {
-        document.getElementById('gpsLabel').textContent = '✅ GPS activo';
-        _ultimaLat = pos.coords.latitude;
-        _ultimaLng = pos.coords.longitude;
-        _initMapa(pos.coords.latitude, pos.coords.longitude);
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        const acc = Math.round(pos.coords.accuracy);
+        document.getElementById('gpsLabel').textContent = '✅ GPS activo — precisión: ' + acc + ' m';
+
+        if (_lastSentLat !== null && _distM(_lastSentLat, _lastSentLng, lat, lng) < 10) return;
+        _lastSentLat = lat; _lastSentLng = lng;
+        _ultimaLat = lat; _ultimaLng = lng;
+
+        _initMapa(lat, lng);
         fetch('<?= BASE_URL ?>api/actualizarTracking', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({
             pedido_id: <?= (int)$pedido['id'] ?>,
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude
+            lat: lat,
+            lng: lng
           })
         });
       },

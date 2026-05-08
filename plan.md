@@ -945,6 +945,22 @@ OPCIÓN B: Traccar (para GPS hardware físico — futuro)
 > Si la empresa ya tiene GPS hardware + Traccar → integrar en Sprint 4D+ con la REST API.
 > Implementación real del tracker va en Sprint 4D (ver más abajo).
 
+**GPS sin internet (respuesta definitiva):**
+```
+✅ GPS satelital (señal de posición)     → Funciona SIN internet (satélite directo)
+❌ Tiles del mapa (OpenStreetMap/Google) → Necesita internet (imágenes del mapa)
+❌ Firebase (sync tiempo real al admin)  → Necesita internet
+❌ tracking_posiciones (guardar en BD)   → Necesita internet
+❌ OSRM route/match (snapping a calles) → Necesita internet
+
+Para funcionar offline sin Traccar:
+  - La señal GPS llega, pero el mapa se ve en blanco (sin tiles)
+  - Firebase y la BD no reciben datos hasta que regrese la señal
+  - Opción futura: PWA con Service Worker para cachear tiles + IndexedDB
+    para encolar posiciones y sincronizar al reconectar (Sprint 4D+)
+  - Para MVP: el repartidor siempre está en zonas urbanas con cobertura → aceptable
+```
+
 #### Sprint 4C-3+ — Vista admin paradas + distribución validada ✅ COMPLETADO (2026-05-07)
 - [x] `detalle.php` — Panel "Paradas de entrega": lista todas las sucursales con estado (chip), productos asignados por parada, enlace Maps ↗ por parada, botón "Ver ruta en Maps" (multi-waypoint Google Maps)
 - [x] `detalle.php` — Admin: formulario inline para asignar `costo_envio_sucursal` por parada → actualiza `pedidos.costo_envio` automáticamente
@@ -1001,7 +1017,9 @@ OPCIÓN B: Traccar (para GPS hardware físico — futuro)
 - [x] `navigator.geolocation.watchPosition()` → escribe `{lat, lng, accuracy, ts, llegado}` en `tracking/{pedidoId}` de Firebase
 - [x] `onDisconnect(trackRef).remove()` — limpieza automática si el repartidor cierra el browser
 - [x] Fallback sin Firebase: AJAX POST a `/api/actualizarTracking` por cada update GPS
-- [x] Historial DB: variables `_ultimaLat/_ultimaLng` actualizadas en cada fix GPS; `setInterval` cada 60 s → POST `/api/guardarPosicion` → `tracking_posiciones`
+- [x] Historial DB: `_ultimaLat/_ultimaLng` actualizados en cada fix válido; `setInterval` 60 s → POST `/api/guardarPosicion` → `tracking_posiciones`
+- [x] Filtro de distancia (`_distM` Haversine, mínimo 10 m): descarta puntos GPS si el dispositivo no se movió lo suficiente — elimina jitter estacionario; aplica a Firebase y fallback AJAX
+- [x] Precisión visible: label GPS muestra "precisión: X m" en cada fix (útil para diagnosticar señal débil en vehículo o edificio)
 - [x] Mini-mapa Leaflet (azul): muestra posición propia (punto azul pulsante + ripple) + pin de destino (rojo) + trail de ruta
 - [x] "He llegado al destino" → `llegado: true` en Firebase → muestra formulario de foto
 - [x] Foto de entrega → POST a `repartidor/confirmarEntregaDirecta/{id}` → estado `entregado`
@@ -1012,7 +1030,9 @@ OPCIÓN B: Traccar (para GPS hardware físico — futuro)
 - [x] Pre-carga historial: al cargar la página → `fetch(api/historialTracking/{id})` → seed del trail con todos los puntos guardados en `tracking_posiciones`; si no hay marcador live, lo crea en la última posición conocida y oculta el aviso "sin GPS"
 - [x] Ruta de conducción OSRM (polyline azul sólida): `fetch(router.project-osrm.org/route/v1/driving/...)` con throttle 30 s; `bringToBack()` para no tapar el trail rojo ni el marcador
 - [x] ETA dinámico desde OSRM: `data.routes[0].duration` (segundos → minutos) → actualiza `#etaDisplay` en tiempo real
+- [x] OSRM Map Matching trail (polyline roja): `fetch(router.project-osrm.org/match/v1/driving/...?tidy=true)` ajusta el recorrido a calles reales; se activa cada 5 puntos nuevos o cada 45 s; fallback a polyline cruda si OSRM no responde; muestreo a 100 puntos máx si hay más
 - [x] `id="sinTracking"` en aviso "sin GPS": oculto automáticamente en `actualizarPosicion()` y en el callback del historial — resuelve el bug donde `$hayTracking` (basado en BD) era `false` aunque Firebase ya tuviera datos live
+- [x] Filtro de distancia repartidor (`_distM`, Haversine): descarta puntos si el dispositivo no se movió > 10 m — elimina jitter GPS estacionario, reduce ruido en el trail
 - [x] Leyenda del mapa: azul = ruta al destino, rojo punteado = recorrido realizado
 - [x] `#posCount`: muestra cuántos puntos históricos se cargaron desde la BD
 - [x] `actualizarPosicion(lat, lng)` — función central que mueve marcador + extiende trail + panTo + oculta sinTracking + lanza OSRM
@@ -1237,4 +1257,4 @@ Todos se configuran desde `/config/apis` y `/config/correo` (solo visible para s
 
 ---
 
-*Última actualización: 2026-05-07 — v2.9.4 (Sprint 4C-3-GPS v2: ruta OSRM, historial tracking_posiciones, fix sinTracking JS, ETA desde OSRM, 60s DB logging repartidor)*
+*Última actualización: 2026-05-07 — v2.9.5 (GPS map matching OSRM, filtro distancia jitter, precisión en display, documentación GPS offline)*
