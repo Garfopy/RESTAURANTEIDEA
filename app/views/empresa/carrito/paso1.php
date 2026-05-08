@@ -94,6 +94,10 @@ $carritoItems = $carrito ?? [];
                 <?php if (!empty($prod['tiene_escalonados'])): ?>
                 <div style="font-size:.7rem;color:#059669;font-weight:600;margin-top:2px">🏷 Descuento por volumen disponible</div>
                 <?php endif; ?>
+                <?php if (!empty($limitePorProducto[$prod['id']])): ?>
+                <?php $lim = $limitePorProducto[$prod['id']]; $perC = ['por_pedido'=>'/pedido','semanal'=>'/semana','mensual'=>'/mes'][$lim['periodo']] ?? ''; ?>
+                <div style="font-size:.68rem;font-weight:700;color:#92400E;margin-top:2px">🔒 Máx. <?= $lim['limite_kg'] ? number_format($lim['limite_kg'],0).' kg' : '$'.number_format($lim['limite_monto'],2) ?> <?= $perC ?></div>
+                <?php endif; ?>
                 <!-- Alerta de descuento por tramo -->
                 <div id="alert-<?= $prod['id'] ?>" style="display:none;margin-top:4px;font-size:.72rem;padding:3px 8px;border-radius:6px;font-weight:600"></div>
               </td>
@@ -112,6 +116,7 @@ $carritoItems = $carrito ?? [];
                          id="qty-<?= $prod['id'] ?>"
                          value="<?= $prev > 0 ? $prev : '' ?>"
                          min="0" step="0.5"
+                         <?= !empty($limitePorProducto[$prod['id']]) && $limitePorProducto[$prod['id']]['limite_kg'] ? 'max="'.htmlspecialchars($limitePorProducto[$prod['id']]['limite_kg']).'"' : '' ?>
                          placeholder="0"
                          oninput="actualizarFila(<?= $prod['id'] ?>, <?= $prod['precio_base'] ?>, '<?= htmlspecialchars($prod['nombre']) ?>', '<?= $prod['presentacion'] ?>')"
                          style="width:70px;padding:6px 8px;border:1px solid #D1D5DB;border-radius:6px;text-align:center;font-size:.875rem">

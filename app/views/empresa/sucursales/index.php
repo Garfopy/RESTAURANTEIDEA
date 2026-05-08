@@ -6,6 +6,15 @@ $inactivas = $totalSucursales - $activas;
 $totalCompradores = count($porComprador) - (isset($porComprador[0]) ? 1 : 0);
 ?>
 
+<!-- Guía para el admin -->
+<div style="background:#F0FDF4;border:1px solid #A7F3D0;border-radius:10px;padding:14px 16px;margin-bottom:20px;display:flex;gap:12px;align-items:flex-start">
+  <span style="font-size:1.2rem;flex-shrink:0">💡</span>
+  <div>
+    <div style="font-size:.82rem;font-weight:700;color:#065F46;margin-bottom:2px">Sucursales de entrega</div>
+    <div style="font-size:.78rem;color:#047857">Las sucursales las registran tus compradores desde su perfil. Aquí puedes ver todas sus ubicaciones de entrega agrupadas por comprador. Para ver o editar el perfil de un comprador, ve a <strong>Mi equipo</strong>.</div>
+  </div>
+</div>
+
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
   <div>
     <p style="font-size:.875rem;color:#6B7280">Todas las sucursales registradas por tus compradores.</p>

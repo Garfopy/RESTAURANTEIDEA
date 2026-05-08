@@ -145,6 +145,12 @@ function getProductImageUrl($prod) {
       <?php if (!empty($prod['escalonados'])): ?>
       <div style="font-size:.72rem;color:#059669;margin-top:6px;font-weight:600">✦ Descuentos por volumen</div>
       <?php endif; ?>
+      <?php if (!empty($limitePorProducto[$prod['id']])): ?>
+      <?php $lim = $limitePorProducto[$prod['id']]; $periodoC = ['por_pedido'=>'/pedido','semanal'=>'/semana','mensual'=>'/mes'][$lim['periodo']] ?? ''; ?>
+      <div style="font-size:.7rem;font-weight:700;color:#92400E;background:#FEF3C7;border-radius:4px;padding:2px 6px;display:inline-block;margin-top:4px">
+        🔒 Máx. <?= $lim['limite_kg'] ? number_format($lim['limite_kg'],0).' kg' : '$'.number_format($lim['limite_monto'],2) ?> <?= $periodoC ?>
+      </div>
+      <?php endif; ?>
     </div>
     <!-- Acciones -->
     <?php
@@ -156,6 +162,7 @@ function getProductImageUrl($prod) {
         'imagen'      => getProductImageUrl($prod),
         'categoria'   => $prod['categoria_nombre'],
         'escalonados' => $prod['escalonados'],
+        'limite'      => $limitePorProducto[$prod['id']] ?? null,
     ]);
     ?>
     <div style="padding:12px 16px;border-top:1px solid #F3F4F6;display:flex;align-items:center;justify-content:space-between;gap:10px">
@@ -276,6 +283,11 @@ function getProductImageUrl($prod) {
       <!-- Alerta de tramo -->
       <div id="modAgrAlertaTramo" style="display:none;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:.82rem;font-weight:600"></div>
 
+      <!-- Límite de compra -->
+      <div id="modAgrLimite" style="display:none;background:#FEF3C7;border:1px solid #FCD34D;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:.8rem;color:#92400E;font-weight:600">
+        🔒 <span id="modAgrLimiteTxt"></span>
+      </div>
+
       <!-- Precios por volumen -->
       <div id="modAgrTiersSection" style="display:none;margin-bottom:14px">
         <div style="font-size:.78rem;font-weight:700;color:#374151;margin-bottom:6px">📊 Precios por volumen</div>
@@ -364,6 +376,23 @@ function abrirModalAgregar(prod) {
 
   document.getElementById('modalAgregar').style.display = 'flex';
   setTimeout(() => document.getElementById('modAgrCantidad').focus(), 100);
+
+  // Límite de compra
+  const limDiv = document.getElementById('modAgrLimite');
+  const limTxt = document.getElementById('modAgrLimiteTxt');
+  const qtyIn  = document.getElementById('modAgrCantidad');
+  if (prod.limite) {
+    const p = {'por_pedido':'/pedido','semanal':'/semana','mensual':'/mes'}[prod.limite.periodo] || '';
+    const limLabel = prod.limite.limite_kg
+      ? `Límite: ${parseFloat(prod.limite.limite_kg)} kg ${p}`
+      : `Límite de monto: $${parseFloat(prod.limite.limite_monto).toFixed(2)} ${p}`;
+    limTxt.textContent = limLabel;
+    limDiv.style.display = 'block';
+    qtyIn.max = prod.limite.limite_kg ? prod.limite.limite_kg : '';
+  } else {
+    limDiv.style.display = 'none';
+    qtyIn.removeAttribute('max');
+  }
 }
 
 function cerrarModalAgregar() {
@@ -462,6 +491,14 @@ function confirmarAgregar() {
   if (qty <= 0) {
     document.getElementById('modAgrCantidad').style.borderColor = '#DC2626';
     document.getElementById('modAgrCantidad').focus();
+    return;
+  }
+  // Validación de límite en cliente
+  if (modalProducto.limite && modalProducto.limite.limite_kg && qty > parseFloat(modalProducto.limite.limite_kg)) {
+    document.getElementById('modAgrCantidad').style.borderColor = '#DC2626';
+    const fb = document.getElementById('modAgrFeedback');
+    fb.style.cssText = 'display:block;margin-top:12px;padding:10px 14px;border-radius:8px;font-size:.85rem;text-align:center;background:#FEE2E2;color:#991B1B;border:1px solid #FECACA';
+    fb.textContent = `🔒 Límite superado: máximo ${modalProducto.limite.limite_kg} ${modalProducto.presentacion} por pedido`;
     return;
   }
   document.getElementById('modAgrCantidad').style.borderColor = '#D1D5DB';

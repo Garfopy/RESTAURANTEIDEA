@@ -46,6 +46,16 @@ class CarritoController extends BaseController
         $db = Database::getInstance();
         $categorias = $db->query('SELECT * FROM categorias WHERE activo = 1 ORDER BY nombre')->fetchAll();
 
+        // Cargar límites activos para mostrarlos en la vista
+        $stmtLim = $db->prepare(
+            'SELECT producto_id, limite_kg, limite_monto, periodo FROM limites_compra WHERE empresa_id=? AND activo=1 AND producto_id IS NOT NULL'
+        );
+        $stmtLim->execute([$empresaId]);
+        $limitePorProducto = [];
+        foreach ($stmtLim->fetchAll() as $lim) {
+            $limitePorProducto[(int)$lim['producto_id']] = $lim;
+        }
+
         $compradorId = $this->usuarioId();
         $combos      = $this->comboModel->getCombosParaComprador($compradorId, $empresaId);
 
@@ -109,6 +119,26 @@ class CarritoController extends BaseController
         }
         if (!empty($erroresStock)) {
             $this->flash('error', 'Stock insuficiente — ' . implode(' | ', $erroresStock) . '. Ajusta las cantidades.');
+            $this->redirect('carrito/index');
+        }
+
+        // Validar límites de compra por pedido
+        $db2 = Database::getInstance();
+        $stmtLimUpd = $db2->prepare(
+            "SELECT limite_kg, limite_monto, periodo FROM limites_compra WHERE empresa_id=? AND producto_id=? AND activo=1 AND periodo='por_pedido' LIMIT 1"
+        );
+        $erroresLimite = [];
+        foreach ($items as $item) {
+            $stmtLimUpd->execute([$empresaId, $item['producto_id']]);
+            $lim = $stmtLimUpd->fetch();
+            if ($lim) {
+                if ($lim['limite_kg'] && $item['cantidad'] > (float)$lim['limite_kg']) {
+                    $erroresLimite[] = "{$item['nombre']}: máx. {$lim['limite_kg']} kg por pedido (solicitado: {$item['cantidad']})";
+                }
+            }
+        }
+        if (!empty($erroresLimite)) {
+            $this->flash('error', 'Límite superado — ' . implode(' | ', $erroresLimite));
             $this->redirect('carrito/index');
         }
 
@@ -325,6 +355,17 @@ class CarritoController extends BaseController
         if ($stockDisponible !== null && $totalSolicitado > $stockDisponible) {
             $disponible = max(0, $stockDisponible - $carritoActual);
             echo json_encode(['ok' => false, 'msg' => "Stock insuficiente. Disponible: " . number_format($stockDisponible, 0) . " (ya tienes " . number_format($carritoActual, 0) . " en el carrito)"]);
+            return;
+        }
+
+        // Validar límite de compra (por pedido)
+        $stmtLimAgr = Database::getInstance()->prepare(
+            "SELECT limite_kg, limite_monto, periodo FROM limites_compra WHERE empresa_id=? AND producto_id=? AND activo=1 AND periodo='por_pedido' LIMIT 1"
+        );
+        $stmtLimAgr->execute([$empresaId, $productoId]);
+        $limiteAgr = $stmtLimAgr->fetch();
+        if ($limiteAgr && $limiteAgr['limite_kg'] && $totalSolicitado > (float)$limiteAgr['limite_kg']) {
+            echo json_encode(['ok' => false, 'msg' => "🔒 Límite superado: máximo {$limiteAgr['limite_kg']} {$producto['presentacion']} de {$producto['nombre']} por pedido."]);
             return;
         }
 

@@ -1,13 +1,22 @@
 <?php
-// Vista: Límites de compra
+// Vista: Límites de compra (aplica globalmente a todos los compradores)
 $periodoLabels = ['por_pedido' => 'Por pedido', 'semanal' => 'Semanal', 'mensual' => 'Mensual'];
 $activos   = count(array_filter($limites, fn($l) => $l['activo']));
 $inactivos = count($limites) - $activos;
 ?>
 
+<!-- Guía para el admin -->
+<div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:14px 16px;margin-bottom:20px;display:flex;gap:12px;align-items:flex-start">
+  <span style="font-size:1.2rem;flex-shrink:0">💡</span>
+  <div>
+    <div style="font-size:.82rem;font-weight:700;color:#1E40AF;margin-bottom:2px">Cómo funcionan los límites</div>
+    <div style="font-size:.78rem;color:#1D4ED8">Los límites aplican a <strong>todos tus compradores</strong>. Cuando configuras un límite para un producto, se muestra en el catálogo y se valida automáticamente al hacer un pedido. Puedes limitar por <strong>kg</strong> y/o por <strong>monto ($)</strong>.</div>
+  </div>
+</div>
+
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
   <div>
-    <p style="font-size:.875rem;color:#6B7280">Controla los límites de compra por sucursal y producto para tus compradores.</p>
+    <p style="font-size:.875rem;color:#6B7280">Controla los límites de compra por producto para tus compradores.</p>
   </div>
   <button onclick="document.getElementById('formNuevo').classList.toggle('hidden')"
           style="padding:8px 16px;background:var(--color-primary);color:#fff;border:none;border-radius:6px;font-weight:600;font-size:.875rem;cursor:pointer">
@@ -30,19 +39,6 @@ $inactivos = count($limites) - $activos;
   <div style="font-weight:700;font-size:.95rem;color:#111827;margin-bottom:14px">Nuevo límite de compra</div>
   <form method="POST" action="<?= BASE_URL ?>limite/guardar">
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:14px">
-
-      <div>
-        <label style="display:block;font-size:.75rem;font-weight:600;color:#374151;margin-bottom:4px">Sucursal</label>
-        <select name="sucursal_id" style="width:100%;padding:8px 10px;border:1px solid #D1D5DB;border-radius:8px;font-size:.85rem;background:#fff">
-          <option value="">— Todas las sucursales —</option>
-          <?php foreach ($sucursales as $s): ?>
-          <option value="<?= $s['id'] ?>">
-            <?= htmlspecialchars($s['sucursal_nombre']) ?>
-            <?php if ($s['comprador_nombre']): ?> (<?= htmlspecialchars($s['comprador_nombre']) ?>)<?php endif; ?>
-          </option>
-          <?php endforeach; ?>
-        </select>
-      </div>
 
       <div>
         <label style="display:block;font-size:.75rem;font-weight:600;color:#374151;margin-bottom:4px">Producto</label>
@@ -101,10 +97,10 @@ $inactivos = count($limites) - $activos;
   </div>
   <?php else: ?>
   <div style="overflow-x:auto">
-    <table style="width:100%;border-collapse:collapse;min-width:640px">
+    <table style="width:100%;border-collapse:collapse;min-width:560px">
       <thead>
         <tr style="background:#F9FAFB;border-bottom:1px solid #E5E7EB">
-          <?php foreach (['Sucursal / Comprador','Producto','Límite kg','Límite monto','Período','Estado','Acciones'] as $h): ?>
+          <?php foreach (['Producto','Límite kg','Límite monto','Período','Estado','Acciones'] as $h): ?>
           <th style="padding:10px 14px;text-align:left;font-size:.72rem;color:#6B7280;font-weight:700;text-transform:uppercase;white-space:nowrap"><?= $h ?></th>
           <?php endforeach; ?>
         </tr>
@@ -112,18 +108,8 @@ $inactivos = count($limites) - $activos;
       <tbody>
         <?php foreach ($limites as $l): ?>
         <tr style="border-bottom:1px solid #F3F4F6;<?= !$l['activo'] ? 'opacity:.55' : '' ?>">
-          <td style="padding:11px 14px">
-            <?php if ($l['sucursal_nombre']): ?>
-            <div style="font-size:.85rem;font-weight:600;color:#111827"><?= htmlspecialchars($l['sucursal_nombre']) ?></div>
-            <?php if ($l['comprador_nombre']): ?>
-            <div style="font-size:.72rem;color:#6B7280"><?= htmlspecialchars($l['comprador_nombre'] . ' ' . $l['comprador_apellido']) ?></div>
-            <?php endif; ?>
-            <?php else: ?>
-            <span style="font-size:.82rem;color:#9CA3AF;font-style:italic">Todas las sucursales</span>
-            <?php endif; ?>
-          </td>
           <td style="padding:11px 14px;font-size:.85rem;color:#374151">
-            <?= $l['producto_nombre'] ? htmlspecialchars($l['producto_nombre'] . ' (' . $l['unidad'] . ')') : '<span style="color:#9CA3AF;font-style:italic">Todos</span>' ?>
+            <?= $l['producto_nombre'] ? htmlspecialchars($l['producto_nombre'] . ' (' . $l['unidad'] . ')') : '<span style="color:#9CA3AF;font-style:italic">Todos los productos</span>' ?>
           </td>
           <td style="padding:11px 14px;font-size:.875rem;font-weight:600;color:#374151">
             <?= $l['limite_kg'] ? number_format($l['limite_kg'], 2) . ' kg' : '—' ?>
@@ -168,20 +154,10 @@ $inactivos = count($limites) - $activos;
 
 <!-- Modal editar -->
 <div id="modalEditar" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:999;align-items:center;justify-content:center">
-  <div style="background:#fff;border-radius:12px;padding:24px;width:min(520px,94vw);max-height:90vh;overflow-y:auto">
+  <div style="background:#fff;border-radius:12px;padding:24px;width:min(460px,94vw);max-height:90vh;overflow-y:auto">
     <div style="font-weight:700;font-size:.95rem;color:#111827;margin-bottom:16px">Editar límite</div>
     <form id="formEditar" method="POST">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
-
-        <div style="grid-column:1/-1">
-          <label style="display:block;font-size:.75rem;font-weight:600;color:#374151;margin-bottom:4px">Sucursal</label>
-          <select name="sucursal_id" id="editSucursal" style="width:100%;padding:8px 10px;border:1px solid #D1D5DB;border-radius:8px;font-size:.85rem;background:#fff">
-            <option value="">— Todas las sucursales —</option>
-            <?php foreach ($sucursales as $s): ?>
-            <option value="<?= $s['id'] ?>"><?= htmlspecialchars($s['sucursal_nombre']) ?><?php if ($s['comprador_nombre']): ?> (<?= htmlspecialchars($s['comprador_nombre']) ?>)<?php endif; ?></option>
-            <?php endforeach; ?>
-          </select>
-        </div>
 
         <div style="grid-column:1/-1">
           <label style="display:block;font-size:.75rem;font-weight:600;color:#374151;margin-bottom:4px">Producto</label>
@@ -224,7 +200,6 @@ $inactivos = count($limites) - $activos;
 <script>
 function abrirEditar(l) {
   document.getElementById('formEditar').action = '<?= BASE_URL ?>limite/actualizar/' + l.id;
-  document.getElementById('editSucursal').value    = l.sucursal_id  || '';
   document.getElementById('editProducto').value    = l.producto_id  || '';
   document.getElementById('editLimiteKg').value    = l.limite_kg    || '';
   document.getElementById('editLimiteMonto').value = l.limite_monto || '';

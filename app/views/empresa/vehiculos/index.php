@@ -6,6 +6,15 @@ $inactivos = $totalVeh - $activos;
 $asignados = count(array_filter($vehiculos, fn($v) => !empty($v['repartidor_id'])));
 ?>
 
+<!-- Guía para el admin -->
+<div style="background:#FDF4FF;border:1px solid #E9D5FF;border-radius:10px;padding:14px 16px;margin-bottom:20px;display:flex;gap:12px;align-items:flex-start">
+  <span style="font-size:1.2rem;flex-shrink:0">💡</span>
+  <div>
+    <div style="font-size:.82rem;font-weight:700;color:#6D28D9;margin-bottom:2px">Flota de vehículos</div>
+    <div style="font-size:.78rem;color:#7C3AED">Registra tus vehículos y asígnalos a repartidores. Un repartidor solo puede tener un vehículo activo a la vez. Los vehículos sin repartidor asignado no pueden ser usados en rutas. Ve a <strong>Mi equipo</strong> para gestionar a tus repartidores.</div>
+  </div>
+</div>
+
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
   <div>
     <p style="font-size:.875rem;color:#6B7280">Flota de vehículos y asignación a repartidores.</p>

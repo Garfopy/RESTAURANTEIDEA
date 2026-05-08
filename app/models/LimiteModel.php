@@ -7,15 +7,11 @@ class LimiteModel extends BaseModel
     {
         return $this->query(
             "SELECT lc.*,
-                    s.nombre AS sucursal_nombre,
-                    u.nombre AS comprador_nombre, u.apellido_paterno AS comprador_apellido,
                     p.nombre AS producto_nombre, p.presentacion AS unidad
                FROM limites_compra lc
-          LEFT JOIN sucursales s ON s.id = lc.sucursal_id
-          LEFT JOIN usuarios u ON u.id = s.comprador_id
           LEFT JOIN productos p ON p.id = lc.producto_id
               WHERE lc.empresa_id = ?
-           ORDER BY u.nombre ASC, s.nombre ASC, p.nombre ASC",
+           ORDER BY p.nombre ASC",
             [$empresaId]
         );
     }
@@ -38,10 +34,9 @@ class LimiteModel extends BaseModel
     {
         $this->execute(
             "UPDATE limites_compra
-                SET sucursal_id=?, producto_id=?, limite_kg=?, limite_monto=?, periodo=?
+                SET producto_id=?, limite_kg=?, limite_monto=?, periodo=?
               WHERE id=? AND empresa_id=?",
             [
-                $data['sucursal_id']  ?: null,
                 $data['producto_id']  ?: null,
                 $data['limite_kg']    ?: null,
                 $data['limite_monto'] ?: null,

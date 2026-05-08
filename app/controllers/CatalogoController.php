@@ -32,6 +32,16 @@ class CatalogoController extends BaseController
         $db = Database::getInstance();
         $categorias = $db->query('SELECT * FROM categorias WHERE activo = 1 ORDER BY nombre')->fetchAll();
 
+        // Cargar límites activos de esta empresa indexados por producto_id
+        $stmtLim = $db->prepare(
+            'SELECT producto_id, limite_kg, limite_monto, periodo FROM limites_compra WHERE empresa_id=? AND activo=1 AND producto_id IS NOT NULL'
+        );
+        $stmtLim->execute([$this->empresaId()]);
+        $limitePorProducto = [];
+        foreach ($stmtLim->fetchAll() as $lim) {
+            $limitePorProducto[(int)$lim['producto_id']] = $lim;
+        }
+
         $flash     = $this->getFlash();
         $pageTitle = 'Catálogo de productos';
         $activeMenu = 'catalogo';

@@ -15,9 +15,6 @@ class LimiteController extends BaseController
         $modelo     = new LimiteModel();
         $limites    = $modelo->getByEmpresa($empresaId);
 
-        $sucursalModel = new SucursalModel();
-        $sucursales    = $sucursalModel->getByEmpresa($empresaId);
-
         $db        = Database::getInstance();
         $stmtProds = $db->prepare('SELECT id, nombre, presentacion AS unidad FROM productos WHERE empresa_id=? AND activo=1 ORDER BY nombre');
         $stmtProds->execute([$empresaId]);
@@ -41,7 +38,7 @@ class LimiteController extends BaseController
         $empresaId = $this->empresaId();
         (new LimiteModel())->crear([
             'empresa_id'   => $empresaId,
-            'sucursal_id'  => $this->post('sucursal_id'),
+            'sucursal_id'  => null,
             'producto_id'  => $this->post('producto_id'),
             'limite_kg'    => $this->post('limite_kg'),
             'limite_monto' => $this->post('limite_monto'),
@@ -60,7 +57,6 @@ class LimiteController extends BaseController
         $empresaId = $this->empresaId();
         (new LimiteModel())->actualizar((int)$id, [
             'empresa_id'   => $empresaId,
-            'sucursal_id'  => $this->post('sucursal_id'),
             'producto_id'  => $this->post('producto_id'),
             'limite_kg'    => $this->post('limite_kg'),
             'limite_monto' => $this->post('limite_monto'),
