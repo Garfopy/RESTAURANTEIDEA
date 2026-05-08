@@ -159,6 +159,24 @@ class PedidoController extends BaseController
         require ROOT_PATH . '/app/views/empresa/layouts/main.php';
     }
 
+    // ── Imprimir / exportar PDF de un pedido ─────────────────────
+    public function pdf(?string $id = null): void
+    {
+        $pedidoId = (int)$id;
+        if (!$pedidoId || !$this->model->verificarPertenece($pedidoId, $this->empresaId())) {
+            $this->flash('error', 'Pedido no encontrado.');
+            $this->redirect('pedido/index');
+        }
+
+        $pedido       = $this->model->conDetalle($pedidoId);
+        $empresa      = (new EmpresaModel())->find($this->empresaId());
+        $configModel  = new ConfigModel();
+        $appLogo      = $configModel->get('app_logo', '');
+        $colorPrimary = $configModel->get('color_primary', '#C8102E');
+
+        require ROOT_PATH . '/app/views/empresa/pedidos/pdf.php';
+    }
+
     // ── Cancelar pedido (solo comprador, solo si está pendiente) ──
     public function cancelar(?string $id = null): void
     {
