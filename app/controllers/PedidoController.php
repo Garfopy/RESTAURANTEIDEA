@@ -147,8 +147,9 @@ class PedidoController extends BaseController
             $this->redirect('pedido/index');
         }
 
-        $pedido   = $this->model->conDetalle($pedidoId);
-        $tracking = $this->model->getTrackingActivo($pedidoId);
+        $pedido    = $this->model->conDetalle($pedidoId);
+        $tracking  = $this->model->getTrackingActivo($pedidoId);
+        $sucursales = $this->model->getSucursalesPedido($pedidoId);
 
         $cfgModel = new ConfigModel();
         $firebaseConfig = [

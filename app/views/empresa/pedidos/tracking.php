@@ -65,11 +65,19 @@ $progreso = $barraEstados[$estadoPedido] ?? 0;
   </div>
 </div>
 
-<!-- Leyenda del mapa -->
+<!-- Leyenda + controles del mapa -->
 <?php if ($estadoPedido === 'en_ruta' || $hayTracking): ?>
-<div style="display:flex;gap:16px;flex-wrap:wrap;font-size:.72rem;color:#6B7280;margin-bottom:8px;align-items:center">
+<div style="display:flex;gap:12px;flex-wrap:wrap;font-size:.72rem;color:#6B7280;margin-bottom:8px;align-items:center">
   <span><span style="display:inline-block;width:24px;height:3px;background:#3B82F6;vertical-align:middle;border-radius:2px;margin-right:4px"></span>Ruta al destino</span>
   <span><span style="display:inline-block;width:24px;height:3px;background:#C8102E;vertical-align:middle;border-radius:2px;border-bottom:2px dashed #C8102E;margin-right:4px"></span>Recorrido</span>
+  <button id="btnSeguir" onclick="toggleSeguir()"
+    style="margin-left:auto;padding:5px 12px;border-radius:8px;border:1px solid #D1D5DB;background:#F9FAFB;color:#374151;font-size:.72rem;font-weight:600;cursor:pointer">
+    📍 Centrar auto: <span id="seguirLabel">ON</span>
+  </button>
+  <button onclick="ajustarVista()"
+    style="padding:5px 12px;border-radius:8px;border:1px solid #D1D5DB;background:#F9FAFB;color:#374151;font-size:.72rem;font-weight:600;cursor:pointer">
+    🗺 Ver todo
+  </button>
 </div>
 <?php endif; ?>
 
@@ -88,6 +96,23 @@ $progreso = $barraEstados[$estadoPedido] ?? 0;
 <div id="llegadoAlert" style="display:none;margin-bottom:14px;padding:13px 18px;background:#D1FAE5;border:1px solid #A7F3D0;border-radius:10px;font-size:.9rem;color:#065F46;font-weight:600">
   ✅ El repartidor ha llegado al destino. Esperando confirmación de entrega.
 </div>
+
+<!-- Tips / tutorial colapsable -->
+<details style="margin-bottom:16px;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:12px;padding:12px 16px">
+  <summary style="font-size:.82rem;font-weight:700;color:#374151;cursor:pointer;list-style:none;display:flex;align-items:center;gap:6px">
+    💡 ¿Cómo usar esta vista?
+  </summary>
+  <ul style="margin-top:10px;padding-left:0;list-style:none;font-size:.78rem;color:#6B7280;display:flex;flex-direction:column;gap:7px">
+    <li>🔍 <strong>Zoom:</strong> Usa los botones <code>+</code> / <code>−</code> del mapa o pellizca en móvil para acercarte o alejarte.</li>
+    <li>🗺 <strong>Ver todo:</strong> Pulsa "Ver todo" para encuadrar el recorrido completo en pantalla.</li>
+    <li>📍 <strong>Centrar auto:</strong> Cuando está ON, el mapa sigue al repartidor. Desactívalo si quieres explorar sin que se mueva.</li>
+    <li>📦 <strong>Marcadores azules numerados:</strong> Son las sucursales de entrega del pedido. Haz clic para ver el nombre.</li>
+    <li>🚩 <strong>Bandera verde:</strong> Punto donde inició el viaje.</li>
+    <li>🚚 <strong>Ícono rojo animado:</strong> Posición actual del repartidor.</li>
+    <li>〰 <strong>Línea roja:</strong> Recorrido realizado (ajustado a calles).</li>
+    <li>〰 <strong>Línea azul:</strong> Ruta sugerida al siguiente destino.</li>
+  </ul>
+</details>
 
 <?php if (!$hayTracking): ?>
 <div id="sinTracking" style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:12px;padding:20px;text-align:center;color:#6B7280;font-size:.875rem;margin-bottom:16px">
@@ -121,6 +146,14 @@ var destLng   = <?= $sucursalLng ? (float)$sucursalLng : 'null' ?>;
 var initLat = <?= $hayTracking ? (float)$tracking['lat_actual'] : ($sucursalLat ? (float)$sucursalLat : 19.4326) ?>;
 var initLng = <?= $hayTracking ? (float)$tracking['lng_actual'] : ($sucursalLng ? (float)$sucursalLng : -99.1332) ?>;
 
+var autoFollow = true;
+
+function toggleSeguir() {
+  autoFollow = !autoFollow;
+  document.getElementById('seguirLabel').textContent = autoFollow ? 'ON' : 'OFF';
+  document.getElementById('btnSeguir').style.background = autoFollow ? '#DBEAFE' : '#F9FAFB';
+}
+
 var mapa = L.map('mapa').setView([initLat, initLng], 15);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '© OpenStreetMap contributors', maxZoom: 19
@@ -134,13 +167,23 @@ var iconoRepartidor = L.divIcon({
       + '</div>',
   iconSize: [52, 52], iconAnchor: [26, 26],
 });
-var iconoSucursal = L.divIcon({
+
+function iconoParada(num) {
+  return L.divIcon({
+    className: '',
+    html: '<div style="background:#1E40AF;color:#fff;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35)">' + num + '</div>',
+    iconSize: [30, 30], iconAnchor: [15, 15],
+  });
+}
+
+var iconoInicio = L.divIcon({
   className: '',
-  html: '<div style="background:#1E40AF;color:#fff;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:16px;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3)">📦</div>',
-  iconSize: [32, 32], iconAnchor: [16, 16],
+  html: '<div style="background:#059669;color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:15px;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3)">🚩</div>',
+  iconSize: [28, 28], iconAnchor: [14, 28],
 });
 
 var marcadorRepartidor = null;
+var marcadorInicio     = null;
 var posicionesRuta     = [];
 var routeLine          = null;   // fallback raw polyline
 var snappedLine        = null;   // road-snapped trail (OSRM match)
@@ -150,11 +193,25 @@ var rawBuffer          = [];     // points pending a match call
 var lastMatchedAt      = 0;
 var matchPending       = false;
 
-// Destino fijo
-<?php if ($sucursalLat && $sucursalLng): ?>
-L.marker([<?= (float)$sucursalLat ?>, <?= (float)$sucursalLng ?>], {icon: iconoSucursal})
-  .addTo(mapa).bindPopup('Destino: <?= htmlspecialchars(addslashes($tracking['sucursal_nombre'] ?? '')) ?>');
-<?php endif; ?>
+// Paradas numeradas (sucursales del pedido)
+<?php
+$sucursalesJS = [];
+foreach ($sucursales ?? [] as $i => $s) {
+    $sucursalesJS[] = [
+        'num'    => $i + 1,
+        'nombre' => htmlspecialchars(addslashes($s['sucursal_nombre'] ?? '')),
+        'lat'    => $s['lat'] ? (float)$s['lat'] : null,
+        'lng'    => $s['lng'] ? (float)$s['lng'] : null,
+    ];
+}
+echo 'var paradas = ' . json_encode($sucursalesJS) . ';' . "\n";
+?>
+paradas.forEach(function(p) {
+  if (!p.lat || !p.lng) return;
+  L.marker([p.lat, p.lng], {icon: iconoParada(p.num)})
+   .addTo(mapa)
+   .bindPopup('📦 Parada ' + p.num + ': ' + p.nombre);
+});
 
 // Si ya hay posición conocida al cargar
 <?php if ($hayTracking): ?>
@@ -184,12 +241,10 @@ function actualizarKm() {
 }
 
 // ── OSRM Map Matching — ajusta el trail a calles reales ──────────────────────
-// Solo activo con ≥ 6 puntos Y ≥ 200 m de recorrido; evita loops en 2 puntos
 function snapTrail(points) {
   if (points.length < 6 || matchPending) { drawRawTrail(); return; }
   var distKm = calcDistanciaKm(points);
-  if (distKm < 0.2) { drawRawTrail(); return; } // < 200 m: no tiene sentido snapping
-  // Tomar máx 100 puntos (límite OSRM público); muestrear si hay más
+  if (distKm < 0.2) { drawRawTrail(); return; }
   var pts = points;
   if (pts.length > 100) {
     var step = Math.floor(pts.length / 99);
@@ -232,6 +287,12 @@ function drawRawTrail() {
   }
 }
 
+function ajustarVista() {
+  var pts = posicionesRuta.slice();
+  paradas.forEach(function(p) { if (p.lat && p.lng) pts.push([p.lat, p.lng]); });
+  if (pts.length) mapa.fitBounds(L.latLngBounds(pts), {padding: [30, 30]});
+}
+
 // Pre-cargar historial de posiciones para mostrar el recorrido completo
 fetch(BASE_URL + 'api/historialTracking/' + pedidoId)
   .then(function(r) { return r.json(); })
@@ -244,7 +305,6 @@ fetch(BASE_URL + 'api/historialTracking/' + pedidoId)
     if (!hist.length) return;
     if (posicionesRuta.length === 0) {
       posicionesRuta = hist.slice();
-      // Snap historial solo si hay suficientes puntos y distancia (evita loops con 2 pts)
       if (hist.length >= 6 && calcDistanciaKm(hist) >= 0.2) {
         snapTrail(hist); lastMatchedAt = Date.now();
       } else if (hist.length >= 2) {
@@ -253,10 +313,15 @@ fetch(BASE_URL + 'api/historialTracking/' + pedidoId)
       if (!marcadorRepartidor) {
         var last = posicionesRuta[posicionesRuta.length - 1];
         marcadorRepartidor = L.marker(last, {icon: iconoRepartidor}).addTo(mapa).bindPopup('🚚 Última posición registrada');
-        mapa.setView(last, 15);
+        if (autoFollow) mapa.setView(last, 15);
         var st = document.getElementById('sinTracking');
         if (st) st.style.display = 'none';
       }
+    }
+    // Marcador de inicio del viaje
+    if (hist.length && !marcadorInicio) {
+      marcadorInicio = L.marker(hist[0], {icon: iconoInicio, zIndexOffset: -10})
+        .addTo(mapa).bindPopup('🚩 Inicio del viaje');
     }
     actualizarKm();
     var cntEl = document.getElementById('posCount');
@@ -296,27 +361,31 @@ function actualizarPosicion(lat, lng) {
 
   if (marcadorRepartidor) {
     marcadorRepartidor.setLatLng(pos);
-    mapa.panTo(pos);
+    if (autoFollow) mapa.panTo(pos);
   } else {
     marcadorRepartidor = L.marker(pos, {icon: iconoRepartidor})
       .addTo(mapa).bindPopup('🚚 Repartidor en camino').openPopup();
+    if (autoFollow) mapa.panTo(pos);
   }
 
-  // Actualizar trail: snap a calles cuando hay ≥5 puntos nuevos o ≥45 s
+  // Marcador inicio del viaje (primera posición recibida en vivo)
+  if (!marcadorInicio) {
+    marcadorInicio = L.marker(pos, {icon: iconoInicio, zIndexOffset: -10})
+      .addTo(mapa).bindPopup('🚩 Inicio del viaje');
+  }
+
   var now = Date.now();
   var shouldSnap = rawBuffer.length >= 5 || (rawBuffer.length >= 2 && now - lastMatchedAt > 45000);
   if (shouldSnap) {
-    snapTrail(posicionesRuta); // internamente verifica mínimos antes de llamar OSRM
+    snapTrail(posicionesRuta);
   } else {
     drawRawTrail();
   }
 
   actualizarKm();
 
-  // Ocultar aviso "sin GPS"
   var st = document.getElementById('sinTracking');
   if (st) st.style.display = 'none';
-  // Ruta de conducción al destino
   actualizarRutaOSRM(lat, lng);
 }
 

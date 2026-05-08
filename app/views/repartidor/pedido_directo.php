@@ -231,9 +231,10 @@ function _initMapa(lat, lng) {
   }
 }
 
-// Guardar posición en DB cada 60 s para historial de recorrido
 var _ultimaLat = null, _ultimaLng = null;
 var _lastSentLat = null, _lastSentLng = null;
+var _lastSavedLat = null, _lastSavedLng = null;
+var _lastSavedAt  = 0;   // timestamp del último guardado en DB
 
 // Distancia Haversine en metros — filtra jitter GPS
 function _distM(la1, lo1, la2, lo2) {
@@ -251,9 +252,17 @@ function _guardarPosDB(lat, lng) {
     body: JSON.stringify({pedido_id: pedidoId, lat: lat, lng: lng})
   }).catch(function() {});
 }
-setInterval(function() {
-  if (_ultimaLat && _ultimaLng) _guardarPosDB(_ultimaLat, _ultimaLng);
-}, 60000);
+
+// Guardar en DB cuando se mueve ≥ 50 m O pasan ≥ 5 min desde el último guardado
+function _checkGuardarPos(lat, lng) {
+  var now = Date.now();
+  var movedEnough = _lastSavedLat === null || _distM(_lastSavedLat, _lastSavedLng, lat, lng) >= 50;
+  var timeEnough  = now - _lastSavedAt >= 300000; // 5 min
+  if (movedEnough || timeEnough) {
+    _guardarPosDB(lat, lng);
+    _lastSavedLat = lat; _lastSavedLng = lng; _lastSavedAt = now;
+  }
+}
 </script>
 
 <?php if ($firebaseActivo): ?>
@@ -289,9 +298,9 @@ setInterval(function() {
         // Filtro de distancia: ignorar si no se movió más de 10 m (evita jitter GPS)
         if (_lastSentLat !== null && _distM(_lastSentLat, _lastSentLng, lat, lng) < 10) return;
         _lastSentLat = lat; _lastSentLng = lng;
-        _ultimaLat = lat; _ultimaLng = lng;
 
         _initMapa(lat, lng);
+        _checkGuardarPos(lat, lng);
         set(trackRef, {
           lat: lat,
           lng: lng,
@@ -336,9 +345,9 @@ setInterval(function() {
 
         if (_lastSentLat !== null && _distM(_lastSentLat, _lastSentLng, lat, lng) < 10) return;
         _lastSentLat = lat; _lastSentLng = lng;
-        _ultimaLat = lat; _ultimaLng = lng;
 
         _initMapa(lat, lng);
+        _checkGuardarPos(lat, lng);
         fetch('<?= BASE_URL ?>api/actualizarTracking', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
