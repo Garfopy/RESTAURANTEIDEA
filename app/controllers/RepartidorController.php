@@ -95,6 +95,9 @@ class RepartidorController extends BaseController
         $pedidoModel = new PedidoModel();
         $pedidoModel->cambiarEstado($pedidoId, 'en_ruta');
 
+        $db->prepare('UPDATE pedidos SET ruta_iniciada_at = NOW() WHERE id = ?')
+           ->execute([$pedidoId]);
+
         $this->flash('success', '¡Viaje iniciado! Comparte tu ubicación para el seguimiento.');
         $this->redirect('repartidor/pedidoDirecto/' . $pedidoId);
     }
@@ -136,6 +139,9 @@ class RepartidorController extends BaseController
             'appId'       => $cfgModel->get('firebase_app_id', ''),
         ];
         $firebaseActivo = !empty($firebaseConfig['apiKey']) && !empty($firebaseConfig['databaseURL']);
+
+        $pedidoModel = new PedidoModel();
+        $sucursales  = $pedidoModel->getSucursalesPedido($pedidoId);
 
         $flash     = $this->getFlash();
         $pageTitle = 'Entrega — ' . $pedido['folio'];
@@ -182,6 +188,68 @@ class RepartidorController extends BaseController
         $this->log('Entrega directa confirmada', 'repartidor', "Pedido ID: $pedidoId");
         $this->flash('success', '¡Entrega completada! El pedido fue marcado como entregado.');
         $this->redirect('repartidor/inicio');
+    }
+
+    // ── Confirmar entrega en una sucursal (multi-parada directo) ─────────────
+    public function confirmarParadaDirecta(?string $pedidoSucursalId = null): void
+    {
+        if (!$this->isPost() || !$pedidoSucursalId) {
+            $this->redirect('repartidor/inicio');
+        }
+
+        $psId         = (int)$pedidoSucursalId;
+        $repartidorId = $this->usuarioId();
+        $db           = Database::getInstance();
+
+        // Verificar que esta parada pertenece a un pedido asignado a este repartidor
+        $stmt = $db->prepare(
+            'SELECT ps.pedido_id FROM pedido_sucursal ps
+               JOIN pedidos p ON p.id = ps.pedido_id
+              WHERE ps.id = ? AND p.repartidor_asignado_id = ?
+                AND p.tipo_entrega = \'repartidor\' AND p.estado = \'en_ruta\''
+        );
+        $stmt->execute([$psId, $repartidorId]);
+        $row = $stmt->fetch();
+
+        if (!$row) {
+            $this->flash('error', 'Parada no encontrada.');
+            $this->redirect('repartidor/inicio');
+        }
+
+        $pedidoId = (int)$row['pedido_id'];
+
+        if (empty($_FILES['foto']['tmp_name'])) {
+            $this->flash('error', 'Debes tomar una foto como evidencia de entrega.');
+            $this->redirect('repartidor/pedidoDirecto/' . $pedidoId);
+        }
+
+        $fotoPath = $this->guardarFoto($_FILES['foto'], 'ps_' . $psId);
+        if (!$fotoPath) {
+            $this->flash('error', 'Formato de imagen no válido. Usa JPG, PNG o WEBP.');
+            $this->redirect('repartidor/pedidoDirecto/' . $pedidoId);
+        }
+
+        $pedidoModel = new PedidoModel();
+        $pedidoModel->confirmarSucursalEntrega($psId, $fotoPath);
+
+        // Si ya se entregaron todas las sucursales, finalizar el viaje
+        if ($pedidoModel->allSucursalesEntregadas($pedidoId)) {
+            // Comprimir trail GPS y guardar en pedido
+            $rows = $db->prepare(
+                'SELECT lat, lng FROM tracking_posiciones WHERE pedido_id = ? ORDER BY ts ASC LIMIT 300'
+            );
+            $rows->execute([$pedidoId]);
+            $pts = $rows->fetchAll(\PDO::FETCH_NUM);
+
+            $sampled = $this->samplePoints($pts, 100);
+            $pedidoModel->saveRutaPolyline($pedidoId, json_encode($sampled));
+
+            $this->flash('success', '¡Viaje finalizado! Todas las sucursales entregadas.');
+            $this->redirect('repartidor/historial');
+        }
+
+        $this->flash('success', 'Sucursal entregada. Continúa al siguiente destino.');
+        $this->redirect('repartidor/pedidoDirecto/' . $pedidoId);
     }
 
     public function entrega(?string $paradaId = null): void
@@ -305,6 +373,18 @@ class RepartidorController extends BaseController
         $pageTitle = 'Historial de entregas';
 
         require ROOT_PATH . '/app/views/repartidor/historial.php';
+    }
+
+    private function samplePoints(array $pts, int $max): array
+    {
+        if (count($pts) <= $max) return $pts;
+        $step    = count($pts) / ($max - 1);
+        $sampled = [];
+        for ($i = 0; $i < $max - 1; $i++) {
+            $sampled[] = $pts[(int)round($i * $step)];
+        }
+        $sampled[] = $pts[count($pts) - 1];
+        return $sampled;
     }
 
     private function guardarFirma(string $base64, string $paradaId): ?string

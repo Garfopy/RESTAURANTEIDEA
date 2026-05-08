@@ -723,6 +723,43 @@ class PedidoModel extends BaseModel
         );
     }
 
+    // ── Entrega por sucursal (flujo multi-parada directo) ─────────────────────
+
+    public function confirmarSucursalEntrega(int $pedidoSucursalId, string $fotoPath): void
+    {
+        $this->execute(
+            "UPDATE pedido_sucursal
+                SET estado = 'entregado', foto_entrega_path = ?, fecha_llegada = NOW()
+              WHERE id = ?",
+            [$fotoPath, $pedidoSucursalId]
+        );
+    }
+
+    public function allSucursalesEntregadas(int $pedidoId): bool
+    {
+        $db   = Database::getInstance();
+        $stmt = $db->prepare(
+            "SELECT COUNT(*) FROM pedido_sucursal WHERE pedido_id = ? AND estado != 'entregado'"
+        );
+        $stmt->execute([$pedidoId]);
+        return (int)$stmt->fetchColumn() === 0;
+    }
+
+    public function saveRutaPolyline(int $pedidoId, string $polylineJson): void
+    {
+        $db = Database::getInstance();
+        $db->prepare(
+            "UPDATE pedidos
+                SET ruta_polyline = ?, ruta_finalizada_at = NOW(), estado = 'entregado'
+              WHERE id = ?"
+        )->execute([$polylineJson, $pedidoId]);
+
+        $db->prepare('DELETE FROM tracking_posiciones WHERE pedido_id = ?')
+           ->execute([$pedidoId]);
+
+        $this->logEstado($pedidoId, 'entregado');
+    }
+
     public function asignarCostosEnvioParadas(int $pedidoId, array $envios): void
     {
         if (empty($envios)) return;

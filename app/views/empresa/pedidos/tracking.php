@@ -4,6 +4,7 @@ $hayTracking   = !empty($tracking) && $tracking['lat_actual'] && $tracking['lng_
 $sucursalLat   = $tracking['sucursal_lat'] ?? null;
 $sucursalLng   = $tracking['sucursal_lng'] ?? null;
 $estadoPedido  = $pedido['estado'] ?? 'pendiente';
+$rutaPolyline  = $pedido['ruta_polyline'] ?? null;
 $barraEstados  = [
     'pendiente'      => 0,
     'confirmado'     => 25,
@@ -212,6 +213,19 @@ paradas.forEach(function(p) {
    .addTo(mapa)
    .bindPopup('📦 Parada ' + p.num + ': ' + p.nombre);
 });
+
+// Si el viaje ya terminó, dibujar el recorrido guardado directamente
+<?php if ($rutaPolyline): ?>
+(function() {
+  var storedPts = <?= $rutaPolyline /* JSON array de [lat,lng] */ ?>;
+  if (storedPts && storedPts.length >= 2) {
+    L.polyline(storedPts, {color:'#C8102E', weight:3, opacity:.75, dashArray:'8,5'}).addTo(mapa);
+    var bounds = L.latLngBounds(storedPts);
+    paradas.forEach(function(p) { if (p.lat && p.lng) bounds.extend([p.lat, p.lng]); });
+    mapa.fitBounds(bounds, {padding:[30,30]});
+  }
+})();
+<?php endif; ?>
 
 // Si ya hay posición conocida al cargar
 <?php if ($hayTracking): ?>
