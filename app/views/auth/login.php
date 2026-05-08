@@ -486,7 +486,16 @@ $_waPhone  = preg_replace('/[^0-9]/', '', $_telefono);
       </form>
 
       <p style="margin-top:22px;text-align:center;font-size:.775rem;color:#9CA3AF;line-height:1.5">
-        ¿Problemas para acceder?<br>Contacta al administrador de tu empresa.
+        ¿Problemas para acceder?
+        <?php if ($_waPhone): ?>
+          <a href="https://wa.me/<?= htmlspecialchars($_waPhone) ?>?text=<?= urlencode('Hola, necesito ayuda para acceder al sistema.') ?>"
+             target="_blank" rel="noopener"
+             style="color:#25D366;font-weight:600;text-decoration:none">
+            Contacta al administrador
+          </a>
+        <?php else: ?>
+          <br>Contacta al administrador de tu empresa.
+        <?php endif; ?>
       </p>
 
     </div>
