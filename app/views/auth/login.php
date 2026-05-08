@@ -3,6 +3,9 @@ $pageTitle = 'Iniciar Sesión';
 $_cfgLogin = new ConfigModel();
 $_appLogo  = $_cfgLogin->get('app_logo', '');
 $_appName  = $_cfgLogin->get('app_name', APP_NAME);
+$_waNumero = $_cfgLogin->get('whatsapp_numero_contacto', '');
+$_telefono = $_waNumero ?: $_cfgLogin->get('telefono_contacto', '');
+$_waPhone  = preg_replace('/[^0-9]/', '', $_telefono);
 ?>
 <!DOCTYPE html>
 <html lang="es">
