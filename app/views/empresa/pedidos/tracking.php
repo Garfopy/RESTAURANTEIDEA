@@ -49,6 +49,10 @@ $progreso = $barraEstados[$estadoPedido] ?? 0;
       <span style="color:#6B7280">ETA: </span>
       <strong id="etaDisplay"><?= !empty($tracking['eta_minutos']) ? $tracking['eta_minutos'] . ' min' : '—' ?></strong>
     </div>
+    <div style="font-size:.85rem">
+      <span style="color:#6B7280">Km: </span>
+      <strong id="kmDisplay">—</strong>
+    </div>
     <?php if (!empty($tracking['sucursal_nombre'])): ?>
     <div style="font-size:.85rem">
       <span style="color:#6B7280">Destino: </span>
@@ -159,10 +163,32 @@ marcadorRepartidor = L.marker([<?= (float)$tracking['lat_actual'] ?>, <?= (float
 posicionesRuta.push([<?= (float)$tracking['lat_actual'] ?>, <?= (float)$tracking['lng_actual'] ?>]);
 <?php endif; ?>
 
+// ── Distancia total recorrida ─────────────────────────────────────────────────
+function calcDistanciaKm(points) {
+  var total = 0;
+  for (var i = 1; i < points.length; i++) {
+    var dLa = (points[i][0] - points[i-1][0]) * Math.PI / 180;
+    var dLo = (points[i][1] - points[i-1][1]) * Math.PI / 180;
+    var a = Math.sin(dLa/2)*Math.sin(dLa/2)
+          + Math.cos(points[i-1][0]*Math.PI/180)*Math.cos(points[i][0]*Math.PI/180)
+          * Math.sin(dLo/2)*Math.sin(dLo/2);
+    total += 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  }
+  return total;
+}
+function actualizarKm() {
+  var el = document.getElementById('kmDisplay');
+  if (!el || posicionesRuta.length < 2) return;
+  var km = calcDistanciaKm(posicionesRuta);
+  el.textContent = km < 1 ? Math.round(km * 1000) + ' m' : km.toFixed(2) + ' km';
+}
+
 // ── OSRM Map Matching — ajusta el trail a calles reales ──────────────────────
-// Llama al endpoint /match que "snapa" puntos GPS a la red vial
+// Solo activo con ≥ 6 puntos Y ≥ 200 m de recorrido; evita loops en 2 puntos
 function snapTrail(points) {
-  if (points.length < 2 || matchPending) return;
+  if (points.length < 6 || matchPending) { drawRawTrail(); return; }
+  var distKm = calcDistanciaKm(points);
+  if (distKm < 0.2) { drawRawTrail(); return; } // < 200 m: no tiene sentido snapping
   // Tomar máx 100 puntos (límite OSRM público); muestrear si hay más
   var pts = points;
   if (pts.length > 100) {
@@ -218,8 +244,12 @@ fetch(BASE_URL + 'api/historialTracking/' + pedidoId)
     if (!hist.length) return;
     if (posicionesRuta.length === 0) {
       posicionesRuta = hist.slice();
-      // Snap historial a calles reales
-      if (hist.length >= 2) { snapTrail(hist); lastMatchedAt = Date.now(); }
+      // Snap historial solo si hay suficientes puntos y distancia (evita loops con 2 pts)
+      if (hist.length >= 6 && calcDistanciaKm(hist) >= 0.2) {
+        snapTrail(hist); lastMatchedAt = Date.now();
+      } else if (hist.length >= 2) {
+        drawRawTrail();
+      }
       if (!marcadorRepartidor) {
         var last = posicionesRuta[posicionesRuta.length - 1];
         marcadorRepartidor = L.marker(last, {icon: iconoRepartidor}).addTo(mapa).bindPopup('🚚 Última posición registrada');
@@ -228,8 +258,9 @@ fetch(BASE_URL + 'api/historialTracking/' + pedidoId)
         if (st) st.style.display = 'none';
       }
     }
+    actualizarKm();
     var cntEl = document.getElementById('posCount');
-    if (cntEl) cntEl.textContent = pts.length + ' puntos registrados';
+    if (cntEl) cntEl.textContent = pts.length + ' pts registrados';
   })
   .catch(function() {});
 
@@ -275,10 +306,12 @@ function actualizarPosicion(lat, lng) {
   var now = Date.now();
   var shouldSnap = rawBuffer.length >= 5 || (rawBuffer.length >= 2 && now - lastMatchedAt > 45000);
   if (shouldSnap) {
-    snapTrail(posicionesRuta);
+    snapTrail(posicionesRuta); // internamente verifica mínimos antes de llamar OSRM
   } else {
-    drawRawTrail(); // provisional hasta tener suficientes puntos
+    drawRawTrail();
   }
+
+  actualizarKm();
 
   // Ocultar aviso "sin GPS"
   var st = document.getElementById('sinTracking');
