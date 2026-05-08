@@ -129,9 +129,9 @@ $graficas = $graficas ?? [];
   </div>
 </div>
 
-<script src="<?= BASE_URL ?>public/js/vendor/chart.umd.min.js"></script>
-<script src="<?= BASE_URL ?>public/js/vendor/jspdf.umd.min.js"></script>
-<script src="<?= BASE_URL ?>public/js/vendor/jspdf.plugin.autotable.min.js"></script>
+<script src="<?= BASE_URL ?>public/js/lib/chart.umd.min.js"></script>
+<script src="<?= BASE_URL ?>public/js/lib/jspdf.umd.min.js"></script>
+<script src="<?= BASE_URL ?>public/js/lib/jspdf.plugin.autotable.min.js"></script>
 
 <script>
 const REPORTE_DATA = {
