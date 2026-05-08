@@ -368,6 +368,147 @@ class EmpresaReporteController extends BaseController
             ];
         }
 
+        if ($rol === 'admin_empresa') {
+            $kpiStmt = $db->prepare(
+                "SELECT COUNT(*) AS pedidos,
+                        COALESCE(SUM(total),0) AS monto,
+                        SUM(estado = 'entregado') AS entregados,
+                        SUM(estado = 'pendiente') AS pendientes,
+                        SUM(estado = 'cancelado') AS cancelados,
+                        COALESCE(AVG(total),0) AS ticket,
+                        COUNT(DISTINCT comprador_id) AS compradores
+                   FROM pedidos
+                  WHERE empresa_id = ?
+                    AND DATE(created_at) BETWEEN ? AND ?"
+            );
+            $kpiStmt->execute([$empresaId, $desde, $hasta]);
+            $r = $kpiStmt->fetch() ?: [];
+
+            $stockStmt = $db->prepare(
+                "SELECT COUNT(*) FROM inventario inv
+                   JOIN productos p ON p.id = inv.producto_id
+                  WHERE p.empresa_id = ? AND p.activo = 1
+                    AND inv.stock <= inv.umbral_minimo"
+            );
+            $stockStmt->execute([$empresaId]);
+            $stockCritico = (int)$stockStmt->fetchColumn();
+
+            $trendStmt = $db->prepare(
+                "SELECT DATE(created_at) AS d, COUNT(*) AS pedidos, COALESCE(SUM(total),0) AS monto
+                   FROM pedidos
+                  WHERE empresa_id = ? AND DATE(created_at) BETWEEN ? AND ?
+               GROUP BY DATE(created_at) ORDER BY DATE(created_at)"
+            );
+            $trendStmt->execute([$empresaId, $desde, $hasta]);
+            $trend = $trendStmt->fetchAll();
+
+            $estStmt = $db->prepare(
+                "SELECT estado, COUNT(*) AS c FROM pedidos
+                  WHERE empresa_id = ? AND DATE(created_at) BETWEEN ? AND ?
+               GROUP BY estado"
+            );
+            $estStmt->execute([$empresaId, $desde, $hasta]);
+            $est = $estStmt->fetchAll();
+
+            $topProdStmt = $db->prepare(
+                "SELECT pr.nombre, COALESCE(SUM(pd.subtotal),0) AS monto, COALESCE(SUM(pd.cantidad),0) AS cantidad
+                   FROM pedido_detalle pd
+                   JOIN pedidos p ON p.id = pd.pedido_id
+                   JOIN productos pr ON pr.id = pd.producto_id
+                  WHERE p.empresa_id = ? AND DATE(p.created_at) BETWEEN ? AND ?
+               GROUP BY pr.id, pr.nombre
+               ORDER BY monto DESC LIMIT 5"
+            );
+            $topProdStmt->execute([$empresaId, $desde, $hasta]);
+            $topProd = $topProdStmt->fetchAll();
+
+            $topSucStmt = $db->prepare(
+                "SELECT s.nombre, COUNT(DISTINCT ps.pedido_id) AS pedidos
+                   FROM pedido_sucursal ps
+                   JOIN pedidos p ON p.id = ps.pedido_id
+                   JOIN sucursales s ON s.id = ps.sucursal_id
+                  WHERE p.empresa_id = ? AND DATE(p.created_at) BETWEEN ? AND ?
+               GROUP BY s.id, s.nombre
+               ORDER BY pedidos DESC LIMIT 5"
+            );
+            $topSucStmt->execute([$empresaId, $desde, $hasta]);
+            $topSuc = $topSucStmt->fetchAll();
+
+            $stmt = $db->prepare(
+                "SELECT DATE(p.created_at) AS fecha, p.folio,
+                        CONCAT(u.nombre, ' ', u.apellido_paterno) AS comprador,
+                        p.estado, p.total,
+                        COUNT(DISTINCT ps.id) AS sucursales
+                   FROM pedidos p
+                   JOIN usuarios u ON u.id = p.comprador_id
+              LEFT JOIN pedido_sucursal ps ON ps.pedido_id = p.id
+                  WHERE p.empresa_id = ? AND DATE(p.created_at) BETWEEN ? AND ?
+               GROUP BY p.id
+               ORDER BY p.created_at DESC LIMIT 120"
+            );
+            $stmt->execute([$empresaId, $desde, $hasta]);
+            $rows = $stmt->fetchAll();
+
+            return [
+                'titulo' => 'Reporte Ejecutivo de Empresa',
+                'kpis' => [
+                    ['label' => 'Pedidos del período', 'valor' => number_format((int)($r['pedidos'] ?? 0)), 'hint' => 'Operación total'],
+                    ['label' => 'Monto del período', 'valor' => '$' . number_format((float)($r['monto'] ?? 0), 2), 'hint' => 'Venta acumulada'],
+                    ['label' => 'Entregados', 'valor' => number_format((int)($r['entregados'] ?? 0)), 'hint' => 'Pedidos cerrados'],
+                    ['label' => 'Ticket promedio', 'valor' => '$' . number_format((float)($r['ticket'] ?? 0), 2), 'hint' => 'Monto por pedido'],
+                    ['label' => 'Compradores activos', 'valor' => number_format((int)($r['compradores'] ?? 0)), 'hint' => 'Generaron pedidos'],
+                    ['label' => 'Pendientes', 'valor' => number_format((int)($r['pendientes'] ?? 0)), 'hint' => 'Por aprobar'],
+                    ['label' => 'Cancelados', 'valor' => number_format((int)($r['cancelados'] ?? 0)), 'hint' => 'En el período'],
+                    ['label' => 'Stock crítico', 'valor' => number_format($stockCritico), 'hint' => 'Productos en alerta'],
+                ],
+                'columnas' => ['Fecha', 'Folio', 'Comprador', 'Estado', 'Total', 'Sucursales'],
+                'filas' => array_map(fn($x) => [
+                    $x['fecha'],
+                    $x['folio'],
+                    trim((string)$x['comprador']),
+                    strtoupper((string)$x['estado']),
+                    '$' . number_format((float)$x['total'], 2),
+                    (string)$x['sucursales'],
+                ], $rows),
+                'notas' => [
+                    'Stock crítico actual: ' . number_format($stockCritico) . ' productos por debajo del umbral mínimo.',
+                    'Concentrar esfuerzos comerciales en los compradores con mayor recurrencia para retención.',
+                    'Validar márgenes de los productos top para optimizar rentabilidad del catálogo.',
+                    'Parámetro técnico de conservación recomendado en operación: 0°C a 4°C.',
+                ],
+                'graficas' => [
+                    [
+                        'tipo' => 'line',
+                        'titulo' => 'Monto diario de ventas',
+                        'labels' => array_map(fn($x) => $x['d'], $trend),
+                        'data' => array_map(fn($x) => (float)$x['monto'], $trend),
+                        'label' => 'Monto ($)',
+                    ],
+                    [
+                        'tipo' => 'doughnut',
+                        'titulo' => 'Pedidos por estado',
+                        'labels' => array_map(fn($x) => strtoupper((string)$x['estado']), $est),
+                        'data' => array_map(fn($x) => (int)$x['c'], $est),
+                        'label' => 'Pedidos',
+                    ],
+                    [
+                        'tipo' => 'bar',
+                        'titulo' => 'Top 5 productos por monto',
+                        'labels' => array_map(fn($x) => (string)$x['nombre'], $topProd),
+                        'data' => array_map(fn($x) => (float)$x['monto'], $topProd),
+                        'label' => 'Monto ($)',
+                    ],
+                    [
+                        'tipo' => 'bar',
+                        'titulo' => 'Top 5 sucursales por pedidos',
+                        'labels' => array_map(fn($x) => (string)$x['nombre'], $topSuc),
+                        'data' => array_map(fn($x) => (int)$x['pedidos'], $topSuc),
+                        'label' => 'Pedidos',
+                    ],
+                ],
+            ];
+        }
+
         $kpiStmt = $db->prepare(
             "SELECT COUNT(*) AS pedidos,
                     COALESCE(SUM(total),0) AS monto,

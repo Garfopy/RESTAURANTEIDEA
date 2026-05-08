@@ -129,9 +129,9 @@ $graficas = $graficas ?? [];
   </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="<?= BASE_URL ?>public/js/vendor/chart.umd.min.js"></script>
+<script src="<?= BASE_URL ?>public/js/vendor/jspdf.umd.min.js"></script>
+<script src="<?= BASE_URL ?>public/js/vendor/jspdf.plugin.autotable.min.js"></script>
 
 <script>
 const REPORTE_DATA = {
@@ -245,13 +245,16 @@ async function descargarReportePdf() {
   if (REPORTE_DATA.mostrar.kpis && REPORTE_DATA.kpis.length) {
     doc.setTextColor(107, 114, 128); doc.setFontSize(8); doc.setFont('helvetica', 'bold');
     doc.text('INDICADORES DEL PERÍODO', margin, y); y += 8;
-    const cols = REPORTE_DATA.kpis.length;
+    const perRow = 4;
     const gap = 6;
-    const w = (pageW - margin * 2 - gap * (cols - 1)) / cols;
+    const w = (pageW - margin * 2 - gap * (perRow - 1)) / perRow;
+    const h = 60;
     REPORTE_DATA.kpis.forEach((k, i) => {
-      const x = margin + i * (w + gap);
+      const col = i % perRow;
+      if (col === 0 && i > 0) y += h + gap;
+      const x = margin + col * (w + gap);
       doc.setDrawColor(229, 231, 235); doc.setFillColor(250, 250, 250);
-      doc.rect(x, y, w, 60, 'FD');
+      doc.rect(x, y, w, h, 'FD');
       doc.setTextColor(107, 114, 128); doc.setFontSize(7); doc.setFont('helvetica', 'bold');
       doc.text(String(k.label).toUpperCase(), x + 8, y + 14);
       doc.setTextColor(17, 24, 39); doc.setFontSize(15);
@@ -259,7 +262,7 @@ async function descargarReportePdf() {
       doc.setTextColor(156, 163, 175); doc.setFontSize(7); doc.setFont('helvetica', 'normal');
       doc.text(String(k.hint || ''), x + 8, y + 50);
     });
-    y += 72;
+    y += h + 12;
   }
 
   // Gráficas
