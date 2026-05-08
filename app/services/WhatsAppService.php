@@ -8,7 +8,7 @@ class WhatsAppService {
         $db = Database::getInstance();
         $get = fn(string $k) => $db->query("SELECT valor FROM global_settings WHERE clave = '$k' LIMIT 1")->fetchColumn() ?: '';
         $this->apiUrl  = 'https://graph.facebook.com/v18.0';
-        $this->token   = $get('whatsapp_token');
+        $this->token   = $get('whatsapp_api_token');
         $this->phoneId = $get('whatsapp_phone_id');
     }
 

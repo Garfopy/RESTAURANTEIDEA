@@ -61,7 +61,7 @@ function toggleVis(id) {
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
       WhatsApp Business API
     </h3>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
       <div>
         <label class="form-label">API Token</label>
         <div style="display:flex">
@@ -77,6 +77,12 @@ function toggleVis(id) {
         <input type="text" name="whatsapp_phone_id" value="<?= $s('whatsapp_phone_id') ?>"
                class="form-control" placeholder="123456789012345">
       </div>
+    </div>
+    <div>
+      <label class="form-label">Número de contacto (para enlace en login)</label>
+      <input type="text" name="whatsapp_numero_contacto" value="<?= $s('whatsapp_numero_contacto') ?>"
+             class="form-control" placeholder="+5219991234567" style="max-width:280px">
+      <p style="font-size:.75rem;color:#6B7280;margin-top:4px">Número en formato internacional. Se usa en el enlace "Contacta al administrador" de la pantalla de login.</p>
     </div>
   </div>
 
