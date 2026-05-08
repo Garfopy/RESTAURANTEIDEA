@@ -169,7 +169,7 @@ class PedidoModel extends BaseModel
                  WHERE ' . implode(' AND ', $where) . '
               ORDER BY (p.estado = "pendiente") DESC, p.created_at DESC';
 
-        return $this->paginate($sql, $params, $page);
+        return $this->paginate($sql, $params, $page, 10);
     }
 
     public function crearPersonalizado(int $empresaId, int $compradorId, string $folio, string $nota, ?string $fechaEntrega, array $lineas, float $total, int $creadoPorId): int

@@ -108,7 +108,7 @@ $estados = [
   transition: background .1s;
 }
 .pedidos-table tbody tr:hover { background: #FAFAFA; }
-.pedidos-table td { padding: 11px 16px; }
+.pedidos-table td { padding: 8px 14px; }
 .pedidos-table td.right { text-align: right; }
 .pedidos-table td.center { text-align: center; }
 .estado-badge {
@@ -213,9 +213,7 @@ $estados = [
         <th>Folio</th>
         <th>Comprador</th>
         <th class="center">Estado</th>
-        <th class="center">Entrega</th>
         <th class="right">Total</th>
-        <th>Fecha</th>
         <th class="center">Acciones</th>
       </tr>
     </thead>
@@ -230,6 +228,7 @@ $estados = [
       <tr style="<?= $esPendiente ? 'background:#FEFCE8' : '' ?>">
         <td>
           <div style="font-weight:700;font-size:.84rem;color:#111827;font-family:monospace;letter-spacing:.01em"><?= htmlspecialchars($p['folio']) ?></div>
+          <div style="font-size:.7rem;color:#9CA3AF;margin-top:2px"><?= date('d/m/Y', strtotime($p['created_at'])) ?></div>
           <?php if ($esPersonalizado): ?>
           <span style="display:inline-block;margin-top:3px;padding:1px 7px;border-radius:999px;background:#F3E8FF;color:#6B21A8;font-size:.62rem;font-weight:700;letter-spacing:.03em">Personalizado</span>
           <?php endif; ?>
@@ -238,31 +237,27 @@ $estados = [
           <?= htmlspecialchars($p['comprador_nombre'] . ' ' . $p['comprador_apellido']) ?>
         </td>
         <td class="center">
-          <span class="estado-badge" style="background:<?= $est['bg'] ?>;color:<?= $est['tx'] ?>">
-            <span style="width:6px;height:6px;border-radius:50%;background:<?= $est['dot'] ?>;flex-shrink:0"></span>
-            <?= $est['label'] ?>
-          </span>
-          <?php if ($tieneComprobante && in_array($p['estado'], ['en_preparacion','confirmado'], true)): ?>
-          <div style="margin-top:5px">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+            <span class="estado-badge" style="background:<?= $est['bg'] ?>;color:<?= $est['tx'] ?>">
+              <span style="width:6px;height:6px;border-radius:50%;background:<?= $est['dot'] ?>;flex-shrink:0"></span>
+              <?= $est['label'] ?>
+            </span>
+            <?php if (!empty($p['tipo_entrega'])): ?>
+            <span style="display:inline-flex;align-items:center;gap:4px;font-size:.68rem;color:#9CA3AF;font-weight:600">
+              <?php if ($p['tipo_entrega'] === 'pickup'): ?>
+                <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0H5m14 0h2M5 21H3"/></svg>Pickup
+              <?php else: ?>
+                <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>Repartidor
+              <?php endif; ?>
+            </span>
+            <?php endif; ?>
+            <?php if ($tieneComprobante && in_array($p['estado'], ['en_preparacion','confirmado'], true)): ?>
             <span class="estado-badge" style="background:#D1FAE5;color:#065F46">
               <svg width="9" height="9" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
               Comprobante
             </span>
-          </div>
-          <?php endif; ?>
-        </td>
-        <td class="center">
-          <?php if (!empty($p['tipo_entrega'])): ?>
-          <span style="display:inline-flex;align-items:center;gap:5px;font-size:.78rem;font-weight:600;color:#374151">
-            <?php if ($p['tipo_entrega'] === 'pickup'): ?>
-              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#6B7280" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0H5m14 0h2M5 21H3"/></svg>Pickup
-            <?php else: ?>
-              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#6B7280" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>Repartidor
             <?php endif; ?>
-          </span>
-          <?php else: ?>
-          <span style="font-size:.78rem;color:#D1D5DB">—</span>
-          <?php endif; ?>
+          </div>
         </td>
         <td class="right">
           <div style="font-size:.9rem;font-weight:800;color:#111827">$<?= number_format((float)$p['total'], 2) ?></div>
@@ -270,7 +265,6 @@ $estados = [
           <div style="font-size:.68rem;color:#9CA3AF;margin-top:1px">+ $<?= number_format($p['costo_envio'], 2) ?> envío</div>
           <?php endif; ?>
         </td>
-        <td style="font-size:.78rem;color:#9CA3AF"><?= date('d/m/Y', strtotime($p['created_at'])) ?></td>
         <td class="center">
           <div style="display:flex;justify-content:center;gap:5px;flex-wrap:wrap;align-items:center">
             <a href="<?= $baseUrl ?>pedido/detalle/<?= $p['id'] ?>" class="btn-action" style="background:#F3F4F6;color:#374151;border:1px solid #E5E7EB">
