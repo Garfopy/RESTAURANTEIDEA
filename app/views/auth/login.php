@@ -14,6 +14,26 @@ $_appName  = $_cfgLogin->get('app_name', APP_NAME);
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="<?= BASE_URL ?>public/css/carnihub.css">
   <style>
+    @keyframes textShimmer {
+      0%   { background-position: 200% center; }
+      100% { background-position: -200% center; }
+    }
+    .shimmer-heading {
+      background: linear-gradient(
+        90deg,
+        #E2E8F0 30%,
+        #FF4060 46%,
+        #C8102E 50%,
+        #FF4060 54%,
+        #E2E8F0 70%
+      );
+      background-size: 200% auto;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      animation: textShimmer 2.8s linear infinite;
+    }
+
     @keyframes loginCardIn {
       from { opacity: 0; transform: translateY(32px) scale(.97); }
       to   { opacity: 1; transform: translateY(0) scale(1); }
@@ -336,7 +356,7 @@ $_appName  = $_cfgLogin->get('app_name', APP_NAME);
 
       <div class="login-accent-bar"></div>
 
-      <h2 style="font-size:1.45rem;font-weight:800;margin-bottom:10px;text-align:center;line-height:1.25">
+      <h2 class="shimmer-heading" style="font-size:1.45rem;font-weight:800;margin-bottom:10px;text-align:center;line-height:1.25">
         Abasto Inteligente<br>de Carne
       </h2>
       <p style="color:#94A3B8;text-align:center;font-size:.84rem;line-height:1.65;max-width:240px;margin:0">
