@@ -537,6 +537,7 @@ new Chart(document.getElementById('chartMetodosPago'), {
 
 <script>
 (function() {
+  const BASE_URL    = '<?= BASE_URL ?>';
   let chatHistorial = [];
   let chatAbierto   = false;
   let chatEnviando  = false;
