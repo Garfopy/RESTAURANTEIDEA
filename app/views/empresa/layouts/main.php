@@ -35,7 +35,7 @@ $esComprador   = $rol === 'comprador';
     .sidebar {
       width: 256px;
       min-height: 100vh;
-      background: #111827;
+      background: #fff;
       flex-shrink: 0;
       display: flex;
       flex-direction: column;
@@ -43,15 +43,15 @@ $esComprador   = $rol === 'comprador';
       top: 0; left: 0;
       z-index: 100;
       transition: transform .3s ease;
-      border-right: 1px solid rgba(255,255,255,.05);
+      border-right: 1px solid #E5E7EB;
     }
     .sidebar-logo-area {
       padding: 18px 20px 16px;
-      border-bottom: 1px solid rgba(255,255,255,.07);
+      border-bottom: 1px solid #F3F4F6;
     }
     .sidebar-company {
       font-size: .72rem;
-      color: #6B7280;
+      color: #9CA3AF;
       font-weight: 500;
       margin-top: 6px;
       overflow: hidden;
@@ -69,7 +69,7 @@ $esComprador   = $rol === 'comprador';
       gap: 10px;
       padding: 9px 14px;
       font-size: .845rem;
-      color: #9CA3AF;
+      color: #6B7280;
       text-decoration: none;
       border-radius: 8px;
       margin: 1px 10px;
@@ -78,12 +78,12 @@ $esComprador   = $rol === 'comprador';
       font-weight: 500;
     }
     .sidebar a:hover {
-      background: rgba(255,255,255,.06);
-      color: #E5E7EB;
+      background: #F9FAFB;
+      color: #111827;
     }
     .sidebar a.active {
-      background: rgba(200,16,46,.14);
-      color: #fff;
+      background: #FEF2F2;
+      color: var(--color-primary);
       font-weight: 700;
       border-left-color: var(--color-primary);
     }
@@ -93,14 +93,14 @@ $esComprador   = $rol === 'comprador';
       font-size: .63rem;
       font-weight: 700;
       letter-spacing: .1em;
-      color: #374151;
+      color: #D1D5DB;
       padding: 14px 18px 4px;
       text-transform: uppercase;
     }
     .sidebar-user {
       padding: 14px 16px;
-      border-top: 1px solid rgba(255,255,255,.07);
-      background: rgba(0,0,0,.25);
+      border-top: 1px solid #F3F4F6;
+      background: #FAFAFA;
     }
     .sidebar-user-info {
       display: flex;
@@ -111,37 +111,37 @@ $esComprador   = $rol === 'comprador';
     .sidebar-avatar {
       width: 34px; height: 34px;
       border-radius: 50%;
-      background: rgba(200,16,46,.2);
-      border: 1.5px solid rgba(200,16,46,.4);
+      background: #FEF2F2;
+      border: 1.5px solid #FECACA;
       display: flex; align-items: center; justify-content: center;
       font-weight: 800; font-size: .85rem;
-      color: #F87171; flex-shrink: 0;
+      color: var(--color-primary); flex-shrink: 0;
     }
     .sidebar-user-name {
       font-size: .8rem; font-weight: 600;
-      color: #E5E7EB;
+      color: #111827;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     .badge-rol {
       font-size: .62rem; padding: 2px 8px;
       border-radius: 999px;
-      background: rgba(200,16,46,.18);
-      color: #F87171; font-weight: 700;
+      background: #FEF2F2;
+      color: var(--color-primary); font-weight: 700;
       letter-spacing: .03em;
     }
     .sidebar-logout {
       display: flex; align-items: center; justify-content: center; gap: 6px;
       width: 100%; padding: 7px 10px;
       border-radius: 7px;
-      font-size: .78rem; color: #6B7280;
+      font-size: .78rem; color: #9CA3AF;
       text-decoration: none;
-      border: 1px solid rgba(255,255,255,.08);
+      border: 1px solid #E5E7EB;
       transition: color .15s, border-color .15s, background .15s;
     }
     .sidebar-logout:hover {
-      color: #F87171;
-      border-color: rgba(200,16,46,.4);
-      background: rgba(200,16,46,.07);
+      color: var(--color-primary);
+      border-color: #FECACA;
+      background: #FEF2F2;
     }
 
     /* ── Main content ── */
