@@ -19,7 +19,7 @@ class LimiteController extends BaseController
         $sucursales    = $sucursalModel->getByEmpresa($empresaId);
 
         $db        = Database::getInstance();
-        $stmtProds = $db->prepare('SELECT id, nombre, unidad FROM productos WHERE empresa_id=? AND activo=1 ORDER BY nombre');
+        $stmtProds = $db->prepare('SELECT id, nombre, presentacion AS unidad FROM productos WHERE empresa_id=? AND activo=1 ORDER BY nombre');
         $stmtProds->execute([$empresaId]);
         $productos = $stmtProds->fetchAll();
 

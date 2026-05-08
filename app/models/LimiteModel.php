@@ -9,7 +9,7 @@ class LimiteModel extends BaseModel
             "SELECT lc.*,
                     s.nombre AS sucursal_nombre,
                     u.nombre AS comprador_nombre, u.apellido_paterno AS comprador_apellido,
-                    p.nombre AS producto_nombre, p.unidad
+                    p.nombre AS producto_nombre, p.presentacion AS unidad
                FROM limites_compra lc
           LEFT JOIN sucursales s ON s.id = lc.sucursal_id
           LEFT JOIN usuarios u ON u.id = s.comprador_id
