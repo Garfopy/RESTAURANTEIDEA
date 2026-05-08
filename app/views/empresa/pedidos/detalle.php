@@ -323,6 +323,18 @@ function tiempoTranscurrido(string $desde, string $hasta): string {
   </a>
 </div>
 <?php endif; ?>
+<!-- Recorrido guardado para pedidos entregados -->
+<?php if (!empty($pedido['ruta_polyline']) && ($pedido['tipo_entrega'] ?? '') === 'repartidor'): ?>
+<div style="margin-bottom:20px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:12px;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+  <div style="font-size:.9rem;color:#1E40AF">
+    🗺 <strong>Recorrido guardado</strong> — el viaje fue completado y el recorrido GPS está disponible.
+  </div>
+  <a href="<?= BASE_URL ?>pedido/tracking/<?= $pedido['id'] ?>"
+     style="display:inline-flex;align-items:center;gap:8px;background:#1E40AF;color:#fff;text-decoration:none;padding:9px 18px;border-radius:9px;font-size:.85rem;font-weight:700">
+    🗺 Ver recorrido del viaje
+  </a>
+</div>
+<?php endif; ?>
 <?php if ($esComprador && $pedido['estado'] === 'entregado'): ?>
 <div style="margin-bottom:20px;background:#D1FAE5;border:1px solid #A7F3D0;border-radius:12px;padding:16px 20px">
   <div style="font-weight:700;color:#065F46;font-size:.9rem">✅ Tu pedido fue entregado</div>

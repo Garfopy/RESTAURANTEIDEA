@@ -1,10 +1,14 @@
 <?php
-// Encontrar la primera sucursal pendiente
-$paradaActual = null;
+// Encontrar la primera sucursal pendiente y su número de orden
+$paradaActual    = null;
+$paradaActualNum = 1;
 $todasEntregadas = true;
-foreach ($sucursales as $s) {
+foreach ($sucursales as $i => $s) {
     if (empty($s['foto_entrega_path'])) {
-        if (!$paradaActual) $paradaActual = $s;
+        if (!$paradaActual) {
+            $paradaActual    = $s;
+            $paradaActualNum = $i + 1;
+        }
         $todasEntregadas = false;
     }
 }
@@ -143,7 +147,7 @@ foreach ($sucursales as $s) {
 
     <!-- Destino actual -->
     <div class="card">
-      <div class="dir-label">📍 PARADA <?= array_search($paradaActual, $sucursales) + 1 ?> — <?= htmlspecialchars(strtoupper($paradaActual['sucursal_nombre'])) ?></div>
+      <div class="dir-label">📍 PARADA <?= $paradaActualNum ?> — <?= htmlspecialchars(strtoupper($paradaActual['sucursal_nombre'])) ?></div>
       <?php if (!empty($paradaActual['direccion'])): ?>
       <div class="dir-text"><?= htmlspecialchars($paradaActual['direccion']) ?></div>
       <?php if (!empty($paradaActual['referencia_entrega'])): ?>

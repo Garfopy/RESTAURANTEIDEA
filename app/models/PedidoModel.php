@@ -408,7 +408,8 @@ class PedidoModel extends BaseModel
     public function getSucursalesPedido(int $pedidoId): array
     {
         return $this->query(
-            'SELECT ps.id, ps.estado, s.nombre AS sucursal_nombre, s.direccion, s.lat, s.lng
+            'SELECT ps.id, ps.estado, ps.foto_entrega_path, ps.fecha_llegada,
+                    s.nombre AS sucursal_nombre, s.direccion, s.lat, s.lng
                FROM pedido_sucursal ps
                JOIN sucursales s ON s.id = ps.sucursal_id
               WHERE ps.pedido_id = ?
