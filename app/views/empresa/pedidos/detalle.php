@@ -137,7 +137,13 @@ function tiempoTranscurrido(string $desde, string $hasta): string {
   if ($tieneParadas && in_array($pedido['estado'], array_merge($estadosBloq, ['en_preparacion', 'confirmado']), true)):
   ?>
   <div style="margin-top:14px;padding-top:12px;border-top:1px dashed #E5E7EB">
-    <div style="font-size:.72rem;font-weight:700;color:#6B7280;margin-bottom:8px;letter-spacing:.05em">PARADAS DE ENTREGA</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:4px">
+      <div style="font-size:.72rem;font-weight:700;color:#6B7280;letter-spacing:.05em">PARADAS DE ENTREGA</div>
+      <?php $hayFotos = !empty(array_filter($pedido['sucursales'], fn($s) => !empty($s['foto_entrega_path']))); ?>
+      <?php if ($hayFotos): ?>
+      <div style="font-size:.68rem;color:#059669;font-weight:600">📷 Haz clic en la foto para verla en grande</div>
+      <?php endif; ?>
+    </div>
     <div style="display:flex;flex-wrap:wrap;gap:8px">
       <?php foreach ($pedido['sucursales'] as $i => $ps):
         $psEst = $ps['estado'] ?? 'pendiente';
@@ -166,11 +172,14 @@ function tiempoTranscurrido(string $desde, string $hasta): string {
           <span style="font-size:.72rem;color:#374151;font-weight:600">$<?= number_format($ps['costo_envio_sucursal'], 2) ?></span>
           <?php endif; ?>
           <?php if (!empty($ps['foto_entrega_path'])): ?>
-          <a href="<?= htmlspecialchars($ps['foto_entrega_path']) ?>" target="_blank" title="Ver foto de evidencia"
-             style="flex-shrink:0">
-            <img src="<?= htmlspecialchars($ps['foto_entrega_path']) ?>" alt="Evidencia"
-                 style="width:36px;height:36px;object-fit:cover;border-radius:6px;border:2px solid #A7F3D0;display:block">
+          <a href="<?= htmlspecialchars($ps['foto_entrega_path']) ?>" target="_blank"
+             style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:2px;text-decoration:none">
+            <img src="<?= htmlspecialchars($ps['foto_entrega_path']) ?>" alt="Evidencia de entrega"
+                 style="width:52px;height:52px;object-fit:cover;border-radius:8px;border:2px solid #A7F3D0;display:block;box-shadow:0 1px 4px rgba(0,0,0,.1)">
+            <span style="font-size:.6rem;color:#059669;font-weight:700">📷 Ver foto</span>
           </a>
+          <?php else: ?>
+          <span style="font-size:.65rem;color:#D1D5DB;background:#F9FAFB;border:1px dashed #E5E7EB;border-radius:6px;padding:4px 8px;white-space:nowrap">Sin foto aún</span>
           <?php endif; ?>
         </div>
       </div>

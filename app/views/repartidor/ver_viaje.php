@@ -137,12 +137,18 @@
   }
 
   // Paradas numeradas
-  var paradas = <?= json_encode(array_map(fn($s) => [
-    'lat'    => $s['lat']  ?? null,
-    'lng'    => $s['lng']  ?? null,
-    'nombre' => $s['sucursal_nombre'],
-    'num'    => array_search($s, $sucursales) + 1,
-  ], $sucursales)) ?>;
+  var paradas = <?php
+    $paradaJs = [];
+    foreach ($sucursales as $idx => $s) {
+        $paradaJs[] = [
+            'lat'    => isset($s['lat'])  ? (float)$s['lat']  : null,
+            'lng'    => isset($s['lng'])  ? (float)$s['lng']  : null,
+            'nombre' => $s['sucursal_nombre'],
+            'num'    => $idx + 1,
+        ];
+    }
+    echo json_encode($paradaJs);
+  ?>;
   paradas.forEach(function(p) {
     if (!p.lat || !p.lng) return;
     L.marker([p.lat, p.lng], { icon: L.divIcon({

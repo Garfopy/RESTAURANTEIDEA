@@ -464,7 +464,9 @@ class RepartidorController extends BaseController
         $pageTitle = 'Recorrido — ' . $pedido['folio'];
 
         require ROOT_PATH . '/app/views/repartidor/ver_viaje.php';
-    }(array $pts, int $max): array
+    }
+
+    private function samplePoints(array $pts, int $max): array
     {
         if (count($pts) <= $max) return $pts;
         $step    = count($pts) / ($max - 1);
