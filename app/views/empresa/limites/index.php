@@ -51,14 +51,8 @@ $inactivos = count($limites) - $activos;
       </div>
 
       <div>
-        <label style="display:block;font-size:.75rem;font-weight:600;color:#374151;margin-bottom:4px">Límite kg</label>
-        <input type="number" name="limite_kg" min="0" step="0.01" placeholder="Sin límite"
-               style="width:100%;padding:8px 10px;border:1px solid #D1D5DB;border-radius:8px;font-size:.85rem">
-      </div>
-
-      <div>
-        <label style="display:block;font-size:.75rem;font-weight:600;color:#374151;margin-bottom:4px">Límite monto ($)</label>
-        <input type="number" name="limite_monto" min="0" step="0.01" placeholder="Sin límite"
+        <label style="display:block;font-size:.75rem;font-weight:600;color:#374151;margin-bottom:4px">Límite kg *</label>
+        <input type="number" name="limite_kg" min="0" step="0.01" placeholder="Ej: 50"
                style="width:100%;padding:8px 10px;border:1px solid #D1D5DB;border-radius:8px;font-size:.85rem">
       </div>
 
@@ -100,7 +94,7 @@ $inactivos = count($limites) - $activos;
     <table style="width:100%;border-collapse:collapse;min-width:560px">
       <thead>
         <tr style="background:#F9FAFB;border-bottom:1px solid #E5E7EB">
-          <?php foreach (['Producto','Límite kg','Límite monto','Período','Estado','Acciones'] as $h): ?>
+          <?php foreach (['Producto','Límite kg','Período','Estado','Acciones'] as $h): ?>
           <th style="padding:10px 14px;text-align:left;font-size:.72rem;color:#6B7280;font-weight:700;text-transform:uppercase;white-space:nowrap"><?= $h ?></th>
           <?php endforeach; ?>
         </tr>
@@ -113,9 +107,6 @@ $inactivos = count($limites) - $activos;
           </td>
           <td style="padding:11px 14px;font-size:.875rem;font-weight:600;color:#374151">
             <?= $l['limite_kg'] ? number_format($l['limite_kg'], 2) . ' kg' : '—' ?>
-          </td>
-          <td style="padding:11px 14px;font-size:.875rem;font-weight:600;color:#374151">
-            <?= $l['limite_monto'] ? '$' . number_format($l['limite_monto'], 2) : '—' ?>
           </td>
           <td style="padding:11px 14px">
             <span style="font-size:.75rem;padding:2px 8px;border-radius:999px;background:#EDE9FE;color:#5B21B6;font-weight:600">
@@ -170,13 +161,8 @@ $inactivos = count($limites) - $activos;
         </div>
 
         <div>
-          <label style="display:block;font-size:.75rem;font-weight:600;color:#374151;margin-bottom:4px">Límite kg</label>
-          <input type="number" name="limite_kg" id="editLimiteKg" min="0" step="0.01" placeholder="Sin límite"
-                 style="width:100%;padding:8px 10px;border:1px solid #D1D5DB;border-radius:8px;font-size:.85rem">
-        </div>
-        <div>
-          <label style="display:block;font-size:.75rem;font-weight:600;color:#374151;margin-bottom:4px">Límite monto ($)</label>
-          <input type="number" name="limite_monto" id="editLimiteMonto" min="0" step="0.01" placeholder="Sin límite"
+          <label style="display:block;font-size:.75rem;font-weight:600;color:#374151;margin-bottom:4px">Límite kg *</label>
+          <input type="number" name="limite_kg" id="editLimiteKg" min="0" step="0.01" placeholder="Ej: 50"
                  style="width:100%;padding:8px 10px;border:1px solid #D1D5DB;border-radius:8px;font-size:.85rem">
         </div>
         <div>
@@ -200,10 +186,9 @@ $inactivos = count($limites) - $activos;
 <script>
 function abrirEditar(l) {
   document.getElementById('formEditar').action = '<?= BASE_URL ?>limite/actualizar/' + l.id;
-  document.getElementById('editProducto').value    = l.producto_id  || '';
-  document.getElementById('editLimiteKg').value    = l.limite_kg    || '';
-  document.getElementById('editLimiteMonto').value = l.limite_monto || '';
-  document.getElementById('editPeriodo').value     = l.periodo;
+  document.getElementById('editProducto').value = l.producto_id || '';
+  document.getElementById('editLimiteKg').value = l.limite_kg   || '';
+  document.getElementById('editPeriodo').value  = l.periodo;
   document.getElementById('modalEditar').style.display = 'flex';
 }
 function cerrarEditar() {

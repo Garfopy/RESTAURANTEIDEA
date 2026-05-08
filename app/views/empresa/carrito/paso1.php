@@ -96,7 +96,7 @@ $carritoItems = $carrito ?? [];
                 <?php endif; ?>
                 <?php if (!empty($limitePorProducto[$prod['id']])): ?>
                 <?php $lim = $limitePorProducto[$prod['id']]; $perC = ['por_pedido'=>'/pedido','semanal'=>'/semana','mensual'=>'/mes'][$lim['periodo']] ?? ''; ?>
-                <div style="font-size:.68rem;font-weight:700;color:#92400E;margin-top:2px">🔒 Máx. <?= $lim['limite_kg'] ? number_format($lim['limite_kg'],0).' kg' : '$'.number_format($lim['limite_monto'],2) ?> <?= $perC ?></div>
+                <div style="font-size:.68rem;font-weight:700;color:#92400E;margin-top:2px">🔒 Máx. <?= number_format($lim['limite_kg'],0) ?> kg <?= $perC ?></div>
                 <?php endif; ?>
                 <!-- Alerta de descuento por tramo -->
                 <div id="alert-<?= $prod['id'] ?>" style="display:none;margin-top:4px;font-size:.72rem;padding:3px 8px;border-radius:6px;font-weight:600"></div>
@@ -201,6 +201,8 @@ const preciosProductos = {};
 let debTimers = {};
 // Mapa de escalonados por producto (se llena con la API)
 const escalonadosMap = {};
+// Límites de compra por producto_id
+const limitesProducto = <?= json_encode($limitePorProducto ?? []) ?>;
 
 carritoInicial.forEach(item => {
   preciosProductos[item.producto_id] = {
@@ -216,7 +218,11 @@ carritoInicial.forEach(item => {
 function cambiarCantidad(id, delta, precioBase, nombre, presentacion) {
   const input = document.getElementById('qty-' + id);
   const val = parseFloat(input.value) || 0;
-  const nuevo = Math.max(0, Math.round((val + delta) * 2) / 2);
+  let nuevo = Math.max(0, Math.round((val + delta) * 2) / 2);
+  const lim = limitesProducto[id];
+  if (lim && lim.limite_kg && nuevo > parseFloat(lim.limite_kg)) {
+    nuevo = parseFloat(lim.limite_kg);
+  }
   input.value = nuevo || '';
   actualizarFila(id, precioBase, nombre, presentacion);
 }
@@ -263,9 +269,12 @@ function actualizarFila(id, precioBase, nombre, presentacion) {
 
         preciosProductos[id] = { precio, precioBase, nombre, presentacion, cantidad: qty, subtotal };
 
-        // Guardar escalonados para alertas
-        if (d.escalonados) escalonadosMap[id] = d.escalonados;
-        mostrarAlertaDescuento(id, qty, precio, precioBase, d.escalonados || []);
+        // Filtrar tramos por límite antes de mostrar alertas
+        const limProd = limitesProducto[id];
+        const maxKgProd = limProd?.limite_kg ? parseFloat(limProd.limite_kg) : Infinity;
+        const escFiltrados = (d.escalonados || []).filter(t => parseFloat(t.cantidad_desde || t.cantidad_min || 0) <= maxKgProd);
+        if (d.escalonados) escalonadosMap[id] = escFiltrados;
+        mostrarAlertaDescuento(id, qty, precio, precioBase, escFiltrados);
 
         renderTicket();
       })

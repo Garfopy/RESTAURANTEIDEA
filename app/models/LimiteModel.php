@@ -19,14 +19,13 @@ class LimiteModel extends BaseModel
     public function crear(array $data): int
     {
         return $this->insert([
-            'empresa_id'   => $data['empresa_id'],
-            'sucursal_id'  => $data['sucursal_id']  ?: null,
-            'producto_id'  => $data['producto_id']  ?: null,
-            'limite_kg'    => $data['limite_kg']    ?: null,
-            'limite_monto' => $data['limite_monto'] ?: null,
-            'periodo'      => $data['periodo'],
-            'activo'       => 1,
-            'created_by'   => $data['created_by'],
+            'empresa_id'  => $data['empresa_id'],
+            'sucursal_id' => null,
+            'producto_id' => $data['producto_id'] ?: null,
+            'limite_kg'   => $data['limite_kg']   ?: null,
+            'periodo'     => $data['periodo'],
+            'activo'      => 1,
+            'created_by'  => $data['created_by'],
         ]);
     }
 
@@ -34,12 +33,11 @@ class LimiteModel extends BaseModel
     {
         $this->execute(
             "UPDATE limites_compra
-                SET producto_id=?, limite_kg=?, limite_monto=?, periodo=?
+                SET producto_id=?, limite_kg=?, periodo=?
               WHERE id=? AND empresa_id=?",
             [
-                $data['producto_id']  ?: null,
-                $data['limite_kg']    ?: null,
-                $data['limite_monto'] ?: null,
+                $data['producto_id'] ?: null,
+                $data['limite_kg']   ?: null,
                 $data['periodo'],
                 $id,
                 $data['empresa_id'],

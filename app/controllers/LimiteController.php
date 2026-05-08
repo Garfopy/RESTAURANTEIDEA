@@ -37,13 +37,11 @@ class LimiteController extends BaseController
         }
         $empresaId = $this->empresaId();
         (new LimiteModel())->crear([
-            'empresa_id'   => $empresaId,
-            'sucursal_id'  => null,
-            'producto_id'  => $this->post('producto_id'),
-            'limite_kg'    => $this->post('limite_kg'),
-            'limite_monto' => $this->post('limite_monto'),
-            'periodo'      => $this->post('periodo') ?: 'por_pedido',
-            'created_by'   => $this->usuarioId(),
+            'empresa_id'  => $empresaId,
+            'producto_id' => $this->post('producto_id'),
+            'limite_kg'   => $this->post('limite_kg'),
+            'periodo'     => $this->post('periodo') ?: 'por_pedido',
+            'created_by'  => $this->usuarioId(),
         ]);
         $this->flash('success', 'Límite creado correctamente.');
         $this->redirect('limite/index');
@@ -56,11 +54,10 @@ class LimiteController extends BaseController
         }
         $empresaId = $this->empresaId();
         (new LimiteModel())->actualizar((int)$id, [
-            'empresa_id'   => $empresaId,
-            'producto_id'  => $this->post('producto_id'),
-            'limite_kg'    => $this->post('limite_kg'),
-            'limite_monto' => $this->post('limite_monto'),
-            'periodo'      => $this->post('periodo') ?: 'por_pedido',
+            'empresa_id'  => $empresaId,
+            'producto_id' => $this->post('producto_id'),
+            'limite_kg'   => $this->post('limite_kg'),
+            'periodo'     => $this->post('periodo') ?: 'por_pedido',
         ]);
         $this->flash('success', 'Límite actualizado.');
         $this->redirect('limite/index');
