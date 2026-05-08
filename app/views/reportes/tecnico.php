@@ -163,28 +163,100 @@ function renderCharts() {
     const el = document.getElementById('grafica' + idx);
     if (!el) return;
     const isPie = g.tipo === 'doughnut' || g.tipo === 'pie';
-    const cfg = {
-      type: g.tipo,
-      data: {
-        labels: g.labels,
-        datasets: [{
-          label: g.label,
-          data: g.data,
-          backgroundColor: isPie ? PALETTE.slice(0, g.labels.length) : 'rgba(200,16,46,0.15)',
-          borderColor: isPie ? '#fff' : '#C8102E',
-          borderWidth: 2,
-          tension: 0.3,
-          fill: !isPie
+    const isGauge = g.tipo === 'gauge';
+    const isBubble = g.tipo === 'bubble';
+    const isBarH = g.tipo === 'barH';
+    let cfg;
+
+    if (isGauge) {
+      const val = Math.max(0, Math.min(100, Number(g.data[0]) || 0));
+      const color = val >= 95 ? '#10B981' : val >= 80 ? '#F59E0B' : '#EF4444';
+      cfg = {
+        type: 'doughnut',
+        data: {
+          labels: ['Cumplimiento', 'Restante'],
+          datasets: [{
+            data: [val, 100 - val],
+            backgroundColor: [color, '#E5E7EB'],
+            borderWidth: 0,
+            circumference: 180,
+            rotation: 270,
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false, animation: false,
+          cutout: '70%',
+          plugins: { legend: { display: false }, tooltip: { enabled: false } }
+        },
+        plugins: [{
+          id: 'gaugeText',
+          afterDraw(chart) {
+            const { ctx, chartArea: { width, height, top } } = chart;
+            ctx.save();
+            ctx.fillStyle = '#111827';
+            ctx.font = 'bold 28px Inter, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(val.toFixed(1) + '%', width / 2, top + height * 0.78);
+            ctx.font = '11px Inter, sans-serif';
+            ctx.fillStyle = '#6B7280';
+            ctx.fillText('Meta 98.5%', width / 2, top + height * 0.96);
+            ctx.restore();
+          }
         }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        animation: false,
-        plugins: { legend: { display: isPie, position: 'bottom' } },
-        scales: isPie ? {} : { y: { beginAtZero: true } }
-      }
-    };
+      };
+    } else if (isBubble) {
+      cfg = {
+        type: 'bubble',
+        data: {
+          datasets: g.data.map((d, i) => ({
+            label: g.labels[i] || ('Cliente ' + (i + 1)),
+            data: [d],
+            backgroundColor: PALETTE[i % PALETTE.length] + 'AA',
+            borderColor: PALETTE[i % PALETTE.length],
+            borderWidth: 1,
+          }))
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false, animation: false,
+          plugins: {
+            legend: { display: g.data.length <= 8, position: 'bottom', labels: { boxWidth: 10, font: { size: 9 } } },
+            tooltip: { callbacks: { label: (c) => c.dataset.label + ': ' + c.raw.x + ' pedidos / $' + c.raw.y.toLocaleString() } }
+          },
+          scales: {
+            x: { title: { display: true, text: 'N° de pedidos' }, beginAtZero: true },
+            y: { title: { display: true, text: 'Gasto ($)' }, beginAtZero: true }
+          }
+        }
+      };
+    } else {
+      cfg = {
+        type: isBarH ? 'bar' : g.tipo,
+        data: {
+          labels: g.labels,
+          datasets: [{
+            label: g.label,
+            data: g.data,
+            backgroundColor: isPie
+              ? PALETTE.slice(0, g.labels.length)
+              : (isBarH ? PALETTE.slice(0, g.labels.length) : 'rgba(200,16,46,0.15)'),
+            borderColor: isPie ? '#fff' : '#C8102E',
+            borderWidth: 2,
+            tension: 0.3,
+            fill: !isPie && !isBarH
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: false,
+          indexAxis: isBarH ? 'y' : 'x',
+          plugins: { legend: { display: isPie, position: 'bottom' } },
+          scales: isPie ? {} : { [isBarH ? 'x' : 'y']: { beginAtZero: true } }
+        }
+      };
+    }
+
     chartInstances[idx] = new Chart(el, cfg);
   });
 }

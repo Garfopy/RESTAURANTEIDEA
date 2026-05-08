@@ -109,12 +109,36 @@ class EmpresaReporteController extends BaseController
                     (SELECT COUNT(*) FROM empresas WHERE activo = 1) AS empresas_activas,
                     (SELECT COUNT(*) FROM usuarios WHERE activo = 1) AS usuarios_activos,
                     COUNT(*) AS pedidos,
-                    COALESCE(SUM(CASE WHEN estado != 'cancelado' THEN total ELSE 0 END),0) AS ingresos
+                    COALESCE(SUM(CASE WHEN estado != 'cancelado' THEN total ELSE 0 END),0) AS ingresos,
+                    COALESCE(SUM(CASE WHEN estado = 'entregado' THEN total ELSE 0 END),0) AS facturado,
+                    COALESCE(SUM(CASE WHEN estado IN ('confirmado','en_preparacion','en_ruta') THEN total ELSE 0 END),0) AS pendiente_cobro
                  FROM pedidos
                  WHERE DATE(created_at) BETWEEN ? AND ?"
             );
             $kpiRow->execute([$desde, $hasta]);
             $r = $kpiRow->fetch() ?: [];
+
+            $slaStmt = $db->prepare(
+                "SELECT
+                    SUM(CASE WHEN rd.estado='entregado' AND p.fecha_entrega IS NOT NULL AND DATE(rd.hora_entrega) <= p.fecha_entrega THEN 1 ELSE 0 END) AS a_tiempo,
+                    SUM(CASE WHEN rd.estado='entregado' THEN 1 ELSE 0 END) AS entregadas
+                   FROM ruta_detalle rd
+                   JOIN rutas r ON r.id = rd.ruta_id
+                   JOIN pedidos p ON p.id = rd.pedido_id
+                  WHERE DATE(r.fecha) BETWEEN ? AND ?"
+            );
+            $slaStmt->execute([$desde, $hasta]);
+            $sla = $slaStmt->fetch() ?: ['a_tiempo'=>0,'entregadas'=>0];
+            $entregadasTot = (int)($sla['entregadas'] ?? 0);
+            $slaPct = $entregadasTot > 0 ? ((int)($sla['a_tiempo'] ?? 0) / $entregadasTot) * 100 : 0.0;
+
+            $stockCriticoStmt = $db->prepare(
+                "SELECT COUNT(*) FROM inventario inv
+                   JOIN productos p ON p.id = inv.producto_id
+                  WHERE p.activo = 1 AND inv.stock <= inv.umbral_minimo"
+            );
+            $stockCriticoStmt->execute();
+            $stockCritico = (int)$stockCriticoStmt->fetchColumn();
 
             $stmt = $db->prepare(
                 "SELECT DATE(p.created_at) AS fecha, e.razon_social, p.folio, p.estado, p.total,
@@ -129,15 +153,16 @@ class EmpresaReporteController extends BaseController
             $stmt->execute([$desde, $hasta]);
             $rows = $stmt->fetchAll();
 
-            $trendStmt = $db->prepare(
-                "SELECT DATE(created_at) AS d, COUNT(*) AS pedidos, COALESCE(SUM(CASE WHEN estado != 'cancelado' THEN total ELSE 0 END),0) AS ingresos
+            $semanaStmt = $db->prepare(
+                "SELECT YEARWEEK(created_at, 3) AS yw, MIN(DATE(created_at)) AS desde,
+                        COALESCE(SUM(CASE WHEN estado != 'cancelado' THEN total ELSE 0 END),0) AS ingresos
                    FROM pedidos
                   WHERE DATE(created_at) BETWEEN ? AND ?
-               GROUP BY DATE(created_at)
-               ORDER BY DATE(created_at)"
+               GROUP BY YEARWEEK(created_at, 3)
+               ORDER BY yw"
             );
-            $trendStmt->execute([$desde, $hasta]);
-            $trend = $trendStmt->fetchAll();
+            $semanaStmt->execute([$desde, $hasta]);
+            $semanas = $semanaStmt->fetchAll();
 
             $estStmt = $db->prepare(
                 "SELECT estado, COUNT(*) AS c FROM pedidos
@@ -147,6 +172,32 @@ class EmpresaReporteController extends BaseController
             $estStmt->execute([$desde, $hasta]);
             $est = $estStmt->fetchAll();
 
+            $topProdStmt = $db->prepare(
+                "SELECT pr.nombre, COALESCE(SUM(pd.cantidad),0) AS volumen, COALESCE(SUM(pd.subtotal),0) AS monto
+                   FROM pedido_detalle pd
+                   JOIN pedidos p ON p.id = pd.pedido_id
+                   JOIN productos pr ON pr.id = pd.producto_id
+                  WHERE DATE(p.created_at) BETWEEN ? AND ?
+               GROUP BY pr.id, pr.nombre
+               ORDER BY volumen DESC LIMIT 5"
+            );
+            $topProdStmt->execute([$desde, $hasta]);
+            $topProd = $topProdStmt->fetchAll();
+
+            $clientesStmt = $db->prepare(
+                "SELECT CONCAT(u.nombre, ' ', u.apellido_paterno) AS cliente,
+                        COUNT(*) AS pedidos,
+                        COALESCE(SUM(p.total),0) AS gasto
+                   FROM pedidos p
+                   JOIN usuarios u ON u.id = p.comprador_id
+                  WHERE DATE(p.created_at) BETWEEN ? AND ?
+                    AND p.estado != 'cancelado'
+               GROUP BY u.id, u.nombre, u.apellido_paterno
+               ORDER BY gasto DESC LIMIT 12"
+            );
+            $clientesStmt->execute([$desde, $hasta]);
+            $clientes = $clientesStmt->fetchAll();
+
             return [
                 'titulo' => 'Reporte Ejecutivo SaaS',
                 'kpis' => [
@@ -154,6 +205,10 @@ class EmpresaReporteController extends BaseController
                     ['label' => 'Usuarios activos', 'valor' => number_format((int)($r['usuarios_activos'] ?? 0)), 'hint' => 'Plataforma completa'],
                     ['label' => 'Pedidos del período', 'valor' => number_format((int)($r['pedidos'] ?? 0)), 'hint' => 'Transacciones'],
                     ['label' => 'Ingresos del período', 'valor' => '$' . number_format((float)($r['ingresos'] ?? 0), 2), 'hint' => 'Sin cancelados'],
+                    ['label' => 'Monto facturado', 'valor' => '$' . number_format((float)($r['facturado'] ?? 0), 2), 'hint' => 'Pedidos entregados'],
+                    ['label' => 'Saldo pendiente cobro', 'valor' => '$' . number_format((float)($r['pendiente_cobro'] ?? 0), 2), 'hint' => 'Confirmados sin entregar'],
+                    ['label' => 'Cumplimiento SLA', 'valor' => number_format($slaPct, 1) . '%', 'hint' => 'Meta ideal 98.5%'],
+                    ['label' => 'Inventario crítico', 'valor' => number_format($stockCritico), 'hint' => 'Productos en alerta'],
                 ],
                 'columnas' => ['Fecha', 'Empresa', 'Folio', 'Estado', 'Total', 'Responsable'],
                 'filas' => array_map(fn($x) => [
@@ -165,24 +220,52 @@ class EmpresaReporteController extends BaseController
                     trim((string)$x['responsable']),
                 ], $rows),
                 'notas' => [
-                    'Monitorear variaciones de demanda por empresa para ajustar capacidad de distribución.',
-                    'Validar stock crítico en centros de mayor rotación antes del siguiente corte operativo.',
-                    'Rango técnico recomendado de conservación para cadena fría: 0°C a 4°C.',
+                    'Saldo pendiente de cobro acumulado: $' . number_format((float)($r['pendiente_cobro'] ?? 0), 2) . '. Priorizar gestión de cobranza.',
+                    'Cumplimiento SLA actual: ' . number_format($slaPct, 1) . '%. Meta operativa recomendada: 98.5%.',
+                    'Productos en stock crítico: ' . number_format($stockCritico) . '. Coordinar reabastecimiento con productores.',
+                    'Concentrar atención comercial en los clientes "VIP" identificados en la gráfica de burbujas.',
+                    'Rango técnico de conservación para cadena fría: 0°C a 4°C.',
                 ],
                 'graficas' => [
                     [
                         'tipo' => 'line',
-                        'titulo' => 'Tendencia diaria de pedidos',
-                        'labels' => array_map(fn($x) => $x['d'], $trend),
-                        'data' => array_map(fn($x) => (int)$x['pedidos'], $trend),
-                        'label' => 'Pedidos',
+                        'titulo' => 'Tendencia de ventas semanal',
+                        'labels' => array_map(fn($x) => 'Sem ' . substr((string)$x['yw'], 4) . ' (' . $x['desde'] . ')', $semanas),
+                        'data' => array_map(fn($x) => (float)$x['ingresos'], $semanas),
+                        'label' => 'Ingresos ($)',
                     ],
                     [
                         'tipo' => 'doughnut',
-                        'titulo' => 'Distribución por estado',
+                        'titulo' => 'Distribución de pedidos por estado',
                         'labels' => array_map(fn($x) => strtoupper((string)$x['estado']), $est),
                         'data' => array_map(fn($x) => (int)$x['c'], $est),
                         'label' => 'Pedidos',
+                    ],
+                    [
+                        'tipo' => 'barH',
+                        'titulo' => 'Top 5 productos más vendidos (volumen)',
+                        'labels' => array_map(fn($x) => (string)$x['nombre'], $topProd),
+                        'data' => array_map(fn($x) => (float)$x['volumen'], $topProd),
+                        'label' => 'Volumen (kg)',
+                    ],
+                    [
+                        'tipo' => 'gauge',
+                        'titulo' => 'Efectividad de logística (SLA)',
+                        'labels' => ['Cumplimiento'],
+                        'data' => [round($slaPct, 1)],
+                        'label' => '%',
+                    ],
+                    [
+                        'tipo' => 'bubble',
+                        'titulo' => 'Gasto vs volumen por cliente',
+                        'labels' => array_map(fn($x) => trim((string)$x['cliente']), $clientes),
+                        'data' => array_map(function($x) {
+                            $pedidos = (int)$x['pedidos'];
+                            $gasto = (float)$x['gasto'];
+                            $ticket = $pedidos > 0 ? $gasto / $pedidos : 0;
+                            return ['x' => $pedidos, 'y' => $gasto, 'r' => max(6, min(28, sqrt($ticket) / 2))];
+                        }, $clientes),
+                        'label' => 'Clientes',
                     ],
                 ],
             ];
