@@ -140,4 +140,26 @@ class UsuarioModel extends BaseModel
             [$compradorId, $empresaId]
         );
     }
+
+    public function getByResetToken(string $token): ?array
+    {
+        return $this->queryOne(
+            'SELECT id, nombre, apellido_paterno, email, email_verificado, activo, token_expira
+               FROM usuarios
+              WHERE token_verificacion = ? AND activo = 1
+              LIMIT 1',
+            [$token]
+        );
+    }
+
+    public function actualizarPassword(int $id, string $newPassword): void
+    {
+        $db = Database::getInstance();
+        $stmt = $db->prepare(
+            'UPDATE usuarios
+                SET password = ?, token_verificacion = NULL, token_expira = NULL
+              WHERE id = ?'
+        );
+        $stmt->execute([password_hash($newPassword, PASSWORD_BCRYPT), $id]);
+    }
 }

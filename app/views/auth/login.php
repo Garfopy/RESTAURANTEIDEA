@@ -191,6 +191,17 @@ $_appName  = $_cfgLogin->get('app_name', APP_NAME);
     }
     .input-login::placeholder { color: #BFC4CE; }
 
+    @media (max-width: 768px) {
+      .login-card-wrap {
+        border-radius: 16px;
+        min-height: auto;
+        flex-direction: column;
+      }
+      .login-right {
+        padding: 36px 24px;
+      }
+    }
+
     /* ── Password toggle icons ── */
     .pw-toggle-btn {
       position: absolute; right: 11px; top: 50%;
@@ -405,7 +416,7 @@ $_appName  = $_cfgLogin->get('app_name', APP_NAME);
           </div>
         </div>
 
-        <a href="#" class="forgot-link">¿Olvidaste tu contraseña?</a>
+        <a href="<?= BASE_URL ?>auth/forgot" class="forgot-link">¿Olvidaste tu contraseña?</a>
 
         <button type="submit" class="btn-login-submit">Iniciar sesión</button>
       </form>

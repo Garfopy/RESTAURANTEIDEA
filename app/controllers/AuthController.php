@@ -373,4 +373,122 @@ class AuthController extends BaseController
         header('Location: ' . BASE_URL . 'auth/login');
         exit;
     }
+
+    public function forgot(?string $p = null): void
+    {
+        if (isset($_SESSION['usuario'])) {
+            $this->redirectSegunRol($_SESSION['usuario']['rol_slug'] ?? '');
+        }
+        $flash = $this->getFlash();
+        $this->render('auth/forgot', compact('flash'));
+    }
+
+    public function sendReset(?string $p = null): void
+    {
+        if (!$this->isPost()) {
+            $this->redirect('auth/forgot');
+        }
+
+        $email = trim($this->post('email', ''));
+
+        // Mensaje genérico siempre — no revelar si el email existe
+        $this->flash('success', 'Si existe una cuenta con ese correo, recibirás un link para restablecer tu contraseña en los próximos minutos.');
+
+        if (!$email) {
+            $this->redirect('auth/forgot');
+        }
+
+        $usuarioModel = new UsuarioModel();
+        $usuario      = $usuarioModel->getByEmail($email);
+
+        if ($usuario && !empty($usuario['email_verificado'])) {
+            $token  = bin2hex(random_bytes(32));
+            $expira = date('Y-m-d H:i:s', strtotime('+1 hour'));
+
+            $db = Database::getInstance();
+            $stmt = $db->prepare(
+                'UPDATE usuarios SET token_verificacion = ?, token_expira = ? WHERE id = ?'
+            );
+            $stmt->execute([$token, $expira, $usuario['id']]);
+
+            require_once ROOT_PATH . '/app/services/EmailService.php';
+            $emailSvc = new EmailService();
+            $enviado  = $emailSvc->enviarResetPassword($usuario, $token);
+            error_log("[AuthController::sendReset] Email reset " . ($enviado ? 'enviado' : 'FALLÓ') . " para: $email");
+        }
+
+        $this->redirect('auth/forgot');
+    }
+
+    public function reset(?string $p = null): void
+    {
+        $token = trim($_GET['token'] ?? '');
+
+        if (!$token) {
+            $this->flash('error', 'Link de recuperación inválido.');
+            $this->redirect('auth/login');
+        }
+
+        $usuarioModel = new UsuarioModel();
+        $usuario      = $usuarioModel->getByResetToken($token);
+
+        if (!$usuario) {
+            $this->flash('error', 'El link de recuperación no es válido o ya fue utilizado.');
+            $this->redirect('auth/login');
+        }
+
+        if (strtotime($usuario['token_expira']) < time()) {
+            $this->flash('error', 'El link de recuperación ha expirado. Solicita uno nuevo.');
+            $this->redirect('auth/forgot');
+        }
+
+        $flash = $this->getFlash();
+        $this->render('auth/reset', compact('flash', 'token'));
+    }
+
+    public function doReset(?string $p = null): void
+    {
+        if (!$this->isPost()) {
+            $this->redirect('auth/login');
+        }
+
+        $token           = trim($this->post('token', ''));
+        $password        = $this->post('password', '');
+        $passwordConfirm = $this->post('password_confirm', '');
+
+        if (!$token) {
+            $this->flash('error', 'Token inválido.');
+            $this->redirect('auth/login');
+        }
+
+        if ($password !== $passwordConfirm) {
+            $this->flash('error', 'Las contraseñas no coinciden.');
+            $this->redirect('auth/reset?token=' . urlencode($token));
+        }
+
+        require_once ROOT_PATH . '/app/helpers/PasswordHelper.php';
+        if (!PasswordHelper::validar($password)) {
+            $this->flash('error', 'La contraseña debe tener mínimo 8 caracteres, una mayúscula, una minúscula y un número.');
+            $this->redirect('auth/reset?token=' . urlencode($token));
+        }
+
+        $usuarioModel = new UsuarioModel();
+        $usuario      = $usuarioModel->getByResetToken($token);
+
+        if (!$usuario) {
+            $this->flash('error', 'El link de recuperación no es válido o ya fue utilizado.');
+            $this->redirect('auth/login');
+        }
+
+        if (strtotime($usuario['token_expira']) < time()) {
+            $this->flash('error', 'El link de recuperación ha expirado. Solicita uno nuevo.');
+            $this->redirect('auth/forgot');
+        }
+
+        $usuarioModel->actualizarPassword($usuario['id'], $password);
+        $this->log('Contraseña restablecida', 'auth', "Usuario ID: {$usuario['id']}");
+
+        $this->flash('success', '¡Contraseña actualizada correctamente! Ya puedes iniciar sesión.');
+        $this->redirect('auth/login');
+    }
 }
