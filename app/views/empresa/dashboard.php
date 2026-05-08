@@ -494,10 +494,20 @@ new Chart(document.getElementById('chartMetodosPago'), {
   <!-- Header -->
   <div style="padding:14px 16px;background:var(--color-primary,#C8102E);color:#fff;display:flex;align-items:center;gap:10px;flex-shrink:0">
     <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2"><circle cx="12" cy="12" r="10"/><path stroke-linecap="round" d="M12 8v4l2 2"/></svg>
-    <div>
+    <div style="flex:1">
       <div style="font-weight:700;font-size:.9rem">Asistente CarniHub</div>
-      <div style="font-size:.72rem;opacity:.85">Powered by Claude AI</div>
+      <div style="font-size:.72rem;opacity:.85">Powered by Gemini</div>
     </div>
+    <!-- Botón silenciar/activar voz -->
+    <button id="ttsBtn" onclick="toggleTts()" title="Activar/silenciar voz"
+      style="background:rgba(255,255,255,.2);border:none;border-radius:6px;padding:5px 7px;cursor:pointer;display:flex;align-items:center">
+      <svg id="ttsIconOn" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M15.536 8.464a5 5 0 010 7.072M12 6v12m-3.536-9.536a5 5 0 000 7.072M6.343 7.757a8 8 0 000 11.314"/>
+      </svg>
+      <svg id="ttsIconOff" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2" style="display:none">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/><path stroke-linecap="round" stroke-linejoin="round" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"/>
+      </svg>
+    </button>
   </div>
   <!-- Mensajes -->
   <div id="chatMessages"
@@ -505,7 +515,17 @@ new Chart(document.getElementById('chartMetodosPago'), {
   </div>
   <!-- Input -->
   <div style="padding:10px 12px;border-top:1px solid #E5E7EB;display:flex;gap:8px;flex-shrink:0;background:#fff">
-    <input id="chatInput" type="text" placeholder="Escribe tu pregunta..."
+    <!-- Botón micrófono -->
+    <button id="micBtn" onclick="toggleMic()" title="Hablar"
+      style="padding:8px 10px;border:1px solid #D1D5DB;border-radius:8px;background:#fff;cursor:pointer;display:flex;align-items:center;flex-shrink:0">
+      <svg id="micIconOff" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#6B7280" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path stroke-linecap="round" stroke-linejoin="round" d="M19 10v2a7 7 0 01-14 0v-2M12 19v4m-4 0h8"/>
+      </svg>
+      <svg id="micIconOn" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#C8102E" stroke-width="2" style="display:none">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path stroke-linecap="round" stroke-linejoin="round" d="M19 10v2a7 7 0 01-14 0v-2M12 19v4m-4 0h8"/>
+      </svg>
+    </button>
+    <input id="chatInput" type="text" placeholder="Escribe o habla..."
            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat()}"
            style="flex:1;padding:8px 12px;border:1px solid #D1D5DB;border-radius:8px;font-size:.85rem;outline:none;font-family:inherit">
     <button onclick="sendChat()"
@@ -520,7 +540,29 @@ new Chart(document.getElementById('chartMetodosPago'), {
   let chatHistorial = [];
   let chatAbierto   = false;
   let chatEnviando  = false;
+  let ttsActivo     = true;
+  let reconociendo  = false;
+  let recognition   = null;
 
+  // ── Inicializar SpeechRecognition ─────────────────────────────
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (SpeechRecognition) {
+    recognition = new SpeechRecognition();
+    recognition.lang        = 'es-MX';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onresult = function(e) {
+      const texto = e.results[0][0].transcript;
+      document.getElementById('chatInput').value = texto;
+      setMicState(false);
+      sendChat();
+    };
+    recognition.onerror  = function() { setMicState(false); };
+    recognition.onend    = function() { setMicState(false); };
+  }
+
+  // ── Controles de UI ───────────────────────────────────────────
   window.toggleChat = function() {
     chatAbierto = !chatAbierto;
     const panel = document.getElementById('chatPanel');
@@ -533,6 +575,36 @@ new Chart(document.getElementById('chartMetodosPago'), {
     }
   };
 
+  window.toggleTts = function() {
+    ttsActivo = !ttsActivo;
+    document.getElementById('ttsIconOn').style.display  = ttsActivo ? ''     : 'none';
+    document.getElementById('ttsIconOff').style.display = ttsActivo ? 'none' : '';
+    if (!ttsActivo) speechSynthesis.cancel();
+  };
+
+  window.toggleMic = function() {
+    if (!recognition) {
+      alert('Tu navegador no soporta reconocimiento de voz. Usa Chrome o Edge.');
+      return;
+    }
+    if (reconociendo) {
+      recognition.stop();
+      setMicState(false);
+    } else {
+      speechSynthesis.cancel();
+      recognition.start();
+      setMicState(true);
+    }
+  };
+
+  function setMicState(activo) {
+    reconociendo = activo;
+    document.getElementById('micIconOff').style.display = activo ? 'none' : '';
+    document.getElementById('micIconOn').style.display  = activo ? ''     : 'none';
+    document.getElementById('micBtn').style.background  = activo ? '#FEE2E2' : '#fff';
+  }
+
+  // ── Enviar mensaje ────────────────────────────────────────────
   window.sendChat = async function() {
     if (chatEnviando) return;
     const input = document.getElementById('chatInput');
@@ -555,6 +627,16 @@ new Chart(document.getElementById('chartMetodosPago'), {
       chatHistorial.push({ role: 'user',      content: msg   });
       chatHistorial.push({ role: 'assistant', content: texto });
       appendMsg('assistant', texto);
+
+      // Texto a voz
+      if (ttsActivo && 'speechSynthesis' in window) {
+        speechSynthesis.cancel();
+        const utterance  = new SpeechSynthesisUtterance(texto);
+        utterance.lang   = 'es-MX';
+        utterance.rate   = 1;
+        utterance.pitch  = 1;
+        speechSynthesis.speak(utterance);
+      }
     } catch (e) {
       document.getElementById(loadId)?.remove();
       appendMsg('assistant', 'Error de conexión. Inténtalo de nuevo.');
@@ -563,6 +645,7 @@ new Chart(document.getElementById('chartMetodosPago'), {
     input.focus();
   };
 
+  // ── Renderizar burbuja ────────────────────────────────────────
   function appendMsg(role, text, isTemp) {
     const id  = 'cm' + Date.now() + Math.random().toString(36).slice(2);
     const div = document.createElement('div');
