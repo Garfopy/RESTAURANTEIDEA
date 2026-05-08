@@ -66,6 +66,7 @@ class ConfigController extends BaseController
                 'google_maps_key',
                 'qr_api_url', 'qr_api_key',
                 'whatsapp_api_token', 'whatsapp_phone_id', 'whatsapp_numero_contacto',
+                'gemini_api_key',
                 'traccar_url', 'traccar_user', 'traccar_pass',
                 'facturalo_api_key',
                 'paypal_client_id', 'paypal_secret', 'paypal_mode',

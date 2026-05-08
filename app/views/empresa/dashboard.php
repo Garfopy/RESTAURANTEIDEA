@@ -466,3 +466,116 @@ new Chart(document.getElementById('chartMetodosPago'), {
 <?php endif; ?>
 
 <?php endif; ?>
+
+<?php if ($rol === 'admin_empresa'): ?>
+<!-- ═══════════════════════════════════════════════════════════
+     CHATBOT IA — solo para admin_empresa
+════════════════════════════════════════════════════════════ -->
+
+<!-- Botón flotante -->
+<button id="chatBtn" onclick="toggleChat()"
+  title="Asistente IA"
+  style="position:fixed;bottom:28px;right:28px;z-index:1100;width:56px;height:56px;border-radius:50%;
+         background:var(--color-primary,#C8102E);border:none;cursor:pointer;
+         box-shadow:0 4px 20px rgba(0,0,0,.28);display:flex;align-items:center;justify-content:center">
+  <svg id="chatIconOpen" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.862 9.862 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+  </svg>
+  <svg id="chatIconClose" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2.5" style="display:none">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+  </svg>
+</button>
+
+<!-- Panel de chat -->
+<div id="chatPanel"
+  style="display:none;position:fixed;bottom:96px;right:28px;z-index:1100;
+         width:340px;height:490px;background:#fff;border-radius:16px;flex-direction:column;
+         box-shadow:0 8px 40px rgba(0,0,0,.18);overflow:hidden">
+  <!-- Header -->
+  <div style="padding:14px 16px;background:var(--color-primary,#C8102E);color:#fff;display:flex;align-items:center;gap:10px;flex-shrink:0">
+    <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2"><circle cx="12" cy="12" r="10"/><path stroke-linecap="round" d="M12 8v4l2 2"/></svg>
+    <div>
+      <div style="font-weight:700;font-size:.9rem">Asistente CarniHub</div>
+      <div style="font-size:.72rem;opacity:.85">Powered by Claude AI</div>
+    </div>
+  </div>
+  <!-- Mensajes -->
+  <div id="chatMessages"
+    style="flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px;background:#F9FAFB">
+  </div>
+  <!-- Input -->
+  <div style="padding:10px 12px;border-top:1px solid #E5E7EB;display:flex;gap:8px;flex-shrink:0;background:#fff">
+    <input id="chatInput" type="text" placeholder="Escribe tu pregunta..."
+           onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat()}"
+           style="flex:1;padding:8px 12px;border:1px solid #D1D5DB;border-radius:8px;font-size:.85rem;outline:none;font-family:inherit">
+    <button onclick="sendChat()"
+      style="padding:8px 14px;background:var(--color-primary,#C8102E);color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600;font-size:.82rem">
+      Enviar
+    </button>
+  </div>
+</div>
+
+<script>
+(function() {
+  let chatHistorial = [];
+  let chatAbierto   = false;
+  let chatEnviando  = false;
+
+  window.toggleChat = function() {
+    chatAbierto = !chatAbierto;
+    const panel = document.getElementById('chatPanel');
+    panel.style.display = chatAbierto ? 'flex' : 'none';
+    document.getElementById('chatIconOpen').style.display  = chatAbierto ? 'none' : '';
+    document.getElementById('chatIconClose').style.display = chatAbierto ? ''     : 'none';
+    if (chatAbierto && chatHistorial.length === 0) {
+      appendMsg('assistant', '¡Hola! Soy tu asistente. Puedo ayudarte con pedidos, stock, equipo y más. ¿En qué te puedo ayudar?');
+      document.getElementById('chatInput').focus();
+    }
+  };
+
+  window.sendChat = async function() {
+    if (chatEnviando) return;
+    const input = document.getElementById('chatInput');
+    const msg   = input.value.trim();
+    if (!msg) return;
+    input.value  = '';
+    chatEnviando = true;
+    appendMsg('user', msg);
+    const loadId = appendMsg('assistant', '…', true);
+
+    try {
+      const resp = await fetch(BASE_URL + 'api/chat', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ mensaje: msg, historial: chatHistorial }),
+      }).then(r => r.json());
+
+      document.getElementById(loadId)?.remove();
+      const texto = resp.respuesta ?? resp.error ?? 'Error al conectar.';
+      chatHistorial.push({ role: 'user',      content: msg   });
+      chatHistorial.push({ role: 'assistant', content: texto });
+      appendMsg('assistant', texto);
+    } catch (e) {
+      document.getElementById(loadId)?.remove();
+      appendMsg('assistant', 'Error de conexión. Inténtalo de nuevo.');
+    }
+    chatEnviando = false;
+    input.focus();
+  };
+
+  function appendMsg(role, text, isTemp) {
+    const id  = 'cm' + Date.now() + Math.random().toString(36).slice(2);
+    const div = document.createElement('div');
+    div.id    = id;
+    div.style.cssText = role === 'user'
+      ? 'align-self:flex-end;background:var(--color-primary,#C8102E);color:#fff;padding:9px 13px;border-radius:14px 14px 3px 14px;max-width:82%;font-size:.84rem;line-height:1.45;word-break:break-word'
+      : 'align-self:flex-start;background:#fff;color:#111827;padding:9px 13px;border-radius:14px 14px 14px 3px;max-width:82%;font-size:.84rem;line-height:1.45;border:1px solid #E5E7EB;word-break:break-word';
+    div.textContent = text;
+    const box = document.getElementById('chatMessages');
+    box.appendChild(div);
+    box.scrollTop = box.scrollHeight;
+    return id;
+  }
+})();
+</script>
+<?php endif; ?>

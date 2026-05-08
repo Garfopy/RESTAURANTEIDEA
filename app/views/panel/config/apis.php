@@ -86,6 +86,24 @@ function toggleVis(id) {
     </div>
   </div>
 
+  <!-- IA / Gemini -->
+  <div style="background:#fff;border-radius:12px;border:1px solid #E5E7EB;padding:20px;margin-bottom:16px">
+    <h3 style="font-size:.85rem;font-weight:700;color:#111827;margin-bottom:14px;display:flex;align-items:center;gap:8px">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+      IA / Gemini (Chatbot del administrador)
+    </h3>
+    <label class="form-label">API Key (Google Gemini)</label>
+    <div style="display:flex;max-width:480px">
+      <input type="password" id="gemini_api_key" name="gemini_api_key"
+             value="<?= $s('gemini_api_key') ?>"
+             class="form-control" style="border-radius:6px 0 0 6px;border-right:none;font-family:monospace;font-size:.85rem"
+             placeholder="AIza...">
+      <button type="button" onclick="toggleVis('gemini_api_key')"
+              style="padding:0 12px;border:1px solid #E5E7EB;border-left:none;border-radius:0 6px 6px 0;background:#F9FAFB;cursor:pointer;font-size:.8rem;color:#6B7280;white-space:nowrap">Ver</button>
+    </div>
+    <p style="font-size:.75rem;color:#6B7280;margin-top:4px">Obtén tu key gratis en <strong>aistudio.google.com</strong>. Habilita el chatbot del dashboard de empresa.</p>
+  </div>
+
   <!-- Traccar GPS -->
   <div style="background:#fff;border-radius:12px;border:1px solid #E5E7EB;padding:20px;margin-bottom:16px">
     <h3 style="font-size:.85rem;font-weight:700;color:#111827;margin-bottom:14px;display:flex;align-items:center;gap:8px">

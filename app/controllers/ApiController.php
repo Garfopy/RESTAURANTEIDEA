@@ -151,6 +151,54 @@ class ApiController extends BaseController
         $this->json(['ok' => true]);
     }
 
+    // ── Chatbot IA ────────────────────────────────────────────────
+    /** POST /api/chat */
+    public function chat(?string $p = null): void
+    {
+        $this->requireAdminEmpresa();
+
+        $body    = json_decode(file_get_contents('php://input'), true) ?? [];
+        $mensaje = trim($body['mensaje'] ?? '');
+        $hist    = $body['historial'] ?? [];
+
+        if (!$mensaje) {
+            $this->json(['error' => 'Mensaje vacío'], 400);
+            return;
+        }
+
+        $empresaId = $this->empresaId();
+        $db        = Database::getInstance();
+
+        $totalMes  = (int)$db->query("SELECT COUNT(*) FROM pedidos WHERE empresa_id=$empresaId AND MONTH(created_at)=MONTH(NOW()) AND YEAR(created_at)=YEAR(NOW())")->fetchColumn();
+        $pendientes = (int)$db->query("SELECT COUNT(*) FROM pedidos WHERE empresa_id=$empresaId AND estado='pendiente'")->fetchColumn();
+        $gastoMes  = (float)$db->query("SELECT COALESCE(SUM(total),0) FROM pedidos WHERE empresa_id=$empresaId AND MONTH(created_at)=MONTH(NOW()) AND YEAR(created_at)=YEAR(NOW()) AND estado NOT IN ('cancelado')")->fetchColumn();
+        $stockBajo = (int)$db->query("SELECT COUNT(*) FROM inventario i JOIN productos p ON p.id=i.producto_id WHERE p.empresa_id=$empresaId AND i.cantidad<=i.minimo_stock")->fetchColumn();
+        $equipo    = (int)$db->query("SELECT COUNT(*) FROM usuarios WHERE empresa_id=$empresaId AND activo=1")->fetchColumn();
+
+        $empresa = htmlspecialchars($_SESSION['empresa']['razon_social'] ?? 'la empresa');
+
+        $system = "Eres el asistente de negocio de \"$empresa\" en CarniHub, plataforma B2B de abasto de carne. "
+                . "Ayudas al administrador a entender y gestionar su negocio. Responde siempre en español, de forma clara y concisa.\n\n"
+                . "Datos actuales del negocio:\n"
+                . "- Pedidos este mes: $totalMes\n"
+                . "- Pedidos pendientes de aprobación: $pendientes\n"
+                . "- Gasto acumulado del mes: $" . number_format($gastoMes, 2) . " MXN\n"
+                . "- Productos con stock bajo: $stockBajo\n"
+                . "- Usuarios activos en el equipo: $equipo\n\n"
+                . "Solo responde preguntas relacionadas con la gestión del negocio. Si te preguntan algo fuera del tema, redirige amablemente.";
+
+        $mensajes = array_merge(
+            array_map(fn($m) => ['role' => $m['role'], 'content' => $m['content']], $hist),
+            [['role' => 'user', 'content' => $mensaje]]
+        );
+
+        require_once ROOT_PATH . '/app/services/GeminiService.php';
+        $claude    = new GeminiService();
+        $respuesta = $claude->chat($system, $mensajes);
+
+        $this->json(['respuesta' => $respuesta]);
+    }
+
     // ── Fórmula Haversine (distancia entre dos coordenadas en km) ─
     private function haversine(float $lat1, float $lng1, float $lat2, float $lng2): float
     {
