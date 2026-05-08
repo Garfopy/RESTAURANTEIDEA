@@ -616,11 +616,22 @@ new Chart(document.getElementById('chartMetodosPago'), {
     const loadId = appendMsg('assistant', '…', true);
 
     try {
-      const resp = await fetch(BASE_URL + 'api/chat', {
+      const r = await fetch(BASE_URL + 'api/chat', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ mensaje: msg, historial: chatHistorial }),
-      }).then(r => r.json());
+      });
+      const rawText = await r.text();
+      let resp;
+      try {
+        resp = JSON.parse(rawText);
+      } catch(e) {
+        document.getElementById(loadId)?.remove();
+        appendMsg('assistant', '[Debug] Respuesta no-JSON (' + r.status + '): ' + rawText.substring(0, 300));
+        chatEnviando = false;
+        input.focus();
+        return;
+      }
 
       document.getElementById(loadId)?.remove();
       const texto = resp.respuesta ?? resp.error ?? 'Error al conectar.';
