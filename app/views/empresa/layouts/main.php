@@ -148,6 +148,7 @@ $esComprador   = $rol === 'comprador';
     .main-content {
       margin-left: 256px;
       min-height: 100vh;
+      width: calc(100% - 256px);
       background: #F4F6FA;
       display: flex; flex-direction: column;
     }

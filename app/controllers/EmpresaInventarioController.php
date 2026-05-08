@@ -49,7 +49,7 @@ class EmpresaInventarioController extends BaseController
             'salida'  => 'Registrar Salida de Stock',
             'merma'   => 'Registrar Merma',
         };
-        $activeMenu = 'inventario';
+        $activeMenu = 'inventario_entrada';
 
         ob_start();
         require ROOT_PATH . '/app/views/empresa/inventario/movimiento_form.php';
