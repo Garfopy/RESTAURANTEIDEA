@@ -650,7 +650,7 @@ new Chart(document.getElementById('chartMetodosPago'), {
       }
     } catch (e) {
       document.getElementById(loadId)?.remove();
-      appendMsg('assistant', 'Error de conexión. Inténtalo de nuevo.');
+      appendMsg('assistant', '[Debug] Error JS: ' + e.message);
     }
     chatEnviando = false;
     input.focus();
