@@ -15,23 +15,35 @@ $_appName  = $_cfgLogin->get('app_name', APP_NAME);
   <link rel="stylesheet" href="<?= BASE_URL ?>public/css/carnihub.css">
   <style>
     @keyframes loginCardIn {
-      from { opacity: 0; transform: translateY(28px) scale(.98); }
+      from { opacity: 0; transform: translateY(32px) scale(.97); }
       to   { opacity: 1; transform: translateY(0) scale(1); }
     }
     @keyframes glowPulse {
-      0%, 100% { opacity: .30; transform: scale(1); }
-      50%       { opacity: .55; transform: scale(1.10); }
+      0%, 100% { opacity: .35; transform: scale(1); }
+      50%       { opacity: .65; transform: scale(1.12); }
+    }
+    @keyframes bgShift {
+      0%, 100% { background-position: 0% 50%; }
+      50%       { background-position: 100% 50%; }
     }
 
     .login-bg {
       min-height: 100vh;
       display: flex; align-items: center; justify-content: center;
       font-family: 'Inter', sans-serif;
-      background:
-        radial-gradient(ellipse 65% 55% at 25% 65%, rgba(200,16,46,.07) 0%, transparent 70%),
-        radial-gradient(ellipse 45% 40% at 80% 20%, rgba(45,49,57,.10) 0%, transparent 70%),
-        linear-gradient(155deg, #EAECEF 0%, #F0F1F3 55%, #E6E9EE 100%);
+      background: #0D1117;
+      position: relative;
       padding: 24px 16px;
+      overflow: hidden;
+    }
+    /* Atmospheric blobs behind the card */
+    .login-bg::before {
+      content: '';
+      position: fixed; inset: 0; pointer-events: none;
+      background:
+        radial-gradient(ellipse 55% 45% at 12% 25%, rgba(200,16,46,.18) 0%, transparent 65%),
+        radial-gradient(ellipse 45% 55% at 88% 75%, rgba(25,35,65,.7) 0%, transparent 65%),
+        radial-gradient(ellipse 70% 35% at 50% 110%, rgba(200,16,46,.06) 0%, transparent 60%);
     }
 
     .login-card-wrap {
@@ -41,11 +53,14 @@ $_appName  = $_cfgLogin->get('app_name', APP_NAME);
       min-height: 640px;
       border-radius: 24px;
       overflow: hidden;
+      border: 1px solid rgba(255,255,255,.07);
       box-shadow:
-        0 4px 6px rgba(0,0,0,.04),
-        0 25px 50px rgba(0,0,0,.15),
-        0 60px 120px rgba(0,0,0,.10);
-      animation: loginCardIn .65s cubic-bezier(.22,1,.36,1) both;
+        0 0 0 1px rgba(255,255,255,.03),
+        0 32px 80px rgba(0,0,0,.65),
+        0 80px 160px rgba(0,0,0,.40),
+        0 0 120px rgba(200,16,46,.12);
+      animation: loginCardIn .7s cubic-bezier(.22,1,.36,1) both;
+      position: relative; z-index: 1;
     }
 
     /* ── Left panel ── */
@@ -53,7 +68,7 @@ $_appName  = $_cfgLogin->get('app_name', APP_NAME);
       flex: 1;
       position: relative;
       overflow: hidden;
-      background: linear-gradient(150deg, #1A1D23 0%, #23272F 50%, #2D3139 100%);
+      background: linear-gradient(150deg, #12151A 0%, #1C2028 45%, #252B34 100%);
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -61,33 +76,48 @@ $_appName  = $_cfgLogin->get('app_name', APP_NAME);
       padding: 48px 40px;
       color: #fff;
     }
+    /* Dot grid */
     .login-left::before {
       content: '';
       position: absolute; inset: 0;
-      background-image: radial-gradient(circle, rgba(255,255,255,.11) 1px, transparent 1px);
-      background-size: 22px 22px;
+      background-image: radial-gradient(circle, rgba(255,255,255,.09) 1px, transparent 1px);
+      background-size: 24px 24px;
+      pointer-events: none;
+      z-index: 0;
+    }
+    /* Diagonal stripe overlay — premium texture */
+    .login-left::after {
+      content: '';
+      position: absolute; inset: 0;
+      background: repeating-linear-gradient(
+        -52deg,
+        transparent,
+        transparent 28px,
+        rgba(255,255,255,.018) 28px,
+        rgba(255,255,255,.018) 29px
+      );
       pointer-events: none;
       z-index: 0;
     }
     .login-glow-top {
       position: absolute;
-      top: -80px; right: -80px;
-      width: 280px; height: 280px;
+      top: -100px; right: -100px;
+      width: 340px; height: 340px;
       border-radius: 50%;
-      background: radial-gradient(circle, rgba(200,16,46,.40) 0%, transparent 70%);
-      filter: blur(40px);
-      animation: glowPulse 4s ease-in-out infinite;
+      background: radial-gradient(circle, rgba(200,16,46,.45) 0%, transparent 70%);
+      filter: blur(50px);
+      animation: glowPulse 4.5s ease-in-out infinite;
       pointer-events: none;
       z-index: 0;
     }
     .login-glow-btm {
       position: absolute;
-      bottom: -100px; left: -60px;
-      width: 220px; height: 220px;
+      bottom: -120px; left: -70px;
+      width: 260px; height: 260px;
       border-radius: 50%;
-      background: radial-gradient(circle, rgba(200,16,46,.18) 0%, transparent 70%);
-      filter: blur(55px);
-      animation: glowPulse 4s ease-in-out infinite reverse;
+      background: radial-gradient(circle, rgba(200,16,46,.22) 0%, transparent 70%);
+      filter: blur(60px);
+      animation: glowPulse 4.5s ease-in-out infinite reverse;
       pointer-events: none;
       z-index: 0;
     }
@@ -153,10 +183,20 @@ $_appName  = $_cfgLogin->get('app_name', APP_NAME);
     /* ── Right panel ── */
     .login-right {
       flex: 1;
-      background: #F8F9FB;
+      background: #FFFFFF;
       display: flex; flex-direction: column;
       align-items: center; justify-content: center;
       padding: 52px 44px;
+      position: relative;
+    }
+    /* Thin red top accent line */
+    .login-right::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, #C8102E 0%, #FF2E52 50%, #C8102E 100%);
+      background-size: 200% 100%;
+      animation: bgShift 4s ease infinite;
     }
 
     /* ── Inputs ── */
@@ -193,9 +233,10 @@ $_appName  = $_cfgLogin->get('app_name', APP_NAME);
 
     @media (max-width: 768px) {
       .login-card-wrap {
-        border-radius: 16px;
+        border-radius: 20px;
         min-height: auto;
         flex-direction: column;
+        box-shadow: 0 20px 60px rgba(0,0,0,.6), 0 0 60px rgba(200,16,46,.10);
       }
       .login-right {
         padding: 36px 24px;
