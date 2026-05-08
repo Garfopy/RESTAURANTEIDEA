@@ -3,6 +3,9 @@ $pageTitle = 'Iniciar Sesión';
 $_cfgLogin = new ConfigModel();
 $_appLogo  = $_cfgLogin->get('app_logo', '');
 $_appName  = $_cfgLogin->get('app_name', APP_NAME);
+$_waNumero = $_cfgLogin->get('whatsapp_numero_contacto', '');
+$_telefono = $_waNumero ?: $_cfgLogin->get('telefono_contacto', '');
+$_waPhone  = preg_replace('/[^0-9]/', '', $_telefono);
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -82,7 +85,16 @@ $_appName  = $_cfgLogin->get('app_name', APP_NAME);
       </form>
 
       <p style="margin-top:24px;text-align:center;font-size:.8rem;color:#9CA3AF">
-        ¿Problemas para acceder? Contacta al administrador.
+        ¿Problemas para acceder?
+        <?php if ($_waPhone): ?>
+          <a href="https://wa.me/<?= htmlspecialchars($_waPhone) ?>?text=<?= urlencode('Hola, necesito ayuda para acceder al sistema.') ?>"
+             target="_blank" rel="noopener"
+             style="color:#25D366;font-weight:600;text-decoration:none">
+            Contacta al administrador
+          </a>
+        <?php else: ?>
+          Contacta al administrador.
+        <?php endif; ?>
       </p>
     </div>
   </div>

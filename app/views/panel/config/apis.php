@@ -61,7 +61,7 @@ function toggleVis(id) {
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
       WhatsApp Business API
     </h3>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
       <div>
         <label class="form-label">API Token</label>
         <div style="display:flex">
@@ -78,6 +78,30 @@ function toggleVis(id) {
                class="form-control" placeholder="123456789012345">
       </div>
     </div>
+    <div>
+      <label class="form-label">Número de contacto (para enlace en login)</label>
+      <input type="text" name="whatsapp_numero_contacto" value="<?= $s('whatsapp_numero_contacto') ?>"
+             class="form-control" placeholder="+5219991234567" style="max-width:280px">
+      <p style="font-size:.75rem;color:#6B7280;margin-top:4px">Número en formato internacional. Se usa en el enlace "Contacta al administrador" de la pantalla de login.</p>
+    </div>
+  </div>
+
+  <!-- IA / Gemini -->
+  <div style="background:#fff;border-radius:12px;border:1px solid #E5E7EB;padding:20px;margin-bottom:16px">
+    <h3 style="font-size:.85rem;font-weight:700;color:#111827;margin-bottom:14px;display:flex;align-items:center;gap:8px">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+      IA / Gemini (Chatbot del administrador)
+    </h3>
+    <label class="form-label">API Key (Google Gemini)</label>
+    <div style="display:flex;max-width:480px">
+      <input type="password" id="gemini_api_key" name="gemini_api_key"
+             value="<?= $s('gemini_api_key') ?>"
+             class="form-control" style="border-radius:6px 0 0 6px;border-right:none;font-family:monospace;font-size:.85rem"
+             placeholder="AIza...">
+      <button type="button" onclick="toggleVis('gemini_api_key')"
+              style="padding:0 12px;border:1px solid #E5E7EB;border-left:none;border-radius:0 6px 6px 0;background:#F9FAFB;cursor:pointer;font-size:.8rem;color:#6B7280;white-space:nowrap">Ver</button>
+    </div>
+    <p style="font-size:.75rem;color:#6B7280;margin-top:4px">Obtén tu key gratis en <strong>aistudio.google.com</strong>. Habilita el chatbot del dashboard de empresa.</p>
   </div>
 
   <!-- Traccar GPS -->
