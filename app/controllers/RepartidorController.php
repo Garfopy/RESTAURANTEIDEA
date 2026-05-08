@@ -375,6 +375,7 @@ class RepartidorController extends BaseController
         $repartidorId = $this->usuarioId();
         $db = Database::getInstance();
 
+        // Paradas de ruta formal entregadas
         $stmt = $db->prepare(
             "SELECT rd.*, s.nombre AS sucursal_nombre, p.folio,
                     r.fecha, e.razon_social AS empresa_nombre
@@ -389,13 +390,81 @@ class RepartidorController extends BaseController
         $stmt->execute([$repartidorId]);
         $historial = $stmt->fetchAll();
 
+        // Pedidos directos completados (multi-parada)
+        $stmtDirectos = $db->prepare(
+            "SELECT p.id, p.folio, p.estado, p.ruta_polyline, p.ruta_iniciada_at,
+                    p.ruta_finalizada_at, p.fecha_entrega,
+                    e.razon_social AS empresa_nombre
+               FROM pedidos p
+               JOIN empresas e ON e.id = p.empresa_id
+              WHERE p.repartidor_asignado_id = ?
+                AND p.tipo_entrega = 'repartidor'
+                AND p.estado = 'entregado'
+           ORDER BY p.ruta_finalizada_at DESC, p.id DESC
+              LIMIT 30"
+        );
+        $stmtDirectos->execute([$repartidorId]);
+        $pedidosEntregados = $stmtDirectos->fetchAll();
+
+        // Sucursales por pedido directo
+        if (!empty($pedidosEntregados)) {
+            $ids = implode(',', array_map('intval', array_column($pedidosEntregados, 'id')));
+            $stmtSucs = $db->query(
+                "SELECT ps.pedido_id, ps.foto_entrega_path, ps.fecha_llegada,
+                        s.nombre AS sucursal_nombre
+                   FROM pedido_sucursal ps
+                   JOIN sucursales s ON s.id = ps.sucursal_id
+                  WHERE ps.pedido_id IN ($ids)
+                  ORDER BY ps.id ASC"
+            );
+            $sucsPorPedido = [];
+            foreach ($stmtSucs->fetchAll() as $row) {
+                $sucsPorPedido[$row['pedido_id']][] = $row;
+            }
+            foreach ($pedidosEntregados as &$pd) {
+                $pd['sucursales'] = $sucsPorPedido[$pd['id']] ?? [];
+            }
+            unset($pd);
+        }
+
         $flash     = $this->getFlash();
         $pageTitle = 'Historial de entregas';
 
         require ROOT_PATH . '/app/views/repartidor/historial.php';
     }
 
-    private function samplePoints(array $pts, int $max): array
+    public function verViaje(?string $pedidoId = null): void
+    {
+        $repartidorId = $this->usuarioId();
+        $db = Database::getInstance();
+        $pedidoId = (int)$pedidoId;
+
+        if (!$pedidoId) {
+            $this->redirect('repartidor/historial');
+        }
+
+        $stmt = $db->prepare(
+            "SELECT p.id, p.folio, p.ruta_polyline, p.ruta_iniciada_at, p.ruta_finalizada_at,
+                    p.estado, e.razon_social AS empresa_nombre
+               FROM pedidos p
+               JOIN empresas e ON e.id = p.empresa_id
+              WHERE p.id = ? AND p.repartidor_asignado_id = ?"
+        );
+        $stmt->execute([$pedidoId, $repartidorId]);
+        $pedido = $stmt->fetch();
+
+        if (!$pedido) {
+            $this->redirect('repartidor/historial');
+        }
+
+        $pedidoModel = new PedidoModel();
+        $sucursales  = $pedidoModel->getSucursalesPedido($pedidoId);
+
+        $flash     = $this->getFlash();
+        $pageTitle = 'Recorrido — ' . $pedido['folio'];
+
+        require ROOT_PATH . '/app/views/repartidor/ver_viaje.php';
+    }(array $pts, int $max): array
     {
         if (count($pts) <= $max) return $pts;
         $step    = count($pts) / ($max - 1);

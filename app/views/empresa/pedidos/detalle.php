@@ -147,20 +147,32 @@ function tiempoTranscurrido(string $desde, string $hasta): string {
                    'rechazado'=>['bg'=>'#FEE2E2','c'=>'#991B1B','label'=>'Rechazado']][$psEst]
                   ?? ['bg'=>'#F3F4F6','c'=>'#6B7280','label'=>$psEst];
       ?>
-      <div style="display:flex;align-items:center;gap:8px;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px;padding:7px 12px">
-        <div style="width:20px;height:20px;border-radius:50%;background:<?= $psEst==='entregado' ? '#059669' : 'var(--color-primary)' ?>;color:#fff;font-size:.65rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+      <div style="display:flex;align-items:flex-start;gap:8px;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px;padding:7px 12px;flex-wrap:wrap">
+        <div style="width:20px;height:20px;border-radius:50%;background:<?= $psEst==='entregado' ? '#059669' : 'var(--color-primary)' ?>;color:#fff;font-size:.65rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">
           <?= $psEst==='entregado' ? '✓' : ($i+1) ?>
         </div>
-        <div>
+        <div style="flex:1;min-width:120px">
           <div style="font-size:.8rem;font-weight:700;color:#111827"><?= htmlspecialchars($ps['sucursal_nombre']) ?></div>
           <div style="font-size:.72rem;color:#6B7280"><?= htmlspecialchars($ps['direccion']) ?></div>
+          <?php if (!empty($ps['fecha_llegada'])): ?>
+          <div style="font-size:.68rem;color:#9CA3AF;margin-top:2px">Entregado <?= date('d/m H:i', strtotime($ps['fecha_llegada'])) ?></div>
+          <?php endif; ?>
         </div>
-        <span style="font-size:.7rem;padding:2px 8px;border-radius:999px;background:<?= $psChip['bg'] ?>;color:<?= $psChip['c'] ?>;font-weight:600;white-space:nowrap">
-          <?= $psChip['label'] ?>
-        </span>
-        <?php if (($ps['costo_envio_sucursal'] ?? 0) > 0): ?>
-        <span style="font-size:.72rem;color:#374151;font-weight:600">$<?= number_format($ps['costo_envio_sucursal'], 2) ?></span>
-        <?php endif; ?>
+        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+          <span style="font-size:.7rem;padding:2px 8px;border-radius:999px;background:<?= $psChip['bg'] ?>;color:<?= $psChip['c'] ?>;font-weight:600;white-space:nowrap">
+            <?= $psChip['label'] ?>
+          </span>
+          <?php if (($ps['costo_envio_sucursal'] ?? 0) > 0): ?>
+          <span style="font-size:.72rem;color:#374151;font-weight:600">$<?= number_format($ps['costo_envio_sucursal'], 2) ?></span>
+          <?php endif; ?>
+          <?php if (!empty($ps['foto_entrega_path'])): ?>
+          <a href="<?= htmlspecialchars($ps['foto_entrega_path']) ?>" target="_blank" title="Ver foto de evidencia"
+             style="flex-shrink:0">
+            <img src="<?= htmlspecialchars($ps['foto_entrega_path']) ?>" alt="Evidencia"
+                 style="width:36px;height:36px;object-fit:cover;border-radius:6px;border:2px solid #A7F3D0;display:block">
+          </a>
+          <?php endif; ?>
+        </div>
       </div>
       <?php endforeach; ?>
     </div>
