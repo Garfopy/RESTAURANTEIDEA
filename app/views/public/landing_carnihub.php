@@ -180,6 +180,7 @@
       <a href="#compras"    class="text-sm font-medium text-white/70 px-4 py-2 rounded-lg hover:text-white hover:bg-white/10 transition-all">Compras</a>
       <a href="#logistica"  class="text-sm font-medium text-white/70 px-4 py-2 rounded-lg hover:text-white hover:bg-white/10 transition-all">Logística</a>
       <a href="#soluciones" class="text-sm font-medium text-white/70 px-4 py-2 rounded-lg hover:text-white hover:bg-white/10 transition-all">Soluciones</a>
+      <a href="#how"        class="text-sm font-medium text-white/70 px-4 py-2 rounded-lg hover:text-white hover:bg-white/10 transition-all">Cómo funciona</a>
       <a href="#precios"    class="text-sm font-medium text-white/70 px-4 py-2 rounded-lg hover:text-white hover:bg-white/10 transition-all">Precios</a>
     </div>
     <div class="flex items-center gap-2">
@@ -721,27 +722,249 @@
   </div>
 </section>
 
-<!-- ══ QUIÉNES USAN CARNIHUB ══ -->
-<section class="bg-white py-16">
-  <div class="max-w-5xl mx-auto px-6 text-center reveal">
-    <p class="text-xs font-bold uppercase tracking-widest text-primary mb-4">¿Qué tipo de negocios usan CarniHub?</p>
-    <div class="flex flex-wrap gap-3 justify-center mb-10">
-      <?php foreach (['Restaurantes','Hoteles','Taquerías','Hospitales','Carnicerías','Comedores industriales'] as $seg): ?>
-      <span class="px-4 py-2 rounded-full text-sm font-semibold bg-slate-100 text-slate-700"><?= htmlspecialchars($seg) ?></span>
-      <?php endforeach; ?>
+<!-- ══ FEATURE SHOWCASE ══ -->
+<section class="bg-white py-24" id="features">
+  <div class="max-w-6xl mx-auto px-6">
+    <div class="text-center mb-20 reveal">
+      <p class="text-xs font-bold uppercase tracking-widest text-primary mb-3">Funcionalidades</p>
+      <h2 class="text-3xl md:text-4xl font-extrabold text-gray-900 mb-4">Una plataforma, miles de posibilidades</h2>
+      <p class="text-gray-500 max-w-xl mx-auto">Todo lo que tu operación necesita en un solo lugar, sin integraciones complicadas ni curvas de aprendizaje.</p>
     </div>
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-      <?php foreach ([
-        ['Mermas y devoluciones','Trazabilidad · POD digital · Incidencias'],
-        ['Facturación y crédito','Control admin · Compras recurrentes · Conciliación'],
-        ['Personal y entregas','Validación de rutas · Evidencias · Inventarios'],
-        ['IIoT y mantenimiento','Monitoreo · Activos · Cadena de frío'],
-      ] as [$t,$d]): ?>
-      <div class="bg-slate-50 rounded-2xl p-5 border border-gray-100 text-left">
-        <div class="font-extrabold text-sm text-gray-900 mb-1"><?= htmlspecialchars($t) ?></div>
-        <div class="text-xs text-gray-500 leading-relaxed"><?= htmlspecialchars($d) ?></div>
+
+    <!-- Feature 1: Portal de pedidos -->
+    <div class="grid md:grid-cols-2 gap-14 items-center mb-24">
+      <div class="reveal">
+        <p class="text-xs font-bold uppercase tracking-widest text-primary mb-3">Pedidos</p>
+        <h3 class="text-2xl font-extrabold text-gray-900 mb-4">Portal de pedidos para tus clientes</h3>
+        <p class="text-gray-600 leading-relaxed mb-6">Cada comprador tiene su propio portal donde ve tu catálogo con sus precios especiales y hace pedidos al instante. Sin llamadas, sin WhatsApp, sin errores.</p>
+        <a href="<?= BASE_URL ?>planes/registro" class="btn-primary btn-shimmer inline-block font-bold px-7 py-3.5 rounded-xl">Ver portal de pedidos →</a>
+      </div>
+      <div class="reveal">
+        <div class="bg-gray-900 rounded-2xl p-5 shadow-2xl border border-gray-700">
+          <div class="flex items-center gap-1.5 mb-4">
+            <div class="w-3 h-3 rounded-full bg-red-500"></div>
+            <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+            <div class="w-3 h-3 rounded-full bg-green-500"></div>
+            <span class="text-xs text-gray-500 ml-2">carnihub.mx/pedidos</span>
+          </div>
+          <div class="space-y-3">
+            <div class="flex items-center justify-between bg-gray-800 rounded-xl px-4 py-3">
+              <div><div class="text-sm font-bold text-white">Rib eye – 2 kg</div><div class="text-xs text-gray-400">Código: RBE-002</div></div>
+              <span class="text-primary font-black text-sm">$1,240</span>
+            </div>
+            <div class="flex items-center justify-between bg-gray-800 rounded-xl px-4 py-3">
+              <div><div class="text-sm font-bold text-white">T-Bone – 3 kg</div><div class="text-xs text-gray-400">Código: TBN-003</div></div>
+              <span class="text-primary font-black text-sm">$1,680</span>
+            </div>
+            <div class="flex items-center justify-between bg-gray-800 rounded-xl px-4 py-3">
+              <div><div class="text-sm font-bold text-white">Arrachera – 1 kg</div><div class="text-xs text-gray-400">Código: ARR-001</div></div>
+              <span class="text-primary font-black text-sm">$480</span>
+            </div>
+            <div class="w-full py-3 rounded-xl font-bold text-sm text-white text-center btn-primary mt-2">Confirmar pedido →</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Feature 2: GPS -->
+    <div class="grid md:grid-cols-2 gap-14 items-center mb-24">
+      <div class="order-2 md:order-1 reveal">
+        <div class="bg-gray-900 rounded-2xl p-5 shadow-2xl border border-gray-700">
+          <div class="flex items-center gap-1.5 mb-4">
+            <div class="w-3 h-3 rounded-full bg-red-500"></div>
+            <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+            <div class="w-3 h-3 rounded-full bg-green-500"></div>
+            <span class="text-xs text-gray-500 ml-2">Rastreo GPS en tiempo real</span>
+          </div>
+          <div class="bg-gray-800 rounded-xl p-4 mb-3" style="min-height:110px">
+            <div class="absolute inset-0 opacity-5 pointer-events-none" style="background:repeating-linear-gradient(0deg,transparent,transparent 18px,rgba(255,255,255,.1) 18px,rgba(255,255,255,.1) 19px),repeating-linear-gradient(90deg,transparent,transparent 18px,rgba(255,255,255,.1) 18px,rgba(255,255,255,.1) 19px)"></div>
+            <div class="space-y-3">
+              <div class="flex items-center gap-3">
+                <span class="w-2.5 h-2.5 rounded-full bg-green-400 animate-pulse flex-shrink-0"></span>
+                <span class="text-sm font-semibold text-white">Carlos R.</span>
+                <span class="text-xs text-gray-400 ml-auto">En ruta · 3 km</span>
+              </div>
+              <div class="flex items-center gap-3">
+                <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background:var(--cp)"></span>
+                <span class="text-sm font-semibold text-white">Miguel A.</span>
+                <span class="text-xs text-gray-400 ml-auto">Entregando</span>
+              </div>
+              <div class="flex items-center gap-3">
+                <span class="w-2.5 h-2.5 rounded-full bg-gray-500 flex-shrink-0"></span>
+                <span class="text-sm font-semibold text-white">Pedro L.</span>
+                <span class="text-xs text-gray-400 ml-auto">Disponible</span>
+              </div>
+            </div>
+          </div>
+          <div class="text-xs text-gray-500 text-center">3 repartidores activos · Actualización cada 30 s</div>
+        </div>
+      </div>
+      <div class="order-1 md:order-2 reveal">
+        <p class="text-xs font-bold uppercase tracking-widest text-primary mb-3">GPS &amp; Trazabilidad</p>
+        <h3 class="text-2xl font-extrabold text-gray-900 mb-4">Rastreo GPS en tiempo real</h3>
+        <p class="text-gray-600 leading-relaxed mb-6">Monitorea a todos tus repartidores en un mapa en vivo. Tus clientes también pueden ver su entrega en camino. Trazabilidad total desde el almacén hasta la entrega final.</p>
+        <a href="<?= BASE_URL ?>planes/registro" class="btn-primary btn-shimmer inline-block font-bold px-7 py-3.5 rounded-xl">Ver rastreo GPS →</a>
+      </div>
+    </div>
+
+    <!-- Feature 3: Inventario -->
+    <div class="grid md:grid-cols-2 gap-14 items-center mb-24">
+      <div class="reveal">
+        <p class="text-xs font-bold uppercase tracking-widest text-primary mb-3">Inventario</p>
+        <h3 class="text-2xl font-extrabold text-gray-900 mb-4">Control de inventario inteligente</h3>
+        <p class="text-gray-600 leading-relaxed mb-6">Registra entradas y salidas. Recibe alertas automáticas cuando el stock de un producto llegue a su mínimo. Sin sorpresas ni quiebres operativos que afecten tu servicio.</p>
+        <a href="<?= BASE_URL ?>planes/registro" class="btn-primary btn-shimmer inline-block font-bold px-7 py-3.5 rounded-xl">Ver control de inventario →</a>
+      </div>
+      <div class="reveal">
+        <div class="bg-gray-900 rounded-2xl p-5 shadow-2xl border border-gray-700">
+          <div class="flex items-center gap-1.5 mb-4">
+            <div class="w-3 h-3 rounded-full bg-red-500"></div>
+            <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+            <div class="w-3 h-3 rounded-full bg-green-500"></div>
+            <span class="text-xs text-gray-500 ml-2">Control de inventario</span>
+          </div>
+          <div class="space-y-3">
+            <div class="flex items-center justify-between bg-gray-800 rounded-xl px-4 py-3">
+              <span class="text-sm font-bold text-white">Rib eye</span>
+              <div class="flex items-center gap-2">
+                <span class="text-xs text-gray-400">142 kg</span>
+                <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-green-900 text-green-400">OK</span>
+              </div>
+            </div>
+            <div class="flex items-center justify-between bg-gray-800 rounded-xl px-4 py-3">
+              <span class="text-sm font-bold text-white">Arrachera</span>
+              <div class="flex items-center gap-2">
+                <span class="text-xs text-gray-400">18 kg</span>
+                <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-yellow-900 text-yellow-400">Bajo</span>
+              </div>
+            </div>
+            <div class="flex items-center justify-between bg-gray-800 rounded-xl px-4 py-3">
+              <span class="text-sm font-bold text-white">Costilla</span>
+              <div class="flex items-center gap-2">
+                <span class="text-xs text-gray-400">76 kg</span>
+                <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-green-900 text-green-400">OK</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Feature 4: Reportes -->
+    <div class="grid md:grid-cols-2 gap-14 items-center">
+      <div class="order-2 md:order-1 reveal">
+        <div class="bg-gray-900 rounded-2xl p-5 shadow-2xl border border-gray-700">
+          <div class="flex items-center gap-1.5 mb-4">
+            <div class="w-3 h-3 rounded-full bg-red-500"></div>
+            <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+            <div class="w-3 h-3 rounded-full bg-green-500"></div>
+            <span class="text-xs text-gray-500 ml-2">Reportes y analítica</span>
+          </div>
+          <div class="grid grid-cols-3 gap-3 mb-4">
+            <div class="bg-gray-800 rounded-xl p-3 text-center">
+              <div class="text-base font-black text-white">$284k</div>
+              <div class="text-xs text-gray-400">Ventas mes</div>
+            </div>
+            <div class="bg-gray-800 rounded-xl p-3 text-center">
+              <div class="text-base font-black text-white">342</div>
+              <div class="text-xs text-gray-400">Pedidos</div>
+            </div>
+            <div class="bg-gray-800 rounded-xl p-3 text-center">
+              <div class="text-base font-black text-green-400">↑18%</div>
+              <div class="text-xs text-gray-400">Crecimiento</div>
+            </div>
+          </div>
+          <div class="bg-gray-800 rounded-xl px-4 py-3">
+            <div class="text-xs text-gray-400 mb-2">Ventas esta semana</div>
+            <div class="flex items-end gap-1" style="height:40px">
+              <?php foreach ([40,60,45,80,70,55,90] as $pct): ?>
+              <div class="flex-1 rounded-sm bg-primary" style="height:<?= $pct ?>%;opacity:.85"></div>
+              <?php endforeach; ?>
+            </div>
+            <div class="flex mt-1">
+              <?php foreach (['L','M','X','J','V','S','D'] as $dia): ?>
+              <span class="flex-1 text-center text-xs text-gray-600"><?= $dia ?></span>
+              <?php endforeach; ?>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="order-1 md:order-2 reveal">
+        <p class="text-xs font-bold uppercase tracking-widest text-primary mb-3">Analítica</p>
+        <h3 class="text-2xl font-extrabold text-gray-900 mb-4">Reportes y analítica detallada</h3>
+        <p class="text-gray-600 leading-relaxed mb-6">Ventas por período, desempeño de repartidores, productos más vendidos y movimientos de inventario. Información clave para tomar decisiones operativas con datos reales.</p>
+        <a href="<?= BASE_URL ?>planes/registro" class="btn-primary btn-shimmer inline-block font-bold px-7 py-3.5 rounded-xl">Ver reportes →</a>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ══ FEATURE GRID ══ -->
+<section class="py-24" style="background:linear-gradient(180deg,#f8fafc,#f1f5f9)">
+  <div class="max-w-6xl mx-auto px-6">
+    <div class="text-center mb-14 reveal">
+      <p class="text-xs font-bold uppercase tracking-widest text-primary mb-3">Plataforma SaaS</p>
+      <h2 class="text-3xl md:text-4xl font-extrabold text-gray-900 mb-4">Todo lo que necesitas para operar</h2>
+      <p class="text-gray-500 max-w-xl mx-auto">Diseñado específicamente para productores y distribuidores de carne en México.</p>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      <?php
+      $ops = [
+        ['Pedidos en línea','Tus clientes hacen pedidos desde su portal sin llamadas ni WhatsApp. Catálogo siempre actualizado.',
+         '<path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z"/>'],
+        ['GPS en tiempo real','Rastrea repartidores con Traccar integrado. Tus clientes ven exactamente dónde está su entrega.',
+         '<path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"/>'],
+        ['Control de inventario','Registra entradas y salidas de stock con alertas automáticas cuando un producto llega a su mínimo.',
+         '<path stroke-linecap="round" stroke-linejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 5.625c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125"/>'],
+        ['Aprobaciones y límites','Supervisores revisan y aprueban pedidos. Define límites de compra por cliente para un control total.',
+         '<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"/>'],
+        ['Reportes detallados','Ventas por período, movimientos de inventario y desempeño de repartidores en un solo lugar.',
+         '<path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zm6.75-4.5c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zm6.75-4.5c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"/>'],
+        ['SaaS sin contratos','Paga mensual o anual. Sin permanencia. Actualiza o cancela tu plan cuando lo necesites.',
+         '<path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/>'],
+      ];
+      foreach ($ops as $k => [$ot,$od,$osvg]):
+      ?>
+      <div class="feat-card bg-white rounded-2xl p-7 reveal" style="transition-delay:<?= $k * 80 ?>ms">
+        <div class="feat-icon w-12 h-12 rounded-xl flex items-center justify-center mb-5">
+          <svg class="w-6 h-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><?= $osvg ?></svg>
+        </div>
+        <h3 class="font-bold text-gray-900 text-base mb-2"><?= htmlspecialchars($ot) ?></h3>
+        <p class="text-gray-500 text-sm leading-relaxed"><?= htmlspecialchars($od) ?></p>
       </div>
       <?php endforeach; ?>
+    </div>
+  </div>
+</section>
+
+<!-- ══ CÓMO FUNCIONA ══ -->
+<section id="how" class="bg-white py-24">
+  <div class="max-w-6xl mx-auto px-6">
+    <div class="text-center mb-16 reveal">
+      <p class="text-xs font-bold uppercase tracking-widest text-primary mb-3">Proceso</p>
+      <h2 class="text-3xl md:text-4xl font-extrabold text-gray-900 mb-4">¿Cómo funciona?</h2>
+      <p class="text-gray-500 max-w-xl mx-auto">Empieza a operar en minutos, no en semanas.</p>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-14">
+      <?php
+      $pasos = [
+        ['01','Te registras','Elige tu plan, realiza el pago con PayPal y recibe acceso inmediato a tu panel de administración.'],
+        ['02','Configuras tu empresa','Carga tu catálogo, registra clientes, supervisores y repartidores. Todo listo en minutos.'],
+        ['03','Tus clientes piden','Cada cliente entra a su portal, ve el catálogo con sus precios personalizados y hace pedidos al instante.'],
+      ];
+      foreach ($pasos as $p => [$num,$ptitulo,$pdesc]):
+      ?>
+      <div class="step-wrap text-center reveal" style="transition-delay:<?= $p * 120 ?>ms">
+        <div class="step-circle w-16 h-16 rounded-full flex items-center justify-center text-white text-2xl font-black mx-auto mb-6"><?= $num ?></div>
+        <p class="text-xs font-bold uppercase tracking-widest text-primary mb-2">Paso <?= $p + 1 ?></p>
+        <h3 class="text-xl font-extrabold text-gray-900 mb-3"><?= htmlspecialchars($ptitulo) ?></h3>
+        <p class="text-gray-500 leading-relaxed text-sm max-w-xs mx-auto"><?= htmlspecialchars($pdesc) ?></p>
+      </div>
+      <?php endforeach; ?>
+    </div>
+    <div class="text-center reveal">
+      <a href="<?= BASE_URL ?>planes/registro" class="btn-primary btn-shimmer inline-block font-bold px-10 py-4 rounded-2xl">Comenzar ahora →</a>
     </div>
   </div>
 </section>
@@ -846,6 +1069,45 @@
   </div>
 </section>
 
+<!-- ══ TESTIMONIALES ══ -->
+<section class="bg-slate-50 py-24">
+  <div class="max-w-6xl mx-auto px-6">
+    <div class="text-center mb-14 reveal">
+      <p class="text-xs font-bold uppercase tracking-widest text-primary mb-3">Testimonios</p>
+      <h2 class="text-3xl md:text-4xl font-extrabold text-gray-900 mb-4">Lo que dicen nuestros clientes</h2>
+      <p class="text-gray-500 max-w-xl mx-auto">Productores y distribuidores de carne que ya digitalizaron su operación con CarniHub.</p>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <?php
+      $testimonios = [
+        ['DR','Don Ramón','Carnicería Don Ramón','Antes tardaba 2 horas en recibir y confirmar pedidos. Ahora mis clientes piden solos y yo solo los proceso. Un cambio total.'],
+        ['MG','Mtra. González','Distribuidora González e Hijos','Los repartidores ya no se pierden ni llegan tarde. Con el GPS en tiempo real yo y mis clientes sabemos exactamente dónde está cada entrega.'],
+        ['CV','Carlos V.','Res & Co. CDMX','Las ventas subieron 30% en el primer mes porque mis clientes pueden pedir a cualquier hora sin tener que llamarme.'],
+      ];
+      foreach ($testimonios as $ti => [$tini,$tnombre,$tempresa,$tcita]):
+      ?>
+      <div class="bg-white rounded-2xl p-8 border border-gray-100 feat-card reveal" style="transition-delay:<?= $ti * 100 ?>ms">
+        <div class="flex gap-1 mb-5">
+          <?php for ($ts = 0; $ts < 5; $ts++): ?>
+          <svg class="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+          </svg>
+          <?php endfor; ?>
+        </div>
+        <p class="text-gray-700 text-sm leading-relaxed mb-6 italic">"<?= htmlspecialchars($tcita) ?>"</p>
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white text-sm font-extrabold flex-shrink-0"><?= htmlspecialchars($tini) ?></div>
+          <div>
+            <div class="font-bold text-gray-900 text-sm"><?= htmlspecialchars($tnombre) ?></div>
+            <div class="text-xs text-gray-400"><?= htmlspecialchars($tempresa) ?></div>
+          </div>
+        </div>
+      </div>
+      <?php endforeach; ?>
+    </div>
+  </div>
+</section>
+
 <!-- ══ FAQ ══ -->
 <section class="bg-white py-20">
   <div class="max-w-3xl mx-auto px-6">
@@ -884,6 +1146,31 @@
         <div class="faq-body">
           <p class="text-gray-600 text-sm leading-relaxed pb-5"><?= htmlspecialchars($a) ?></p>
         </div>
+      </div>
+      <?php endforeach; ?>
+    </div>
+  </div>
+</section>
+
+<!-- ══ QUIÉNES USAN CARNIHUB ══ -->
+<section class="bg-white py-16">
+  <div class="max-w-5xl mx-auto px-6 text-center reveal">
+    <p class="text-xs font-bold uppercase tracking-widest text-primary mb-4">¿Qué tipo de negocios usan CarniHub?</p>
+    <div class="flex flex-wrap gap-3 justify-center mb-10">
+      <?php foreach (['Restaurantes','Hoteles','Taquerías','Hospitales','Carnicerías','Comedores industriales'] as $seg): ?>
+      <span class="px-4 py-2 rounded-full text-sm font-semibold bg-slate-100 text-slate-700"><?= htmlspecialchars($seg) ?></span>
+      <?php endforeach; ?>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <?php foreach ([
+        ['Mermas y devoluciones','Trazabilidad · POD digital · Incidencias'],
+        ['Facturación y crédito','Control admin · Compras recurrentes · Conciliación'],
+        ['Personal y entregas','Validación de rutas · Evidencias · Inventarios'],
+        ['IIoT y mantenimiento','Monitoreo · Activos · Cadena de frío'],
+      ] as [$t,$d]): ?>
+      <div class="bg-slate-50 rounded-2xl p-5 border border-gray-100 text-left">
+        <div class="font-extrabold text-sm text-gray-900 mb-1"><?= htmlspecialchars($t) ?></div>
+        <div class="text-xs text-gray-500 leading-relaxed"><?= htmlspecialchars($d) ?></div>
       </div>
       <?php endforeach; ?>
     </div>
