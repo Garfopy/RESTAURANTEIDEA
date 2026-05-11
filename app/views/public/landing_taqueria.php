@@ -314,7 +314,7 @@
             ['🌮','Taquerías atendidas','500+'],
             ['🚚','Entregas garantizadas','100%'],
             ['⏱','Tiempo de respuesta','24 h'],
-            ['💳','Crédito disponible','Sí'],
+            ['💳','Pago en linea','Sí'],
           ] as [$icon,$label,$val]): ?>
           <div class="bg-slate-50 rounded-2xl p-6 border border-gray-100 feat-card text-center">
             <div class="text-3xl mb-2"><?= $icon ?></div>

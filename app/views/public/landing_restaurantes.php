@@ -11,7 +11,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cortes de carne PREMIUM para restaurantes | Proveedor certificado TIF | <?= htmlspecialchars($appName) ?></title>
   <meta name="description" content="Encuentra cortes de carne para restaurantes con trazabilidad, entrega confiable y proveedores certificados TIF. Ideal para hoteles y comedores industriales.">
-  <meta name="keywords" content="cortes de carne para restaurantes, Rastreo de transporte de alimentos, Trazabilidad de productos cárnicos, Logística de alimentos perecederos, Monitoreo de temperatura en transporte, Proveedor de carne certificado TIF, Venta de carne al mayoreo para hoteles, Cotización de carne para comedores, Proveedores de carne con crédito, Software de compras para restaurantes, Evidencia de entrega digital POD, Certificados sanitarios de carne, Reportes de consumo por sucursal">
+  <meta name="keywords" content="cortes de carne para restaurantes, Rastreo de transporte de alimentos, Trazabilidad de productos cárnicos, Logística de alimentos perecederos, Monitoreo de temperatura en transporte, Proveedor de carne certificado TIF, Venta de carne al mayoreo para hoteles, Cotización de carne para comedores, Proveedores de carne con crédito, Software de compras para restaurantes, Evidencia de entrega digital POD, Certificados sanitarios de carne, Reportes de consumo por sucursal, Sistema de control de calidad alimentos, Gestión de devoluciones alimentos, Pedidos multi-sucursal para negocios, Registro de incidencias logísticas">
   <link rel="canonical" href="<?= BASE_URL ?>restaurantes">
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -93,6 +93,20 @@
     .faq-item details[open] .faq-arrow { transform: rotate(180deg); }
     .text-gradient { background: linear-gradient(135deg, #fff 30%, color-mix(in srgb,var(--cp) 80%,#fff)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
     .tif-badge { display:inline-flex; align-items:center; gap:.5rem; background:color-mix(in srgb,var(--cp) 10%,#fff); border:1px solid color-mix(in srgb,var(--cp) 30%,transparent); padding:.5rem 1rem; border-radius:9999px; font-size:.8rem; font-weight:700; color:var(--cp); }
+    /* ── Slider ── */
+    .slider-wrap { position:relative; overflow:hidden; min-height:82vh; }
+    .slide { position:absolute; inset:0; opacity:0; pointer-events:none; transition:opacity .8s ease; }
+    .slide.active { opacity:1; pointer-events:auto; }
+    .slider-arrow { position:absolute; top:50%; transform:translateY(-50%); z-index:30; background:rgba(255,255,255,.13); border:1px solid rgba(255,255,255,.3); color:#fff; width:52px; height:52px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:background .2s, border-color .2s, transform .2s; backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); }
+    .slider-arrow:hover { background:rgba(255,255,255,.28); border-color:rgba(255,255,255,.7); transform:translateY(-50%) scale(1.08); }
+    #slider-prev { left:20px; }
+    #slider-next { right:20px; }
+    .slider-dots { position:absolute; bottom:30px; left:50%; transform:translateX(-50%); display:flex; gap:10px; z-index:30; }
+    .slider-dot { width:10px; height:10px; border-radius:50%; background:rgba(255,255,255,.35); border:none; cursor:pointer; transition:background .25s, transform .25s; padding:0; }
+    .slider-dot.active { background:#fff; transform:scale(1.4); }
+    .slide-chip { display:inline-flex; align-items:center; gap:.5rem; padding:.4rem 1.1rem; border-radius:9999px; font-size:.72rem; font-weight:800; letter-spacing:.1em; text-transform:uppercase; margin-bottom:1.25rem; }
+    .slider-progress { position:absolute; bottom:0; left:0; height:3px; background:var(--cp); width:0%; z-index:30; }
+    .slider-progress.running { width:100%; transition:width 5s linear; }
   </style>
 </head>
 <body class="bg-white text-gray-900">
@@ -118,42 +132,155 @@
   </div>
 </nav>
 
-<!-- ══ HERO ══ -->
-<section class="hero-bg relative min-h-[85vh] flex flex-col justify-center overflow-hidden pt-16">
-  <div class="orb" style="width:500px;height:500px;background:var(--cp);top:-120px;right:-100px;"></div>
-  <div class="orb" style="width:350px;height:350px;background:#22c55e;bottom:-80px;left:-60px;"></div>
+<!-- ══ SLIDER HERO ══ -->
+<div class="slider-wrap pt-16" id="hero-slider">
 
-  <div class="max-w-6xl mx-auto px-6 py-24 md:py-32 relative z-10">
-    <div class="max-w-3xl">
-      <div class="flex items-center gap-2 mb-6 text-sm">
-        <a href="<?= BASE_URL ?>" class="text-white/50 hover:text-white/80 transition-colors">Inicio</a>
-        <span class="text-white/30">›</span>
-        <span class="text-white/70">Restaurantes &amp; Hoteles</span>
+  <!-- Slide 1: Cortes de carne para restaurantes con trazabilidad y entrega garantizada -->
+  <!-- alt-img: cortes-carne-restaurantes-trazabilidad -->
+  <div class="slide active" data-slide="0" style="background:radial-gradient(ellipse 80% 60% at 50% -10%,color-mix(in srgb,var(--cp) 30%,transparent),transparent),linear-gradient(160deg,#0a0f1e 0%,#111827 55%,#1a2235 100%)">
+    <div class="orb" style="width:500px;height:500px;background:var(--cp);top:-120px;right:-100px;"></div>
+    <div class="orb" style="width:350px;height:350px;background:#22c55e;bottom:-80px;left:-60px;"></div>
+    <div class="max-w-6xl mx-auto px-6 py-20 md:py-28 relative z-10">
+      <div class="max-w-3xl">
+        <div class="slide-chip pulse-badge" style="background:color-mix(in srgb,var(--cp) 20%,transparent);border:1px solid color-mix(in srgb,var(--cp) 50%,transparent);color:var(--cp)">
+          <span class="w-2 h-2 rounded-full bg-primary animate-pulse inline-block"></span>
+          Cortes de carne para restaurantes
+        </div>
+        <h2 class="text-4xl md:text-5xl lg:text-6xl font-black text-white leading-tight mb-5">
+          Trazabilidad y<br>
+          <span class="text-gradient">entrega garantizada</span>
+        </h2>
+        <p class="text-gray-400 text-lg mb-8 max-w-xl leading-relaxed">
+          Conecta con proveedores certificados TIF. Calidad constante, monitoreo logístico y entregas puntuales para tu restaurante u hotel.
+        </p>
+        <a href="<?= BASE_URL ?>planes/registro" class="btn-primary btn-shimmer inline-block font-bold px-8 py-4 rounded-xl">Conectar con proveedor TIF →</a>
       </div>
-      <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full mb-6 pulse-badge"
-           style="background:color-mix(in srgb,var(--cp) 20%,transparent);border:1px solid color-mix(in srgb,var(--cp) 50%,transparent)">
-        <span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
-        <span class="text-xs font-bold uppercase tracking-widest text-primary">Cortes Premium · Proveedor TIF</span>
+    </div>
+  </div>
+
+  <!-- Slide 2: Proveedores certificados TIF para restaurantes y hoteles -->
+  <!-- alt-img: proveedor-carne-certificado-tif -->
+  <div class="slide" data-slide="1" style="background:radial-gradient(ellipse 80% 60% at 50% -10%,rgba(34,197,94,.25),transparent),linear-gradient(160deg,#0a0f1e 0%,#111827 55%,#0f1e14 100%)">
+    <div class="orb" style="width:500px;height:500px;background:#22c55e;top:-120px;right:-100px;"></div>
+    <div class="orb" style="width:350px;height:350px;background:var(--cp);bottom:-80px;left:-60px;"></div>
+    <div class="max-w-6xl mx-auto px-6 py-20 md:py-28 relative z-10">
+      <div class="max-w-3xl">
+        <div class="slide-chip" style="background:rgba(34,197,94,.18);border:1px solid rgba(34,197,94,.45);color:#22c55e">
+          <span class="w-2 h-2 rounded-full inline-block" style="background:#22c55e"></span>
+          Proveedor de carne certificado TIF
+        </div>
+        <h2 class="text-4xl md:text-5xl lg:text-6xl font-black text-white leading-tight mb-5">
+          Proveedores certificados TIF<br>
+          <span style="background:linear-gradient(135deg,#fff 30%,#86efac);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">para restaurantes y hoteles</span>
+        </h2>
+        <p class="text-gray-400 text-lg mb-8 max-w-xl leading-relaxed">
+          Cumplimiento sanitario verificado, inocuidad alimentaria certificada y documentación verificable en cada entrega para hoteles y cadenas restauranteras.
+        </p>
+        <a href="<?= BASE_URL ?>planes/registro" class="inline-block font-bold px-8 py-4 rounded-xl" style="background:#22c55e;color:#fff">Ver proveedores certificados →</a>
       </div>
-      <h1 class="text-4xl md:text-5xl lg:text-6xl font-black leading-[1.1] mb-6">
-        <span class="text-gradient">Cortes de carne</span><br>
-        <span class="text-white">para restaurantes</span><br>
-        <span class="text-white text-3xl md:text-4xl font-bold">con trazabilidad, calidad y logística confiable</span>
-      </h1>
-      <p class="text-gray-400 text-lg leading-relaxed mb-10 max-w-2xl">
-        Encontrar cortes de carne para restaurantes que mantengan <strong class="text-white/80">calidad constante</strong>,
-        trazabilidad y entregas puntuales es uno de los mayores retos para chefs ejecutivos,
-        cadenas restauranteras y hoteles.
-      </p>
-      <div class="flex flex-wrap gap-3 mb-8">
-        <?php foreach (['Entregas confiables','Monitoreo de temperatura','Evidencia digital de entrega','Control multi-sucursal','Cumplimiento sanitario'] as $tag): ?>
-        <span class="tif-badge"><?= htmlspecialchars($tag) ?></span>
-        <?php endforeach; ?>
+    </div>
+  </div>
+
+  <!-- Slide 3: Controla evidencias de entrega desde un solo sistema -->
+  <!-- alt-img: pedidos-multi-sucursal-restaurantes -->
+  <div class="slide" data-slide="2" style="background:radial-gradient(ellipse 80% 60% at 50% -10%,rgba(245,158,11,.28),transparent),linear-gradient(160deg,#0a0f1e 0%,#111827 55%,#1e1a10 100%)">
+    <div class="orb" style="width:500px;height:500px;background:#f59e0b;top:-120px;right:-100px;"></div>
+    <div class="orb" style="width:350px;height:350px;background:var(--cp);bottom:-80px;left:-60px;"></div>
+    <div class="max-w-6xl mx-auto px-6 py-20 md:py-28 relative z-10">
+      <div class="max-w-3xl">
+        <div class="slide-chip" style="background:rgba(245,158,11,.18);border:1px solid rgba(245,158,11,.45);color:#f59e0b">
+          <span class="w-2 h-2 rounded-full inline-block" style="background:#f59e0b"></span>
+          Pedidos multi-sucursal para restaurantes
+        </div>
+        <h2 class="text-4xl md:text-5xl lg:text-6xl font-black text-white leading-tight mb-5">
+          Controla evidencias de entrega<br>
+          <span style="background:linear-gradient(135deg,#fff 30%,#fcd34d);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">desde un solo sistema</span>
+        </h2>
+        <p class="text-gray-400 text-lg mb-8 max-w-xl leading-relaxed">
+          POD digital, pedidos multi-sucursal y trazabilidad centralizada para reducir errores operativos y mejorar el control de tu cadena de abastecimiento.
+        </p>
+        <a href="<?= BASE_URL ?>planes/registro" class="inline-block font-bold px-8 py-4 rounded-xl" style="background:#f59e0b;color:#fff">Ver evidencia digital POD →</a>
       </div>
-      <div class="flex flex-col sm:flex-row gap-3">
-        <a href="<?= BASE_URL ?>planes/registro" class="btn-primary btn-shimmer font-bold text-base px-8 py-4 rounded-xl text-center">Conectar con proveedor TIF →</a>
-        <a href="#tif" class="btn-outline font-semibold text-base px-8 py-4 rounded-xl text-center">Ver trazabilidad</a>
+    </div>
+  </div>
+
+  <!-- Slide 4: CarniHub optimiza compras, logística y control de calidad -->
+  <!-- alt-img: software-compras-restaurantes-carnihub -->
+  <div class="slide" data-slide="3" style="background:radial-gradient(ellipse 80% 60% at 50% -10%,rgba(99,102,241,.28),transparent),linear-gradient(160deg,#0a0f1e 0%,#111827 55%,#0e1120 100%)">
+    <div class="orb" style="width:500px;height:500px;background:#6366f1;top:-120px;right:-100px;"></div>
+    <div class="orb" style="width:350px;height:350px;background:var(--cp);bottom:-80px;left:-60px;"></div>
+    <div class="max-w-6xl mx-auto px-6 py-20 md:py-28 relative z-10">
+      <div class="max-w-3xl">
+        <div class="slide-chip" style="background:rgba(99,102,241,.18);border:1px solid rgba(99,102,241,.45);color:#a5b4fc">
+          <span class="w-2 h-2 rounded-full inline-block" style="background:#a5b4fc"></span>
+          Software de compras para restaurantes
+        </div>
+        <h2 class="text-4xl md:text-5xl lg:text-6xl font-black text-white leading-tight mb-5">
+          CarniHub optimiza compras,<br>
+          <span style="background:linear-gradient(135deg,#fff 30%,#c7d2fe);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">logística y control de calidad</span>
+        </h2>
+        <p class="text-gray-400 text-lg mb-8 max-w-xl leading-relaxed">
+          Administra proveedores, valida entregas, gestiona devoluciones y genera reportes de consumo por sucursal desde una sola plataforma.
+        </p>
+        <a href="<?= BASE_URL ?>planes/registro" class="inline-block font-bold px-8 py-4 rounded-xl" style="background:#6366f1;color:#fff">Ver software de compras →</a>
       </div>
+    </div>
+  </div>
+
+  <!-- Flecha izquierda -->
+  <button class="slider-arrow" id="slider-prev" aria-label="Diapositiva anterior">
+    <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+    </svg>
+  </button>
+
+  <!-- Flecha derecha -->
+  <button class="slider-arrow" id="slider-next" aria-label="Diapositiva siguiente">
+    <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+    </svg>
+  </button>
+
+  <!-- Dots de navegación -->
+  <div class="slider-dots" id="slider-dots">
+    <button class="slider-dot active" data-slide="0" aria-label="Diapositiva 1"></button>
+    <button class="slider-dot" data-slide="1" aria-label="Diapositiva 2"></button>
+    <button class="slider-dot" data-slide="2" aria-label="Diapositiva 3"></button>
+    <button class="slider-dot" data-slide="3" aria-label="Diapositiva 4"></button>
+  </div>
+
+  <!-- Barra de progreso -->
+  <div class="slider-progress" id="slider-progress"></div>
+</div>
+
+<!-- ══ H1 INTRO ══ -->
+<section id="intro" class="bg-white py-16">
+  <div class="max-w-6xl mx-auto px-6 reveal">
+    <div class="flex items-center gap-2 text-sm text-gray-400 mb-5">
+      <a href="<?= BASE_URL ?>" class="hover:text-gray-600 transition-colors">Inicio</a>
+      <span>›</span>
+      <span>Restaurantes &amp; Hoteles</span>
+    </div>
+    <h1 class="text-3xl md:text-4xl font-extrabold text-gray-900 mb-5">
+      Cortes de carne para restaurantes con trazabilidad, calidad y logística confiable
+    </h1>
+    <p class="text-gray-600 leading-relaxed max-w-3xl mb-4">
+      Encontrar cortes de carne para restaurantes que mantengan calidad constante, trazabilidad y entregas
+      puntuales es uno de los mayores retos para chefs ejecutivos, cadenas restauranteras y hoteles.
+      Las operaciones gastronómicas modernas requieren mucho más que un proveedor tradicional.
+    </p>
+    <div class="grid grid-cols-2 md:grid-cols-3 gap-2 mb-6 max-w-3xl">
+      <?php foreach (['Entregas confiables','Monitoreo de temperatura','Evidencia digital de entrega','Control multi-sucursal','Cumplimiento sanitario','Logística inversa eficiente'] as $tag): ?>
+      <span class="tif-badge text-xs"><?= htmlspecialchars($tag) ?></span>
+      <?php endforeach; ?>
+    </div>
+    <p class="text-gray-600 leading-relaxed max-w-3xl mb-8">
+      CarniHub conecta restaurantes, hoteles y comedores industriales con proveedores especializados de
+      productos cárnicos certificados y herramientas digitales de control operativo.
+    </p>
+    <div class="flex flex-col sm:flex-row gap-3">
+      <a href="<?= BASE_URL ?>planes/registro" class="btn-primary btn-shimmer inline-block font-bold text-base px-8 py-4 rounded-xl text-center">Conectar con proveedor TIF →</a>
+      <a href="#tif" class="inline-block border-2 border-gray-200 font-semibold text-base px-8 py-4 rounded-xl text-gray-700 hover:border-gray-400 transition-colors text-center">Ver trazabilidad</a>
     </div>
   </div>
 </section>
@@ -220,7 +347,7 @@
     <a href="<?= BASE_URL ?>planes/registro"
        class="flex-shrink-0 bg-white font-bold px-8 py-4 rounded-xl text-sm hover:bg-gray-100 transition-colors whitespace-nowrap"
        style="color:var(--cp)">
-      Sistema de control de calidad →
+      Sistema de control de calidad alimentos →
     </a>
   </div>
 </section>
@@ -450,7 +577,7 @@
       </div>
       <div class="reveal">
         <div class="rounded-2xl p-8" style="background:linear-gradient(135deg,#1a2235,#111827)">
-          <h3 class="text-xl font-extrabold text-white mb-5">Reportes de consumo por sucursal y control de calidad</h3>
+          <h2 class="text-xl font-extrabold text-white mb-5">Reportes de consumo por sucursal y control de calidad de alimentos</h2>
           <p class="text-gray-400 text-sm mb-5 leading-relaxed">
             Los grupos restauranteros necesitan visibilidad total sobre consumo, comportamiento de compras y rendimiento operativo.
           </p>
@@ -547,6 +674,14 @@
          'Con monitoreo de temperatura en transporte, certificados sanitarios de carne, registro de incidencias logísticas y trazabilidad de productos cárnicos.'],
         ['¿Qué beneficios tiene la trazabilidad de productos cárnicos?',
          'Permite identificar origen, condiciones de transporte y evidencia operativa para mejorar control sanitario y cumplimiento.'],
+        ['¿Cómo evitar que las entregas tardías afecten la operación de mi restaurante?',
+         'La falta de visibilidad logística genera retrasos operativos, pérdida de producción e incumplimiento interno. CarniHub facilita rastreo de transporte de alimentos, evidencia digital POD, monitoreo operativo y control de incidencias logísticas para mejorar trazabilidad y reducir incertidumbre en entregas críticas.'],
+        ['¿Cómo mejorar logística inversa y devoluciones de alimentos?',
+         'Cuando existen productos dañados, diferencias en pedidos o incidencias logísticas, muchos proveedores tardan demasiado en responder. CarniHub facilita la gestión de devoluciones de alimentos, seguimiento de incidencias, trazabilidad documental y validación operativa, mejorando tiempos de respuesta y control de reposiciones.'],
+        ['¿Cómo encontrar proveedores de carne confiables para hoteles y restaurantes?',
+         'El principal problema del mercado gastronómico no es solo el precio: es encontrar proveedores que mantengan calidad constante, entregas puntuales, documentación correcta y capacidad operativa. CarniHub ofrece proveedores certificados, distribuidores especializados, soluciones de trazabilidad y herramientas de control operativo para reducir riesgo y mejorar estabilidad operativa.'],
+        ['¿Qué debe ofrecer un proveedor profesional de carne para restaurantes?',
+         'Debe garantizar trazabilidad, calidad constante, entregas puntuales y cumplimiento sanitario. CarniHub ayuda a resolver entregas confiables (rastreo, trazabilidad, POD digital), calidad y precio (proveedores especializados, compra recurrente, mayoreo), facilidades administrativas (historial de pedidos, control documental, validaciones digitales), cumplimiento normativo (certificados sanitarios, monitoreo de temperatura) y logística inversa (devoluciones ágiles, seguimiento de anomalías, control operativo).'],
       ] as [$q,$a]): ?>
       <div class="faq-item border border-gray-200 rounded-2xl overflow-hidden bg-white">
         <details>
@@ -620,10 +755,62 @@
 window.addEventListener('scroll', () => {
   document.querySelector('.navbar').classList.toggle('scrolled', window.scrollY > 40);
 });
+// ── Scroll reveal ──
 const observer = new IntersectionObserver((entries) => {
   entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
 }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
 document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+// ── Slider ──
+(function () {
+  const INTERVAL = 5000;
+  const slides  = document.querySelectorAll('#hero-slider .slide');
+  const dots    = document.querySelectorAll('#slider-dots .slider-dot');
+  const bar     = document.getElementById('slider-progress');
+  let current   = 0;
+  let autoTimer = null;
+
+  function goTo(index) {
+    slides[current].classList.remove('active');
+    dots[current].classList.remove('active');
+    current = (index + slides.length) % slides.length;
+    slides[current].classList.add('active');
+    dots[current].classList.add('active');
+    resetProgress();
+  }
+
+  function resetProgress() {
+    if (!bar) return;
+    bar.classList.remove('running');
+    bar.style.transition = 'none';
+    bar.style.width = '0%';
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      bar.style.transition = '';
+      bar.classList.add('running');
+    }));
+  }
+
+  function startAuto() {
+    clearInterval(autoTimer);
+    autoTimer = setInterval(() => goTo(current + 1), INTERVAL);
+  }
+
+  document.getElementById('slider-prev').addEventListener('click', () => { goTo(current - 1); startAuto(); });
+  document.getElementById('slider-next').addEventListener('click', () => { goTo(current + 1); startAuto(); });
+  dots.forEach(dot => dot.addEventListener('click', () => { goTo(parseInt(dot.dataset.slide)); startAuto(); }));
+
+  // Swipe support
+  let touchStartX = 0;
+  const wrap = document.getElementById('hero-slider');
+  wrap.addEventListener('touchstart', e => { touchStartX = e.changedTouches[0].clientX; }, { passive: true });
+  wrap.addEventListener('touchend', e => {
+    const diff = touchStartX - e.changedTouches[0].clientX;
+    if (Math.abs(diff) > 50) { goTo(diff > 0 ? current + 1 : current - 1); startAuto(); }
+  }, { passive: true });
+
+  resetProgress();
+  startAuto();
+})();
 </script>
 </body>
 </html>
