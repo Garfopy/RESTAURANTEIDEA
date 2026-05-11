@@ -38,7 +38,11 @@ if ($path === '') {
     $ctrlSlug = 'landing';
     $action   = 'landing';
 }
-
+// ── Rutas de audiencia → PublicController ────────────────────────────────
+if (in_array($path, ['taqueria', 'restaurantes', 'cedis'], true)) {
+    $ctrlSlug = $path;
+    $action   = $path;
+}
 // ── Route map: URL slug → Controller class ────────────────────────────────────
 $routes = [
     // Auth (público)
@@ -84,6 +88,10 @@ $routes = [
     'planes'              => 'PublicController',
     // Landing page pública
     'landing'             => 'PublicController',
+    // Landings de audiencia
+    'taqueria'            => 'PublicController',
+    'restaurantes'        => 'PublicController',
+    'cedis'               => 'PublicController',
 ];
 
 // ── Auth guard ────────────────────────────────────────────────────────────────
@@ -104,7 +112,10 @@ $publicPaths = [
     'planes/simularpago',
     'planes/aprobarpagotest',
     'suscripcion/webhook',
-    'landing/landing'
+    'landing/landing',
+    'taqueria/taqueria',
+    'restaurantes/restaurantes',
+    'cedis/cedis',
 ];
 
 $currentPath = strtolower($ctrlSlug . '/' . $action);
