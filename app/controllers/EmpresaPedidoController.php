@@ -284,6 +284,24 @@ class EmpresaPedidoController extends BaseController
         $this->redirect('empresa-pedido');
     }
 
+    // ── Imprimir / exportar PDF de un pedido ─────────────────────
+    public function pdf(?string $id = null): void
+    {
+        $pedidoId = (int)$id;
+        if (!$pedidoId || !$this->pedidoModel->verificarPertenece($pedidoId, $this->empresaId())) {
+            $this->flash('error', 'Pedido no encontrado.');
+            $this->redirect('empresa-pedido');
+        }
+
+        $pedido       = $this->pedidoModel->conDetalle($pedidoId);
+        $empresa      = (new EmpresaModel())->find($this->empresaId());
+        $configModel  = new ConfigModel();
+        $appLogo      = $configModel->get('app_logo', '');
+        $colorPrimary = $configModel->get('color_primary', '#C8102E');
+
+        require ROOT_PATH . '/app/views/empresa/pedidos/pdf.php';
+    }
+
     // Asignar costos de envío por parada (pedido multi-sucursal)
     public function asignarCostoEnvio(?string $p = null): void
     {

@@ -779,4 +779,460 @@ class PedidoModel extends BaseModel
             [$totalEnvio, $totalEnvio, $pedidoId]
         );
     }
+
+    // ── KPIs operativos del Supervisor ───────────────────────────────────────
+
+    /**
+     * Pedidos pendientes de aprobación cuyo tiempo de espera supera $minutos.
+     * Indicador crítico de SLA: lo primero que el supervisor debe atender.
+     */
+    public function pedidosDemoradosAprobacion(int $empresaId, int $minutos = 15): int
+    {
+        $row = $this->queryOne(
+            "SELECT COUNT(*) AS n
+               FROM pedidos
+              WHERE empresa_id = ?
+                AND estado = 'pendiente'
+                AND TIMESTAMPDIFF(MINUTE, created_at, NOW()) > ?",
+            [$empresaId, $minutos]
+        );
+        return (int)($row['n'] ?? 0);
+    }
+
+    /**
+     * Excepciones de límite registradas en bitácora dentro del período.
+     * Cuenta intentos en los que el comprador excedió su límite de compra.
+     */
+    public function excepcionesLimite(int $empresaId, string $desde, string $hasta): int
+    {
+        $row = $this->queryOne(
+            "SELECT COUNT(*) AS n
+               FROM action_logs
+              WHERE empresa_id = ?
+                AND DATE(created_at) BETWEEN ? AND ?
+                AND (
+                    accion LIKE '%limite%'
+                 OR accion LIKE '%límite%'
+                 OR descripcion LIKE '%limite excedido%'
+                 OR descripcion LIKE '%límite excedido%'
+                 OR descripcion LIKE '%excede límite%'
+                 OR descripcion LIKE '%excede limite%'
+                )",
+            [$empresaId, $desde, $hasta]
+        );
+        return (int)($row['n'] ?? 0);
+    }
+
+    /**
+     * Incidencias de reparto: paradas marcadas como fallidas o pedidos en ruta
+     * cuya fecha de entrega ya venció sin completarse.
+     */
+    public function incidenciasReparto(int $empresaId, string $desde, string $hasta): int
+    {
+        $row = $this->queryOne(
+            "SELECT COUNT(*) AS n
+               FROM ruta_detalle rd
+               JOIN rutas   r ON r.id = rd.ruta_id
+               JOIN pedidos p ON p.id = rd.pedido_id
+              WHERE p.empresa_id = ?
+                AND DATE(r.fecha) BETWEEN ? AND ?
+                AND (
+                    rd.estado = 'fallido'
+                 OR (rd.estado = 'pendiente' AND r.fecha < CURDATE())
+                )",
+            [$empresaId, $desde, $hasta]
+        );
+        return (int)($row['n'] ?? 0);
+    }
+
+    // ── KPIs y analytics del Comprador ────────────────────────────────────
+
+    /**
+     * Kilos totales comprados en el mes en curso (productos con presentacion='kg').
+     */
+    public function kgTotalesMes(int $compradorId, int $empresaId): float
+    {
+        $row = $this->queryOne(
+            "SELECT COALESCE(SUM(pd.cantidad),0) AS kg
+               FROM pedido_detalle pd
+               JOIN pedidos p   ON p.id = pd.pedido_id
+               JOIN productos pr ON pr.id = pd.producto_id
+              WHERE p.comprador_id = ? AND p.empresa_id = ?
+                AND p.estado != 'cancelado'
+                AND pr.presentacion = 'kg'
+                AND YEAR(p.created_at)  = YEAR(CURDATE())
+                AND MONTH(p.created_at) = MONTH(CURDATE())",
+            [$compradorId, $empresaId]
+        );
+        return (float)($row['kg'] ?? 0);
+    }
+
+    /**
+     * Gasto total del mes en curso (sin cancelados).
+     */
+    public function gastoMesComprador(int $compradorId, int $empresaId): float
+    {
+        $row = $this->queryOne(
+            "SELECT COALESCE(SUM(total),0) AS g
+               FROM pedidos
+              WHERE comprador_id = ? AND empresa_id = ?
+                AND estado != 'cancelado'
+                AND YEAR(created_at)  = YEAR(CURDATE())
+                AND MONTH(created_at) = MONTH(CURDATE())",
+            [$compradorId, $empresaId]
+        );
+        return (float)($row['g'] ?? 0);
+    }
+
+    /**
+     * Pedidos del comprador en tránsito con tracking GPS activo.
+     */
+    public function pedidosEnTransitoConGps(int $compradorId, int $empresaId): int
+    {
+        $row = $this->queryOne(
+            "SELECT COUNT(DISTINCT p.id) AS n
+               FROM pedidos p
+          LEFT JOIN ruta_detalle rd ON rd.pedido_id = p.id
+              WHERE p.comprador_id = ? AND p.empresa_id = ?
+                AND p.estado = 'en_ruta'
+                AND rd.tracking_activo = 1",
+            [$compradorId, $empresaId]
+        );
+        return (int)($row['n'] ?? 0);
+    }
+
+    /**
+     * Ahorro acumulado por motor de precios escalonados:
+     * SUM((precio_original - precio_unit) * cantidad) cuando precio_original > precio_unit.
+     */
+    public function ahorroPorVolumen(int $compradorId, int $empresaId, string $desde, string $hasta): float
+    {
+        $row = $this->queryOne(
+            "SELECT COALESCE(SUM((pd.precio_original - pd.precio_unit) * pd.cantidad),0) AS ahorro
+               FROM pedido_detalle pd
+               JOIN pedidos p ON p.id = pd.pedido_id
+              WHERE p.comprador_id = ? AND p.empresa_id = ?
+                AND p.estado != 'cancelado'
+                AND DATE(p.created_at) BETWEEN ? AND ?
+                AND pd.precio_original IS NOT NULL
+                AND pd.precio_original > pd.precio_unit",
+            [$compradorId, $empresaId, $desde, $hasta]
+        );
+        return (float)($row['ahorro'] ?? 0);
+    }
+
+    /**
+     * Plantillas de pedidos recurrentes activas para la empresa del comprador.
+     */
+    public function recurrentesActivos(int $empresaId): int
+    {
+        $row = $this->queryOne(
+            "SELECT COUNT(*) AS n FROM pedidos_recurrentes
+              WHERE empresa_id = ? AND activo = 1",
+            [$empresaId]
+        );
+        return (int)($row['n'] ?? 0);
+    }
+
+    /**
+     * Próxima entrega del comprador (pedido en ruta o confirmado más cercano).
+     */
+    public function proximaEntregaComprador(int $compradorId, int $empresaId): ?array
+    {
+        return $this->queryOne(
+            "SELECT p.id, p.folio, p.estado, p.fecha_entrega, p.total,
+                    rd.eta_minutos
+               FROM pedidos p
+          LEFT JOIN ruta_detalle rd ON rd.pedido_id = p.id AND rd.tracking_activo = 1
+              WHERE p.comprador_id = ? AND p.empresa_id = ?
+                AND p.estado IN ('confirmado','en_preparacion','en_ruta')
+              ORDER BY (p.fecha_entrega IS NULL), p.fecha_entrega ASC, p.created_at ASC
+              LIMIT 1",
+            [$compradorId, $empresaId]
+        );
+    }
+
+    /**
+     * Producto más comprado por el comprador en el período.
+     */
+    public function topProductoComprador(int $compradorId, int $empresaId, string $desde, string $hasta): ?array
+    {
+        return $this->queryOne(
+            "SELECT pr.nombre, pr.presentacion,
+                    SUM(pd.cantidad) AS total_cantidad
+               FROM pedido_detalle pd
+               JOIN pedidos   p  ON p.id  = pd.pedido_id
+               JOIN productos pr ON pr.id = pd.producto_id
+              WHERE p.comprador_id = ? AND p.empresa_id = ?
+                AND p.estado != 'cancelado'
+                AND DATE(p.created_at) BETWEEN ? AND ?
+              GROUP BY pd.producto_id
+              ORDER BY total_cantidad DESC
+              LIMIT 1",
+            [$compradorId, $empresaId, $desde, $hasta]
+        );
+    }
+
+    /**
+     * Consumo del comprador agrupado por categoría (monto) en el período.
+     */
+    public function consumoPorCategoriaComprador(int $compradorId, int $empresaId, string $desde, string $hasta): array
+    {
+        return $this->query(
+            "SELECT c.nombre AS categoria,
+                    COALESCE(SUM(pd.subtotal),0) AS monto,
+                    COALESCE(SUM(pd.cantidad),0) AS cantidad
+               FROM pedido_detalle pd
+               JOIN pedidos    p  ON p.id  = pd.pedido_id
+               JOIN productos  pr ON pr.id = pd.producto_id
+               JOIN categorias c  ON c.id  = pr.categoria_id
+              WHERE p.comprador_id = ? AND p.empresa_id = ?
+                AND p.estado != 'cancelado'
+                AND DATE(p.created_at) BETWEEN ? AND ?
+              GROUP BY c.id, c.nombre
+              ORDER BY monto DESC",
+            [$compradorId, $empresaId, $desde, $hasta]
+        );
+    }
+
+    /**
+     * Histórico de gasto semanal del comprador (últimas N semanas).
+     */
+    public function gastoSemanalComprador(int $compradorId, int $empresaId, int $semanas = 8): array
+    {
+        $semanas = max(1, min(52, $semanas));
+        return $this->query(
+            "SELECT YEARWEEK(created_at, 3) AS yw,
+                    MIN(DATE(created_at)) AS desde,
+                    COALESCE(SUM(total),0) AS gasto,
+                    COUNT(*) AS pedidos
+               FROM pedidos
+              WHERE comprador_id = ? AND empresa_id = ?
+                AND estado != 'cancelado'
+                AND created_at >= DATE_SUB(CURDATE(), INTERVAL $semanas WEEK)
+              GROUP BY YEARWEEK(created_at, 3)
+              ORDER BY yw",
+            [$compradorId, $empresaId]
+        );
+    }
+
+    // ── KPIs y analytics del Repartidor ─────────────────────────────────────
+
+    /**
+     * Resumen de paradas del día para un repartidor (programadas / entregadas / pendientes / fallidas).
+     */
+    public function paradasHoyRepartidor(int $repartidorId): array
+    {
+        try {
+            $row = $this->queryOne(
+                "SELECT COUNT(*) AS total,
+                        SUM(CASE WHEN rd.estado = 'entregado' THEN 1 ELSE 0 END) AS entregadas,
+                        SUM(CASE WHEN rd.estado = 'pendiente' THEN 1 ELSE 0 END) AS pendientes,
+                        SUM(CASE WHEN rd.estado = 'fallido'   THEN 1 ELSE 0 END) AS fallidas,
+                        SUM(CASE WHEN rd.estado = 'parcial'   THEN 1 ELSE 0 END) AS parciales
+                   FROM ruta_detalle rd
+                   JOIN rutas r ON r.id = rd.ruta_id
+                  WHERE r.repartidor_id = ? AND r.fecha = CURDATE()",
+                [$repartidorId]
+            );
+        } catch (\Throwable $e) {
+            error_log('paradasHoyRepartidor: ' . $e->getMessage());
+            $row = null;
+        }
+        return [
+            'total'      => (int)($row['total']      ?? 0),
+            'entregadas' => (int)($row['entregadas'] ?? 0),
+            'pendientes' => (int)($row['pendientes'] ?? 0),
+            'fallidas'   => (int)($row['fallidas']   ?? 0),
+            'parciales'  => (int)($row['parciales']  ?? 0),
+        ];
+    }
+
+    /**
+     * Kilos pendientes de descargar hoy: suma de cantidades (presentacion='kg')
+     * de pedidos cuyas paradas siguen pendientes en la ruta del repartidor.
+     */
+    public function kilosPendientesHoy(int $repartidorId): float
+    {
+        try {
+            $row = $this->queryOne(
+                "SELECT COALESCE(SUM(pd.cantidad),0) AS kg
+                   FROM ruta_detalle rd
+                   JOIN rutas r       ON r.id = rd.ruta_id
+                   JOIN pedido_detalle pd ON pd.pedido_id = rd.pedido_id
+                   JOIN productos pr  ON pr.id = pd.producto_id
+                  WHERE r.repartidor_id = ? AND r.fecha = CURDATE()
+                    AND rd.estado = 'pendiente'
+                    AND pr.presentacion = 'kg'",
+                [$repartidorId]
+            );
+            return (float)($row['kg'] ?? 0);
+        } catch (\Throwable $e) {
+            error_log('kilosPendientesHoy: ' . $e->getMessage());
+            return 0.0;
+        }
+    }
+
+    /**
+     * Próxima parada del repartidor (siguiente pendiente por orden en la ruta de hoy).
+     */
+    public function proximaParadaRepartidor(int $repartidorId): ?array
+    {
+        try {
+            $row = $this->queryOne(
+                "SELECT rd.id, rd.orden, rd.eta_minutos, p.folio, p.fecha_entrega,
+                        s.nombre AS sucursal_nombre
+                   FROM ruta_detalle rd
+                   JOIN rutas r       ON r.id = rd.ruta_id
+                   JOIN pedidos p     ON p.id = rd.pedido_id
+                   JOIN sucursales s  ON s.id = rd.sucursal_id
+                  WHERE r.repartidor_id = ? AND r.fecha = CURDATE()
+                    AND rd.estado = 'pendiente'
+                  ORDER BY rd.orden ASC
+                  LIMIT 1",
+                [$repartidorId]
+            );
+            return $row ?: null;
+        } catch (\Throwable $e) {
+            error_log('proximaParadaRepartidor: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Cumplimiento de evidencia: % de paradas entregadas con foto + firma capturadas.
+     */
+    public function cumplimientoEvidencia(int $repartidorId, string $desde, string $hasta): array
+    {
+        $row = null;
+        try {
+            $row = $this->queryOne(
+                "SELECT
+                    COUNT(rd.id) AS entregadas,
+                    SUM(CASE WHEN ev.firma_path IS NOT NULL AND ev.foto_path IS NOT NULL THEN 1 ELSE 0 END) AS completas
+                   FROM ruta_detalle rd
+                   JOIN rutas r ON r.id = rd.ruta_id
+              LEFT JOIN evidencias_entrega ev ON ev.ruta_detalle_id = rd.id
+                  WHERE r.repartidor_id = ?
+                    AND DATE(r.fecha) BETWEEN ? AND ?
+                    AND rd.estado = 'entregado'",
+                [$repartidorId, $desde, $hasta]
+            );
+        } catch (\Throwable $e) {
+            error_log('cumplimientoEvidencia: ' . $e->getMessage());
+        }
+        $entregadas = (int)($row['entregadas'] ?? 0);
+        $completas  = (int)($row['completas'] ?? 0);
+        return [
+            'entregadas' => $entregadas,
+            'completas'  => $completas,
+            'pct'        => $entregadas > 0 ? round(($completas / $entregadas) * 100, 1) : 0.0,
+        ];
+    }
+
+    /**
+     * Incidencias de ruta del repartidor (paradas fallidas o parciales) en el período.
+     */
+    public function incidenciasRutaRepartidor(int $repartidorId, string $desde, string $hasta): int
+    {
+        try {
+            $row = $this->queryOne(
+                "SELECT COUNT(*) AS n
+                   FROM ruta_detalle rd
+                   JOIN rutas r ON r.id = rd.ruta_id
+                  WHERE r.repartidor_id = ?
+                    AND DATE(r.fecha) BETWEEN ? AND ?
+                    AND rd.estado IN ('fallido','parcial')",
+                [$repartidorId, $desde, $hasta]
+            );
+            return (int)($row['n'] ?? 0);
+        } catch (\Throwable $e) {
+            error_log('incidenciasRutaRepartidor: ' . $e->getMessage());
+            return 0;
+        }
+    }
+
+    /**
+     * Productividad semanal: entregadas vs intentos (paradas) agrupado por semana.
+     */
+    public function productividadSemanalRepartidor(int $repartidorId, int $semanas = 6): array
+    {
+        $semanas = max(1, min(52, $semanas));
+        try {
+            $rows = $this->query(
+                "SELECT YEARWEEK(r.fecha, 3) AS yw,
+                        MIN(r.fecha) AS desde,
+                        COUNT(rd.id) AS intentos,
+                        SUM(CASE WHEN rd.estado = 'entregado' THEN 1 ELSE 0 END) AS entregadas
+                   FROM ruta_detalle rd
+                   JOIN rutas r ON r.id = rd.ruta_id
+                  WHERE r.repartidor_id = ?
+                    AND r.fecha >= DATE_SUB(CURDATE(), INTERVAL $semanas WEEK)
+                  GROUP BY YEARWEEK(r.fecha, 3)
+                  ORDER BY yw",
+                [$repartidorId]
+            );
+            return is_array($rows) ? $rows : [];
+        } catch (\Throwable $e) {
+            error_log('productividadSemanalRepartidor: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Tiempo promedio (minutos) por parada del repartidor en el período.
+     * Calculado por diferencia entre hora_entrega de paradas consecutivas.
+     */
+    public function tiempoPromedioPorParada(int $repartidorId, string $desde, string $hasta): float
+    {
+        // Intento con LAG() (MySQL 8+). Fallback PHP-side si la versión no lo soporta.
+        try {
+            $row = $this->queryOne(
+                "SELECT AVG(diff_min) AS prom FROM (
+                    SELECT TIMESTAMPDIFF(MINUTE, prev_entrega, hora_entrega) AS diff_min
+                      FROM (
+                        SELECT rd.id, rd.ruta_id, rd.orden, rd.hora_entrega,
+                               LAG(rd.hora_entrega) OVER (PARTITION BY rd.ruta_id ORDER BY rd.orden) AS prev_entrega
+                          FROM ruta_detalle rd
+                          JOIN rutas r ON r.id = rd.ruta_id
+                         WHERE r.repartidor_id = ?
+                           AND DATE(r.fecha) BETWEEN ? AND ?
+                           AND rd.estado = 'entregado'
+                           AND rd.hora_entrega IS NOT NULL
+                      ) sub
+                     WHERE prev_entrega IS NOT NULL
+                  ) t",
+                [$repartidorId, $desde, $hasta]
+            );
+            return (float)($row['prom'] ?? 0);
+        } catch (\Throwable $e) {
+            // Fallback compatible con MySQL 5.7: traemos las paradas y calculamos en PHP.
+            try {
+                $rows = $this->query(
+                    "SELECT rd.ruta_id, rd.orden, rd.hora_entrega
+                       FROM ruta_detalle rd
+                       JOIN rutas r ON r.id = rd.ruta_id
+                      WHERE r.repartidor_id = ?
+                        AND DATE(r.fecha) BETWEEN ? AND ?
+                        AND rd.estado = 'entregado'
+                        AND rd.hora_entrega IS NOT NULL
+                      ORDER BY rd.ruta_id, rd.orden",
+                    [$repartidorId, $desde, $hasta]
+                );
+                $diffs = []; $prevRuta = null; $prevHora = null;
+                foreach (($rows ?: []) as $r) {
+                    if ($prevRuta === $r['ruta_id'] && $prevHora) {
+                        $d = (strtotime($r['hora_entrega']) - strtotime($prevHora)) / 60;
+                        if ($d > 0) $diffs[] = $d;
+                    }
+                    $prevRuta = $r['ruta_id'];
+                    $prevHora = $r['hora_entrega'];
+                }
+                return $diffs ? array_sum($diffs) / count($diffs) : 0.0;
+            } catch (\Throwable $e2) {
+                error_log('tiempoPromedioPorParada fallback: ' . $e2->getMessage());
+                return 0.0;
+            }
+        }
+    }
 }

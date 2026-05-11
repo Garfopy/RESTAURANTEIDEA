@@ -264,17 +264,25 @@ function periodoUrl(string $p, string $base): string {
     <h2 style="font-size:1.15rem;font-weight:800;color:#111827;margin:0 0 3px">Panel de análisis</h2>
     <p style="font-size:.78rem;color:#9CA3AF;margin:0"><?= htmlspecialchars($labelPeriodo) ?> &mdash; actualizado al <?= date('d/m/Y H:i') ?></p>
   </div>
-
-  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-    <div class="period-tabs">
-      <?php foreach (['hoy' => 'Hoy', '7d' => '7 días', '30d' => '30 días', '90d' => '90 días', 'año' => 'Este año'] as $key => $label): ?>
-      <a href="<?= periodoUrl($key, $baseUrlPeriodo) ?>" class="period-tab <?= $periodo === $key ? 'active' : '' ?>"><?= $label ?></a>
-      <?php endforeach; ?>
-      <button onclick="toggleCustom()"
-              class="period-tab-custom <?= $periodo === 'custom' ? 'active' : '' ?>">
-        <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2" style="vertical-align:-1px;margin-right:3px"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Rango
-      </button>
-    </div>
+  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+    <?php foreach (['hoy' => 'Hoy', '7d' => '7 días', '30d' => '30 días', '90d' => '90 días', 'año' => 'Este año'] as $key => $label): ?>
+    <a href="<?= periodoUrl($key, $baseUrlPeriodo) ?>"
+       style="padding:6px 14px;border-radius:6px;font-size:.8rem;font-weight:600;text-decoration:none;
+              <?= $periodo === $key ? 'background:var(--color-primary);color:#fff' : 'background:#fff;color:#374151;border:1px solid #D1D5DB' ?>">
+      <?= $label ?>
+    </a>
+    <?php endforeach; ?>
+    <button onclick="document.getElementById('custom-range').style.display=document.getElementById('custom-range').style.display==='none'?'flex':'none'"
+            style="padding:6px 14px;border-radius:6px;font-size:.8rem;font-weight:600;cursor:pointer;
+                   <?= $periodo === 'custom' ? 'background:var(--color-primary);color:#fff;border:none' : 'background:#fff;color:#374151;border:1px solid #D1D5DB' ?>">
+      Personalizado
+    </button>
+    <span style="width:1px;height:22px;background:#E5E7EB;margin:0 4px"></span>
+    <a href="<?= $baseUrl ?>empresa-reporte/index?periodo=<?= urlencode($periodo) ?>&fecha_desde=<?= urlencode($desde) ?>&fecha_hasta=<?= urlencode($hasta) ?>"
+       style="padding:6px 14px;border-radius:6px;font-size:.8rem;font-weight:700;text-decoration:none;background:var(--color-primary,#C8102E);color:#fff;display:inline-flex;align-items:center;gap:6px">
+      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+      Generar reporte
+    </a>
   </div>
 </div>
 
@@ -303,63 +311,54 @@ function periodoUrl(string $p, string $base): string {
   </button>
 </form>
 
-<!-- ── FILA 1: KPIs principales ─────────────────────────────────────────── -->
-<div class="dash-section-title">Métricas clave del período</div>
-<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:22px">
+<!-- ── FILA 1: KPIs operativos críticos del Supervisor ─────────────────────
+     Foco: lo que necesita atención inmediata, no métricas comerciales.
+     ────────────────────────────────────────────────────────────────────── -->
+<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:14px;margin-bottom:20px">
 
-  <div class="kpi-card" style="background:linear-gradient(135deg,#C8102E 0%,#9B0A22 100%)">
-    <div class="kpi-card-label">
-      <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-      Pedidos totales
-    </div>
-    <div class="kpi-card-value"><?= number_format($totalPed) ?></div>
-    <div class="progress-bar-track"><div class="progress-bar-fill" style="width:<?= min(100, $totalPed) ?>%"></div></div>
-    <div class="kpi-card-sub"><?= htmlspecialchars($labelPeriodo) ?></div>
-    <svg class="kpi-card-icon" width="80" height="80" fill="none" viewBox="0 0 24 24" stroke="white" stroke-width="1"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+  <!-- 1. SLA de aprobación crítica (rojo) -->
+  <div style="background:linear-gradient(135deg,<?= $sla_demorados > 0 ? '#DC2626,#991B1B' : '#6B7280,#4B5563' ?>);border-radius:12px;padding:18px;color:#fff;position:relative;overflow:hidden">
+    <?php if ($sla_demorados > 0): ?>
+      <div style="position:absolute;top:8px;right:8px;background:rgba(255,255,255,.2);font-size:.6rem;font-weight:800;padding:2px 6px;border-radius:4px;letter-spacing:.05em">URGENTE</div>
+    <?php endif; ?>
+    <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;opacity:.85;margin-bottom:8px">SLA crítico (&gt;15 min)</div>
+    <div style="font-size:2.2rem;font-weight:800;line-height:1"><?= number_format($sla_demorados) ?></div>
+    <div style="font-size:.72rem;opacity:.75;margin-top:6px">pedidos demorados sin aprobar</div>
   </div>
 
-  <div class="kpi-card" style="background:linear-gradient(135deg,#1D4ED8 0%,#1E3A8A 100%)">
-    <div class="kpi-card-label">
-      <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-      Ingresos
-    </div>
-    <div class="kpi-card-value" style="font-size:1.6rem">$<?= number_format((float)($kpis['monto_total'] ?? 0), 0) ?></div>
-    <div class="progress-bar-track"><div class="progress-bar-fill" style="width:72%"></div></div>
-    <div class="kpi-card-sub">MXN &middot; <?= htmlspecialchars($labelPeriodo) ?></div>
-    <svg class="kpi-card-icon" width="80" height="80" fill="none" viewBox="0 0 24 24" stroke="white" stroke-width="1"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+  <!-- 2. Pendientes ahora -->
+  <div style="background:linear-gradient(135deg,#D97706,#B45309);border-radius:12px;padding:18px;color:#fff">
+    <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;opacity:.85;margin-bottom:8px">Pendientes ahora</div>
+    <div style="font-size:2.2rem;font-weight:800;line-height:1"><?= count($pendientes) ?></div>
+    <div style="font-size:.72rem;opacity:.75;margin-top:6px"><?= count($enRuta) ?> en ruta</div>
   </div>
 
-  <div class="kpi-card" style="background:linear-gradient(135deg,#059669 0%,#065F46 100%)">
-    <div class="kpi-card-label">
-      <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-      Tasa de entrega
-    </div>
-    <div class="kpi-card-value"><?= $tasaEntrega ?>%</div>
-    <div class="progress-bar-track"><div class="progress-bar-fill" style="width:<?= $tasaEntrega ?>%"></div></div>
-    <div class="kpi-card-sub"><?= $entregados ?> entregados</div>
-    <svg class="kpi-card-icon" width="80" height="80" fill="none" viewBox="0 0 24 24" stroke="white" stroke-width="1"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+  <!-- 3. Excepciones de límite -->
+  <div style="background:linear-gradient(135deg,#7C3AED,#5B21B6);border-radius:12px;padding:18px;color:#fff">
+    <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;opacity:.85;margin-bottom:8px">Excepciones de límite</div>
+    <div style="font-size:2.2rem;font-weight:800;line-height:1"><?= number_format($excepciones_limite) ?></div>
+    <div style="font-size:.72rem;opacity:.75;margin-top:6px">intentos por encima del límite</div>
   </div>
 
-  <div class="kpi-card" style="background:linear-gradient(135deg,#D97706 0%,#92400E 100%)">
-    <div class="kpi-card-label">
-      <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-      Pendientes ahora
-    </div>
-    <div class="kpi-card-value"><?= count($pendientes) ?></div>
-    <div class="progress-bar-track"><div class="progress-bar-fill" style="width:<?= min(100, count($pendientes) * 8) ?>%"></div></div>
-    <div class="kpi-card-sub"><?= count($enRuta) ?> en ruta</div>
-    <svg class="kpi-card-icon" width="80" height="80" fill="none" viewBox="0 0 24 24" stroke="white" stroke-width="1"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+  <!-- 4. Incidencias de reparto -->
+  <div style="background:linear-gradient(135deg,#0EA5E9,#0369A1);border-radius:12px;padding:18px;color:#fff">
+    <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;opacity:.85;margin-bottom:8px">Incidencias de reparto</div>
+    <div style="font-size:2.2rem;font-weight:800;line-height:1"><?= number_format($incidencias_reparto) ?></div>
+    <div style="font-size:.72rem;opacity:.75;margin-top:6px">paradas fallidas / vencidas</div>
   </div>
 
-  <div class="kpi-card" style="background:linear-gradient(135deg,#7C3AED 0%,#4C1D95 100%)">
-    <div class="kpi-card-label">
-      <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-      Tiempo aprobación
-    </div>
-    <div class="kpi-card-value"><?= $avgLabel ?></div>
-    <div class="progress-bar-track"><div class="progress-bar-fill" style="width:58%"></div></div>
-    <div class="kpi-card-sub">promedio del período</div>
-    <svg class="kpi-card-icon" width="80" height="80" fill="none" viewBox="0 0 24 24" stroke="white" stroke-width="1"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+  <!-- 5. Tasa de entrega -->
+  <div style="background:linear-gradient(135deg,#059669,#047857);border-radius:12px;padding:18px;color:#fff">
+    <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;opacity:.85;margin-bottom:8px">Tasa de entrega</div>
+    <div style="font-size:2.2rem;font-weight:800;line-height:1"><?= $tasaEntrega ?>%</div>
+    <div style="font-size:.72rem;opacity:.75;margin-top:6px"><?= $entregados ?> entregados</div>
+  </div>
+
+  <!-- 6. Tiempo aprobación promedio -->
+  <div style="background:linear-gradient(135deg,#1D4ED8,#1E40AF);border-radius:12px;padding:18px;color:#fff">
+    <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;opacity:.85;margin-bottom:8px">Tiempo aprobación</div>
+    <div style="font-size:2rem;font-weight:800;line-height:1"><?= $avgLabel ?></div>
+    <div style="font-size:.72rem;opacity:.75;margin-top:6px">promedio del período</div>
   </div>
 
 </div>

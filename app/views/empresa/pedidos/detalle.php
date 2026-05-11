@@ -74,6 +74,13 @@ function tiempoTranscurrido(string $desde, string $hasta): string {
     <div style="font-size:1.3rem;font-weight:800;color:var(--color-primary)">$<?= number_format($pedido['total'], 2) ?></div>
   </div>
   <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <a href="<?= BASE_URL ?>pedido/pdf/<?= $pedido['id'] ?>" target="_blank"
+       style="display:inline-flex;align-items:center;gap:6px;padding:9px 18px;background:#C8102E;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;font-size:.875rem">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+      </svg>
+      Imprimir / PDF
+    </a>
     <?php if ($esComprador && $pedido['estado'] === 'pendiente'): ?>
     <a href="<?= BASE_URL ?>pedido/cancelar/<?= $pedido['id'] ?>"
        onclick="return confirm('¿Cancelar este pedido?')"

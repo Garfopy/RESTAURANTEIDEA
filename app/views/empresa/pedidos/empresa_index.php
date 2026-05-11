@@ -275,6 +275,12 @@ $estados = [
               <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
               Ver
             </a>
+            <a href="<?= $baseUrl ?>empresa-pedido/pdf/<?= $p['id'] ?>" target="_blank"
+               title="Imprimir / Guardar PDF"
+               style="padding:5px 8px;border:1px solid #C8102E;border-radius:6px;color:#C8102E;text-decoration:none;font-size:.72rem;font-weight:600;display:inline-flex;align-items:center;gap:3px">
+              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+              PDF
+            </a>
 
             <?php if ($esPendiente): ?>
             <button onclick="abrirRevision(<?= htmlspecialchars(json_encode([
