@@ -863,18 +863,29 @@ class PedidoModel extends BaseModel
      */
     public function paradasHoyRepartidor(int $repartidorId): array
     {
-        $row = $this->queryOne(
-            "SELECT COUNT(*) AS total,
-                    SUM(rd.estado = 'entregado') AS entregadas,
-                    SUM(rd.estado = 'pendiente') AS pendientes,
-                    SUM(rd.estado = 'fallido')   AS fallidas,
-                    SUM(rd.estado = 'parcial')   AS parciales
-               FROM ruta_detalle rd
-               JOIN rutas r ON r.id = rd.ruta_id
-              WHERE r.repartidor_id = ? AND r.fecha = CURDATE()",
-            [$repartidorId]
-        );
-        return $row ?: ['total' => 0, 'entregadas' => 0, 'pendientes' => 0, 'fallidas' => 0, 'parciales' => 0];
+        try {
+            $row = $this->queryOne(
+                "SELECT COUNT(*) AS total,
+                        SUM(CASE WHEN rd.estado = 'entregado' THEN 1 ELSE 0 END) AS entregadas,
+                        SUM(CASE WHEN rd.estado = 'pendiente' THEN 1 ELSE 0 END) AS pendientes,
+                        SUM(CASE WHEN rd.estado = 'fallido'   THEN 1 ELSE 0 END) AS fallidas,
+                        SUM(CASE WHEN rd.estado = 'parcial'   THEN 1 ELSE 0 END) AS parciales
+                   FROM ruta_detalle rd
+                   JOIN rutas r ON r.id = rd.ruta_id
+                  WHERE r.repartidor_id = ? AND r.fecha = CURDATE()",
+                [$repartidorId]
+            );
+        } catch (\Throwable $e) {
+            error_log('paradasHoyRepartidor: ' . $e->getMessage());
+            $row = null;
+        }
+        return [
+            'total'      => (int)($row['total']      ?? 0),
+            'entregadas' => (int)($row['entregadas'] ?? 0),
+            'pendientes' => (int)($row['pendientes'] ?? 0),
+            'fallidas'   => (int)($row['fallidas']   ?? 0),
+            'parciales'  => (int)($row['parciales']  ?? 0),
+        ];
     }
 
     /**
@@ -883,18 +894,23 @@ class PedidoModel extends BaseModel
      */
     public function kilosPendientesHoy(int $repartidorId): float
     {
-        $row = $this->queryOne(
-            "SELECT COALESCE(SUM(pd.cantidad),0) AS kg
-               FROM ruta_detalle rd
-               JOIN rutas r       ON r.id = rd.ruta_id
-               JOIN pedido_detalle pd ON pd.pedido_id = rd.pedido_id
-               JOIN productos pr  ON pr.id = pd.producto_id
-              WHERE r.repartidor_id = ? AND r.fecha = CURDATE()
-                AND rd.estado = 'pendiente'
-                AND pr.presentacion = 'kg'",
-            [$repartidorId]
-        );
-        return (float)($row['kg'] ?? 0);
+        try {
+            $row = $this->queryOne(
+                "SELECT COALESCE(SUM(pd.cantidad),0) AS kg
+                   FROM ruta_detalle rd
+                   JOIN rutas r       ON r.id = rd.ruta_id
+                   JOIN pedido_detalle pd ON pd.pedido_id = rd.pedido_id
+                   JOIN productos pr  ON pr.id = pd.producto_id
+                  WHERE r.repartidor_id = ? AND r.fecha = CURDATE()
+                    AND rd.estado = 'pendiente'
+                    AND pr.presentacion = 'kg'",
+                [$repartidorId]
+            );
+            return (float)($row['kg'] ?? 0);
+        } catch (\Throwable $e) {
+            error_log('kilosPendientesHoy: ' . $e->getMessage());
+            return 0.0;
+        }
     }
 
     /**
@@ -902,19 +918,25 @@ class PedidoModel extends BaseModel
      */
     public function proximaParadaRepartidor(int $repartidorId): ?array
     {
-        return $this->queryOne(
-            "SELECT rd.id, rd.orden, rd.eta_minutos, p.folio, p.fecha_entrega,
-                    s.nombre AS sucursal_nombre
-               FROM ruta_detalle rd
-               JOIN rutas r       ON r.id = rd.ruta_id
-               JOIN pedidos p     ON p.id = rd.pedido_id
-               JOIN sucursales s  ON s.id = rd.sucursal_id
-              WHERE r.repartidor_id = ? AND r.fecha = CURDATE()
-                AND rd.estado = 'pendiente'
-              ORDER BY rd.orden ASC
-              LIMIT 1",
-            [$repartidorId]
-        );
+        try {
+            $row = $this->queryOne(
+                "SELECT rd.id, rd.orden, rd.eta_minutos, p.folio, p.fecha_entrega,
+                        s.nombre AS sucursal_nombre
+                   FROM ruta_detalle rd
+                   JOIN rutas r       ON r.id = rd.ruta_id
+                   JOIN pedidos p     ON p.id = rd.pedido_id
+                   JOIN sucursales s  ON s.id = rd.sucursal_id
+                  WHERE r.repartidor_id = ? AND r.fecha = CURDATE()
+                    AND rd.estado = 'pendiente'
+                  ORDER BY rd.orden ASC
+                  LIMIT 1",
+                [$repartidorId]
+            );
+            return $row ?: null;
+        } catch (\Throwable $e) {
+            error_log('proximaParadaRepartidor: ' . $e->getMessage());
+            return null;
+        }
     }
 
     /**
@@ -922,18 +944,23 @@ class PedidoModel extends BaseModel
      */
     public function cumplimientoEvidencia(int $repartidorId, string $desde, string $hasta): array
     {
-        $row = $this->queryOne(
-            "SELECT
-                COUNT(rd.id) AS entregadas,
-                SUM(CASE WHEN ev.firma_path IS NOT NULL AND ev.foto_path IS NOT NULL THEN 1 ELSE 0 END) AS completas
-               FROM ruta_detalle rd
-               JOIN rutas r ON r.id = rd.ruta_id
-          LEFT JOIN evidencias_entrega ev ON ev.ruta_detalle_id = rd.id
-              WHERE r.repartidor_id = ?
-                AND DATE(r.fecha) BETWEEN ? AND ?
-                AND rd.estado = 'entregado'",
-            [$repartidorId, $desde, $hasta]
-        );
+        $row = null;
+        try {
+            $row = $this->queryOne(
+                "SELECT
+                    COUNT(rd.id) AS entregadas,
+                    SUM(CASE WHEN ev.firma_path IS NOT NULL AND ev.foto_path IS NOT NULL THEN 1 ELSE 0 END) AS completas
+                   FROM ruta_detalle rd
+                   JOIN rutas r ON r.id = rd.ruta_id
+              LEFT JOIN evidencias_entrega ev ON ev.ruta_detalle_id = rd.id
+                  WHERE r.repartidor_id = ?
+                    AND DATE(r.fecha) BETWEEN ? AND ?
+                    AND rd.estado = 'entregado'",
+                [$repartidorId, $desde, $hasta]
+            );
+        } catch (\Throwable $e) {
+            error_log('cumplimientoEvidencia: ' . $e->getMessage());
+        }
         $entregadas = (int)($row['entregadas'] ?? 0);
         $completas  = (int)($row['completas'] ?? 0);
         return [
@@ -948,16 +975,21 @@ class PedidoModel extends BaseModel
      */
     public function incidenciasRutaRepartidor(int $repartidorId, string $desde, string $hasta): int
     {
-        $row = $this->queryOne(
-            "SELECT COUNT(*) AS n
-               FROM ruta_detalle rd
-               JOIN rutas r ON r.id = rd.ruta_id
-              WHERE r.repartidor_id = ?
-                AND DATE(r.fecha) BETWEEN ? AND ?
-                AND rd.estado IN ('fallido','parcial')",
-            [$repartidorId, $desde, $hasta]
-        );
-        return (int)($row['n'] ?? 0);
+        try {
+            $row = $this->queryOne(
+                "SELECT COUNT(*) AS n
+                   FROM ruta_detalle rd
+                   JOIN rutas r ON r.id = rd.ruta_id
+                  WHERE r.repartidor_id = ?
+                    AND DATE(r.fecha) BETWEEN ? AND ?
+                    AND rd.estado IN ('fallido','parcial')",
+                [$repartidorId, $desde, $hasta]
+            );
+            return (int)($row['n'] ?? 0);
+        } catch (\Throwable $e) {
+            error_log('incidenciasRutaRepartidor: ' . $e->getMessage());
+            return 0;
+        }
     }
 
     /**
@@ -966,19 +998,25 @@ class PedidoModel extends BaseModel
     public function productividadSemanalRepartidor(int $repartidorId, int $semanas = 6): array
     {
         $semanas = max(1, min(52, $semanas));
-        return $this->query(
-            "SELECT YEARWEEK(r.fecha, 3) AS yw,
-                    MIN(r.fecha) AS desde,
-                    COUNT(rd.id) AS intentos,
-                    SUM(rd.estado = 'entregado') AS entregadas
-               FROM ruta_detalle rd
-               JOIN rutas r ON r.id = rd.ruta_id
-              WHERE r.repartidor_id = ?
-                AND r.fecha >= DATE_SUB(CURDATE(), INTERVAL $semanas WEEK)
-              GROUP BY YEARWEEK(r.fecha, 3)
-              ORDER BY yw",
-            [$repartidorId]
-        );
+        try {
+            $rows = $this->query(
+                "SELECT YEARWEEK(r.fecha, 3) AS yw,
+                        MIN(r.fecha) AS desde,
+                        COUNT(rd.id) AS intentos,
+                        SUM(CASE WHEN rd.estado = 'entregado' THEN 1 ELSE 0 END) AS entregadas
+                   FROM ruta_detalle rd
+                   JOIN rutas r ON r.id = rd.ruta_id
+                  WHERE r.repartidor_id = ?
+                    AND r.fecha >= DATE_SUB(CURDATE(), INTERVAL $semanas WEEK)
+                  GROUP BY YEARWEEK(r.fecha, 3)
+                  ORDER BY yw",
+                [$repartidorId]
+            );
+            return is_array($rows) ? $rows : [];
+        } catch (\Throwable $e) {
+            error_log('productividadSemanalRepartidor: ' . $e->getMessage());
+            return [];
+        }
     }
 
     /**
@@ -987,23 +1025,54 @@ class PedidoModel extends BaseModel
      */
     public function tiempoPromedioPorParada(int $repartidorId, string $desde, string $hasta): float
     {
-        $row = $this->queryOne(
-            "SELECT AVG(diff_min) AS prom FROM (
-                SELECT TIMESTAMPDIFF(MINUTE, prev_entrega, rd.hora_entrega) AS diff_min
-                  FROM (
-                    SELECT rd.id, rd.ruta_id, rd.orden, rd.hora_entrega,
-                           LAG(rd.hora_entrega) OVER (PARTITION BY rd.ruta_id ORDER BY rd.orden) AS prev_entrega
-                      FROM ruta_detalle rd
-                      JOIN rutas r ON r.id = rd.ruta_id
-                     WHERE r.repartidor_id = ?
-                       AND DATE(r.fecha) BETWEEN ? AND ?
-                       AND rd.estado = 'entregado'
-                       AND rd.hora_entrega IS NOT NULL
-                  ) rd
-                 WHERE prev_entrega IS NOT NULL
-              ) t",
-            [$repartidorId, $desde, $hasta]
-        );
-        return (float)($row['prom'] ?? 0);
+        // Intento con LAG() (MySQL 8+). Fallback PHP-side si la versión no lo soporta.
+        try {
+            $row = $this->queryOne(
+                "SELECT AVG(diff_min) AS prom FROM (
+                    SELECT TIMESTAMPDIFF(MINUTE, prev_entrega, hora_entrega) AS diff_min
+                      FROM (
+                        SELECT rd.id, rd.ruta_id, rd.orden, rd.hora_entrega,
+                               LAG(rd.hora_entrega) OVER (PARTITION BY rd.ruta_id ORDER BY rd.orden) AS prev_entrega
+                          FROM ruta_detalle rd
+                          JOIN rutas r ON r.id = rd.ruta_id
+                         WHERE r.repartidor_id = ?
+                           AND DATE(r.fecha) BETWEEN ? AND ?
+                           AND rd.estado = 'entregado'
+                           AND rd.hora_entrega IS NOT NULL
+                      ) sub
+                     WHERE prev_entrega IS NOT NULL
+                  ) t",
+                [$repartidorId, $desde, $hasta]
+            );
+            return (float)($row['prom'] ?? 0);
+        } catch (\Throwable $e) {
+            // Fallback compatible con MySQL 5.7: traemos las paradas y calculamos en PHP.
+            try {
+                $rows = $this->query(
+                    "SELECT rd.ruta_id, rd.orden, rd.hora_entrega
+                       FROM ruta_detalle rd
+                       JOIN rutas r ON r.id = rd.ruta_id
+                      WHERE r.repartidor_id = ?
+                        AND DATE(r.fecha) BETWEEN ? AND ?
+                        AND rd.estado = 'entregado'
+                        AND rd.hora_entrega IS NOT NULL
+                      ORDER BY rd.ruta_id, rd.orden",
+                    [$repartidorId, $desde, $hasta]
+                );
+                $diffs = []; $prevRuta = null; $prevHora = null;
+                foreach (($rows ?: []) as $r) {
+                    if ($prevRuta === $r['ruta_id'] && $prevHora) {
+                        $d = (strtotime($r['hora_entrega']) - strtotime($prevHora)) / 60;
+                        if ($d > 0) $diffs[] = $d;
+                    }
+                    $prevRuta = $r['ruta_id'];
+                    $prevHora = $r['hora_entrega'];
+                }
+                return $diffs ? array_sum($diffs) / count($diffs) : 0.0;
+            } catch (\Throwable $e2) {
+                error_log('tiempoPromedioPorParada fallback: ' . $e2->getMessage());
+                return 0.0;
+            }
+        }
     }
 }

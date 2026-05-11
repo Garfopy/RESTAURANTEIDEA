@@ -81,7 +81,16 @@
   <p style="font-size:.8rem;color:#9CA3AF;margin-bottom:16px"><?= date('d \d\e F \d\e Y') ?></p>
 
   <?php
-    // ── Datos de KPIs ──────────────────────────────────────────────────────
+    // ── Datos de KPIs (defensivos) ─────────────────────────────────────────
+    $resumenHoy     = $resumenHoy     ?? [];
+    $proximaParada  = $proximaParada  ?? null;
+    $evidencia      = $evidencia      ?? ['entregadas' => 0, 'completas' => 0, 'pct' => 0.0];
+    $incidencias    = $incidencias    ?? 0;
+    $tiempoProm     = isset($tiempoProm) ? (float)$tiempoProm : 0.0;
+    $kilosPendientes = isset($kilosPendientes) ? (float)$kilosPendientes : 0.0;
+    $prodSemanal    = is_array($prodSemanal ?? null) ? $prodSemanal : [];
+    $slaMinutosParada = $slaMinutosParada ?? 30;
+
     $totalHoy      = (int)($resumenHoy['total'] ?? 0);
     $entregadasHoy = (int)($resumenHoy['entregadas'] ?? 0);
     $pendientesHoy = (int)($resumenHoy['pendientes'] ?? 0);
