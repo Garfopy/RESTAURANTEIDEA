@@ -9,7 +9,8 @@ unset($prod);
 
 $rol          = $_SESSION['usuario']['rol_slug'] ?? '';
 $puedeComprar = in_array($rol, ['admin_empresa','comprador'], true);
-$totalCarrito = count($_SESSION['carrito']['items'] ?? []);
+$itemsCarrito = $_SESSION['carrito']['items'] ?? [];
+$totalCarrito = count($itemsCarrito);
 
 // Helper para imágenes reales
 function getProductImageUrl($prod) {
@@ -118,36 +119,49 @@ function getProductImageUrl($prod) {
 <div style="text-align:center;padding:40px;color:#6B7280">Sin productos disponibles.</div>
 <?php else: ?>
 <div class="catalog-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:20px">
-  <?php foreach ($productos as $prod): ?>
-  <div style="background:#fff;border-radius:14px;border:1px solid #E5E7EB;overflow:hidden;display:flex;flex-direction:column;transition:all .25s ease;box-shadow:0 2px 8px rgba(0,0,0,.06);cursor:pointer"
-       onmouseenter="this.style.boxShadow='0 12px 32px rgba(0,0,0,.12)';this.style.transform='translateY(-6px)';this.style.borderColor='#D1D5DB'"
-       onmouseleave="this.style.boxShadow='0 2px 8px rgba(0,0,0,.06)';this.style.transform='translateY(0)';this.style.borderColor='#E5E7EB'">
-    <!-- Imagen -->
-    <div style="height:200px;background:linear-gradient(135deg,#F9FAFB 0%,#F3F4F6 100%);display:flex;align-items:center;justify-content:center;overflow:hidden">
+  <?php foreach ($productos as $prod):
+    $estaEnCarrito = isset($itemsCarrito[$prod['id']]) && ($itemsCarrito[$prod['id']]['cantidad'] ?? 0) > 0;
+    $qtyEnCarrito  = $estaEnCarrito ? (float)$itemsCarrito[$prod['id']]['cantidad'] : 0;
+  ?>
+  <div style="background:#fff;border-radius:16px;border:1px solid <?= $estaEnCarrito ? 'var(--color-primary)' : '#E5E7EB' ?>;overflow:hidden;display:flex;flex-direction:column;transition:all .25s ease;box-shadow:<?= $estaEnCarrito ? '0 0 0 3px rgba(200,16,46,.08)' : '0 2px 8px rgba(0,0,0,.06)' ?>;cursor:pointer"
+       onmouseenter="this.style.boxShadow='0 12px 32px rgba(0,0,0,.12)';this.style.transform='translateY(-5px)'"
+       onmouseleave="this.style.boxShadow='<?= $estaEnCarrito ? '0 0 0 3px rgba(200,16,46,.08)' : '0 2px 8px rgba(0,0,0,.06)' ?>';this.style.transform='translateY(0)'">
+    <!-- Stripe de categoría + badge carrito -->
+    <div style="height:4px;background:linear-gradient(90deg,var(--color-primary) 0%,#FF6B6B 100%)"></div>
+    <!-- Imagen con overlay si está en carrito -->
+    <div style="height:200px;background:linear-gradient(135deg,#F9FAFB 0%,#F3F4F6 100%);display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative">
       <img src="<?= getProductImageUrl($prod) ?>"
            alt="<?= htmlspecialchars($prod['nombre']) ?>"
-           loading="lazy"
-           decoding="async"
+           loading="lazy" decoding="async"
            style="width:100%;height:100%;object-fit:cover"
            onerror="this.parentElement.innerHTML='<span style=\'font-size:4rem\'>🥩</span>'">
+      <?php if ($estaEnCarrito): ?>
+      <div style="position:absolute;top:10px;right:10px;background:var(--color-primary);color:#fff;font-size:.7rem;font-weight:700;padding:4px 10px;border-radius:999px;box-shadow:0 2px 8px rgba(0,0,0,.25)">
+        🛒 <?= $qtyEnCarrito ?> <?= $prod['presentacion'] ?>
+      </div>
+      <?php endif; ?>
+      <?php if (!empty($prod['escalonados'])): ?>
+      <div style="position:absolute;bottom:10px;left:10px;background:#10B981;color:#fff;font-size:.65rem;font-weight:700;padding:3px 8px;border-radius:999px">
+        ✦ Vol. desc.
+      </div>
+      <?php endif; ?>
     </div>
     <!-- Info -->
     <div style="padding:16px 18px;flex:1;display:flex;flex-direction:column">
-      <div style="font-size:.75rem;color:#9CA3AF;margin-bottom:4px"><?= htmlspecialchars($prod['categoria_nombre']) ?></div>
-      <div style="font-weight:700;font-size:.95rem;color:#111827;margin-bottom:4px"><?= htmlspecialchars($prod['nombre']) ?></div>
-      <div style="font-size:.8rem;color:#6B7280;margin-bottom:10px"><?= htmlspecialchars($prod['presentacion']) ?></div>
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+        <span style="font-size:.68rem;font-weight:700;color:var(--color-primary);background:#FEF2F2;padding:2px 8px;border-radius:999px;text-transform:uppercase;letter-spacing:.04em"><?= htmlspecialchars($prod['categoria_nombre']) ?></span>
+      </div>
+      <div style="font-weight:800;font-size:1rem;color:#111827;margin-bottom:2px;line-height:1.3"><?= htmlspecialchars($prod['nombre']) ?></div>
+      <div style="font-size:.8rem;color:#6B7280;margin-bottom:12px"><?= htmlspecialchars($prod['presentacion']) ?></div>
       <div style="margin-top:auto">
-        <div style="font-size:1.25rem;font-weight:800;color:var(--color-primary)">
+        <div style="font-size:1.5rem;font-weight:900;color:var(--color-primary);line-height:1">
           $<?= number_format($prod['precio_base'],2) ?>
         </div>
-        <div style="font-size:.75rem;color:#9CA3AF;margin-top:1px">por <?= $prod['presentacion'] ?></div>
+        <div style="font-size:.75rem;color:#9CA3AF;margin-top:2px">por <?= $prod['presentacion'] ?> · Sin IVA</div>
       </div>
-      <?php if (!empty($prod['escalonados'])): ?>
-      <div style="font-size:.72rem;color:#059669;margin-top:6px;font-weight:600">✦ Descuentos por volumen</div>
-      <?php endif; ?>
       <?php if (!empty($limitePorProducto[$prod['id']])): ?>
       <?php $lim = $limitePorProducto[$prod['id']]; $periodoC = ['por_pedido'=>'/pedido','semanal'=>'/semana','mensual'=>'/mes'][$lim['periodo']] ?? ''; ?>
-      <div style="font-size:.7rem;font-weight:700;color:#92400E;background:#FEF3C7;border-radius:4px;padding:2px 6px;display:inline-block;margin-top:4px">
+      <div style="font-size:.7rem;font-weight:700;color:#92400E;background:#FEF3C7;border-radius:6px;padding:3px 8px;display:inline-block;margin-top:8px">
         🔒 Máx. <?= number_format($lim['limite_kg'],0) ?> kg <?= $periodoC ?>
       </div>
       <?php endif; ?>
@@ -167,21 +181,18 @@ function getProductImageUrl($prod) {
     ?>
     <div style="padding:12px 16px;border-top:1px solid #F3F4F6;display:flex;align-items:center;justify-content:space-between;gap:10px">
       <button onclick='verDetalleCatalogo(<?= $prodData ?>)'
-              style="font-size:.85rem;color:#374151;background:#F9FAFB;border:1.5px solid #E5E7EB;cursor:pointer;padding:7px 14px;border-radius:7px;font-weight:600;transition:all .2s;display:inline-flex;align-items:center;gap:5px;font-family:inherit"
+              style="font-size:.82rem;color:#374151;background:#F9FAFB;border:1.5px solid #E5E7EB;cursor:pointer;padding:8px 14px;border-radius:8px;font-weight:600;transition:all .2s;display:inline-flex;align-items:center;gap:5px;font-family:inherit"
               onmouseenter="this.style.background='#fff';this.style.borderColor='var(--color-primary)';this.style.color='var(--color-primary)'"
               onmouseleave="this.style.background='#F9FAFB';this.style.borderColor='#E5E7EB';this.style.color='#374151'">
-        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-          <path d="M9 12h6m-6 4h6"/>
-        </svg>
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
         Ver precios
       </button>
       <?php if ($puedeComprar): ?>
       <button onclick='abrirModalAgregar(<?= $prodData ?>)'
-              style="padding:8px 16px;background:var(--color-primary);color:#fff;border:none;border-radius:7px;font-size:.85rem;font-weight:700;cursor:pointer;transition:all .2s;font-family:inherit;white-space:nowrap"
-              onmouseenter="this.style.background='#A00D24';this.style.transform='translateY(-1px)'"
-              onmouseleave="this.style.background='var(--color-primary)';this.style.transform='translateY(0)'">
-        + Agregar
+              style="padding:9px 18px;background:var(--color-primary);color:#fff;border:none;border-radius:8px;font-size:.875rem;font-weight:700;cursor:pointer;transition:all .2s;font-family:inherit;white-space:nowrap;box-shadow:0 2px 8px rgba(200,16,46,.2)"
+              onmouseenter="this.style.background='#A00D24';this.style.transform='translateY(-1px)';this.style.boxShadow='0 4px 14px rgba(200,16,46,.35)'"
+              onmouseleave="this.style.background='var(--color-primary)';this.style.transform='translateY(0)';this.style.boxShadow='0 2px 8px rgba(200,16,46,.2)'">
+        <?= $estaEnCarrito ? '✓ En carrito' : '+ Agregar' ?>
       </button>
       <?php endif; ?>
     </div>

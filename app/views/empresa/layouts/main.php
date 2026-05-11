@@ -342,14 +342,20 @@ $esComprador   = $rol === 'comprador';
       Inicio
     </a>
 
-    <div class="sidebar-section">Pedidos</div>
+    <div class="sidebar-section">Comprar</div>
     <a href="<?= BASE_URL ?>catalogo/index" class="<?= ($activeMenu??'')==='catalogo'?'active':'' ?>">
       <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
       Catálogo
     </a>
-    <a href="<?= BASE_URL ?>carrito/index" class="<?= ($activeMenu??'')==='carrito'?'active':'' ?>">
+    <a href="<?= BASE_URL ?>carrito/index" class="<?= ($activeMenu??'')==='carrito'?'active':'' ?>" style="position:relative">
       <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2 9m5-9v9m4-9v9m5-9l2 9"/></svg>
-      Hacer pedido
+      Carrito
+      <?php
+      $carritoCount = count($_SESSION['carrito']['items'] ?? []);
+      if ($carritoCount > 0):
+      ?>
+      <span style="margin-left:auto;background:var(--color-primary);color:#fff;font-size:.6rem;font-weight:700;padding:1px 6px;border-radius:999px;line-height:1.5"><?= $carritoCount ?></span>
+      <?php endif; ?>
     </a>
     <a href="<?= BASE_URL ?>pedido/index" class="<?= ($activeMenu??'')==='pedidos'?'active':'' ?>">
       <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>

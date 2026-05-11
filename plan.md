@@ -1150,6 +1150,13 @@ Para funcionar offline sin Traccar:
 - [x] Planes SaaS editables — `SuscripcionController::editarPlan()` + `guardarPlan()` + vista `editar_plan.php`; botón "Editar límites" en cada plan de `/suscripcion/configurar`; solo superadmin puede acceder
 - [x] Sidebar panel — enlace "Permisos de planes" (visible solo superadmin) → `suscripcion/configurar`
 
+**UX Comprador (2026-05-11):**
+- [x] Sidebar comprador — sección "Pedidos" renombrada a "Comprar"; "Hacer pedido" renombrado a "Carrito" con badge de items activos
+- [x] Catálogo (`empresa/catalogo/index.php`) — tarjetas rediseñadas: stripe de color en la parte superior, badge de categoría pill, precio más grande (1.5rem/bold), badge "🛒 en carrito" en la imagen si el producto ya fue agregado, badge de descuento por volumen en la imagen, botón "+ Agregar" con sombra y animación
+- [x] Carrito paso1 (`empresa/carrito/paso1.php`) — ahora muestra SOLO productos en el carrito (qty > 0); estado vacío con CTA "Explorar catálogo"; botones − y + de 38×38px con hover primary; input con `onclick="this.select()"` para edición directa; hint de uso visible; botón papelera por fila; ticket lateral mejorado con gradiente y total prominente
+- [x] Distribución paso2 (`empresa/carrito/paso2.php`) — rediseño completo: guía numerada con instrucciones, tarjeta por producto con barra de progreso animada (F59E0B→10B981→EF4444), botones ± por sucursal, botón "⚡ Repartir igual" automático, estado dinámico (⏳/✅/❌) con color
+- [x] Distribución paso3/resumen (`empresa/carrito/paso3.php`) — bloque distribución rediseñado de tabla a tarjetas card-based con ± buttons, barras de progreso y botón "⚡ Repartir igual"; inputs con `onclick="this.select()"`; ajustarDistStep3/repartirIgualStep3 funciones JS
+
 ---
 
 ### PAYPAL SUBSCRIPTIONS — CONFIGURACIÓN PASO A PASO
