@@ -177,15 +177,14 @@
       <?php endif; ?>
     </a>
     <div class="hidden md:flex items-center gap-1">
-      <a href="#compras"    class="text-sm font-medium text-white/70 px-4 py-2 rounded-lg hover:text-white hover:bg-white/10 transition-all">Compras</a>
-      <a href="#logistica"  class="text-sm font-medium text-white/70 px-4 py-2 rounded-lg hover:text-white hover:bg-white/10 transition-all">Logística</a>
-      <a href="#soluciones" class="text-sm font-medium text-white/70 px-4 py-2 rounded-lg hover:text-white hover:bg-white/10 transition-all">Soluciones</a>
-      <a href="#how"        class="text-sm font-medium text-white/70 px-4 py-2 rounded-lg hover:text-white hover:bg-white/10 transition-all">Cómo funciona</a>
-      <a href="#precios"    class="text-sm font-medium text-white/70 px-4 py-2 rounded-lg hover:text-white hover:bg-white/10 transition-all">Precios</a>
+      <a href="#roles"    class="text-sm font-medium text-white/70 px-4 py-2 rounded-lg hover:text-white hover:bg-white/10 transition-all">Experiencias</a>
+      <a href="#features" class="text-sm font-medium text-white/70 px-4 py-2 rounded-lg hover:text-white hover:bg-white/10 transition-all">Funciones</a>
+      <a href="#how"      class="text-sm font-medium text-white/70 px-4 py-2 rounded-lg hover:text-white hover:bg-white/10 transition-all">¿Cómo funciona?</a>
+      <a href="#precios"  class="text-sm font-medium text-white/70 px-4 py-2 rounded-lg hover:text-white hover:bg-white/10 transition-all">Precios</a>
     </div>
     <div class="flex items-center gap-2">
       <a href="<?= BASE_URL ?>auth/login" class="text-sm font-semibold text-white/80 px-4 py-2 hover:text-white transition-colors">Iniciar sesión</a>
-      <a href="<?= BASE_URL ?>planes/registro" class="btn-primary btn-shimmer text-sm font-bold px-5 py-2.5 rounded-xl">Solicitar demo</a>
+      <a href="<?= BASE_URL ?>planes" class="btn-primary btn-shimmer text-sm font-bold px-5 py-2.5 rounded-xl">Ver planes</a>
     </div>
   </div>
 </nav>
@@ -648,7 +647,7 @@
 </section>
 
 <!-- ══ SELECTOR DE AUDIENCIA ══ -->
-<section class="bg-slate-50 py-24">
+<section id="roles" class="bg-slate-50 py-24">
   <div class="max-w-6xl mx-auto px-6">
     <div class="text-center mb-14 reveal">
       <p class="text-xs font-bold uppercase tracking-widest text-primary mb-3">¿Qué tipo de negocio eres?</p>
@@ -1117,7 +1116,7 @@
     </div>
     <div class="reveal" id="faq-list">
       <?php
-      $faqs = [
+      $faqs_a = [
         ['¿Cómo controlar compras multi-sucursal en restaurantes?',
          'Centralizando pedidos, facturación y reportes desde una sola plataforma como CarniHub. Haz una prueba hoy.'],
         ['¿Cómo mejorar la logística de alimentos perecederos?',
@@ -1126,6 +1125,36 @@
          'Sí. CarniHub cuenta con infraestructura para abastecimiento y distribución de productos cárnicos.'],
         ['¿CarniHub funciona para cadenas con múltiples sucursales?',
          'Sí. Está diseñado para operaciones multi-sucursal y control centralizado.'],
+      ];
+      foreach ($faqs_a as $j => [$q,$a]): ?>
+      <div class="faq-item">
+        <button class="faq-btn" onclick="toggleFaq(this)" type="button">
+          <span><?= htmlspecialchars($q) ?></span>
+          <svg class="faq-icon w-5 h-5 text-primary flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
+          </svg>
+        </button>
+        <div class="faq-body">
+          <p class="text-gray-600 text-sm leading-relaxed pb-5"><?= htmlspecialchars($a) ?></p>
+        </div>
+      </div>
+      <?php endforeach; ?>
+    </div>
+
+    <!-- Mini-CTA dentro de FAQ -->
+    <div class="my-10 rounded-2xl p-8 text-center reveal" style="background:linear-gradient(135deg,#0a0f1e 0%,#111827 100%)">
+      <p class="text-xs font-bold uppercase tracking-widest text-primary mb-3">Empieza hoy</p>
+      <h3 class="text-xl md:text-2xl font-extrabold text-white mb-4">
+        Optimiza abastecimiento, logística y trazabilidad en tus sucursales
+      </h3>
+      <a href="<?= BASE_URL ?>planes/registro" class="btn-primary btn-shimmer inline-block font-bold px-8 py-3.5 rounded-xl">
+        Solicita una demostración de CarniHub →
+      </a>
+    </div>
+
+    <div class="reveal" id="faq-list-b">
+      <?php
+      $faqs_b = [
         ['¿Se puede monitorear temperatura y rutas?',
          'Sí. CarniHub permite monitoreo operativo y trazabilidad logística en tiempo real.'],
         ['¿CarniHub ayuda con devoluciones e incidencias?',
@@ -1135,7 +1164,7 @@
         ['¿Qué beneficios tiene la trazabilidad de productos cárnicos?',
          'Mejora control sanitario, reduce pérdidas y facilita auditorías internas y con proveedores.'],
       ];
-      foreach ($faqs as $j => [$q,$a]): ?>
+      foreach ($faqs_b as $j => [$q,$a]): ?>
       <div class="faq-item">
         <button class="faq-btn" onclick="toggleFaq(this)" type="button">
           <span><?= htmlspecialchars($q) ?></span>
