@@ -298,6 +298,7 @@
       <p style="font-size:.85rem;margin-top:4px">Contacta a tu empresa para más información.</p>
       <a href="<?= BASE_URL ?>repartidor/historial" class="btn-secondary" style="margin-top:20px;display:inline-block;width:auto;padding:10px 24px">Ver historial</a>
     </div>
+  <?php endif; ?>
 
     <?php
     // Calcular stats generales

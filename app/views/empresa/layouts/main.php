@@ -34,7 +34,7 @@ $esComprador   = $rol === 'comprador';
     /* ── Sidebar dark premium ── */
     .sidebar {
       width: 256px;
-      min-height: 100vh;
+      height: 100vh;
       background: #fff;
       flex-shrink: 0;
       display: flex;
@@ -42,6 +42,7 @@ $esComprador   = $rol === 'comprador';
       position: fixed;
       top: 0; left: 0;
       z-index: 100;
+      overflow: hidden;
       transition: transform .3s ease;
       border-right: 1px solid #E5E7EB;
     }
@@ -60,6 +61,7 @@ $esComprador   = $rol === 'comprador';
     }
     .sidebar nav {
       flex: 1;
+      min-height: 0;
       padding: 8px 0;
       overflow-y: auto;
     }
@@ -101,6 +103,7 @@ $esComprador   = $rol === 'comprador';
       padding: 14px 16px;
       border-top: 1px solid #F3F4F6;
       background: #FAFAFA;
+      flex-shrink: 0;
     }
     .sidebar-user-info {
       display: flex;
