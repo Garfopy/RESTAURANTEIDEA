@@ -380,7 +380,7 @@
       </p>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
 
       <!-- Taquerías -->
       <a href="<?= BASE_URL ?>distribuidora-carne-cerca-de-mi"
@@ -438,38 +438,6 @@
             'Trazabilidad de productos cárnicos',
             'Evidencia digital POD',
             'Reportes de consumo por sucursal',
-          ] as $item): ?>
-          <li class="flex items-center gap-2.5 text-sm text-gray-600">
-            <svg class="w-4 h-4 flex-shrink-0 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
-            </svg>
-            <?= htmlspecialchars($item) ?>
-          </li>
-          <?php endforeach; ?>
-        </ul>
-        <span class="audience-cta">
-          Ver mi solución
-          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/>
-          </svg>
-        </span>
-      </a>
-
-      <!-- CEDIS y Carnicerias -->
-      <a href="<?= BASE_URL ?>carnihub"
-         class="audience-card rounded-3xl p-8 reveal" style="transition-delay:200ms">
-        <div class="audience-icon mb-6" style="background:color-mix(in srgb,#6366f1 12%,transparent)">🏭</div>
-        <span class="audience-chip mb-4 inline-block">CEDIS &amp; Carnicerías</span>
-        <h3 class="text-xl font-extrabold text-gray-900 mt-3 mb-3">Plataforma de abastecimiento y logística</h3>
-        <p class="text-sm text-gray-500 leading-relaxed mb-6">
-          Control total de compras, crédito, facturación, mermas, cadena de frío e IIoT para operaciones gastronómicas complejas.
-        </p>
-        <ul class="space-y-2.5 mb-8">
-          <?php foreach ([
-            'Pedidos multi-sucursal centralizados',
-            'Monitoreo de cadena de frío',
-            'Gestión de devoluciones y mermas',
-            'IIoT y mantenimiento preventivo',
           ] as $item): ?>
           <li class="flex items-center gap-2.5 text-sm text-gray-600">
             <svg class="w-4 h-4 flex-shrink-0 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">

@@ -53,16 +53,23 @@ class PublicController extends BaseController
         require ROOT_PATH . '/app/views/public/landing_restaurantes.php';
     }
 
-    // GET /cedis → landing audiencia CEDIS y carnicerías
-    public function cedis(?string $p = null): void
+    // GET /carnihub → hub CarniHub (selector de audiencia + planes)
+    public function carnihub(?string $p = null): void
     {
+        if (isset($_SESSION['usuario'])) {
+            $this->redirectSegunRol($_SESSION['usuario']['rol_slug'] ?? '');
+        }
+
         $config       = new ConfigModel();
         $appName      = $config->get('app_name',     APP_NAME);
         $appLogo      = $config->get('app_logo',      '');
         $colorPrimary = $config->get('color_primary', '#C8102E');
         $contactEmail = $config->get('smtp_user',     'contacto@carnihub.mx');
 
-        require ROOT_PATH . '/app/views/public/landing_cedis.php';
+        $susModel = new SuscripcionModel();
+        $planes   = $susModel->getPlanesActivos();
+
+        require ROOT_PATH . '/app/views/public/landing_carnihub.php';
     }
 
     // GET planes/index

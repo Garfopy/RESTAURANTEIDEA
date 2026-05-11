@@ -52,7 +52,7 @@ if (isset($oldRouteRedirects[$path])) {
 $seoRoutes = [
     'distribuidora-carne-cerca-de-mi'             => 'taqueria',
     'carnihub/cortes-de-carne-para-restaurantes'  => 'restaurantes',
-    'carnihub'                                    => 'cedis',
+    'carnihub'                                    => 'carnihub',
 ];
 if (isset($seoRoutes[$path])) {
     $ctrlSlug = 'landing';
@@ -103,10 +103,9 @@ $routes = [
     'planes'              => 'PublicController',
     // Landing page pública
     'landing'             => 'PublicController',
-    // Landings de audiencia (mantenidas para compatibilidad)
+    // Landings de audiencia
     'taqueria'            => 'PublicController',
     'restaurantes'        => 'PublicController',
-    'cedis'               => 'PublicController',
 ];
 
 // ── Auth guard ────────────────────────────────────────────────────────────────
@@ -130,11 +129,10 @@ $publicPaths = [
     'landing/landing',
     'taqueria/taqueria',
     'restaurantes/restaurantes',
-    'cedis/cedis',
-    // Nuevas rutas SEO HUB (mapeadas a landing/taqueria|restaurantes|cedis)
+    // Nuevas rutas SEO HUB
     'landing/taqueria',
     'landing/restaurantes',
-    'landing/cedis',
+    'landing/carnihub',
 ];
 
 $currentPath = strtolower($ctrlSlug . '/' . $action);
