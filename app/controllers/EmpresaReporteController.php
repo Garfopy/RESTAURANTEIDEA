@@ -239,6 +239,8 @@ class EmpresaReporteController extends BaseController
         }
 
         if ($rol === 'comprador') {
+            $pedidoModel = new PedidoModel();
+
             $kpiStmt = $db->prepare(
                 "SELECT COUNT(*) AS pedidos,
                         COALESCE(SUM(total),0) AS gasto,
@@ -284,13 +286,53 @@ class EmpresaReporteController extends BaseController
             $estStmt->execute([$empresaId, $usuarioId, $desde, $hasta]);
             $est = $estStmt->fetchAll();
 
+            // Nuevos KPIs estratégicos del Comprador
+            $kgMes              = $pedidoModel->kgTotalesMes($usuarioId, (int)$empresaId);
+            $gastoMes           = $pedidoModel->gastoMesComprador($usuarioId, (int)$empresaId);
+            $enTransitoGps      = $pedidoModel->pedidosEnTransitoConGps($usuarioId, (int)$empresaId);
+            $ahorroVolumen      = $pedidoModel->ahorroPorVolumen($usuarioId, (int)$empresaId, $desde, $hasta);
+            $recurrentesActivos = $pedidoModel->recurrentesActivos((int)$empresaId);
+            $proxima            = $pedidoModel->proximaEntregaComprador($usuarioId, (int)$empresaId);
+            $topProd            = $pedidoModel->topProductoComprador($usuarioId, (int)$empresaId, $desde, $hasta);
+            $consumoCat         = $pedidoModel->consumoPorCategoriaComprador($usuarioId, (int)$empresaId, $desde, $hasta);
+            $gastoSemanal       = $pedidoModel->gastoSemanalComprador($usuarioId, (int)$empresaId, 8);
+
+            // Presupuesto = suma de límites mensuales activos de la empresa (referencia)
+            $presupuestoStmt = $db->prepare(
+                "SELECT COALESCE(SUM(limite_monto),0) AS p
+                   FROM limites_compra
+                  WHERE empresa_id = ? AND activo = 1 AND periodo = 'mensual'"
+            );
+            $presupuestoStmt->execute([$empresaId]);
+            $presupuesto = (float)$presupuestoStmt->fetchColumn();
+            $pctPresupuesto = $presupuesto > 0 ? min(100, ($gastoMes / $presupuesto) * 100) : 0.0;
+
+            $proximaTxt = '—';
+            if ($proxima) {
+                if (!empty($proxima['fecha_entrega'])) {
+                    $proximaTxt = date('d/m H:i', strtotime((string)$proxima['fecha_entrega']));
+                } elseif (!empty($proxima['eta_minutos'])) {
+                    $proximaTxt = 'ETA ' . (int)$proxima['eta_minutos'] . ' min';
+                } else {
+                    $proximaTxt = strtoupper((string)$proxima['estado']);
+                }
+            }
+
+            $topProdNombre = $topProd ? (string)$topProd['nombre'] : '—';
+
             return [
                 'titulo' => 'Reporte de Compras y Abasto',
                 'kpis' => [
-                    ['label' => 'Pedidos generados', 'valor' => number_format((int)($r['pedidos'] ?? 0)), 'hint' => 'Período seleccionado'],
-                    ['label' => 'Gasto total', 'valor' => '$' . number_format((float)($r['gasto'] ?? 0), 2), 'hint' => 'Monto acumulado'],
+                    ['label' => 'Kilos totales (mes)', 'valor' => number_format($kgMes, 2) . ' kg', 'hint' => 'Volumen para escalonado'],
+                    ['label' => 'Gasto del mes', 'valor' => '$' . number_format($gastoMes, 2), 'hint' => $presupuesto > 0
+                        ? 'de $' . number_format($presupuesto, 0) . ' (' . number_format($pctPresupuesto, 1) . '%)'
+                        : 'Sin presupuesto configurado'],
+                    ['label' => 'Pedidos en tránsito', 'valor' => number_format($enTransitoGps), 'hint' => 'con rastreo GPS activo'],
+                    ['label' => 'Ahorro por volumen', 'valor' => '$' . number_format($ahorroVolumen, 2), 'hint' => 'Precios escalonados'],
+                    ['label' => 'Recurrentes activos', 'valor' => number_format($recurrentesActivos), 'hint' => 'Plantillas automáticas'],
+                    ['label' => 'Próxima entrega', 'valor' => $proximaTxt, 'hint' => $proxima ? '#' . ($proxima['folio'] ?? '') : 'Sin programada'],
+                    ['label' => 'Top producto', 'valor' => mb_strimwidth($topProdNombre, 0, 20, '…'), 'hint' => 'Más comprado'],
                     ['label' => 'Ticket promedio', 'valor' => '$' . number_format((float)($r['ticket'] ?? 0), 2), 'hint' => 'Costo por pedido'],
-                    ['label' => 'Pedidos en ruta', 'valor' => number_format((int)($r['en_ruta'] ?? 0)), 'hint' => 'Logística activa'],
                 ],
                 'columnas' => ['Fecha', 'Folio', 'Estado', 'Total', 'Tipo entrega', 'Entrega programada'],
                 'filas' => array_map(fn($x) => [
@@ -302,17 +344,35 @@ class EmpresaReporteController extends BaseController
                     $x['fecha_entrega'],
                 ], $rows),
                 'notas' => [
+                    'Volumen del mes: ' . number_format($kgMes, 2) . ' kg. Acumular más kilos puede activar mejores precios escalonados.',
+                    'Ahorro acumulado por escalonado en el período: $' . number_format($ahorroVolumen, 2) . '.',
+                    $presupuesto > 0
+                        ? ('Has consumido ' . number_format($pctPresupuesto, 1) . '% del presupuesto mensual configurado ($' . number_format($presupuesto, 2) . ').')
+                        : 'No hay presupuesto mensual configurado en límites de compra.',
                     'Programar compras de alto volumen en ventanas de menor saturación logística.',
-                    'Revisar productos recurrentes para activar pedidos automatizados de reposición.',
-                    'Parámetro técnico recomendado de conservación: 0°C a 4°C en transporte y recepción.',
+                    'Revisar pedidos recurrentes para automatizar reposición.',
                 ],
                 'graficas' => [
                     [
                         'tipo' => 'line',
-                        'titulo' => 'Gasto diario',
+                        'titulo' => 'Gasto diario del período',
                         'labels' => array_map(fn($x) => $x['d'], $trend),
                         'data' => array_map(fn($x) => (float)$x['gasto'], $trend),
                         'label' => 'Gasto ($)',
+                    ],
+                    [
+                        'tipo' => 'doughnut',
+                        'titulo' => 'Consumo por categoría',
+                        'labels' => array_map(fn($x) => (string)$x['categoria'], $consumoCat),
+                        'data' => array_map(fn($x) => (float)$x['monto'], $consumoCat),
+                        'label' => 'Monto ($)',
+                    ],
+                    [
+                        'tipo' => 'bar',
+                        'titulo' => 'Historial de gasto semanal',
+                        'labels' => array_map(fn($x) => 'Sem ' . substr((string)$x['yw'], 4) . ' (' . $x['desde'] . ')', $gastoSemanal),
+                        'data' => array_map(fn($x) => (float)$x['gasto'], $gastoSemanal),
+                        'label' => 'Gasto semanal ($)',
                     ],
                     [
                         'tipo' => 'doughnut',
@@ -657,9 +717,22 @@ class EmpresaReporteController extends BaseController
         // ── Reporte específico para Supervisor (foco operativo, no comercial) ─
         if ($rol === 'supervisor') {
             $pedidoModel = new PedidoModel();
-            $slaDemorados      = $pedidoModel->pedidosDemoradosAprobacion($empresaId, 15);
-            $excepcionesLimite = $pedidoModel->excepcionesLimite($empresaId, $desde, $hasta);
-            $incidenciasReparto = $pedidoModel->incidenciasReparto($empresaId, $desde, $hasta);
+            $movModel    = new MovimientoInventarioModel();
+
+            $slaDemorados        = $pedidoModel->pedidosDemoradosAprobacion($empresaId, 15);
+            $excepcionesLimite   = $pedidoModel->excepcionesLimite($empresaId, $desde, $hasta);
+            $incidenciasReparto  = $pedidoModel->incidenciasReparto($empresaId, $desde, $hasta);
+
+            // Datos para gráficas adicionales (espejo del dashboard)
+            $topProds = $pedidoModel->topProductos($empresaId, $desde, $hasta, 8);
+            $stockResumen = $movModel->resumenStock($empresaId);
+            $stockStats = [
+                'agotado' => count(array_filter($stockResumen, fn($p) => $p['estado_stock'] === 'agotado')),
+                'critico' => count(array_filter($stockResumen, fn($p) => $p['estado_stock'] === 'critico')),
+                'bajo'    => count(array_filter($stockResumen, fn($p) => $p['estado_stock'] === 'bajo')),
+                'ok'      => count(array_filter($stockResumen, fn($p) => $p['estado_stock'] === 'ok')),
+            ];
+            $movsSemanal = $movModel->entradasVsSalidasSemanal($empresaId, 6);
 
             return [
                 'titulo' => 'Reporte Operativo de Supervisión',
@@ -701,6 +774,29 @@ class EmpresaReporteController extends BaseController
                         'labels' => array_map(fn($x) => strtoupper((string)$x['estado']), $est),
                         'data' => array_map(fn($x) => (int)$x['c'], $est),
                         'label' => 'Pedidos',
+                    ],
+                    [
+                        'tipo' => 'barH',
+                        'titulo' => 'Top productos más pedidos',
+                        'labels' => array_map(fn($x) => (string)$x['nombre'], $topProds),
+                        'data' => array_map(fn($x) => (float)$x['total_cantidad'], $topProds),
+                        'label' => 'Cantidad',
+                    ],
+                    [
+                        'tipo' => 'doughnut',
+                        'titulo' => 'Estado del inventario',
+                        'labels' => ['Agotado', 'Crítico', 'Bajo', 'Normal'],
+                        'data' => [$stockStats['agotado'], $stockStats['critico'], $stockStats['bajo'], $stockStats['ok']],
+                        'label' => 'Productos',
+                    ],
+                    [
+                        'tipo' => 'bar',
+                        'titulo' => 'Entradas vs Salidas de stock (últimas 6 semanas)',
+                        'labels' => array_map(fn($x) => 'Sem ' . date('d/m', strtotime((string)$x['inicio_semana'])), $movsSemanal),
+                        'datasets' => [
+                            ['label' => 'Entradas', 'data' => array_map(fn($x) => (float)$x['entradas'], $movsSemanal), 'color' => '#10B981'],
+                            ['label' => 'Salidas',  'data' => array_map(fn($x) => (float)$x['salidas'],  $movsSemanal), 'color' => '#EF4444'],
+                        ],
                     ],
                 ],
             ];

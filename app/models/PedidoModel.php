@@ -684,4 +684,175 @@ class PedidoModel extends BaseModel
         );
         return (int)($row['n'] ?? 0);
     }
+
+    // ── KPIs y analytics del Comprador ────────────────────────────────────
+
+    /**
+     * Kilos totales comprados en el mes en curso (productos con presentacion='kg').
+     */
+    public function kgTotalesMes(int $compradorId, int $empresaId): float
+    {
+        $row = $this->queryOne(
+            "SELECT COALESCE(SUM(pd.cantidad),0) AS kg
+               FROM pedido_detalle pd
+               JOIN pedidos p   ON p.id = pd.pedido_id
+               JOIN productos pr ON pr.id = pd.producto_id
+              WHERE p.comprador_id = ? AND p.empresa_id = ?
+                AND p.estado != 'cancelado'
+                AND pr.presentacion = 'kg'
+                AND YEAR(p.created_at)  = YEAR(CURDATE())
+                AND MONTH(p.created_at) = MONTH(CURDATE())",
+            [$compradorId, $empresaId]
+        );
+        return (float)($row['kg'] ?? 0);
+    }
+
+    /**
+     * Gasto total del mes en curso (sin cancelados).
+     */
+    public function gastoMesComprador(int $compradorId, int $empresaId): float
+    {
+        $row = $this->queryOne(
+            "SELECT COALESCE(SUM(total),0) AS g
+               FROM pedidos
+              WHERE comprador_id = ? AND empresa_id = ?
+                AND estado != 'cancelado'
+                AND YEAR(created_at)  = YEAR(CURDATE())
+                AND MONTH(created_at) = MONTH(CURDATE())",
+            [$compradorId, $empresaId]
+        );
+        return (float)($row['g'] ?? 0);
+    }
+
+    /**
+     * Pedidos del comprador en tránsito con tracking GPS activo.
+     */
+    public function pedidosEnTransitoConGps(int $compradorId, int $empresaId): int
+    {
+        $row = $this->queryOne(
+            "SELECT COUNT(DISTINCT p.id) AS n
+               FROM pedidos p
+          LEFT JOIN ruta_detalle rd ON rd.pedido_id = p.id
+              WHERE p.comprador_id = ? AND p.empresa_id = ?
+                AND p.estado = 'en_ruta'
+                AND rd.tracking_activo = 1",
+            [$compradorId, $empresaId]
+        );
+        return (int)($row['n'] ?? 0);
+    }
+
+    /**
+     * Ahorro acumulado por motor de precios escalonados:
+     * SUM((precio_original - precio_unit) * cantidad) cuando precio_original > precio_unit.
+     */
+    public function ahorroPorVolumen(int $compradorId, int $empresaId, string $desde, string $hasta): float
+    {
+        $row = $this->queryOne(
+            "SELECT COALESCE(SUM((pd.precio_original - pd.precio_unit) * pd.cantidad),0) AS ahorro
+               FROM pedido_detalle pd
+               JOIN pedidos p ON p.id = pd.pedido_id
+              WHERE p.comprador_id = ? AND p.empresa_id = ?
+                AND p.estado != 'cancelado'
+                AND DATE(p.created_at) BETWEEN ? AND ?
+                AND pd.precio_original IS NOT NULL
+                AND pd.precio_original > pd.precio_unit",
+            [$compradorId, $empresaId, $desde, $hasta]
+        );
+        return (float)($row['ahorro'] ?? 0);
+    }
+
+    /**
+     * Plantillas de pedidos recurrentes activas para la empresa del comprador.
+     */
+    public function recurrentesActivos(int $empresaId): int
+    {
+        $row = $this->queryOne(
+            "SELECT COUNT(*) AS n FROM pedidos_recurrentes
+              WHERE empresa_id = ? AND activo = 1",
+            [$empresaId]
+        );
+        return (int)($row['n'] ?? 0);
+    }
+
+    /**
+     * Próxima entrega del comprador (pedido en ruta o confirmado más cercano).
+     */
+    public function proximaEntregaComprador(int $compradorId, int $empresaId): ?array
+    {
+        return $this->queryOne(
+            "SELECT p.id, p.folio, p.estado, p.fecha_entrega, p.total,
+                    rd.eta_minutos
+               FROM pedidos p
+          LEFT JOIN ruta_detalle rd ON rd.pedido_id = p.id AND rd.tracking_activo = 1
+              WHERE p.comprador_id = ? AND p.empresa_id = ?
+                AND p.estado IN ('confirmado','en_preparacion','en_ruta')
+              ORDER BY (p.fecha_entrega IS NULL), p.fecha_entrega ASC, p.created_at ASC
+              LIMIT 1",
+            [$compradorId, $empresaId]
+        );
+    }
+
+    /**
+     * Producto más comprado por el comprador en el período.
+     */
+    public function topProductoComprador(int $compradorId, int $empresaId, string $desde, string $hasta): ?array
+    {
+        return $this->queryOne(
+            "SELECT pr.nombre, pr.presentacion,
+                    SUM(pd.cantidad) AS total_cantidad
+               FROM pedido_detalle pd
+               JOIN pedidos   p  ON p.id  = pd.pedido_id
+               JOIN productos pr ON pr.id = pd.producto_id
+              WHERE p.comprador_id = ? AND p.empresa_id = ?
+                AND p.estado != 'cancelado'
+                AND DATE(p.created_at) BETWEEN ? AND ?
+              GROUP BY pd.producto_id
+              ORDER BY total_cantidad DESC
+              LIMIT 1",
+            [$compradorId, $empresaId, $desde, $hasta]
+        );
+    }
+
+    /**
+     * Consumo del comprador agrupado por categoría (monto) en el período.
+     */
+    public function consumoPorCategoriaComprador(int $compradorId, int $empresaId, string $desde, string $hasta): array
+    {
+        return $this->query(
+            "SELECT c.nombre AS categoria,
+                    COALESCE(SUM(pd.subtotal),0) AS monto,
+                    COALESCE(SUM(pd.cantidad),0) AS cantidad
+               FROM pedido_detalle pd
+               JOIN pedidos    p  ON p.id  = pd.pedido_id
+               JOIN productos  pr ON pr.id = pd.producto_id
+               JOIN categorias c  ON c.id  = pr.categoria_id
+              WHERE p.comprador_id = ? AND p.empresa_id = ?
+                AND p.estado != 'cancelado'
+                AND DATE(p.created_at) BETWEEN ? AND ?
+              GROUP BY c.id, c.nombre
+              ORDER BY monto DESC",
+            [$compradorId, $empresaId, $desde, $hasta]
+        );
+    }
+
+    /**
+     * Histórico de gasto semanal del comprador (últimas N semanas).
+     */
+    public function gastoSemanalComprador(int $compradorId, int $empresaId, int $semanas = 8): array
+    {
+        $semanas = max(1, min(52, $semanas));
+        return $this->query(
+            "SELECT YEARWEEK(created_at, 3) AS yw,
+                    MIN(DATE(created_at)) AS desde,
+                    COALESCE(SUM(total),0) AS gasto,
+                    COUNT(*) AS pedidos
+               FROM pedidos
+              WHERE comprador_id = ? AND empresa_id = ?
+                AND estado != 'cancelado'
+                AND created_at >= DATE_SUB(CURDATE(), INTERVAL $semanas WEEK)
+              GROUP BY YEARWEEK(created_at, 3)
+              ORDER BY yw",
+            [$compradorId, $empresaId]
+        );
+    }
 }

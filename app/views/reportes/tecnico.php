@@ -288,28 +288,46 @@ function renderCharts() {
         }
       };
     } else {
+      // Soporte para múltiples datasets (g.datasets) o un solo dataset (g.data/g.label)
+      let datasets;
+      if (Array.isArray(g.datasets) && g.datasets.length) {
+        datasets = g.datasets.map((ds, di) => ({
+          label: ds.label || ('Serie ' + (di + 1)),
+          data: ds.data || [],
+          backgroundColor: ds.color || PALETTE[di % PALETTE.length],
+          borderColor: ds.color || PALETTE[di % PALETTE.length],
+          borderWidth: 2,
+          tension: 0.3,
+          fill: false,
+        }));
+      } else {
+        datasets = [{
+          label: g.label,
+          data: g.data,
+          backgroundColor: isPie
+            ? PALETTE.slice(0, g.labels.length)
+            : (isBarH ? PALETTE.slice(0, g.labels.length) : 'rgba(200,16,46,0.15)'),
+          borderColor: isPie ? '#fff' : '#C8102E',
+          borderWidth: 2,
+          tension: 0.3,
+          fill: !isPie && !isBarH
+        }];
+      }
+
       cfg = {
         type: isBarH ? 'bar' : g.tipo,
-        data: {
-          labels: g.labels,
-          datasets: [{
-            label: g.label,
-            data: g.data,
-            backgroundColor: isPie
-              ? PALETTE.slice(0, g.labels.length)
-              : (isBarH ? PALETTE.slice(0, g.labels.length) : 'rgba(200,16,46,0.15)'),
-            borderColor: isPie ? '#fff' : '#C8102E',
-            borderWidth: 2,
-            tension: 0.3,
-            fill: !isPie && !isBarH
-          }]
-        },
+        data: { labels: g.labels, datasets },
         options: {
           responsive: true,
           maintainAspectRatio: false,
           animation: false,
           indexAxis: isBarH ? 'y' : 'x',
-          plugins: { legend: { display: isPie, position: 'bottom' } },
+          plugins: {
+            legend: {
+              display: isPie || (Array.isArray(g.datasets) && g.datasets.length > 1),
+              position: 'bottom'
+            }
+          },
           scales: isPie ? {} : { [isBarH ? 'x' : 'y']: { beginAtZero: true } }
         }
       };
