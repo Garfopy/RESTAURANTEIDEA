@@ -42,7 +42,7 @@ if ($path === '') {
 $oldRouteRedirects = [
     'taqueria'    => BASE_URL . 'distribuidora-carne-cerca-de-mi',
     'restaurantes' => BASE_URL . 'carnihub/cortes-de-carne-para-restaurantes',
-    'cedis'       => BASE_URL . 'carnihub/',
+    'cedis'       => BASE_URL . 'carnihub',
 ];
 if (isset($oldRouteRedirects[$path])) {
     header('Location: ' . $oldRouteRedirects[$path], true, 301);
@@ -52,7 +52,7 @@ if (isset($oldRouteRedirects[$path])) {
 $seoRoutes = [
     'distribuidora-carne-cerca-de-mi'             => 'taqueria',
     'carnihub/cortes-de-carne-para-restaurantes'  => 'restaurantes',
-    'carnihub/'                                   => 'cedis',
+    'carnihub'                                    => 'cedis',
 ];
 if (isset($seoRoutes[$path])) {
     $ctrlSlug = 'landing';

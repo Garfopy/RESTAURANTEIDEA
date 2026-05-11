@@ -12,7 +12,7 @@
   <title>Plataforma de abastecimiento productos cárnicos con visibilidad y trazabilidad a 1 click | <?= htmlspecialchars($appName) ?></title>
   <meta name="description" content="Optimiza compras, entregas, trazabilidad y logística inversa con CarniHub. Ideal para CEDIS de restaurantes, hoteles, taquerías y carnicerías.">
   <meta name="keywords" content="proveedores de carne con crédito, cotización de carne para comedores, precio de carne para restaurantes, carne por mayoreo para hoteles, proveedor de carne para cadenas restauranteras, proveedor de carne con entrega garantizada, proveedor de carne para CEDIS, compra de carne para restaurantes, compra de carne para hoteles, proveedor de carne para taquerías">
-  <link rel="canonical" href="<?= BASE_URL ?>carnihub/">
+  <link rel="canonical" href="<?= BASE_URL ?>carnihub">
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   <script type="application/ld+json">
@@ -22,7 +22,7 @@
       {
         "@type": "Organization",
         "name": "CarniHub",
-        "url": "<?= BASE_URL ?>",
+        "url": "<?= BASE_URL ?>carnihub/",
         "description": "Plataforma de abastecimiento, trazabilidad y logística para restaurantes y cadenas gastronómicas.",
         "knowsAbout": [
           "logística de alimentos perecederos",
@@ -84,6 +84,9 @@
     .reveal.visible { opacity:1; transform:translateY(0); }
     .navbar { transition: background .3s, box-shadow .3s; }
     .navbar.scrolled { background: rgba(255,255,255,.97) !important; box-shadow: 0 4px 24px rgba(0,0,0,.08); }
+    .navbar.scrolled a:not(.btn-primary) { color: #374151 !important; }
+    .navbar.scrolled a:not(.btn-primary):hover { color: #111827 !important; background: rgba(0,0,0,.04) !important; }
+    .navbar.scrolled span { color: #374151 !important; }
     .btn-shimmer { position:relative; overflow:hidden; }
     .btn-shimmer::after { content:''; position:absolute; top:0; left:-100%; width:60%; height:100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,.3), transparent); animation: shimmer 2.5s infinite; }
     @keyframes shimmer { 0%{left:-100%} 100%{left:200%} }
@@ -713,7 +716,6 @@
           <li><a href="<?= BASE_URL ?>distribuidora-carne-cerca-de-mi"            class="text-sm text-gray-500 hover:text-white transition-colors">Distribuidora de carne cerca de mí</a></li>
           <li><a href="<?= BASE_URL ?>carnihub/cortes-de-carne-para-restaurantes" class="text-sm text-gray-500 hover:text-white transition-colors">Cortes de carne para restaurantes</a></li>
           <li><a href="<?= BASE_URL ?>carnihub/cortes-de-carne-para-restaurantes" class="text-sm text-gray-500 hover:text-white transition-colors">Software de compras para restaurantes</a></li>
-          <li><a href="<?= BASE_URL ?>carnihub/"                                   class="text-sm text-white/60 font-semibold">→ Software para CEDIS y carnicerias</a></li>
         </ul>
       </div>
       <div>

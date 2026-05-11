@@ -80,6 +80,9 @@
     .reveal.visible { opacity:1; transform:translateY(0); }
     .navbar { transition: background .3s, box-shadow .3s; }
     .navbar.scrolled { background: rgba(255,255,255,.97) !important; box-shadow: 0 4px 24px rgba(0,0,0,.08); }
+    .navbar.scrolled a:not(.btn-primary) { color: #374151 !important; }
+    .navbar.scrolled a:not(.btn-primary):hover { color: #111827 !important; background: rgba(0,0,0,.04) !important; }
+    .navbar.scrolled span { color: #374151 !important; }
     .btn-shimmer { position:relative; overflow:hidden; }
     .btn-shimmer::after { content:''; position:absolute; top:0; left:-100%; width:60%; height:100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,.3), transparent); animation: shimmer 2.5s infinite; }
     @keyframes shimmer { 0%{left:-100%} 100%{left:200%} }
@@ -627,7 +630,7 @@
         <ul class="space-y-2">
           <li><a href="<?= BASE_URL ?>distribuidora-carne-cerca-de-mi"            class="text-sm text-white/60 font-semibold">→ Distribuidora de carne cerca de mí</a></li>
           <li><a href="<?= BASE_URL ?>carnihub/cortes-de-carne-para-restaurantes" class="text-sm text-gray-500 hover:text-white transition-colors">Cortes de carne para restaurantes</a></li>
-          <li><a href="<?= BASE_URL ?>carnihub/"                                   class="text-sm text-gray-500 hover:text-white transition-colors">Software para CEDIS y carnicerias</a></li>
+          <li><a href="<?= BASE_URL ?>carnihub"                                    class="text-sm text-gray-500 hover:text-white transition-colors">Software para CEDIS y carnicerias</a></li>
         </ul>
       </div>
       <div>

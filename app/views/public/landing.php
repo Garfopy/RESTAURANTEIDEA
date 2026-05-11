@@ -131,6 +131,9 @@
     /* ── Navbar scroll ── */
     .navbar { transition: background .3s, box-shadow .3s; }
     .navbar.scrolled { background: rgba(255,255,255,.97) !important; box-shadow: 0 4px 24px rgba(0,0,0,.08); }
+    .navbar.scrolled a:not(.btn-primary) { color: #374151 !important; }
+    .navbar.scrolled a:not(.btn-primary):hover { color: #111827 !important; background: rgba(0,0,0,.04) !important; }
+    .navbar.scrolled span { color: #374151 !important; }
 
     /* ── Shimmer en botón CTA ── */
     .btn-shimmer { position:relative; overflow:hidden; }
@@ -453,7 +456,7 @@
       </a>
 
       <!-- CEDIS y Carnicerias -->
-      <a href="<?= BASE_URL ?>carnihub/"
+      <a href="<?= BASE_URL ?>carnihub"
          class="audience-card rounded-3xl p-8 reveal" style="transition-delay:200ms">
         <div class="audience-icon mb-6" style="background:color-mix(in srgb,#6366f1 12%,transparent)">🏭</div>
         <span class="audience-chip mb-4 inline-block">CEDIS &amp; Carnicerías</span>
