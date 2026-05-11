@@ -50,10 +50,226 @@ class RepartidorController extends BaseController
             $paradas = $stmt->fetchAll();
         }
 
+        // Pedidos directos asignados (sin ruta formal)
+        $stmtDirectos = $db->prepare(
+            "SELECT p.id, p.folio, p.estado, p.fecha_entrega,
+                    p.direccion_entrega, p.nota_empresa,
+                    e.razon_social AS empresa_nombre
+               FROM pedidos p
+               JOIN empresas e ON e.id = p.empresa_id
+              WHERE p.repartidor_asignado_id = ?
+                AND p.tipo_entrega = 'repartidor'
+                AND p.estado IN ('en_preparacion', 'en_ruta')
+              ORDER BY p.fecha_entrega ASC, p.id ASC"
+        );
+        $stmtDirectos->execute([$repartidorId]);
+        $pedidosDirectos = $stmtDirectos->fetchAll();
+
+        // Agregar sucursales a cada pedido directo para mostrar progreso en inicio
+        if (!empty($pedidosDirectos)) {
+            $ids = implode(',', array_map('intval', array_column($pedidosDirectos, 'id')));
+            $stmtSucs = $db->query(
+                "SELECT ps.pedido_id, ps.foto_entrega_path, s.nombre AS sucursal_nombre
+                   FROM pedido_sucursal ps
+                   JOIN sucursales s ON s.id = ps.sucursal_id
+                  WHERE ps.pedido_id IN ($ids)
+                  ORDER BY ps.id ASC"
+            );
+            $sucsPorPedido = [];
+            foreach ($stmtSucs->fetchAll() as $row) {
+                $sucsPorPedido[$row['pedido_id']][] = $row;
+            }
+            foreach ($pedidosDirectos as &$pd) {
+                $pd['sucursales'] = $sucsPorPedido[$pd['id']] ?? [];
+            }
+            unset($pd);
+        }
+
         $flash     = $this->getFlash();
         $pageTitle = 'Mis entregas de hoy';
 
         require ROOT_PATH . '/app/views/repartidor/inicio.php';
+    }
+
+    // ── Inicio de viaje directo (pedido sin ruta formal) ──────────────────────
+    public function iniciarViaje(?string $pedidoId = null): void
+    {
+        if (!$this->isPost() || !$pedidoId) {
+            $this->redirect('repartidor/inicio');
+        }
+
+        $pedidoId     = (int)$pedidoId;
+        $repartidorId = $this->usuarioId();
+        $db           = Database::getInstance();
+
+        $stmt = $db->prepare(
+            "SELECT id FROM pedidos
+              WHERE id = ? AND repartidor_asignado_id = ?
+                AND tipo_entrega = 'repartidor' AND estado = 'en_preparacion'"
+        );
+        $stmt->execute([$pedidoId, $repartidorId]);
+        if (!$stmt->fetch()) {
+            $this->redirect('repartidor/inicio');
+        }
+
+        $pedidoModel = new PedidoModel();
+        $pedidoModel->cambiarEstado($pedidoId, 'en_ruta');
+
+        $db->prepare('UPDATE pedidos SET ruta_iniciada_at = NOW() WHERE id = ?')
+           ->execute([$pedidoId]);
+
+        $this->flash('success', '¡Viaje iniciado! Comparte tu ubicación para el seguimiento.');
+        $this->redirect('repartidor/pedidoDirecto/' . $pedidoId);
+    }
+
+    // ── Vista de entrega directa de un pedido (GPS + foto) ────────────────────
+    public function pedidoDirecto(?string $pedidoId = null): void
+    {
+        if (!$pedidoId) {
+            $this->redirect('repartidor/inicio');
+        }
+
+        $pedidoId     = (int)$pedidoId;
+        $repartidorId = $this->usuarioId();
+        $db           = Database::getInstance();
+
+        $stmt = $db->prepare(
+            "SELECT p.*, e.razon_social AS empresa_nombre,
+                    e.lat AS empresa_lat, e.lng AS empresa_lng,
+                    e.direccion_fiscal AS empresa_direccion
+               FROM pedidos p
+               JOIN empresas e ON e.id = p.empresa_id
+              WHERE p.id = ? AND p.repartidor_asignado_id = ?
+                AND p.tipo_entrega = 'repartidor' AND p.estado IN ('en_preparacion','en_ruta')"
+        );
+        $stmt->execute([$pedidoId, $repartidorId]);
+        $pedido = $stmt->fetch();
+
+        if (!$pedido) {
+            $this->redirect('repartidor/inicio');
+        }
+
+        // Firebase config para el tracking
+        $cfgModel    = new ConfigModel();
+        $firebaseConfig = [
+            'apiKey'      => $cfgModel->get('firebase_api_key', ''),
+            'authDomain'  => $cfgModel->get('firebase_auth_domain', ''),
+            'databaseURL' => $cfgModel->get('firebase_database_url', ''),
+            'projectId'   => $cfgModel->get('firebase_project_id', ''),
+            'appId'       => $cfgModel->get('firebase_app_id', ''),
+        ];
+        $firebaseActivo = !empty($firebaseConfig['apiKey']) && !empty($firebaseConfig['databaseURL']);
+
+        $pedidoModel = new PedidoModel();
+        $sucursales  = $pedidoModel->getSucursalesPedido($pedidoId);
+
+        $flash     = $this->getFlash();
+        $pageTitle = 'Entrega — ' . $pedido['folio'];
+
+        require ROOT_PATH . '/app/views/repartidor/pedido_directo.php';
+    }
+
+    // ── Confirmar entrega directa (foto + marcar entregado) ──────────────────
+    public function confirmarEntregaDirecta(?string $pedidoId = null): void
+    {
+        if (!$this->isPost() || !$pedidoId) {
+            $this->redirect('repartidor/inicio');
+        }
+
+        $pedidoId     = (int)$pedidoId;
+        $repartidorId = $this->usuarioId();
+        $db           = Database::getInstance();
+
+        $stmt = $db->prepare(
+            "SELECT id FROM pedidos
+              WHERE id = ? AND repartidor_asignado_id = ?
+                AND tipo_entrega = 'repartidor' AND estado = 'en_ruta'"
+        );
+        $stmt->execute([$pedidoId, $repartidorId]);
+        if (!$stmt->fetch()) {
+            $this->flash('error', 'Pedido no encontrado.');
+            $this->redirect('repartidor/inicio');
+        }
+
+        if (empty($_FILES['foto']['tmp_name'])) {
+            $this->flash('error', 'Debes tomar una foto como evidencia de entrega.');
+            $this->redirect('repartidor/pedidoDirecto/' . $pedidoId);
+        }
+
+        $fotoPath = $this->guardarFoto($_FILES['foto'], 'dir_' . $pedidoId);
+        if (!$fotoPath) {
+            $this->flash('error', 'Formato de imagen no válido. Usa JPG, PNG o WEBP.');
+            $this->redirect('repartidor/pedidoDirecto/' . $pedidoId);
+        }
+
+        $pedidoModel = new PedidoModel();
+        $pedidoModel->subirFotoEntrega($pedidoId, $fotoPath);
+
+        $this->log('Entrega directa confirmada', 'repartidor', "Pedido ID: $pedidoId");
+        $this->flash('success', '¡Entrega completada! El pedido fue marcado como entregado.');
+        $this->redirect('repartidor/inicio');
+    }
+
+    // ── Confirmar entrega en una sucursal (multi-parada directo) ─────────────
+    public function confirmarParadaDirecta(?string $pedidoSucursalId = null): void
+    {
+        if (!$this->isPost() || !$pedidoSucursalId) {
+            $this->redirect('repartidor/inicio');
+        }
+
+        $psId         = (int)$pedidoSucursalId;
+        $repartidorId = $this->usuarioId();
+        $db           = Database::getInstance();
+
+        // Verificar que esta parada pertenece a un pedido asignado a este repartidor
+        $stmt = $db->prepare(
+            'SELECT ps.pedido_id FROM pedido_sucursal ps
+               JOIN pedidos p ON p.id = ps.pedido_id
+              WHERE ps.id = ? AND p.repartidor_asignado_id = ?
+                AND p.tipo_entrega = \'repartidor\' AND p.estado = \'en_ruta\''
+        );
+        $stmt->execute([$psId, $repartidorId]);
+        $row = $stmt->fetch();
+
+        if (!$row) {
+            $this->flash('error', 'Parada no encontrada.');
+            $this->redirect('repartidor/inicio');
+        }
+
+        $pedidoId = (int)$row['pedido_id'];
+
+        if (empty($_FILES['foto']['tmp_name'])) {
+            $this->flash('error', 'Debes tomar una foto como evidencia de entrega.');
+            $this->redirect('repartidor/pedidoDirecto/' . $pedidoId);
+        }
+
+        $fotoPath = $this->guardarFoto($_FILES['foto'], 'ps_' . $psId);
+        if (!$fotoPath) {
+            $this->flash('error', 'Formato de imagen no válido. Usa JPG, PNG o WEBP.');
+            $this->redirect('repartidor/pedidoDirecto/' . $pedidoId);
+        }
+
+        $pedidoModel = new PedidoModel();
+        $pedidoModel->confirmarSucursalEntrega($psId, $fotoPath);
+
+        // Si ya se entregaron todas las sucursales, finalizar el viaje
+        if ($pedidoModel->allSucursalesEntregadas($pedidoId)) {
+            // Comprimir trail GPS y guardar en pedido
+            $rows = $db->prepare(
+                'SELECT lat, lng FROM tracking_posiciones WHERE pedido_id = ? ORDER BY ts ASC LIMIT 300'
+            );
+            $rows->execute([$pedidoId]);
+            $pts = $rows->fetchAll(\PDO::FETCH_NUM);
+
+            $sampled = $this->samplePoints($pts, 100);
+            $pedidoModel->saveRutaPolyline($pedidoId, json_encode($sampled));
+
+            $this->flash('success', '¡Viaje finalizado! Todas las sucursales entregadas.');
+            $this->redirect('repartidor/historial');
+        }
+
+        $this->flash('success', 'Sucursal entregada. Continúa al siguiente destino.');
+        $this->redirect('repartidor/pedidoDirecto/' . $pedidoId);
     }
 
     public function entrega(?string $paradaId = null): void
@@ -159,6 +375,7 @@ class RepartidorController extends BaseController
         $repartidorId = $this->usuarioId();
         $db = Database::getInstance();
 
+        // Paradas de ruta formal entregadas
         $stmt = $db->prepare(
             "SELECT rd.*, s.nombre AS sucursal_nombre, p.folio,
                     r.fecha, e.razon_social AS empresa_nombre
@@ -173,10 +390,92 @@ class RepartidorController extends BaseController
         $stmt->execute([$repartidorId]);
         $historial = $stmt->fetchAll();
 
+        // Pedidos directos completados (multi-parada)
+        $stmtDirectos = $db->prepare(
+            "SELECT p.id, p.folio, p.estado, p.ruta_polyline, p.ruta_iniciada_at,
+                    p.ruta_finalizada_at, p.fecha_entrega,
+                    e.razon_social AS empresa_nombre
+               FROM pedidos p
+               JOIN empresas e ON e.id = p.empresa_id
+              WHERE p.repartidor_asignado_id = ?
+                AND p.tipo_entrega = 'repartidor'
+                AND p.estado = 'entregado'
+           ORDER BY p.ruta_finalizada_at DESC, p.id DESC
+              LIMIT 30"
+        );
+        $stmtDirectos->execute([$repartidorId]);
+        $pedidosEntregados = $stmtDirectos->fetchAll();
+
+        // Sucursales por pedido directo
+        if (!empty($pedidosEntregados)) {
+            $ids = implode(',', array_map('intval', array_column($pedidosEntregados, 'id')));
+            $stmtSucs = $db->query(
+                "SELECT ps.pedido_id, ps.foto_entrega_path, ps.fecha_llegada,
+                        s.nombre AS sucursal_nombre
+                   FROM pedido_sucursal ps
+                   JOIN sucursales s ON s.id = ps.sucursal_id
+                  WHERE ps.pedido_id IN ($ids)
+                  ORDER BY ps.id ASC"
+            );
+            $sucsPorPedido = [];
+            foreach ($stmtSucs->fetchAll() as $row) {
+                $sucsPorPedido[$row['pedido_id']][] = $row;
+            }
+            foreach ($pedidosEntregados as &$pd) {
+                $pd['sucursales'] = $sucsPorPedido[$pd['id']] ?? [];
+            }
+            unset($pd);
+        }
+
         $flash     = $this->getFlash();
         $pageTitle = 'Historial de entregas';
 
         require ROOT_PATH . '/app/views/repartidor/historial.php';
+    }
+
+    public function verViaje(?string $pedidoId = null): void
+    {
+        $repartidorId = $this->usuarioId();
+        $db = Database::getInstance();
+        $pedidoId = (int)$pedidoId;
+
+        if (!$pedidoId) {
+            $this->redirect('repartidor/historial');
+        }
+
+        $stmt = $db->prepare(
+            "SELECT p.id, p.folio, p.ruta_polyline, p.ruta_iniciada_at, p.ruta_finalizada_at,
+                    p.estado, e.razon_social AS empresa_nombre
+               FROM pedidos p
+               JOIN empresas e ON e.id = p.empresa_id
+              WHERE p.id = ? AND p.repartidor_asignado_id = ?"
+        );
+        $stmt->execute([$pedidoId, $repartidorId]);
+        $pedido = $stmt->fetch();
+
+        if (!$pedido) {
+            $this->redirect('repartidor/historial');
+        }
+
+        $pedidoModel = new PedidoModel();
+        $sucursales  = $pedidoModel->getSucursalesPedido($pedidoId);
+
+        $flash     = $this->getFlash();
+        $pageTitle = 'Recorrido — ' . $pedido['folio'];
+
+        require ROOT_PATH . '/app/views/repartidor/ver_viaje.php';
+    }
+
+    private function samplePoints(array $pts, int $max): array
+    {
+        if (count($pts) <= $max) return $pts;
+        $step    = count($pts) / ($max - 1);
+        $sampled = [];
+        for ($i = 0; $i < $max - 1; $i++) {
+            $sampled[] = $pts[(int)round($i * $step)];
+        }
+        $sampled[] = $pts[count($pts) - 1];
+        return $sampled;
     }
 
     private function guardarFirma(string $base64, string $paradaId): ?string

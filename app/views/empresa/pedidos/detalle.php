@@ -11,9 +11,25 @@ $estadoConfig = [
 $est = $estadoConfig[$pedido['estado']] ?? ['label'=>$pedido['estado'],'bg'=>'#F3F4F6','color'=>'#374151'];
 $rol = $_SESSION['usuario']['rol_slug'] ?? '';
 $esComprador = $rol === 'comprador';
+$esRepartidor = $rol === 'repartidor';
 $estadosOrden = ['pendiente','confirmado','en_preparacion','en_ruta','entregado'];
 $estadoActualIdx = array_search($pedido['estado'], $estadosOrden);
 $cancelado = $pedido['estado'] === 'cancelado';
+$tipoEntrega = $pedido['tipo_entrega'] ?? '';
+$esEnvioRepartidor = $tipoEntrega === 'repartidor';
+
+// Historial de estados indexado por estado (el más reciente si hay duplicados)
+$historialPorEstado = ['pendiente' => ['created_at' => $pedido['created_at']]];
+foreach ($historial ?? [] as $h) {
+    $historialPorEstado[$h['estado']] = $h;
+}
+
+function tiempoTranscurrido(string $desde, string $hasta): string {
+    $mins = (int)round((strtotime($hasta) - strtotime($desde)) / 60);
+    if ($mins < 60)   return $mins . ' min';
+    if ($mins < 1440) return round($mins / 60, 1) . ' h';
+    return round($mins / 1440, 1) . ' días';
+}
 ?>
 
 <?php if ($flash): ?>
@@ -71,7 +87,7 @@ $cancelado = $pedido['estado'] === 'cancelado';
 <!-- Timeline de progreso (solo si no está cancelado) -->
 <?php if (!$cancelado): ?>
 <div style="background:#fff;border-radius:12px;border:1px solid #E5E7EB;padding:16px 20px;margin-bottom:16px;overflow-x:auto">
-  <div style="display:flex;align-items:center;min-width:420px">
+  <div style="display:flex;align-items:flex-start;min-width:420px">
     <?php
     $labelsTimeline = ['pendiente'=>'Pendiente','confirmado'=>'Aprobado','en_preparacion'=>'En preparación','en_ruta'=>'En camino','entregado'=>'Entregado'];
     $iconosTimeline = ['pendiente'=>'📋','confirmado'=>'✓','en_preparacion'=>'📦','en_ruta'=>'🚚','entregado'=>'✅'];
@@ -79,10 +95,25 @@ $cancelado = $pedido['estado'] === 'cancelado';
     foreach ($estadosOrden as $si => $se):
       $hecho  = ($estadoActualIdx !== false) && $si <= $estadoActualIdx;
       $actual = ($estadoActualIdx !== false) && $si === $estadoActualIdx;
+      $tsEstado = $historialPorEstado[$se]['created_at'] ?? null;
+      // Elapsed time between this state and the previous
+      $tiempoLabel = '';
+      if ($si > 0 && $hecho) {
+          $prevEstado = $estadosOrden[$si - 1];
+          $tsPrev = $historialPorEstado[$prevEstado]['created_at'] ?? null;
+          if ($tsPrev && $tsEstado) {
+              $tiempoLabel = tiempoTranscurrido($tsPrev, $tsEstado);
+          }
+      }
     ?>
     <div style="display:flex;flex-direction:column;align-items:center;flex:1;min-width:70px;position:relative">
       <?php if ($si > 0): ?>
       <div style="position:absolute;top:14px;left:-50%;width:100%;height:2px;background:<?= $hecho ? 'var(--color-primary)' : '#E5E7EB' ?>"></div>
+      <?php if ($tiempoLabel): ?>
+      <div style="position:absolute;top:17px;left:-50%;width:100%;text-align:center;font-size:.6rem;color:<?= $hecho ? 'var(--color-primary)' : '#9CA3AF' ?>;font-weight:600;white-space:nowrap;pointer-events:none">
+        <?= htmlspecialchars($tiempoLabel) ?>
+      </div>
+      <?php endif; ?>
       <?php endif; ?>
       <div style="width:28px;height:28px;border-radius:50%;background:<?= $hecho ? 'var(--color-primary)' : '#E5E7EB' ?>;display:flex;align-items:center;justify-content:center;font-size:.75rem;color:<?= $hecho ? '#fff' : '#9CA3AF' ?>;position:relative;z-index:1;border:2px solid <?= $actual ? 'var(--color-primary)' : ($hecho ? 'var(--color-primary)' : '#D1D5DB') ?>">
         <?= $hecho ? ($actual && $se !== 'entregado' ? $iconosTimeline[$se] : '✓') : ($si+1) ?>
@@ -90,9 +121,72 @@ $cancelado = $pedido['estado'] === 'cancelado';
       <div style="font-size:.68rem;font-weight:<?= $actual ? '700' : '500' ?>;color:<?= $actual ? 'var(--color-primary)' : ($hecho ? '#374151' : '#9CA3AF') ?>;text-align:center;margin-top:5px;white-space:nowrap">
         <?= $labelsTimeline[$se] ?>
       </div>
+      <?php if ($tsEstado && $hecho): ?>
+      <div style="font-size:.58rem;color:#9CA3AF;text-align:center;white-space:nowrap;margin-top:2px">
+        <?= date('d/m H:i', strtotime($tsEstado)) ?>
+      </div>
+      <?php endif; ?>
     </div>
     <?php endforeach; ?>
   </div>
+
+  <?php
+  // Sub-timeline de paradas cuando hay multi-destino
+  $tieneParadas = !empty($pedido['sucursales']) && ($pedido['tipo_entrega'] ?? '') === 'repartidor';
+  $estadosBloq = ['en_ruta', 'entregado'];
+  if ($tieneParadas && in_array($pedido['estado'], array_merge($estadosBloq, ['en_preparacion', 'confirmado']), true)):
+  ?>
+  <div style="margin-top:14px;padding-top:12px;border-top:1px dashed #E5E7EB">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:4px">
+      <div style="font-size:.72rem;font-weight:700;color:#6B7280;letter-spacing:.05em">PARADAS DE ENTREGA</div>
+      <?php $hayFotos = !empty(array_filter($pedido['sucursales'], fn($s) => !empty($s['foto_entrega_path']))); ?>
+      <?php if ($hayFotos): ?>
+      <div style="font-size:.68rem;color:#059669;font-weight:600">📷 Haz clic en la foto para verla en grande</div>
+      <?php endif; ?>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px">
+      <?php foreach ($pedido['sucursales'] as $i => $ps):
+        $psEst = $ps['estado'] ?? 'pendiente';
+        $psChip = ['pendiente'=>['bg'=>'#F3F4F6','c'=>'#6B7280','label'=>'Pendiente'],
+                   'entregado'=>['bg'=>'#D1FAE5','c'=>'#065F46','label'=>'✓ Entregado'],
+                   'parcial'  =>['bg'=>'#FEF3C7','c'=>'#92400E','label'=>'Parcial'],
+                   'rechazado'=>['bg'=>'#FEE2E2','c'=>'#991B1B','label'=>'Rechazado']][$psEst]
+                  ?? ['bg'=>'#F3F4F6','c'=>'#6B7280','label'=>$psEst];
+      ?>
+      <div style="display:flex;align-items:flex-start;gap:8px;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px;padding:7px 12px;flex-wrap:wrap">
+        <div style="width:20px;height:20px;border-radius:50%;background:<?= $psEst==='entregado' ? '#059669' : 'var(--color-primary)' ?>;color:#fff;font-size:.65rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">
+          <?= $psEst==='entregado' ? '✓' : ($i+1) ?>
+        </div>
+        <div style="flex:1;min-width:120px">
+          <div style="font-size:.8rem;font-weight:700;color:#111827"><?= htmlspecialchars($ps['sucursal_nombre']) ?></div>
+          <div style="font-size:.72rem;color:#6B7280"><?= htmlspecialchars($ps['direccion']) ?></div>
+          <?php if (!empty($ps['fecha_llegada'])): ?>
+          <div style="font-size:.68rem;color:#9CA3AF;margin-top:2px">Entregado <?= date('d/m H:i', strtotime($ps['fecha_llegada'])) ?></div>
+          <?php endif; ?>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+          <span style="font-size:.7rem;padding:2px 8px;border-radius:999px;background:<?= $psChip['bg'] ?>;color:<?= $psChip['c'] ?>;font-weight:600;white-space:nowrap">
+            <?= $psChip['label'] ?>
+          </span>
+          <?php if (($ps['costo_envio_sucursal'] ?? 0) > 0): ?>
+          <span style="font-size:.72rem;color:#374151;font-weight:600">$<?= number_format($ps['costo_envio_sucursal'], 2) ?></span>
+          <?php endif; ?>
+          <?php if (!empty($ps['foto_entrega_path'])): ?>
+          <a href="<?= htmlspecialchars($ps['foto_entrega_path']) ?>" target="_blank"
+             style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:2px;text-decoration:none">
+            <img src="<?= htmlspecialchars($ps['foto_entrega_path']) ?>" alt="Evidencia de entrega"
+                 style="width:52px;height:52px;object-fit:cover;border-radius:8px;border:2px solid #A7F3D0;display:block;box-shadow:0 1px 4px rgba(0,0,0,.1)">
+            <span style="font-size:.6rem;color:#059669;font-weight:700">📷 Ver foto</span>
+          </a>
+          <?php else: ?>
+          <span style="font-size:.65rem;color:#D1D5DB;background:#F9FAFB;border:1px dashed #E5E7EB;border-radius:6px;padding:4px 8px;white-space:nowrap">Sin foto aún</span>
+          <?php endif; ?>
+        </div>
+      </div>
+      <?php endforeach; ?>
+    </div>
+  </div>
+  <?php endif; ?>
 </div>
 <?php endif; ?>
 
@@ -137,9 +231,13 @@ $cancelado = $pedido['estado'] === 'cancelado';
     <div style="font-size:.75rem;color:#6B7280;margin-top:6px">JPG, PNG, WEBP o PDF · Máx 5 MB</div>
   </form>
   <?php else: ?>
-  <div style="display:flex;align-items:center;gap:8px;color:#065F46;font-size:.875rem;font-weight:600">
-    ✓ Comprobante enviado — la empresa verificará el pago.
-    <a href="<?= htmlspecialchars($pedido['foto_comprobante_path']) ?>" target="_blank" style="color:#1D4ED8;margin-left:8px">Ver comprobante</a>
+  <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:rgba(255,255,255,.7);border-radius:8px;flex-wrap:wrap">
+    <span style="font-size:1.2rem">⏳</span>
+    <div>
+      <div style="font-size:.88rem;font-weight:700;color:#1E40AF">Comprobante enviado — en espera de validación</div>
+      <div style="font-size:.8rem;color:#3B82F6">La empresa revisará tu comprobante y confirmará el pago pronto.</div>
+    </div>
+    <a href="<?= htmlspecialchars($pedido['foto_comprobante_path']) ?>" target="_blank" style="color:#1D4ED8;font-size:.8rem;font-weight:600;white-space:nowrap">Ver comprobante →</a>
   </div>
   <?php endif; ?>
 </div>
@@ -147,8 +245,17 @@ $cancelado = $pedido['estado'] === 'cancelado';
 
 <?php if ($esComprador && $pedido['estado'] === 'en_preparacion'): ?>
 <div style="margin-bottom:20px;background:#EDE9FE;border:1px solid #C4B5FD;border-radius:12px;padding:18px 20px">
+  <?php if ($esEnvioRepartidor): ?>
+  <div style="font-weight:700;color:#5B21B6;font-size:.9rem;margin-bottom:6px">Tu pago fue verificado — Esperando partida del repartidor</div>
+  <p style="font-size:.85rem;color:#6D28D9;margin:0">
+    Tu pedido está listo. El repartidor iniciará el viaje en la fecha programada.
+    <?php if (!empty($pedido['fecha_entrega'])): ?>
+    <br><strong>Fecha de entrega:</strong> <?= date('d/m/Y', strtotime($pedido['fecha_entrega'])) ?>
+    <?php endif; ?>
+  </p>
+  <?php else: ?>
   <div style="font-weight:700;color:#5B21B6;font-size:.9rem;margin-bottom:6px">Tu pago fue verificado — Preparando tu pedido</div>
-  <?php if (($pedido['tipo_entrega'] ?? '') === 'pickup'): ?>
+  <?php if ($tipoEntrega === 'pickup'): ?>
   <p style="font-size:.85rem;color:#6D28D9;margin:0 0 10px 0">
     Tu pedido será preparado para recoger en bodega. La empresa te avisará cuando esté listo.
   </p>
@@ -170,6 +277,7 @@ $cancelado = $pedido['estado'] === 'cancelado';
     <br><strong>Dirección:</strong> <?= htmlspecialchars($pedido['direccion_entrega']) ?>
     <?php endif; ?>
   </p>
+  <?php endif; ?>
   <?php endif; ?>
 </div>
 <?php endif; ?>
@@ -213,9 +321,41 @@ $cancelado = $pedido['estado'] === 'cancelado';
       </div>
     </div>
   </div>
+  <?php if (($pedido['tipo_entrega'] ?? '') === 'repartidor'): ?>
+  <div style="margin-top:14px;border-top:1px solid rgba(245,158,11,.3);padding-top:14px">
+    <a href="<?= BASE_URL ?>pedido/tracking/<?= $pedido['id'] ?>"
+       style="display:inline-flex;align-items:center;gap:8px;background:#D97706;color:#fff;text-decoration:none;padding:10px 20px;border-radius:10px;font-size:.875rem;font-weight:700">
+      📍 Ver seguimiento en tiempo real
+    </a>
+  </div>
+  <?php endif; ?>
 </div>
 <?php endif; ?>
 
+<!-- Banner "En ruta" para ADMIN/SUPERVISOR con acceso al tracking -->
+<?php if (!$esComprador && $pedido['estado'] === 'en_ruta' && ($pedido['tipo_entrega'] ?? '') === 'repartidor'): ?>
+<div style="margin-bottom:20px;background:#FFF7ED;border:1px solid #FED7AA;border-radius:12px;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+  <div style="font-size:.9rem;color:#9A3412">
+    🚚 <strong>Pedido en ruta</strong> — el repartidor está en camino a la entrega.
+  </div>
+  <a href="<?= BASE_URL ?>pedido/tracking/<?= $pedido['id'] ?>"
+     style="display:inline-flex;align-items:center;gap:8px;background:#C8102E;color:#fff;text-decoration:none;padding:9px 18px;border-radius:9px;font-size:.85rem;font-weight:700">
+    📍 Ver seguimiento GPS
+  </a>
+</div>
+<?php endif; ?>
+<!-- Recorrido guardado para pedidos entregados -->
+<?php if (!empty($pedido['ruta_polyline']) && ($pedido['tipo_entrega'] ?? '') === 'repartidor'): ?>
+<div style="margin-bottom:20px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:12px;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+  <div style="font-size:.9rem;color:#1E40AF">
+    🗺 <strong>Recorrido guardado</strong> — el viaje fue completado y el recorrido GPS está disponible.
+  </div>
+  <a href="<?= BASE_URL ?>pedido/tracking/<?= $pedido['id'] ?>"
+     style="display:inline-flex;align-items:center;gap:8px;background:#1E40AF;color:#fff;text-decoration:none;padding:9px 18px;border-radius:9px;font-size:.85rem;font-weight:700">
+    🗺 Ver recorrido del viaje
+  </a>
+</div>
+<?php endif; ?>
 <?php if ($esComprador && $pedido['estado'] === 'entregado'): ?>
 <div style="margin-bottom:20px;background:#D1FAE5;border:1px solid #A7F3D0;border-radius:12px;padding:16px 20px">
   <div style="font-weight:700;color:#065F46;font-size:.9rem">✅ Tu pedido fue entregado</div>
@@ -267,31 +407,57 @@ $cancelado = $pedido['estado'] === 'cancelado';
     </div>
   </div>
 
-  <?php elseif (in_array($pedido['estado'], ['confirmado','en_preparacion'], true) && !empty($pedido['foto_comprobante_path'])): ?>
+  <?php elseif ($pedido['estado'] === 'confirmado' && !empty($pedido['foto_comprobante_path'])): ?>
   <div style="padding:12px 14px;background:#DBEAFE;border:1px solid #BFDBFE;border-radius:10px;font-size:.85rem;color:#1E40AF;margin-bottom:12px">
-    <strong>Comprobante de pago recibido.</strong>
-    Revisa la imagen del comprobante arriba. Si el pago es correcto, confírmalo para continuar con la entrega.
-    <?php if (($pedido['tipo_entrega'] ?? '') === 'pickup'): ?>
-    <br><span style="font-size:.8rem;opacity:.8">El pedido quedará listo para que el comprador lo recoja.</span>
+    <strong>💳 Comprobante de pago recibido.</strong>
+    Revisa la imagen arriba. Si el pago es correcto, confírmalo para mover el pedido a <strong>En preparación</strong>.
+    <?php if ($tipoEntrega === 'pickup'): ?>
+    <br><span style="font-size:.8rem;opacity:.8">Después podrás marcar "Listo para recoger" cuando el pedido esté preparado.</span>
     <?php else: ?>
-    <br><span style="font-size:.8rem;opacity:.8">El pedido pasará a "En camino" para el repartidor asignado.</span>
+    <br><span style="font-size:.8rem;opacity:.8">El repartidor marcará "Empezar viaje" cuando el pedido salga.</span>
     <?php endif; ?>
   </div>
   <form method="POST" action="<?= BASE_URL ?>empresa-pedido/cambiarEstado"
-        onsubmit="return confirm('¿Confirmar el pago y continuar con la entrega?')">
+        onsubmit="return confirm('¿Confirmar el pago y mover a En preparación?')">
     <input type="hidden" name="pedido_id" value="<?= $pedido['id'] ?>">
-    <input type="hidden" name="estado" value="en_ruta">
+    <input type="hidden" name="estado" value="en_preparacion">
     <button type="submit"
-            style="width:100%;padding:12px;background:#1D4ED8;color:#fff;border:none;border-radius:9px;font-weight:700;cursor:pointer;font-size:.9rem">
-      💳 Confirmar pago y continuar
+            style="width:100%;padding:12px;background:#1D4ED8;color:#fff;border:none;border-radius:9px;font-weight:700;cursor:pointer;font-size:.9rem;margin-bottom:8px">
+      ✅ Confirmar pago recibido → En preparación
     </button>
   </form>
 
-  <?php elseif (in_array($pedido['estado'], ['confirmado','en_preparacion'], true) && empty($pedido['foto_comprobante_path'])): ?>
+  <?php elseif ($pedido['estado'] === 'confirmado' && empty($pedido['foto_comprobante_path'])): ?>
   <div style="padding:12px 14px;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:10px;font-size:.85rem;color:#6B7280">
-    <strong>Esperando comprobante de pago.</strong>
-    El comprador recibirá una notificación para subir su comprobante. Cuando lo suba, aparecerá aquí para que puedas confirmarlo.
+    <strong>⏳ Esperando comprobante de pago.</strong>
+    El comprador verá la opción para subir su comprobante. Cuando lo suba, aparecerá aquí para que puedas confirmarlo.
   </div>
+
+  <?php elseif ($pedido['estado'] === 'en_preparacion' && $esEnvioRepartidor): ?>
+  <div style="padding:14px 16px;background:#EDE9FE;border:1px solid #C4B5FD;border-radius:10px;font-size:.85rem;color:#5B21B6;margin-bottom:8px">
+    <div style="font-weight:700;margin-bottom:4px">📦 Pedido verificado — esperando que el repartidor inicie el viaje</div>
+    <div style="font-size:.82rem;color:#6D28D9">
+      El pedido está listo. El repartidor verá el pedido en su app y pulsará <strong>"Empezar viaje"</strong> cuando lo tenga en sus manos.
+      <?php if (!empty($pedido['fecha_entrega'])): ?>
+      <br><span style="opacity:.85">Entrega programada: <strong><?= date('d/m/Y', strtotime($pedido['fecha_entrega'])) ?></strong></span>
+      <?php endif; ?>
+    </div>
+  </div>
+
+  <?php elseif ($pedido['estado'] === 'en_preparacion'): ?>
+  <div style="padding:12px 14px;background:#EDE9FE;border:1px solid #C4B5FD;border-radius:10px;font-size:.85rem;color:#5B21B6;margin-bottom:12px">
+    <strong>📦 Pedido en preparación.</strong>
+    El pago fue confirmado. Cuando el pedido esté listo para que el comprador lo recoja, márcalo.
+  </div>
+  <form method="POST" action="<?= BASE_URL ?>empresa-pedido/cambiarEstado"
+        onsubmit="return confirm('¿Marcar como listo para que el comprador recoja?')">
+    <input type="hidden" name="pedido_id" value="<?= $pedido['id'] ?>">
+    <input type="hidden" name="estado" value="en_ruta">
+    <button type="submit"
+            style="width:100%;padding:12px;background:#059669;color:#fff;border:none;border-radius:9px;font-weight:700;cursor:pointer;font-size:.9rem;margin-bottom:8px">
+      ✓ Listo para recoger
+    </button>
+  </form>
 
   <?php elseif ($pedido['estado'] === 'en_ruta' && ($pedido['tipo_entrega'] ?? '') === 'pickup'): ?>
   <div style="padding:12px 14px;background:#F0FDF4;border:1px solid #A7F3D0;border-radius:10px;font-size:.85rem;color:#065F46;margin-bottom:12px">
@@ -309,22 +475,10 @@ $cancelado = $pedido['estado'] === 'cancelado';
   </form>
 
   <?php elseif ($pedido['estado'] === 'en_ruta'): ?>
-  <div style="padding:12px 14px;background:#FEF3C7;border:1px solid #FCD34D;border-radius:10px;font-size:.85rem;color:#92400E;margin-bottom:12px">
-    <strong>Pedido en camino.</strong>
-    El repartidor asignado entregará el pedido y subirá la foto de evidencia. Si necesitas registrarlo manualmente, usa el formulario de abajo.
+  <div style="padding:14px 16px;background:#FEF9C3;border:1px solid #FDE047;border-radius:10px;font-size:.85rem;color:#713F12;margin-bottom:12px">
+    <div style="font-weight:700;margin-bottom:4px">🚚 Pedido en camino con el repartidor</div>
+    <div style="font-size:.82rem">El repartidor entrega cada sucursal y sube la foto de evidencia desde su app. No se requiere acción manual.</div>
   </div>
-  <form method="POST" action="<?= BASE_URL ?>empresa-pedido/subirFotoEntrega/<?= $pedido['id'] ?>"
-        enctype="multipart/form-data">
-    <div style="display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap">
-      <input type="file" name="foto" accept="image/*" capture="environment"
-             style="flex:1;padding:8px;border:1px solid #D1D5DB;border-radius:8px;font-size:.82rem;background:#fff;min-width:160px">
-      <button type="submit"
-              style="padding:10px 18px;background:#059669;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;white-space:nowrap;font-size:.85rem">
-        📷 Registrar entrega
-      </button>
-    </div>
-    <div style="font-size:.72rem;color:#9CA3AF;margin-top:4px">JPG, PNG o WEBP · Al guardar, el pedido se marca como <strong>Entregado</strong></div>
-  </form>
 
   <?php elseif ($pedido['estado'] === 'entregado'): ?>
   <div style="padding:12px 14px;background:#D1FAE5;border:1px solid #A7F3D0;border-radius:10px;font-size:.85rem;color:#065F46">
@@ -457,6 +611,153 @@ $cancelado = $pedido['estado'] === 'cancelado';
            style="max-width:100%;border-radius:8px;border:1px solid #E5E7EB">
     </div>
     <?php endif; ?>
+
+    <?php if (!empty($pedido['sucursales']) && ($pedido['tipo_entrega'] ?? '') === 'repartidor'): ?>
+    <?php
+    // Cargar info de empresa y clave de Maps
+    if (!isset($empresaInfo)) {
+        $empresaInfo = (new EmpresaModel())->find((int)$pedido['empresa_id']);
+    }
+    $gmKeyDetalle = (new ConfigModel())->get('google_maps_key', '');
+    $empLat   = !empty($empresaInfo['lat'])  ? (float)$empresaInfo['lat']  : null;
+    $empLng   = !empty($empresaInfo['lng'])  ? (float)$empresaInfo['lng']  : null;
+    $empDir   = $empresaInfo['direccion_fiscal'] ?? '';
+    $empNom   = $empresaInfo['razon_social'] ?? 'Empresa';
+
+    // Construir arrays de waypoints para Maps
+    $wpCoords = [];
+    foreach ($pedido['sucursales'] as $ps) {
+        $wpCoords[] = (!empty($ps['lat']) && !empty($ps['lng']))
+            ? (float)$ps['lat'] . ',' . (float)$ps['lng']
+            : urlencode($ps['direccion']);
+    }
+    $originMaps = ($empLat && $empLng) ? "$empLat,$empLng" : ($empDir ? urlencode($empDir) : '');
+    $destMaps   = !empty($wpCoords)    ? array_pop($wpCoords) : null;
+    $wpsMiddle  = $wpCoords;
+
+    if ($originMaps && $destMaps) {
+        $mapsUrl = 'https://www.google.com/maps/dir/' . $originMaps;
+        foreach ($wpsMiddle as $wp) { $mapsUrl .= '/' . $wp; }
+        $mapsUrl .= '/' . $destMaps;
+    } else { $mapsUrl = null; }
+
+    // Embed URL
+    if ($gmKeyDetalle && $originMaps && $destMaps) {
+        $embedWps = implode('|', array_merge($wpsMiddle));
+        $embedUrl = 'https://www.google.com/maps/embed/v1/directions?key=' . urlencode($gmKeyDetalle)
+            . '&origin=' . $originMaps
+            . '&destination=' . $destMaps
+            . ($embedWps ? '&waypoints=' . $embedWps : '')
+            . '&mode=driving&language=es';
+    } else { $embedUrl = null; }
+    ?>
+    <!-- ── Panel paradas de entrega ─────────────────────────────── -->
+    <div style="background:#fff;border-radius:12px;border:1px solid #E5E7EB;overflow:hidden;margin-bottom:16px">
+      <div style="padding:14px 16px;border-bottom:1px solid #F3F4F6;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <div>
+          <span style="font-weight:700;font-size:.9rem;color:#111827">📍 Paradas de entrega</span>
+          <div style="font-size:.75rem;color:#9CA3AF;margin-top:1px"><?= count($pedido['sucursales']) ?> parada<?= count($pedido['sucursales'])>1?'s':'' ?> — el repartidor visita cada una desde el origen</div>
+        </div>
+        <?php if ($mapsUrl): ?>
+        <a href="<?= htmlspecialchars($mapsUrl) ?>" target="_blank" rel="noopener"
+           style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;background:#4285F4;color:#fff;border-radius:8px;font-size:.8rem;font-weight:700;text-decoration:none">
+          🗺 Ver ruta en Maps
+        </a>
+        <?php endif; ?>
+      </div>
+
+      <!-- Origen: empresa -->
+      <div style="padding:12px 16px;border-bottom:1px solid #F3F4F6;background:#F9FAFB">
+        <div style="display:flex;align-items:flex-start;gap:10px">
+          <div style="flex-shrink:0;width:24px;height:24px;border-radius:50%;background:#374151;color:#fff;font-size:.65rem;font-weight:700;display:flex;align-items:center;justify-content:center">O</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:.88rem;font-weight:700;color:#111827">Origen: <?= htmlspecialchars($empNom) ?></div>
+            <div style="font-size:.78rem;color:#6B7280">📍 <?= htmlspecialchars($empDir ?: 'Sin dirección registrada') ?></div>
+            <?php if (!$empDir && !$esComprador): ?>
+            <div style="font-size:.74rem;color:#DC2626;margin-top:2px">⚠ Registra la dirección de la empresa en tu perfil para calcular rutas correctamente.</div>
+            <?php endif; ?>
+          </div>
+          <?php if ($empLat && $empLng): ?>
+          <a href="https://maps.google.com/?q=<?= $empLat ?>,<?= $empLng ?>" target="_blank" rel="noopener"
+             style="font-size:.72rem;color:#4285F4;text-decoration:none;font-weight:600;white-space:nowrap">Maps ↗</a>
+          <?php elseif ($empDir): ?>
+          <a href="https://maps.google.com/?q=<?= urlencode($empDir) ?>" target="_blank" rel="noopener"
+             style="font-size:.72rem;color:#4285F4;text-decoration:none;font-weight:600;white-space:nowrap">Maps ↗</a>
+          <?php endif; ?>
+          <span style="font-size:.7rem;padding:3px 10px;border-radius:999px;background:#F3F4F6;color:#374151;font-weight:600;white-space:nowrap">Salida</span>
+        </div>
+      </div>
+
+      <?php foreach ($pedido['sucursales'] as $i => $ps):
+        $psEst = $ps['estado'] ?? 'pendiente';
+        $psChip = ['pendiente'=>['bg'=>'#FEF3C7','c'=>'#92400E','label'=>'Pendiente entrega'],
+                   'entregado'=>['bg'=>'#D1FAE5','c'=>'#065F46','label'=>'✓ Entregado'],
+                   'parcial'  =>['bg'=>'#DBEAFE','c'=>'#1E40AF','label'=>'Parcial'],
+                   'rechazado'=>['bg'=>'#FEE2E2','c'=>'#991B1B','label'=>'Rechazado']][$psEst]
+                  ?? ['bg'=>'#F3F4F6','c'=>'#6B7280','label'=>$psEst];
+      ?>
+      <div style="padding:14px 16px;border-bottom:1px solid #F9FAFB">
+        <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;flex-wrap:wrap">
+          <div style="flex-shrink:0;width:24px;height:24px;border-radius:50%;background:var(--color-primary);color:#fff;font-size:.75rem;font-weight:700;display:flex;align-items:center;justify-content:center">
+            <?= $i+1 ?>
+          </div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:.9rem;font-weight:700;color:#111827"><?= htmlspecialchars($ps['sucursal_nombre']) ?></div>
+            <div style="font-size:.78rem;color:#6B7280">📍 <?= htmlspecialchars($ps['direccion']) ?></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span style="font-size:.72rem;padding:3px 10px;border-radius:999px;background:<?= $psChip['bg'] ?>;color:<?= $psChip['c'] ?>;font-weight:600">
+              <?= $psChip['label'] ?>
+            </span>
+            <?php if (!empty($ps['lat']) && !empty($ps['lng'])): ?>
+            <a href="https://maps.google.com/?q=<?= (float)$ps['lat'] ?>,<?= (float)$ps['lng'] ?>" target="_blank" rel="noopener"
+               style="font-size:.72rem;color:#4285F4;text-decoration:none;font-weight:600">Maps ↗</a>
+            <?php endif; ?>
+          </div>
+        </div>
+
+        <?php if (!empty($ps['items'])): ?>
+        <div style="margin-left:34px;margin-bottom:8px">
+          <div style="font-size:.72rem;font-weight:700;color:#6B7280;margin-bottom:4px">PRODUCTOS ASIGNADOS</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px">
+            <?php foreach ($ps['items'] as $psi): ?>
+            <span style="background:#F3F4F6;border-radius:6px;padding:4px 10px;font-size:.78rem;color:#374151">
+              <?= htmlspecialchars($psi['producto_nombre']) ?>
+              <span style="font-weight:700"> <?= number_format($psi['cantidad'], 2) ?> <?= htmlspecialchars($psi['presentacion']) ?></span>
+              <span style="color:#9CA3AF"> · $<?= number_format($psi['subtotal'], 2) ?></span>
+            </span>
+            <?php endforeach; ?>
+          </div>
+        </div>
+        <?php endif; ?>
+
+        <div style="margin-left:34px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span style="font-size:.78rem;color:#6B7280">Costo envío esta parada:</span>
+          <?php if (($ps['costo_envio_sucursal'] ?? 0) > 0): ?>
+          <span style="font-size:.85rem;font-weight:700;color:#374151">$<?= number_format($ps['costo_envio_sucursal'], 2) ?></span>
+          <?php else: ?>
+          <span style="font-size:.78rem;color:#9CA3AF;font-style:italic">Sin asignar</span>
+          <?php endif; ?>
+        </div>
+      </div>
+      <?php endforeach; ?>
+
+      <!-- Google Maps embed -->
+      <?php if ($embedUrl): ?>
+      <div style="border-top:1px solid #F3F4F6">
+        <iframe src="<?= htmlspecialchars($embedUrl) ?>" width="100%" height="260"
+                style="border:0;display:block" allowfullscreen loading="lazy"
+                referrerpolicy="no-referrer-when-downgrade"></iframe>
+      </div>
+      <?php elseif ($mapsUrl): ?>
+      <div style="padding:10px 16px;background:#F9FAFB;text-align:center">
+        <a href="<?= htmlspecialchars($mapsUrl) ?>" target="_blank" rel="noopener"
+           style="font-size:.8rem;color:#4285F4;font-weight:600">Ver ruta completa en Google Maps →</a>
+      </div>
+      <?php endif; ?>
+
+    </div>
+    <?php endif; ?>
   </div>
 
   <!-- Panel lateral -->
@@ -485,7 +786,20 @@ $cancelado = $pedido['estado'] === 'cancelado';
       </div>
       <?php endforeach; ?>
 
-      <?php if (!empty($pedido['direccion_entrega']) && ($pedido['tipo_entrega'] ?? '') === 'repartidor'): ?>
+      <?php if (!empty($pedido['sucursales']) && ($pedido['tipo_entrega'] ?? '') === 'repartidor'): ?>
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid #F3F4F6">
+        <div style="font-size:.75rem;font-weight:700;color:#6B7280;margin-bottom:6px">PARADAS DE ENTREGA (<?= count($pedido['sucursales']) ?>)</div>
+        <?php foreach ($pedido['sucursales'] as $i => $ps): ?>
+        <div style="display:flex;gap:6px;margin-bottom:6px;align-items:flex-start">
+          <div style="flex-shrink:0;width:18px;height:18px;border-radius:50%;background:var(--color-primary);color:#fff;font-size:.6rem;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:2px"><?= $i+1 ?></div>
+          <div>
+            <div style="font-size:.83rem;font-weight:700;color:#374151"><?= htmlspecialchars($ps['sucursal_nombre']) ?></div>
+            <div style="font-size:.75rem;color:#6B7280"><?= htmlspecialchars($ps['direccion']) ?></div>
+          </div>
+        </div>
+        <?php endforeach; ?>
+      </div>
+      <?php elseif (!empty($pedido['direccion_entrega']) && ($pedido['tipo_entrega'] ?? '') === 'repartidor'): ?>
       <div style="margin-top:10px;padding-top:10px;border-top:1px solid #F3F4F6">
         <div style="font-size:.75rem;font-weight:700;color:#6B7280;margin-bottom:3px">DIRECCIÓN DE ENTREGA</div>
         <div style="font-size:.83rem;color:#374151"><?= htmlspecialchars($pedido['direccion_entrega']) ?></div>

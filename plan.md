@@ -1,5 +1,5 @@
-# CarniHub — Plan v2.7.0
-**Versión:** 2.7.0 | **Fecha:** 2026-05-06 | **Stack:** PHP 8.3 · MySQL · Tailwind CDN · MVC sin framework
+# CarniHub — Plan v2.9.4
+**Versión:** 2.9.4 | **Fecha:** 2026-05-07 | **Stack:** PHP 8.3 · MySQL · Tailwind CDN · MVC sin framework
 
 ---
 
@@ -865,11 +865,199 @@ Modal "Entrada rápida IA" en /empresa-inventario
 - [x] Fix Chart.js final: `unpkg.com` tampoco servía el archivo → Chart.js descargado localmente a `public/js/chart.min.js`, script tag usa `BASE_URL` (served from 'self', sin CSP)
 - [x] Fix redirect post-login: supervisor aterrizaba en `empresa/dashboard`; `BaseController::redirectSegunRol()` ahora tiene caso dedicado `supervisor → supervisor/dashboard`
 
-### Sprint 4C-3 — Portal Comprador funcional 🔄 SIGUIENTE
-- [ ] `CompradorController::inicio()` — bienvenida + últimos pedidos + acceso rápido al catálogo
-  - [ ] Vista `comprador/inicio.php`
-- [ ] Verificar flujo completo: inicio → catálogo (con precios especiales si aplica) → carrito → confirmar pedido
-- [ ] Verificar que límites de compra bloquean correctamente cuando están activos
+### Sprint 4C-3 — Portal Comprador + Sucursales Multi-Destino + Google Maps ✅ COMPLETADO (rama 4C-3)
+> El portal del comprador ya estaba funcional. Este sprint agrega sucursales propias del comprador, Google Maps para ubicación, checkout multi-parada y simplifica los métodos de pago.
+
+**Implementado:**
+- [x] `migrations/012_sucursales_comprador.sql` — ADD comprador_id a sucursales, CREATE pedido_sucursal_detalle, seed demo
+- [x] `SucursalModel` — getByComprador, getByEmpresa, contarPorComprador, crear, actualizar, toggleActivo, perteneceAComprador
+- [x] `CompradorSucursalController` — CRUD con límite de plan (Básico 3 / Pro 10 / Empresa ilimitado)
+- [x] `comprador/sucursales/index.php` — cards con mapa embed, barra de uso del plan (X/Y)
+- [x] `comprador/sucursales/form.php` — Google Maps Places Autocomplete + pin arrastrable
+- [x] Sidebar comprador: "Mis sucursales" con badge "X/Y"
+- [x] `index.php` — ruta `comprador-sucursal → CompradorSucursalController`
+- [x] `paso3.php` — **picker multi-parada**: botón "+ Añadir sucursal" con dropdown, previene duplicados, botón "× quitar", numeración de paradas; validación al enviar (mínimo 1 parada)
+- [x] `paso3.php` — "+ Otra dirección" (solo 1, manual con Autocomplete Google Maps)
+- [x] `paso3.php` — costo de envío visible "La empresa lo asigna" (se fija al aprobar el pedido)
+- [x] `paso3.php` — métodos de pago: solo `transferencia` y `efectivo`
+- [x] `paso3.php` — **tabla de distribución por sucursal**: productos × sucursales con kg asignables, indicador "Restante" en tiempo real (verde=0, naranja>0, rojo<0), input editable en celda, preserva valores al agregar/quitar paradas; sólo visible con tipo_entrega=repartidor y al menos 1 parada
+- [x] `paso3.php` — inputs distribución con `form="form-pedido"` (fuera del `<form>`, columna izquierda) + inyección PHP→JS de CART_ITEMS y SUCURSALES_MAP
+- [x] `CarritoController::confirmar()` — acepta `sucursales_ids[]` (array multi-parada), pasa a `PedidoModel::crear()`, dirección del pedido = primera parada
+- [x] `CarritoController::confirmar()` — llama `guardarDistribucion($pedidoId, $_POST['dist'])` si hay paradas y distribución
+- [x] `PedidoModel::guardarDistribucion()` — inserta en `pedido_sucursal_detalle` usando `precio_unit` de `pedido_detalle` (respeta precio mayorista calculado sobre total del pedido)
+- [x] `perfil.php` — Google Maps Autocomplete + mapa interactivo para guardar lat/lng
+- [x] `comprador/sucursales/index.php` — Maps embed URL `place` (muestra pin), botón "Maps ↗" flotante sobre iframe, fallback por dirección si no hay coords
+
+**Pendiente de producción:**
+- [ ] Correr `migrations/012_sucursales_comprador.sql` en BD de producción
+- [ ] Configurar Google Maps API key (ver instrucciones abajo)
+- [ ] Verificar flujo: catálogo → carrito → checkout multi-parada → confirmar → admin ve pedido_sucursal
+
+**Modelo de negocio implementado:**
+```
+Comprador "Taquería El Buen Sabor"
+    ├── Cocina Central  (lat/lng guardado)
+    ├── Sucursal Centro (lat/lng guardado)
+    └── Sucursal Norte  (lat/lng guardado)
+
+Al hacer pedido → tipo_entrega = repartidor:
+  → Picker multi-parada: + Añadir sucursal (sin duplicados)
+  → Repartidor hace 1 ruta con N paradas, pago único
+  → pedido_sucursal: 1 registro por parada seleccionada
+```
+
+**Google Maps — Setup completo:**
+```
+1. Ir a console.cloud.google.com
+2. Menú → APIs & Services → Library
+   - Buscar y habilitar: "Maps JavaScript API"
+   - Buscar y habilitar: "Places API"
+3. APIs & Services → Credentials → + Create Credentials → API Key
+4. Editar la key → HTTP referrers → añadir:
+   - https://tudominio.com/*
+   - http://localhost/*   (para pruebas locales)
+5. Copiar la key
+6. En CarniHub: iniciar sesión como superadmin
+   → /config/apis → campo "Google Maps API Key" → Guardar
+   (se guarda en global_settings como google_maps_key)
+7. Verificar: ir a /comprador-sucursal/nueva → debe aparecer el buscador de dirección
+```
+> cPanel no afecta esto: Google Maps es client-side (un script JS en el navegador).
+> Sin key configurada, el sistema funciona igual pero sin autocomplete/mapa (campos de texto normales).
+
+**GPS / Tracking del repartidor — Decisión de arquitectura:**
+```
+OPCIÓN A: Firebase Realtime Database (recomendada para MVP)
+  - Repartidor usa el navegador del celular: envía {lat, lng} cada N segundos via JS/fetch
+  - Comprador ve posición en tiempo real con Google Maps JS polling a Firebase
+  - No requiere hardware especial, funciona en cualquier smartphone
+  - Firebase gratuito hasta ~50k ops/día (más que suficiente para MVP)
+
+OPCIÓN B: Traccar (para GPS hardware físico — futuro)
+  - Dispositivo GPS (GL300, Concox, etc.) con SIM card
+  - El GPS envía NMEA packets al servidor Traccar por TCP
+  - Traccar server: self-hosted (VPS dedicado recomendado, no cPanel)
+  - cPanel NO soporta Traccar (necesita Java + puertos TCP abiertos)
+  - API REST: GET /api/positions?deviceId=X → retorna última posición
+  - Bueno para flotas con hardware dedicado, no para app móvil del repartidor
+```
+> Decisión: usar Firebase para Sprint 4D (repartidor envía ubicación desde navegador).
+> Si la empresa ya tiene GPS hardware + Traccar → integrar en Sprint 4D+ con la REST API.
+> Implementación real del tracker va en Sprint 4D (ver más abajo).
+
+**GPS sin internet (respuesta definitiva):**
+```
+✅ GPS satelital (señal de posición)     → Funciona SIN internet (satélite directo)
+❌ Tiles del mapa (OpenStreetMap/Google) → Necesita internet (imágenes del mapa)
+❌ Firebase (sync tiempo real al admin)  → Necesita internet
+❌ tracking_posiciones (guardar en BD)   → Necesita internet
+❌ OSRM route/match (snapping a calles) → Necesita internet
+
+Para funcionar offline sin Traccar:
+  - La señal GPS llega, pero el mapa se ve en blanco (sin tiles)
+  - Firebase y la BD no reciben datos hasta que regrese la señal
+  - Opción futura: PWA con Service Worker para cachear tiles + IndexedDB
+    para encolar posiciones y sincronizar al reconectar (Sprint 4D+)
+  - Para MVP: el repartidor siempre está en zonas urbanas con cobertura → aceptable
+```
+
+#### Sprint 4C-3+ — Vista admin paradas + distribución validada ✅ COMPLETADO (2026-05-07)
+- [x] `detalle.php` — Panel "Paradas de entrega": lista todas las sucursales con estado (chip), productos asignados por parada, enlace Maps ↗ por parada, botón "Ver ruta en Maps" (multi-waypoint Google Maps)
+- [x] `detalle.php` — Admin: formulario inline para asignar `costo_envio_sucursal` por parada → actualiza `pedidos.costo_envio` automáticamente
+- [x] `detalle.php` — Sidebar comprador: en lugar de una dirección, lista todas las paradas numeradas (nombre + dirección)
+- [x] `detalle.php` — Sub-timeline de paradas bajo el stepper principal: muestra estado por sucursal (Pendiente/Entregado/Parcial) cuando hay multi-destino
+- [x] `EmpresaPedidoController::asignarCostoEnvio()` — acción POST para guardar costos por parada
+- [x] `PedidoModel::asignarCostosEnvioParadas()` — UPDATE pedido_sucursal + recalcula pedidos.total
+- [x] `PedidoModel::conDetalle()` — ahora también trae `items` (distribución por parada) de `pedido_sucursal_detalle`
+- [x] `paso3.php` — Validación distribución DURA: no negativos (clamp a 0), tope por celda, toast de advertencia al exceder, modal bloqueo si Restante ≠ 0
+- [x] `paso3.php` — Hint dinámico "✅ Distribución completa" cuando todo suma correcto
+
+#### Sprint 4C-3++ — UX checkout + admin + dirección empresa ✅ COMPLETADO (2026-05-07)
+- [x] `paso1.php` — Botones +/- junto al input de cantidad (incremento 0.5 kg)
+- [x] `paso1.php` — Alerta en cada fila: "Agrega X kg más → $Y/kg" cuando hay tramo mejor disponible
+- [x] `paso1.php` — Precio actualizado en tiempo real: tachado del precio base + precio en verde cuando aplica descuento
+- [x] `paso1.php` — Sección "Ahorro por volumen" en el ticket lateral cuando el precio es menor que base
+- [x] `paso1.php` — Panel de alertas globales bajo el ticket: una alerta por producto que tiene siguiente tramo accesible
+- [x] `empresa_index.php` — Modal "Revisar pedido": sección "Paradas de entrega" cargada vía AJAX (todas las paradas con estado)
+- [x] `empresa_index.php` — Botón "Ver ruta en Maps" en el modal con empresa como origen de la ruta
+- [x] `empresa_index.php` — Tabla de productos en modal ahora muestra precio tachado + descuento cuando hubo ajuste
+- [x] `detalle.php` — "Ver ruta en Maps" usa empresa como punto de origen (empresa.lat/lng → primera parada → ... → última)
+- [x] `EmpresaDashboardController::guardarDireccion()` — guarda `direccion_fiscal`, `lat`, `lng` en la tabla `empresas`
+- [x] `empresa/dashboard.php` — Botón "📍 Dirección de la empresa" abre modal con formulario de dirección + coordenadas
+- [x] `PedidoModel::getSucursalesPedido()` — nuevo método público para obtener paradas de un pedido
+- [x] `EmpresaPedidoController::itemsJson()` — ahora retorna `{items, sucursales}` en lugar de solo items
+- [x] `EmpresaPedidoController::index()` — pasa `$empresaInfo` a la vista para usar coords como origen en Maps
+
+#### Pendiente 4C-3+ — Marcar paradas individualmente (repartidor)
+- [ ] `RepartidorController::marcarEntregaSucursal()` — repartidor marca cada parada como entregada desde su portal
+- [ ] `EmpresaPedidoController::marcarParadaEntregada()` — admin también puede marcar parada desde detalle
+
+#### Sprint 4C-3-GPS — Firebase Tracking GPS en Tiempo Real ✅ COMPLETADO (2026-05-07)
+> Repartidor envía posición GPS desde el navegador del celular. Admin empresa y comprador ven el mapa en tiempo real vía Firebase Realtime Database o polling AJAX como fallback. Incluye ruta OSRM, historial permanente de posiciones y corrección de todos los errores CSP/GPS.
+
+**Backend:**
+- [x] `migrations/004_pedido_historial.sql` — tabla `pedido_historial` para timeline de cambios de estado con timestamps y usuario_id
+- [x] `migrations/013_tracking_posiciones.sql` — tabla `tracking_posiciones` (pedido_id, lat, lng, ts) para historial GPS permanente; índice compuesto `(pedido_id, ts)`
+- [x] `PedidoModel::logEstado()` — registra cada cambio de estado (try/catch: graceful si tabla no existe en producción aún)
+- [x] `PedidoModel::getHistorial()` — retorna historial ordenado con nombre de usuario (try/catch para tabla inexistente)
+- [x] `RepartidorController::iniciarViaje()` — POST: cambia `en_preparacion → en_ruta`, redirige a `pedidoDirecto`
+- [x] `RepartidorController::pedidoDirecto()` — carga Firebase config desde `ConfigModel`, renderiza vista mobile
+- [x] `RepartidorController::confirmarEntregaDirecta()` — POST: sube foto evidencia → `subirFotoEntrega()` → estado `entregado`
+- [x] `RepartidorController::inicio()` — incluye `$pedidosDirectos` (via `repartidor_asignado_id`)
+- [x] `PedidoController::tracking()` — carga Firebase config; accesible para admin, supervisor y comprador de la misma empresa
+- [x] `ConfigController::apis()` — 5 campos Firebase en el formulario; usa `getAll()` para leer sin depender del campo `grupo` en BD
+- [x] `ApiController::guardarPosicion()` — POST `/api/guardarPosicion`: guarda lat/lng en `tracking_posiciones` (llamado cada 60 s desde el repartidor)
+- [x] `ApiController::historialTracking({id})` — GET `/api/historialTracking/{pedido_id}`: devuelve hasta 300 puntos para pre-cargar el trail en la vista de tracking
+- [x] `.htaccess` CSP: `connect-src *.gstatic.com *.firebaseio.com *.firebasedatabase.app wss://... router.project-osrm.org`; `script-src *.gstatic.com`
+- [x] `.htaccess`: `Permissions-Policy: geolocation=(self)` — permite GPS sin bloqueos del servidor
+
+**Frontend — Repartidor (`pedido_directo.php`):**
+- [x] App mobile-first: `max-width 480px` centrado, dark theme Navy (#111827), tarjetas con borde sutil
+- [x] Firebase ES module: `import { getDatabase, ref, set, onDisconnect }` desde `gstatic` CDN
+- [x] `navigator.geolocation.watchPosition()` → escribe `{lat, lng, accuracy, ts, llegado}` en `tracking/{pedidoId}` de Firebase
+- [x] `onDisconnect(trackRef).remove()` — limpieza automática si el repartidor cierra el browser
+- [x] Fallback sin Firebase: AJAX POST a `/api/actualizarTracking` por cada update GPS
+- [x] Historial DB: `_ultimaLat/_ultimaLng` actualizados en cada fix válido; `setInterval` 60 s → POST `/api/guardarPosicion` → `tracking_posiciones`
+- [x] Filtro de distancia (`_distM` Haversine, mínimo 10 m): descarta puntos GPS si el dispositivo no se movió lo suficiente — elimina jitter estacionario; aplica a Firebase y fallback AJAX
+- [x] Precisión visible: label GPS muestra "precisión: X m" en cada fix (útil para diagnosticar señal débil en vehículo o edificio)
+- [x] Mini-mapa Leaflet (azul): muestra posición propia (punto azul pulsante + ripple) + pin de destino (rojo) + trail de ruta
+- [x] "He llegado al destino" → `llegado: true` en Firebase → muestra formulario de foto
+- [x] Foto de entrega → POST a `repartidor/confirmarEntregaDirecta/{id}` → estado `entregado`
+
+**Frontend — Empresa/Comprador (`tracking.php`):**
+- [x] Marcador repartidor animado: punto rojo 52×52px con efecto ripple circular + pulsación CSS (`@keyframes ripple, pulse-dot`)
+- [x] Trail polyline rojo punteado: acumula posiciones → dibuja ruta recorrida en tiempo real
+- [x] Pre-carga historial: al cargar la página → `fetch(api/historialTracking/{id})` → seed del trail con todos los puntos guardados en `tracking_posiciones`; si no hay marcador live, lo crea en la última posición conocida y oculta el aviso "sin GPS"
+- [x] Ruta de conducción OSRM (polyline azul sólida): `fetch(router.project-osrm.org/route/v1/driving/...)` con throttle 30 s; `bringToBack()` para no tapar el trail rojo ni el marcador
+- [x] ETA dinámico desde OSRM: `data.routes[0].duration` (segundos → minutos) → actualiza `#etaDisplay` en tiempo real
+- [x] OSRM Map Matching trail (polyline roja): `fetch(router.project-osrm.org/match/v1/driving/...?tidy=true)` ajusta el recorrido a calles reales; se activa cada 5 puntos nuevos o cada 45 s; fallback a polyline cruda si OSRM no responde; muestreo a 100 puntos máx si hay más
+- [x] `id="sinTracking"` en aviso "sin GPS": oculto automáticamente en `actualizarPosicion()` y en el callback del historial — resuelve el bug donde `$hayTracking` (basado en BD) era `false` aunque Firebase ya tuviera datos live
+- [x] Filtro de distancia repartidor (`_distM`, Haversine): descarta puntos si el dispositivo no se movió > 10 m — elimina jitter GPS estacionario, reduce ruido en el trail
+- [x] Leyenda del mapa: azul = ruta al destino, rojo punteado = recorrido realizado
+- [x] `#posCount`: muestra cuántos puntos históricos se cargaron desde la BD
+- [x] `actualizarPosicion(lat, lng)` — función central que mueve marcador + extiende trail + panTo + oculta sinTracking + lanza OSRM
+- [x] Firebase `onValue` listener → actualiza en tiempo real (≤1 s de latencia)
+- [x] Polling AJAX cada 5 s como fallback cuando Firebase no configurado (activado solo si `estadoPedido === 'en_ruta'`)
+- [x] Indicador de estado de conexión (punto verde/amarillo + texto)
+- [x] Alerta "El repartidor ha llegado" cuando `llegado=true` en Firebase
+
+**UX Pedidos:**
+- [x] `detalle.php` — formulario "Asignar costo de envío por parada" solo visible hasta `en_preparacion`; se oculta automáticamente cuando el pedido pasa a `en_ruta` o posterior
+
+**Bugs corregidos:**
+- [x] `pedido_historial` tabla faltante en producción → `logEstado()` y `getHistorial()` envueltos en try/catch
+- [x] Firebase API fields no visibles tras guardar → `ConfigController::apis()` usaba `getGrupo('apis')` que retornaba vacío si la columna `grupo` era NULL; corregido usando `getAll()`
+- [x] GPS bloqueado por `Permissions-Policy: geolocation=()` del outer `.htaccess` (proyecto hermano en mismo servidor) → inner `.htaccess` usa `Header always set Permissions-Policy "geolocation=(self)"`
+- [x] Mapa tiles en gris: `img-src` faltaba `*.openstreetmap.org *.tile.openstreetmap.org`
+- [x] Firebase CDN bloqueado: `script-src` faltaba `www.gstatic.com *.gstatic.com`
+- [x] Aviso "sin GPS" persistente aunque Firebase recibía datos: corregido con `id="sinTracking"` + ocultación JS en primer fix recibido
+
+**Pendiente de producción:**
+- [ ] Ejecutar `migrations/004_pedido_historial.sql` en BD de producción para activar historial de estados
+- [ ] Ejecutar `migrations/013_tracking_posiciones.sql` en BD de producción para activar historial de posiciones GPS
+- [ ] Configurar Firebase en CarniHub superadmin → Config → APIs (5 campos: apiKey, authDomain, databaseURL, projectId, appId)
+- [ ] Reglas Firebase Realtime DB: `{ "rules": { "tracking": { ".read": true, ".write": true } } }`
+- [ ] URL Firebase DB: `https://carnihub-4e750-default-rtdb.firebaseio.com`
 
 ### Sprint 4C-4 — Detalle de producto + Descuentos en pedidos (pendiente)
 - [ ] **Página de detalle de producto** (`/catalogo/detalle/{id}` o modal expandido):
@@ -883,20 +1071,20 @@ Modal "Entrada rápida IA" en /empresa-inventario
   - [ ] `LimiteController` — supervisor configura máximos por comprador/producto/mes
   - [ ] `CarritoController::actualizar()` — validar límites antes de crear pedido; mostrar error descriptivo
 
-### Sprint 4D — Sucursales del Comprador (CRUD) + Vehículos
-> Las sucursales son los PUNTOS DE ENTREGA del comprador (no almacenes del productor).
+### Sprint 4D — Vehículos + Logística de Rutas Avanzada
+> Sucursales del comprador: implementadas en Sprint 4C-3. Aquí: gestión de flota y optimización de rutas.
 
-- [ ] `EmpresaSucursalController` — gestión de sucursales (puntos de entrega de compradores)
-  - [ ] index: listado de sucursales de todos los compradores de la empresa
-  - [ ] form: crear/editar con picker de coordenadas en mapa Leaflet
-  - [ ] toggle activo/inactivo
-  - [ ] Ruta: `empresa-sucursal/*`
-- [ ] `EmpresaVehiculoController` — vehículos y asignación a repartidores
-  - [ ] index: listado de vehículos con estado y repartidor asignado
-  - [ ] form: alta de vehículo (placa, modelo, capacidad)
-  - [ ] Asignación en tabla `repartidor_vehiculo`
-  - [ ] Ruta: `empresa-vehiculo/*`
-- [ ] Al crear repartidor: guardar datos de vehículo en `repartidor_vehiculo` + `vehiculos`
+- [ ] `EmpresaVehiculoController` — gestión de flota, rutas `empresa-vehiculo/*`:
+  - [ ] `index()` — listado de vehículos con estado (activo/inactivo) y repartidor asignado actual
+  - [ ] `nuevo()`, `guardar()`, `editar()`, `actualizar()` — placa, modelo, capacidad (kg)
+  - [ ] `asignar($vehiculoId)` — asignación en `repartidor_vehiculo`
+- [ ] `EmpresaLogisticaController` mejorado — creación de rutas del día:
+  - [ ] Seleccionar pedidos aprobados del día → asignar a repartidor + vehículo
+  - [ ] Orden de paradas drag & drop (si multi-sucursal: una parada por sucursal)
+  - [ ] Vista logística: mapa Google Maps con ruta dibujada (Directions API)
+- [ ] Al crear repartidor: opción de asignar vehículo desde el formulario (INSERT en `repartidor_vehiculo`)
+- [ ] `EmpresaSucursalController` — vista admin de TODAS las sucursales de la empresa (solo lectura para logística):
+  - [ ] Ruta `empresa-sucursal/*` — listado por comprador, con mapa de pines Google Maps
 
 ### Sprint 4D+ — Almacenes del Productor (futuro, no MVP)
 > Si el productor tiene múltiples bodegas/centros de distribución propios con stock independiente.
@@ -1069,4 +1257,4 @@ Todos se configuran desde `/config/apis` y `/config/correo` (solo visible para s
 
 ---
 
-*Última actualización: 2026-05-06 — v2.7.0 (dashboard-admin mergeado a main — catálogo empresa modernizado: cards hover, modales separados "Ver Precios" y "Agregar", imágenes reales Unsplash, animaciones CSS; EmpresaDashboardController con queries SQL completos de KPIs; fix definitivo BaseController::redirectSegunRol: supervisor → supervisor/dashboard, comprador → comprador/inicio, admin_empresa → empresa/dashboard — cada rol tiene su ruta dedicada)*
+*Última actualización: 2026-05-07 — v2.9.5 (GPS map matching OSRM, filtro distancia jitter, precisión en display, documentación GPS offline)*

@@ -202,7 +202,7 @@ function toggleVis(id) {
   </div>
 
   <!-- IoT — HikVision -->
-  <div style="background:#fff;border-radius:12px;border:1px solid #E5E7EB;padding:20px;margin-bottom:24px">
+  <div style="background:#fff;border-radius:12px;border:1px solid #E5E7EB;padding:20px;margin-bottom:16px">
     <h3 style="font-size:.85rem;font-weight:700;color:#111827;margin-bottom:14px">IoT — HikVision (Cámaras)</h3>
     <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:14px">
       <div>
@@ -229,7 +229,7 @@ function toggleVis(id) {
   </div>
 
   <!-- cPanel FTP Management -->
-  <div style="background:#fff;border-radius:12px;border:1px solid #E5E7EB;padding:20px;margin-bottom:24px">
+  <div style="background:#fff;border-radius:12px;border:1px solid #E5E7EB;padding:20px;margin-bottom:16px">
     <h3 style="font-size:.85rem;font-weight:700;color:#111827;margin-bottom:14px;display:flex;align-items:center;gap:8px">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
       cPanel FTP (Gestión automática de usuarios FTP)
@@ -276,6 +276,57 @@ function toggleVis(id) {
         <input type="number" name="cpanel_ftp_quota" value="<?= $s('cpanel_ftp_quota', '500') ?>"
                class="form-control" min="50" max="10000">
       </div>
+    </div>
+  </div>
+
+  <!-- Firebase Realtime Database -->
+  <div style="background:#fff;border-radius:12px;border:1px solid #E5E7EB;padding:20px;margin-bottom:24px">
+    <h3 style="font-size:.85rem;font-weight:700;color:#111827;margin-bottom:6px;display:flex;align-items:center;gap:8px">
+      🔥 Firebase Realtime Database (Tracking GPS)
+    </h3>
+    <p style="font-size:.75rem;color:#6B7280;margin-bottom:14px">
+      Usada para el tracking GPS en tiempo real del repartidor. Obtén las credenciales en
+      <strong>console.firebase.google.com</strong> → tu proyecto → Configuración → Web App.
+    </p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+      <div>
+        <label class="form-label">API Key</label>
+        <div style="display:flex">
+          <input type="password" id="firebase_api_key" name="firebase_api_key"
+                 value="<?= $s('firebase_api_key') ?>"
+                 class="form-control" style="border-radius:6px 0 0 6px;border-right:none;font-family:monospace;font-size:.82rem"
+                 placeholder="AIza...">
+          <button type="button" onclick="toggleVis('firebase_api_key')"
+                  style="padding:0 10px;border:1px solid #E5E7EB;border-left:none;border-radius:0 6px 6px 0;background:#F9FAFB;cursor:pointer;font-size:.8rem;color:#6B7280;white-space:nowrap">Ver</button>
+        </div>
+      </div>
+      <div>
+        <label class="form-label">Auth Domain</label>
+        <input type="text" name="firebase_auth_domain" value="<?= $s('firebase_auth_domain') ?>"
+               class="form-control" placeholder="tu-proyecto.firebaseapp.com">
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px">
+      <div>
+        <label class="form-label">Database URL</label>
+        <input type="text" name="firebase_database_url" value="<?= $s('firebase_database_url') ?>"
+               class="form-control" placeholder="https://tu-proyecto-default-rtdb.firebaseio.com">
+      </div>
+      <div>
+        <label class="form-label">Project ID</label>
+        <input type="text" name="firebase_project_id" value="<?= $s('firebase_project_id') ?>"
+               class="form-control" placeholder="tu-proyecto">
+      </div>
+      <div>
+        <label class="form-label">App ID</label>
+        <input type="text" name="firebase_app_id" value="<?= $s('firebase_app_id') ?>"
+               class="form-control" placeholder="1:123...:web:abc...">
+      </div>
+    </div>
+    <div style="margin-top:12px;padding:10px 14px;background:#FEF3C7;border-radius:8px;font-size:.75rem;color:#92400E">
+      <strong>Reglas Firebase recomendadas</strong> (Realtime DB → Reglas):<br>
+      <code style="font-family:monospace">{ "rules": { "tracking": { ".read": true, ".write": true } } }</code><br>
+      En producción limita escritura solo desde tu dominio con reglas más estrictas.
     </div>
   </div>
 

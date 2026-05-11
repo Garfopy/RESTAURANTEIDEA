@@ -46,6 +46,16 @@ class CarritoController extends BaseController
         $db = Database::getInstance();
         $categorias = $db->query('SELECT * FROM categorias WHERE activo = 1 ORDER BY nombre')->fetchAll();
 
+        // Cargar límites activos para mostrarlos en la vista
+        $stmtLim = $db->prepare(
+            'SELECT producto_id, limite_kg, limite_monto, periodo FROM limites_compra WHERE empresa_id=? AND activo=1 AND producto_id IS NOT NULL'
+        );
+        $stmtLim->execute([$empresaId]);
+        $limitePorProducto = [];
+        foreach ($stmtLim->fetchAll() as $lim) {
+            $limitePorProducto[(int)$lim['producto_id']] = $lim;
+        }
+
         $compradorId = $this->usuarioId();
         $combos      = $this->comboModel->getCombosParaComprador($compradorId, $empresaId);
 
@@ -112,6 +122,26 @@ class CarritoController extends BaseController
             $this->redirect('carrito/index');
         }
 
+        // Validar límites de compra por pedido
+        $db2 = Database::getInstance();
+        $stmtLimUpd = $db2->prepare(
+            "SELECT limite_kg, limite_monto, periodo FROM limites_compra WHERE empresa_id=? AND producto_id=? AND activo=1 AND periodo='por_pedido' LIMIT 1"
+        );
+        $erroresLimite = [];
+        foreach ($items as $item) {
+            $stmtLimUpd->execute([$empresaId, $item['producto_id']]);
+            $lim = $stmtLimUpd->fetch();
+            if ($lim) {
+                if ($lim['limite_kg'] && $item['cantidad'] > (float)$lim['limite_kg']) {
+                    $erroresLimite[] = "{$item['nombre']}: máx. {$lim['limite_kg']} kg por pedido (solicitado: {$item['cantidad']})";
+                }
+            }
+        }
+        if (!empty($erroresLimite)) {
+            $this->flash('error', 'Límite superado — ' . implode(' | ', $erroresLimite));
+            $this->redirect('carrito/index');
+        }
+
         $_SESSION['carrito']['items'] = $items;
         unset($_SESSION['carrito']['meta']);
 
@@ -175,7 +205,7 @@ class CarritoController extends BaseController
         if (!in_array($tipoEntrega, ['pickup', 'repartidor'], true)) {
             $tipoEntrega = 'pickup';
         }
-        if (!in_array($metodoPago, ['transferencia', 'tarjeta', 'credito'], true)) {
+        if (!in_array($metodoPago, ['transferencia', 'efectivo'], true)) {
             $metodoPago = 'transferencia';
         }
 
@@ -187,6 +217,7 @@ class CarritoController extends BaseController
         $compradorId = $this->usuarioId();
 
         // Revalidar precios con precios especiales aplicados
+        $sucursalModel = new SucursalModel();
         $itemsDB = [];
         foreach ($items as $prodId => $item) {
             $precio = $this->productoModel->getPrecioFinal($compradorId, (int)$prodId, $item['cantidad']);
@@ -209,16 +240,50 @@ class CarritoController extends BaseController
             'notas'               => $notas ?: null,
         ];
 
+        // IDs de sucursales multi-parada (0, 1 o varias)
+        $sucursalesIds = [];
+
         if ($tipoEntrega === 'repartidor') {
             $comprador = $this->usuarioModel->find($compradorId);
-            $pedidoData['direccion_entrega']  = trim($this->post('direccion_entrega', '')) ?: ($comprador['direccion_entrega'] ?? null);
-            $pedidoData['referencia_entrega'] = trim($this->post('referencia_entrega', '')) ?: ($comprador['referencia_entrega'] ?? null);
-            $pedidoData['lat_entrega']        = $comprador['lat_entrega'] ?? null;
-            $pedidoData['lng_entrega']        = $comprador['lng_entrega'] ?? null;
+
+            // Recoger array del picker multi-parada
+            $rawIds = $_POST['sucursales_ids'] ?? [];
+            if (is_array($rawIds)) {
+                foreach ($rawIds as $sid) {
+                    $sid = (int)$sid;
+                    if ($sid > 0 && $sucursalModel->perteneceAComprador($sid, $compradorId)) {
+                        $sucursalesIds[] = $sid;
+                    }
+                }
+            }
+
+            if (!empty($sucursalesIds)) {
+                // Dirección del pedido = primera parada
+                $primera = $sucursalModel->find($sucursalesIds[0]);
+                if ($primera) {
+                    $pedidoData['direccion_entrega']  = $primera['direccion'];
+                    $pedidoData['lat_entrega']        = $primera['lat'] ?? null;
+                    $pedidoData['lng_entrega']        = $primera['lng'] ?? null;
+                    $pedidoData['referencia_entrega'] = null;
+                }
+            } else {
+                // Dirección manual o del perfil (sin sucursales / "Otra dirección")
+                $pedidoData['direccion_entrega']  = trim($this->post('direccion_entrega', '')) ?: ($comprador['direccion_entrega'] ?? null);
+                $pedidoData['referencia_entrega'] = trim($this->post('referencia_entrega', '')) ?: ($comprador['referencia_entrega'] ?? null);
+                $pedidoData['lat_entrega']        = $this->post('lat_entrega') ?: ($comprador['lat_entrega'] ?? null);
+                $pedidoData['lng_entrega']        = $this->post('lng_entrega') ?: ($comprador['lng_entrega'] ?? null);
+            }
         }
 
         try {
-            $pedidoId = $this->pedidoModel->crear($pedidoData, $itemsDB);
+            $pedidoId = $this->pedidoModel->crear($pedidoData, $itemsDB, $sucursalesIds);
+
+            // Guardar distribución de kg por producto × sucursal
+            $distData = $_POST['dist'] ?? [];
+            if (!empty($distData) && !empty($sucursalesIds)) {
+                $this->pedidoModel->guardarDistribucion($pedidoId, $distData);
+            }
+
             $pedido   = $this->pedidoModel->find($pedidoId);
 
             $this->log('crear_pedido', 'carrito', "Pedido {$pedido['folio']} creado");
@@ -290,6 +355,17 @@ class CarritoController extends BaseController
         if ($stockDisponible !== null && $totalSolicitado > $stockDisponible) {
             $disponible = max(0, $stockDisponible - $carritoActual);
             echo json_encode(['ok' => false, 'msg' => "Stock insuficiente. Disponible: " . number_format($stockDisponible, 0) . " (ya tienes " . number_format($carritoActual, 0) . " en el carrito)"]);
+            return;
+        }
+
+        // Validar límite de compra (por pedido)
+        $stmtLimAgr = Database::getInstance()->prepare(
+            "SELECT limite_kg, limite_monto, periodo FROM limites_compra WHERE empresa_id=? AND producto_id=? AND activo=1 AND periodo='por_pedido' LIMIT 1"
+        );
+        $stmtLimAgr->execute([$empresaId, $productoId]);
+        $limiteAgr = $stmtLimAgr->fetch();
+        if ($limiteAgr && $limiteAgr['limite_kg'] && $totalSolicitado > (float)$limiteAgr['limite_kg']) {
+            echo json_encode(['ok' => false, 'msg' => "🔒 Límite superado: máximo {$limiteAgr['limite_kg']} {$producto['presentacion']} de {$producto['nombre']} por pedido."]);
             return;
         }
 

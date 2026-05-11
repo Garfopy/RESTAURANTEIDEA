@@ -71,6 +71,38 @@ class EmpresaDashboardController extends BaseController
         require ROOT_PATH . '/app/views/empresa/layouts/main.php';
     }
 
+    // Guardar dirección/ubicación de la empresa (para Maps)
+    public function guardarDireccion(?string $p = null): void
+    {
+        if (!$this->isPost()) {
+            $this->redirect('empresa/dashboard');
+        }
+        $this->requireAdminEmpresa();
+        $empresaId       = $this->empresaId();
+        $direccion       = trim($this->post('direccion_fiscal', ''));
+        $lat             = $this->post('lat', '');
+        $lng             = $this->post('lng', '');
+
+        $db   = Database::getInstance();
+        $stmt = $db->prepare(
+            'UPDATE empresas SET direccion_fiscal = ?, lat = ?, lng = ? WHERE id = ?'
+        );
+        $stmt->execute([
+            $direccion ?: null,
+            is_numeric($lat) ? (float)$lat : null,
+            is_numeric($lng) ? (float)$lng : null,
+            $empresaId,
+        ]);
+
+        // Refrescar sesión
+        $empresaModel = new EmpresaModel();
+        $_SESSION['empresa'] = $empresaModel->find($empresaId);
+
+        $this->log('Actualizar dirección empresa', 'empresa', "Dirección: $direccion");
+        $this->flash('success', 'Dirección de la empresa actualizada.');
+        $this->redirect('empresa/dashboard');
+    }
+
     private function obtenerDatosGraficas(int $empresaId): array
     {
         $db = Database::getInstance();

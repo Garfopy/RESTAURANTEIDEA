@@ -1,5 +1,11 @@
 <?php
 $baseUrl = BASE_URL;
+// Empresa origin for Maps route
+$empresaLat  = $empresaInfo['lat']  ?? null;
+$empresaLng  = $empresaInfo['lng']  ?? null;
+$empresaDir  = $empresaInfo['direccion_fiscal'] ?? '';
+$empresaNombre = $empresaInfo['razon_social'] ?? 'Empresa';
+$gmKey       = $gmKey ?? '';
 $estados = [
     'pendiente'      => ['label'=>'Pendiente',       'bg'=>'#FEF3C7','tx'=>'#92400E','dot'=>'#F59E0B'],
     'confirmado'     => ['label'=>'Confirmado',       'bg'=>'#DBEAFE','tx'=>'#1E40AF','dot'=>'#3B82F6'],
@@ -166,13 +172,11 @@ $estados = [
 <?php endif; ?>
 
 <?php if (!empty($countConComprobante) && $countConComprobante > 0): ?>
-<div class="alert-banner" style="background:#ECFDF5;border:1px solid #A7F3D0">
-  <div class="alert-banner-icon" style="background:#D1FAE5">
-    <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#059669" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
-  </div>
+<div style="margin-bottom:16px;padding:12px 16px;background:#DBEAFE;border:1px solid #93C5FD;border-radius:10px;display:flex;align-items:center;gap:10px">
+  <span style="font-size:1.1rem">💳</span>
   <div>
-    <strong style="font-size:.875rem;color:#065F46"><?= $countConComprobante ?> pedido<?= $countConComprobante > 1 ? 's' : '' ?> con comprobante adjunto</strong>
-    <div style="font-size:.78rem;color:#047857;margin-top:2px">Revisa el comprobante en el detalle del pedido y procesa la entrega.</div>
+    <strong style="color:#1E40AF"><?= $countConComprobante ?> pedido(s) con comprobante de pago — pendiente de validación</strong>
+    <span style="font-size:.8rem;color:#1D4ED8;display:block">Haz clic en <strong>💳 Ver comprobante →</strong> para revisar la imagen y confirmar el pago.</span>
   </div>
 </div>
 <?php endif; ?>
@@ -291,15 +295,10 @@ $estados = [
             </button>
 
             <?php elseif ($tieneComprobante && in_array($p['estado'], ['confirmado','en_preparacion'], true)): ?>
-            <form method="POST" action="<?= $baseUrl ?>empresa-pedido/cambiarEstado" style="display:inline"
-                  onsubmit="return confirm('¿Confirmar el comprobante y continuar con la entrega?')">
-              <input type="hidden" name="pedido_id" value="<?= $p['id'] ?>">
-              <input type="hidden" name="estado" value="en_ruta">
-              <button type="submit" class="btn-action" style="background:#DBEAFE;color:#1D4ED8;border:1px solid #BFDBFE">
-                <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                Confirmar pago
-              </button>
-            </form>
+            <a href="<?= $baseUrl ?>pedido/detalle/<?= $p['id'] ?>"
+               style="padding:5px 10px;border:1px solid #2563EB;border-radius:6px;color:#fff;background:#2563EB;font-size:.72rem;font-weight:700;text-decoration:none;display:inline-block">
+              💳 Ver comprobante →
+            </a>
 
             <?php elseif (!$tieneComprobante && $p['estado'] === 'confirmado'): ?>
             <span style="font-size:.68rem;color:#9CA3AF;font-style:italic;white-space:nowrap">Esperando comprobante...</span>
@@ -403,7 +402,19 @@ $estados = [
       <div id="revProdTotal" style="display:none;text-align:right;font-size:.95rem;font-weight:800;color:#C8102E;margin-top:8px;padding-top:8px;border-top:2px solid #E5E7EB"></div>
     </div>
 
-    <!-- Ajuste precios -->
+    <!-- Paradas de entrega (AJAX) -->
+    <div id="revParadasBox" style="display:none;margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="font-size:.85rem;font-weight:700;color:#111827">📍 Paradas de entrega</div>
+        <a id="revMapsBtn" href="#" target="_blank" rel="noopener"
+           style="display:none;padding:6px 12px;background:#4285F4;color:#fff;border-radius:6px;font-size:.75rem;font-weight:700;text-decoration:none">
+          🗺 Ver ruta en Maps
+        </a>
+      </div>
+      <div id="revParadasLista"></div>
+    </div>
+
+    <!-- Ajuste de precios (AJAX) -->
     <div id="preciosSection" style="display:none;margin-bottom:14px">
       <div style="font-size:.82rem;font-weight:700;color:#374151;margin-bottom:8px">
         Ajuste de precios <span style="font-size:.72rem;color:#9CA3AF;font-weight:400">— solo puedes bajar precios</span>
@@ -415,10 +426,10 @@ $estados = [
 
     <!-- Repartidor -->
     <div id="revAsignRepartidor" style="display:none;margin-bottom:14px">
-      <div style="font-size:.84rem;font-weight:700;color:#111827;margin-bottom:10px">Asignar entrega</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div style="font-size:.85rem;font-weight:700;color:#374151;margin-bottom:8px">Asignar entrega</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px">
         <div>
-          <label style="display:block;font-size:.78rem;font-weight:600;color:#374151;margin-bottom:5px">Repartidor asignado</label>
+          <label style="display:block;font-size:.8rem;font-weight:600;color:#374151;margin-bottom:4px">Repartidor asignado <span style="color:#DC2626">*</span></label>
           <select id="revRepartidorSelect"
                   style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:.85rem;font-family:inherit;background:#fff;color:#111827">
             <option value="">— Sin asignar aún —</option>
@@ -428,11 +439,24 @@ $estados = [
           </select>
         </div>
         <div>
-          <label style="display:block;font-size:.78rem;font-weight:600;color:#374151;margin-bottom:5px">Costo de envío ($)</label>
-          <input type="number" id="revCostoEnvioInput" min="0" step="0.01" value="0"
-                 style="width:100%;padding:9px 12px;border:1.5px solid #E5E7EB;border-radius:8px;font-size:.85rem;font-family:inherit;box-sizing:border-box">
-          <div style="font-size:.7rem;color:#9CA3AF;margin-top:3px">0 si está incluido en el precio.</div>
+          <label style="display:block;font-size:.8rem;font-weight:600;color:#374151;margin-bottom:4px">Costo de envío ($) <span style="color:#DC2626">*</span></label>
+          <div style="display:flex;gap:6px">
+            <input type="number" id="revCostoEnvioInput" min="0" step="0.01" value="0"
+                   style="flex:1;padding:9px 12px;border:1px solid #D1D5DB;border-radius:8px;font-size:.85rem;box-sizing:border-box">
+            <button type="button" id="btnCalcularEnvio" onclick="calcularEnvioPorMapeo()"
+                    style="padding:9px 10px;background:#4285F4;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:.72rem;font-weight:700;white-space:nowrap">
+              🗺 Calcular
+            </button>
+          </div>
+          <div id="revCostoEnvioHint" style="font-size:.72rem;color:#9CA3AF;margin-top:2px">0 si está incluido en el precio.</div>
         </div>
+      </div>
+      <div id="revCalcStatus" style="display:none;font-size:.78rem;padding:8px 12px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:7px;color:#1E40AF;margin-bottom:6px"></div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span style="font-size:.75rem;color:#6B7280">Tarifa por km: $</span>
+        <input type="number" id="revTarifaKm" min="0.5" step="0.5" value="2.50"
+               style="width:70px;padding:5px 8px;border:1px solid #D1D5DB;border-radius:6px;font-size:.82rem;text-align:right">
+        <span style="font-size:.75rem;color:#9CA3AF">MXN/km (editable)</span>
       </div>
     </div>
 
@@ -452,10 +476,9 @@ $estados = [
       <input type="hidden" name="repartidor_asignado_id" id="hRepartidorId">
       <input type="hidden" name="costo_envio" id="hCostoEnvio">
       <input type="hidden" name="nota_empresa" id="hNotaEmpresa">
-      <button type="submit" onclick="sincronizarEntrega()"
-              style="width:100%;padding:12px;background:linear-gradient(135deg,#059669,#047857);color:#fff;border:none;border-radius:9px;font-weight:700;cursor:pointer;font-size:.9rem;font-family:inherit;letter-spacing:.01em;display:flex;align-items:center;justify-content:center;gap:7px">
-        <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-        Aprobar pedido
+      <button type="submit" onclick="return sincronizarEntrega()"
+              style="width:100%;padding:11px;background:#059669;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:.9rem">
+        ✓ Aprobar pedido
       </button>
     </form>
 
@@ -508,8 +531,14 @@ $estados = [
 </div>
 
 <script>
-const BASE_URL = '<?= $baseUrl ?>';
+const BASE_URL  = '<?= $baseUrl ?>';
+const GM_KEY    = '<?= addslashes($gmKey) ?>';
+const EMP_LAT   = <?= json_encode($empresaLat) ?>;
+const EMP_LNG   = <?= json_encode($empresaLng) ?>;
+const EMP_DIR   = <?= json_encode($empresaDir) ?>;
+const EMP_NOMBRE = <?= json_encode($empresaNombre) ?>;
 let _revData = null;
+let _revSucursales = [];
 
 function abrirRevision(data) {
   _revData = data;
@@ -558,6 +587,7 @@ function abrirRevision(data) {
     document.getElementById('revDireccionBox').style.display = 'none';
   }
 
+  // Notas del comprador
   if (data.notas) {
     document.getElementById('revNotasBox').style.display = 'block';
     document.getElementById('revNotasDisplay').textContent = data.notas;
@@ -567,11 +597,11 @@ function abrirRevision(data) {
 
   const guia = document.getElementById('revGuiaAdmin');
   if (data.tipo_entrega === 'pickup') {
-    guia.style.cssText = 'margin-bottom:14px;padding:12px 14px;border-radius:9px;font-size:.84rem;background:#F0FDF4;border:1px solid #A7F3D0;color:#065F46';
-    guia.innerHTML = '<strong>¿Qué sigue?</strong> El comprador eligió <strong>recoger en bodega</strong>. Revisa los productos, ajusta precios si es necesario, y aprueba el pedido.';
+    guia.style.cssText = 'margin-bottom:14px;padding:12px 14px;border-radius:10px;font-size:.85rem;background:#F0FDF4;border:1px solid #A7F3D0;color:#065F46';
+    guia.innerHTML = '<strong>¿Qué sigue?</strong> El comprador elegió <strong>recoger en bodega</strong>. Revisa los productos (puedes ajustar precios a la baja), agrega una nota si es necesario, y aprueba el pedido. El comprador recibirá la confirmación y podrá subir su comprobante de pago.';
   } else if (data.tipo_entrega === 'repartidor') {
-    guia.style.cssText = 'margin-bottom:14px;padding:12px 14px;border-radius:9px;font-size:.84rem;background:#EFF6FF;border:1px solid #BFDBFE;color:#1E40AF';
-    guia.innerHTML = '<strong>¿Qué sigue?</strong> El comprador eligió <strong>envío a domicilio</strong>. Asigna un repartidor y define el costo de envío, luego aprueba el pedido.';
+    guia.style.cssText = 'margin-bottom:14px;padding:12px 14px;border-radius:10px;font-size:.85rem;background:#EFF6FF;border:1px solid #BFDBFE;color:#1E40AF';
+    guia.innerHTML = '<strong>¿Qué sigue?</strong> El comprador eligió <strong>envío a domicilio</strong>. <em>Debes asignar un repartidor y definir el costo de envío</em> (usa el botón 🗺 Calcular o ingrésalo manualmente) para poder aprobar el pedido.';
   } else {
     guia.style.cssText = 'margin-bottom:14px;padding:12px 14px;border-radius:9px;font-size:.84rem;background:#F9FAFB;border:1px solid #E5E7EB;color:#374151';
     guia.innerHTML = '<strong>¿Qué sigue?</strong> Revisa los productos, ajusta precios si es necesario, y aprueba o rechaza el pedido.';
@@ -580,6 +610,7 @@ function abrirRevision(data) {
   document.getElementById('revAsignRepartidor').style.display = data.tipo_entrega === 'repartidor' ? 'block' : 'none';
   document.getElementById('hTipoEntrega').value = data.tipo_entrega || '';
   document.getElementById('revNotaEmpresaInput').value = '';
+  document.getElementById('revCalcStatus').style.display = 'none';
   const repSel = document.getElementById('revRepartidorSelect');
   if (repSel) repSel.value = '';
   const costoInp = document.getElementById('revCostoEnvioInput');
@@ -603,55 +634,192 @@ function abrirRevision(data) {
 
   fetch(BASE_URL + 'empresa-pedido/itemsJson/' + data.id)
     .then(r => r.json())
-    .then(items => {
+    .then(resp => {
       loading.style.display = 'none';
-      if (!items || items.length === 0) return;
+      const items      = resp.items      || resp || [];
+      const sucursales = resp.sucursales || [];
+      _revSucursales   = sucursales;
 
-      let html = '<table style="width:100%;border-collapse:collapse;font-size:.83rem">';
-      html += '<thead><tr style="background:#F9FAFB;border-bottom:1px solid #F3F4F6">' +
-        '<th style="padding:8px 12px;text-align:left;color:#6B7280;font-weight:600;font-size:.65rem;text-transform:uppercase">Producto</th>' +
-        '<th style="padding:8px 12px;text-align:center;color:#6B7280;font-weight:600;font-size:.65rem;text-transform:uppercase">Cant.</th>' +
-        '<th style="padding:8px 12px;text-align:right;color:#6B7280;font-weight:600;font-size:.65rem;text-transform:uppercase">P. unit.</th>' +
-        '<th style="padding:8px 12px;text-align:right;color:#6B7280;font-weight:600;font-size:.65rem;text-transform:uppercase">Subtotal</th>' +
-        '</tr></thead><tbody>';
-      let subtotal = 0;
-      items.forEach(item => {
-        subtotal += parseFloat(item.subtotal);
-        html += `<tr style="border-top:1px solid #F9FAFB">
-          <td style="padding:8px 12px;font-weight:600;color:#111827">${item.producto_nombre}
-            <div style="font-size:.7rem;color:#9CA3AF;font-weight:400">${item.presentacion}</div>
-          </td>
-          <td style="padding:8px 12px;text-align:center;color:#374151">${parseFloat(item.cantidad).toFixed(2)}</td>
-          <td style="padding:8px 12px;text-align:right;color:#374151">$${parseFloat(item.precio_unit).toFixed(2)}</td>
-          <td style="padding:8px 12px;text-align:right;font-weight:700;color:#111827">$${parseFloat(item.subtotal).toFixed(2)}</td>
-        </tr>`;
-      });
-      html += '</tbody></table>';
-      tabla.innerHTML = html;
-      tabla.style.display = 'block';
-      totalEl.textContent = 'TOTAL: $' + subtotal.toFixed(2);
-      totalEl.style.display = 'block';
+      if (items.length > 0) {
+        let html = '<table style="width:100%;border-collapse:collapse;font-size:.83rem">';
+        html += '<thead><tr style="background:#F9FAFB">' +
+          '<th style="padding:7px 10px;text-align:left;color:#6B7280;font-weight:600">Producto</th>' +
+          '<th style="padding:7px 10px;text-align:center;color:#6B7280;font-weight:600">Cant.</th>' +
+          '<th style="padding:7px 10px;text-align:right;color:#6B7280;font-weight:600">P. unit.</th>' +
+          '<th style="padding:7px 10px;text-align:right;color:#6B7280;font-weight:600">Subtotal</th>' +
+          '</tr></thead><tbody>';
+        let subtotal = 0;
+        items.forEach(item => {
+          subtotal += parseFloat(item.subtotal);
+          const descuento = item.precio_original && parseFloat(item.precio_original) > parseFloat(item.precio_unit)
+            ? ` <span style="text-decoration:line-through;color:#9CA3AF;font-size:.7rem">$${parseFloat(item.precio_original).toFixed(2)}</span>` : '';
+          html += `<tr style="border-top:1px solid #F3F4F6">
+            <td style="padding:7px 10px;font-weight:600;color:#111827">${item.producto_nombre}
+              <div style="font-size:.72rem;color:#9CA3AF;font-weight:400">${item.presentacion}</div>
+            </td>
+            <td style="padding:7px 10px;text-align:center;color:#374151">${parseFloat(item.cantidad).toFixed(2)}</td>
+            <td style="padding:7px 10px;text-align:right;color:#374151">${descuento} $${parseFloat(item.precio_unit).toFixed(2)}</td>
+            <td style="padding:7px 10px;text-align:right;font-weight:700;color:#111827">$${parseFloat(item.subtotal).toFixed(2)}</td>
+          </tr>`;
+        });
+        html += '</tbody></table>';
+        tabla.innerHTML = html;
+        tabla.style.display = 'block';
+        totalEl.textContent = 'TOTAL: $' + subtotal.toFixed(2);
+        totalEl.style.display = 'block';
 
-      precSec.style.display = 'block';
-      items.forEach(item => {
-        const row = document.createElement('div');
-        row.style.cssText = 'display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:10px 12px;border-bottom:1px solid #F9FAFB';
-        row.innerHTML = `
-          <div>
-            <div style="font-weight:600;color:#111827;font-size:.85rem">${item.producto_nombre}</div>
-            <div style="font-size:.73rem;color:#9CA3AF">${item.cantidad} ${item.presentacion} × $${parseFloat(item.precio_unit).toFixed(2)}</div>
-          </div>
-          <div style="display:flex;align-items:center;gap:6px">
-            <span style="font-size:.7rem;color:#9CA3AF">Nuevo precio:</span>
-            <input type="number" name="ajustes[${item.id}]" form="formAprobar"
-                   min="0.01" max="${item.precio_unit}" step="0.01"
-                   placeholder="${parseFloat(item.precio_unit).toFixed(2)}"
-                   style="width:88px;padding:5px 8px;border:1.5px solid #E5E7EB;border-radius:7px;font-size:.85rem;text-align:right;font-family:inherit">
-          </div>`;
-        itemsCont.appendChild(row);
-      });
+        precSec.style.display = 'block';
+        items.forEach(item => {
+          const row = document.createElement('div');
+          row.style.cssText = 'display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:8px;border-bottom:1px solid #F3F4F6';
+          row.innerHTML = `
+            <div>
+              <div style="font-weight:600;color:#111827">${item.producto_nombre}</div>
+              <div style="font-size:.75rem;color:#9CA3AF">${item.cantidad} ${item.presentacion} × $${parseFloat(item.precio_unit).toFixed(2)} = $${parseFloat(item.subtotal).toFixed(2)}</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="font-size:.72rem;color:#9CA3AF">Nuevo precio:</span>
+              <input type="number" name="ajustes[${item.id}]" form="formAprobar"
+                     min="0.01" max="${item.precio_unit}" step="0.01"
+                     placeholder="${parseFloat(item.precio_unit).toFixed(2)}"
+                     style="width:90px;padding:5px 8px;border:1px solid #D1D5DB;border-radius:6px;font-size:.85rem;text-align:right">
+            </div>`;
+          itemsCont.appendChild(row);
+        });
+      }
+
+      // Paradas de entrega
+      renderizarParadas(sucursales, data);
     })
     .catch(() => { loading.style.display = 'none'; });
+}
+
+function renderizarParadas(sucursales, data) {
+  const paradasBox  = document.getElementById('revParadasBox');
+  const paradasList = document.getElementById('revParadasLista');
+  const mapsBtn     = document.getElementById('revMapsBtn');
+
+  if (sucursales.length > 0 && data.tipo_entrega === 'repartidor') {
+    paradasBox.style.display = 'block';
+
+    const estadoChip = {
+      pendiente: 'background:#FEF3C7;color:#92400E',
+      entregado: 'background:#D1FAE5;color:#065F46',
+      parcial:   'background:#DBEAFE;color:#1E40AF',
+      rechazado: 'background:#FEE2E2;color:#991B1B',
+    };
+
+    // Construir URL de Google Maps (empresa → paradas)
+    const origin = EMP_LAT && EMP_LNG
+      ? EMP_LAT + ',' + EMP_LNG
+      : (EMP_DIR ? encodeURIComponent(EMP_DIR) : '');
+    const waypts = sucursales.slice(0, -1).map(s =>
+      s.lat && s.lng ? s.lat + ',' + s.lng : encodeURIComponent(s.direccion)
+    );
+    const last = sucursales[sucursales.length - 1];
+    const dest = last.lat && last.lng ? last.lat + ',' + last.lng : encodeURIComponent(last.direccion);
+
+    if (origin && dest) {
+      let url = 'https://www.google.com/maps/dir/' + origin;
+      waypts.forEach(w => { url += '/' + w; });
+      url += '/' + dest;
+      mapsBtn.href = url;
+      mapsBtn.style.display = 'inline-flex';
+    } else {
+      mapsBtn.style.display = 'none';
+    }
+
+    // Renderizar paradas con origen primero
+    let phml = '';
+
+    // Parada 0: Origen (empresa)
+    const empAddr = EMP_DIR || 'Sin dirección registrada';
+    const empMapsLink = EMP_LAT && EMP_LNG
+      ? `https://maps.google.com/?q=${EMP_LAT},${EMP_LNG}`
+      : (EMP_DIR ? `https://maps.google.com/?q=${encodeURIComponent(EMP_DIR)}` : '');
+    phml += `<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid #F3F4F6">
+      <div style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:#374151;color:#fff;font-size:.6rem;font-weight:700;display:flex;align-items:center;justify-content:center">O</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:700;font-size:.85rem;color:#111827">Origen: ${EMP_NOMBRE}</div>
+        <div style="font-size:.75rem;color:#6B7280">📍 ${empAddr}</div>
+      </div>
+      ${empMapsLink ? `<a href="${empMapsLink}" target="_blank" style="font-size:.7rem;color:#4285F4;text-decoration:none;font-weight:600;white-space:nowrap">Maps ↗</a>` : ''}
+      <span style="font-size:.7rem;padding:2px 8px;border-radius:999px;background:#F3F4F6;color:#374151;font-weight:600;white-space:nowrap">Salida</span>
+    </div>`;
+
+    // Paradas de entrega
+    sucursales.forEach((s, i) => {
+      const chip = estadoChip[s.estado] || 'background:#F3F4F6;color:#6B7280';
+      const sMapsLink = s.lat && s.lng ? `https://maps.google.com/?q=${s.lat},${s.lng}` : '';
+      phml += `<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid #F3F4F6">
+        <div style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:var(--color-primary);color:#fff;font-size:.7rem;font-weight:700;display:flex;align-items:center;justify-content:center">${i+1}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:.85rem;color:#111827">${s.sucursal_nombre}</div>
+          <div style="font-size:.75rem;color:#6B7280">📍 ${s.direccion || '—'}</div>
+        </div>
+        ${sMapsLink ? `<a href="${sMapsLink}" target="_blank" style="font-size:.7rem;color:#4285F4;text-decoration:none;font-weight:600">Maps ↗</a>` : ''}
+        <span style="font-size:.7rem;padding:2px 8px;border-radius:999px;font-weight:600;${chip}">${s.estado || 'pendiente'}</span>
+      </div>`;
+    });
+
+    // Google Maps embed iframe
+    if (origin && dest && GM_KEY) {
+      const wayptStr = waypts.join('|');
+      const embedUrl = `https://www.google.com/maps/embed/v1/directions?key=${GM_KEY}&origin=${origin}&destination=${dest}${wayptStr ? '&waypoints=' + wayptStr : ''}&mode=driving&language=es`;
+      phml += `<div style="margin-top:10px;border-radius:8px;overflow:hidden;border:1px solid #E5E7EB">
+        <iframe src="${embedUrl}" width="100%" height="220" style="border:0;display:block" allowfullscreen loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+      </div>`;
+    }
+
+    paradasList.innerHTML = phml;
+  } else {
+    paradasBox.style.display = 'none';
+    mapsBtn.style.display = 'none';
+  }
+}
+
+function calcularEnvioPorMapeo() {
+  if (!EMP_DIR && !(EMP_LAT && EMP_LNG)) {
+    alert('La empresa no tiene dirección registrada. Ve a Perfil de empresa y agrega la dirección con Google Maps.');
+    return;
+  }
+  if (_revSucursales.length === 0) {
+    alert('No hay paradas de entrega para calcular la ruta.');
+    return;
+  }
+
+  const statusEl = document.getElementById('revCalcStatus');
+  statusEl.style.display = 'block';
+  statusEl.textContent = '⏳ Calculando distancia de la ruta...';
+
+  // Haversine para distancia en línea recta entre dos coords
+  function haversine(lat1, lng1, lat2, lng2) {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat/2)**2 + Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) * Math.sin(dLng/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  }
+
+  const puntos = [{ lat: parseFloat(EMP_LAT) || 0, lng: parseFloat(EMP_LNG) || 0 }];
+  _revSucursales.forEach(s => { if (s.lat && s.lng) puntos.push({ lat: parseFloat(s.lat), lng: parseFloat(s.lng) }); });
+
+  if (puntos.length < 2) {
+    statusEl.textContent = '⚠️ Faltan coordenadas GPS en las paradas. Abre Google Maps para ver la ruta y calcula el costo manualmente.';
+    return;
+  }
+
+  let distTotal = 0;
+  for (let i = 0; i < puntos.length - 1; i++) {
+    distTotal += haversine(puntos[i].lat, puntos[i].lng, puntos[i+1].lat, puntos[i+1].lng);
+  }
+  // Factor de corrección por carretera ~1.35
+  const distRuta = distTotal * 1.35;
+  const tarifa   = parseFloat(document.getElementById('revTarifaKm').value) || 2.50;
+  const costo    = Math.ceil(distRuta * tarifa);
+
+  document.getElementById('revCostoEnvioInput').value = costo.toFixed(2);
+  statusEl.innerHTML = `✅ Distancia estimada: <strong>${distRuta.toFixed(1)} km</strong> (${puntos.length-1} parada${puntos.length>2?'s':''}) · Costo calculado: <strong>$${costo.toFixed(2)}</strong> a $${tarifa}/km. Puedes ajustar manualmente.`;
 }
 
 function abrirSubirFoto(id) {
@@ -660,12 +828,27 @@ function abrirSubirFoto(id) {
 }
 
 function sincronizarEntrega() {
-  document.getElementById('hTipoEntrega').value  = (_revData && _revData.tipo_entrega) ? _revData.tipo_entrega : '';
+  const tipoEntrega = (_revData && _revData.tipo_entrega) ? _revData.tipo_entrega : '';
+  if (tipoEntrega === 'repartidor') {
+    const rep   = document.getElementById('revRepartidorSelect').value;
+    const costo = parseFloat(document.getElementById('revCostoEnvioInput').value || 0);
+    if (!rep) {
+      alert('⚠️ Debes asignar un repartidor para pedidos con envío a domicilio antes de aprobar.');
+      return false;
+    }
+    if (costo <= 0) {
+      if (!confirm('El costo de envío es $0.00. ¿Está incluido en el precio del producto? Si es correcto, haz clic en Aceptar para continuar.')) {
+        return false;
+      }
+    }
+  }
+  document.getElementById('hTipoEntrega').value  = tipoEntrega;
   const repSel   = document.getElementById('revRepartidorSelect');
   const costoInp = document.getElementById('revCostoEnvioInput');
   document.getElementById('hRepartidorId').value = repSel   ? repSel.value   : '';
   document.getElementById('hCostoEnvio').value   = costoInp ? costoInp.value : '0';
   document.getElementById('hNotaEmpresa').value  = document.getElementById('revNotaEmpresaInput').value;
+  return true;
 }
 
 ['modalRevision','modalFotoEntrega'].forEach(id => {

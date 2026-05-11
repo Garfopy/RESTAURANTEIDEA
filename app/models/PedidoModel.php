@@ -56,6 +56,45 @@ class PedidoModel extends BaseModel
         }
     }
 
+    public function guardarDistribucion(int $pedidoId, array $distPost): void
+    {
+        // $distPost = ['prod_id' => ['suc_id' => cantidad, ...], ...]
+        if (empty($distPost)) return;
+
+        $psRows = $this->query(
+            'SELECT id, sucursal_id FROM pedido_sucursal WHERE pedido_id = ?', [$pedidoId]
+        );
+        $psMap = [];
+        foreach ($psRows as $r) { $psMap[(int)$r['sucursal_id']] = (int)$r['id']; }
+        if (empty($psMap)) return;
+
+        $pdRows = $this->query(
+            'SELECT id, producto_id, precio_unit FROM pedido_detalle WHERE pedido_id = ?', [$pedidoId]
+        );
+        $pdMap = [];
+        foreach ($pdRows as $r) { $pdMap[(int)$r['producto_id']] = ['id' => (int)$r['id'], 'precio' => (float)$r['precio_unit']]; }
+
+        foreach ($distPost as $prodId => $sucDist) {
+            $prodId = (int)$prodId;
+            if (!isset($pdMap[$prodId])) continue;
+            $pdId  = $pdMap[$prodId]['id'];
+            $precio = $pdMap[$prodId]['precio'];
+
+            foreach ($sucDist as $sucId => $cantidad) {
+                $sucId   = (int)$sucId;
+                $cantidad = (float)str_replace(',', '.', $cantidad);
+                if ($cantidad <= 0 || !isset($psMap[$sucId])) continue;
+
+                $this->execute(
+                    'INSERT INTO pedido_sucursal_detalle
+                       (pedido_sucursal_id, pedido_detalle_id, producto_id, cantidad, precio_unit, subtotal)
+                     VALUES (?, ?, ?, ?, ?, ?)',
+                    [$psMap[$sucId], $pdId, $prodId, $cantidad, $precio, round($precio * $cantidad, 2)]
+                );
+            }
+        }
+    }
+
     public function asignarEntrega(int $id, string $tipo, ?int $repartidorId, float $costoEnvio, string $notaEmpresa = ''): void
     {
         $this->execute(
@@ -104,6 +143,7 @@ class PedidoModel extends BaseModel
                   WHERE id = ?",
                 [$aprobadoPorId, $nuevoSubtotal, $nuevoSubtotal, $id]
             );
+            $this->logEstado($id, 'confirmado');
 
             $this->db->commit();
         } catch (\Throwable $e) {
@@ -118,12 +158,14 @@ class PedidoModel extends BaseModel
             "UPDATE pedidos SET estado = 'cancelado', nota_empresa = ? WHERE id = ?",
             [$nota ?: null, $id]
         );
+        $this->logEstado($id, 'cancelado');
     }
 
     public function subirComprobante(int $id, string $path): void
     {
+        // Solo guarda la ruta; el admin valida manualmente → en_preparacion
         $this->execute(
-            "UPDATE pedidos SET foto_comprobante_path = ?, estado = 'en_preparacion' WHERE id = ?",
+            "UPDATE pedidos SET foto_comprobante_path = ? WHERE id = ? AND estado = 'confirmado'",
             [$path, $id]
         );
     }
@@ -134,6 +176,7 @@ class PedidoModel extends BaseModel
             "UPDATE pedidos SET foto_entrega_path = ?, estado = 'entregado' WHERE id = ?",
             [$path, $id]
         );
+        $this->logEstado($id, 'entregado');
     }
 
     public function listadoEmpresa(int $empresaId, array $filtros = [], int $page = 1): array
@@ -209,7 +252,7 @@ class PedidoModel extends BaseModel
     public function countConComprobantePendiente(int $empresaId): int
     {
         $row = $this->queryOne(
-            "SELECT COUNT(*) AS n FROM pedidos WHERE empresa_id = ? AND estado = 'en_preparacion' AND foto_comprobante_path IS NOT NULL",
+            "SELECT COUNT(*) AS n FROM pedidos WHERE empresa_id = ? AND estado = 'confirmado' AND foto_comprobante_path IS NOT NULL",
             [$empresaId]
         );
         return (int)($row['n'] ?? 0);
@@ -274,35 +317,54 @@ class PedidoModel extends BaseModel
         );
 
         $pedido['sucursales'] = $this->query(
-            'SELECT ps.*, s.nombre AS sucursal_nombre, s.direccion
+            'SELECT ps.*, s.nombre AS sucursal_nombre, s.direccion, s.lat, s.lng
                FROM pedido_sucursal ps
                JOIN sucursales s ON s.id = ps.sucursal_id
-              WHERE ps.pedido_id = ?',
+              WHERE ps.pedido_id = ?
+              ORDER BY ps.id ASC',
             [$id]
         );
+
+        // Distribución de productos por parada
+        foreach ($pedido['sucursales'] as &$ps) {
+            $ps['items'] = $this->query(
+                'SELECT psd.cantidad, psd.precio_unit, psd.subtotal,
+                        pr.nombre AS producto_nombre, pr.presentacion
+                   FROM pedido_sucursal_detalle psd
+                   JOIN productos pr ON pr.id = psd.producto_id
+                  WHERE psd.pedido_sucursal_id = ?
+                  ORDER BY pr.nombre',
+                [$ps['id']]
+            );
+        }
+        unset($ps);
 
         return $pedido;
     }
 
     public function aprobar(int $id, int $aprobadoPor): bool
     {
-        return $this->execute(
+        $ok = $this->execute(
             "UPDATE pedidos
                 SET estado = 'confirmado', aprobado_por = ?, aprobado_at = NOW()
               WHERE id = ? AND estado = 'pendiente' AND requiere_aprobacion = 1",
             [$aprobadoPor, $id]
         );
+        if ($ok) $this->logEstado($id, 'confirmado');
+        return $ok;
     }
 
     public function rechazar(int $id, int $rechazadoPor, string $motivo): bool
     {
-        return $this->execute(
+        $ok = $this->execute(
             "UPDATE pedidos
                 SET estado = 'cancelado', aprobado_por = ?, aprobado_at = NOW(),
                     notas = CONCAT(COALESCE(notas,''), IF(notas IS NULL OR notas='','','\n'), 'Rechazado: ', ?)
               WHERE id = ? AND estado = 'pendiente'",
             [$rechazadoPor, $motivo, $id]
         );
+        if ($ok) $this->logEstado($id, 'cancelado');
+        return $ok;
     }
 
     public function getTrackingActivo(int $pedidoId): ?array
@@ -339,6 +401,19 @@ class PedidoModel extends BaseModel
                JOIN productos pr ON pr.id = pd.producto_id
               WHERE pd.pedido_id = ?
            ORDER BY pr.nombre',
+            [$pedidoId]
+        );
+    }
+
+    public function getSucursalesPedido(int $pedidoId): array
+    {
+        return $this->query(
+            'SELECT ps.id, ps.estado, ps.foto_entrega_path, ps.fecha_llegada,
+                    s.nombre AS sucursal_nombre, s.direccion, s.lat, s.lng
+               FROM pedido_sucursal ps
+               JOIN sucursales s ON s.id = ps.sucursal_id
+              WHERE ps.pedido_id = ?
+              ORDER BY ps.id ASC',
             [$pedidoId]
         );
     }
@@ -413,10 +488,39 @@ class PedidoModel extends BaseModel
         $validos = ['pendiente', 'confirmado', 'en_preparacion', 'en_ruta', 'entregado', 'cancelado'];
         if (!in_array($estado, $validos, true)) return false;
 
-        return $this->execute(
-            'UPDATE pedidos SET estado = ? WHERE id = ?',
-            [$estado, $id]
-        );
+        $ok = $this->execute('UPDATE pedidos SET estado = ? WHERE id = ?', [$estado, $id]);
+        if ($ok) $this->logEstado($id, $estado);
+        return $ok;
+    }
+
+    private function logEstado(int $pedidoId, string $estado): void
+    {
+        try {
+            $usuarioId = $_SESSION['usuario']['id'] ?? null;
+            $this->execute(
+                'INSERT INTO pedido_historial (pedido_id, estado, usuario_id) VALUES (?, ?, ?)',
+                [$pedidoId, $estado, $usuarioId]
+            );
+        } catch (\Throwable $e) {
+            // tabla aún no migrada — no bloquear la operación principal
+        }
+    }
+
+    public function getHistorial(int $id): array
+    {
+        try {
+            return $this->query(
+                "SELECT ph.estado, ph.created_at,
+                        CONCAT(COALESCE(u.nombre,''), ' ', COALESCE(u.apellido_paterno,'')) AS usuario_nombre
+                   FROM pedido_historial ph
+                   LEFT JOIN usuarios u ON u.id = ph.usuario_id
+                  WHERE ph.pedido_id = ?
+                  ORDER BY ph.created_at ASC",
+                [$id]
+            );
+        } catch (\Throwable $e) {
+            return [];
+        }
     }
 
     public function listadoConfirmadosPorEmpresa(int $empresaId): array
@@ -617,6 +721,62 @@ class PedidoModel extends BaseModel
               ORDER BY p.created_at DESC
               LIMIT $limite",
             [$empresaId]
+        );
+    }
+
+    // ── Entrega por sucursal (flujo multi-parada directo) ─────────────────────
+
+    public function confirmarSucursalEntrega(int $pedidoSucursalId, string $fotoPath): void
+    {
+        $this->execute(
+            "UPDATE pedido_sucursal
+                SET estado = 'entregado', foto_entrega_path = ?, fecha_llegada = NOW()
+              WHERE id = ?",
+            [$fotoPath, $pedidoSucursalId]
+        );
+    }
+
+    public function allSucursalesEntregadas(int $pedidoId): bool
+    {
+        $db   = Database::getInstance();
+        $stmt = $db->prepare(
+            "SELECT COUNT(*) FROM pedido_sucursal WHERE pedido_id = ? AND estado != 'entregado'"
+        );
+        $stmt->execute([$pedidoId]);
+        return (int)$stmt->fetchColumn() === 0;
+    }
+
+    public function saveRutaPolyline(int $pedidoId, string $polylineJson): void
+    {
+        $db = Database::getInstance();
+        $db->prepare(
+            "UPDATE pedidos
+                SET ruta_polyline = ?, ruta_finalizada_at = NOW(), estado = 'entregado'
+              WHERE id = ?"
+        )->execute([$polylineJson, $pedidoId]);
+
+        $db->prepare('DELETE FROM tracking_posiciones WHERE pedido_id = ?')
+           ->execute([$pedidoId]);
+
+        $this->logEstado($pedidoId, 'entregado');
+    }
+
+    public function asignarCostosEnvioParadas(int $pedidoId, array $envios): void
+    {
+        if (empty($envios)) return;
+        $totalEnvio = 0.0;
+        foreach ($envios as $psId => $costo) {
+            $psId   = (int)$psId;
+            $costo  = round(max(0.0, (float)$costo), 2);
+            $this->execute(
+                'UPDATE pedido_sucursal SET costo_envio_sucursal = ? WHERE id = ? AND pedido_id = ?',
+                [$costo, $psId, $pedidoId]
+            );
+            $totalEnvio += $costo;
+        }
+        $this->execute(
+            'UPDATE pedidos SET costo_envio = ?, total = subtotal + ? WHERE id = ?',
+            [$totalEnvio, $totalEnvio, $pedidoId]
         );
     }
 }

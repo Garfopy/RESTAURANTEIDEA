@@ -72,6 +72,8 @@ class ConfigController extends BaseController
                 'paypal_client_id', 'paypal_secret', 'paypal_mode',
                 'shelly_api_url', 'shelly_auth_key',
                 'hikvision_host', 'hikvision_user', 'hikvision_pass',
+                'firebase_api_key', 'firebase_auth_domain',
+                'firebase_database_url', 'firebase_project_id', 'firebase_app_id',
             ];
             foreach ($campos as $c) {
                 $this->cfg->set($c, trim($this->post($c, '')));
@@ -82,14 +84,7 @@ class ConfigController extends BaseController
             $this->redirect('config/apis');
         }
 
-        $settings = array_merge(
-            $this->asClave($this->cfg->getGrupo('apis')),
-            $this->asClave($this->cfg->getGrupo('notificaciones')),
-            $this->asClave($this->cfg->getGrupo('gps')),
-            $this->asClave($this->cfg->getGrupo('facturacion')),
-            $this->asClave($this->cfg->getGrupo('pagos')),
-            $this->asClave($this->cfg->getGrupo('iot'))
-        );
+        $settings = $this->cfg->getAll();
         $flash      = $this->getFlash();
         $pageTitle  = 'Configuración — APIs y servicios';
         $activeMenu = 'config';

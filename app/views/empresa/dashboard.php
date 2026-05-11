@@ -90,6 +90,10 @@ function dismissFirstLoginBanner(userId) {
   <a href="<?= BASE_URL ?>empresa-sucursal/nuevo" style="padding:10px 20px;background:#F3F4F6;color:#374151;border-radius:8px;text-decoration:none;font-weight:600;font-size:.875rem">
     + Nueva sucursal
   </a>
+  <button onclick="document.getElementById('modalDireccion').style.display='flex'"
+          style="padding:10px 20px;background:#F3F4F6;color:#374151;border-radius:8px;font-weight:600;font-size:.875rem;border:1px solid #E5E7EB;cursor:pointer;font-family:inherit">
+    📍 Dirección de la empresa
+  </button>
 </div>
 <?php endif; ?>
 
@@ -673,4 +677,51 @@ new Chart(document.getElementById('chartMetodosPago'), {
   }
 })();
 </script>
+
+<!-- Modal: Dirección de la empresa (origen para rutas Maps) -->
+<div id="modalDireccion" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;align-items:center;justify-content:center"
+     onclick="if(event.target===this)this.style.display='none'">
+  <div style="background:#fff;border-radius:14px;padding:28px;width:520px;max-width:95vw">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+      <h3 style="font-size:1rem;font-weight:700;color:#111827;margin:0">📍 Dirección de la empresa</h3>
+      <button onclick="document.getElementById('modalDireccion').style.display='none'"
+              style="background:none;border:none;cursor:pointer;font-size:1.2rem;color:#9CA3AF">✕</button>
+    </div>
+    <p style="font-size:.82rem;color:#6B7280;margin-bottom:16px">
+      Esta dirección se usa como <strong>punto de origen</strong> en las rutas de Maps al ver los pedidos. Asegúrate de que sea tu bodega o domicilio fiscal correcto.
+    </p>
+    <form method="POST" action="<?= BASE_URL ?>empresa/guardarDireccion">
+      <div style="margin-bottom:14px">
+        <label style="display:block;font-size:.82rem;font-weight:600;color:#374151;margin-bottom:5px">Dirección</label>
+        <input type="text" name="direccion_fiscal"
+               value="<?= htmlspecialchars($_SESSION['empresa']['direccion_fiscal'] ?? '') ?>"
+               placeholder="Ej: Av. Industrial 234, Col. Centro, Guadalajara, Jalisco"
+               style="width:100%;padding:9px 12px;border:1px solid #D1D5DB;border-radius:8px;font-size:.875rem;box-sizing:border-box">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px">
+        <div>
+          <label style="display:block;font-size:.82rem;font-weight:600;color:#374151;margin-bottom:5px">Latitud (opcional)</label>
+          <input type="number" name="lat" step="0.0000001"
+                 value="<?= htmlspecialchars($_SESSION['empresa']['lat'] ?? '') ?>"
+                 placeholder="20.6597"
+                 style="width:100%;padding:9px 12px;border:1px solid #D1D5DB;border-radius:8px;font-size:.875rem;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="display:block;font-size:.82rem;font-weight:600;color:#374151;margin-bottom:5px">Longitud (opcional)</label>
+          <input type="number" name="lng" step="0.0000001"
+                 value="<?= htmlspecialchars($_SESSION['empresa']['lng'] ?? '') ?>"
+                 placeholder="-103.3496"
+                 style="width:100%;padding:9px 12px;border:1px solid #D1D5DB;border-radius:8px;font-size:.875rem;box-sizing:border-box">
+        </div>
+      </div>
+      <div style="font-size:.75rem;color:#9CA3AF;margin-bottom:16px">
+        💡 Obtén coordenadas exactas: Google Maps → clic derecho en tu dirección → copia los números.
+      </div>
+      <button type="submit"
+              style="width:100%;padding:11px;background:var(--color-primary);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:.9rem">
+        Guardar dirección
+      </button>
+    </form>
+  </div>
+</div>
 <?php endif; ?>

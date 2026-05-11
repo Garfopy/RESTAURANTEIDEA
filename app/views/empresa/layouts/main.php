@@ -354,6 +354,23 @@ $esComprador   = $rol === 'comprador';
       <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
       Pedidos recurrentes
     </a>
+
+    <div class="sidebar-section">Mis ubicaciones</div>
+    <?php
+    // Mostrar conteo de sucursales en sidebar
+    try {
+      $susModel  = new SucursalModel();
+      $susCount  = $susModel->contarPorComprador($_SESSION['usuario']['id'] ?? 0);
+      $susScript = new SuscripcionModel();
+      $susSub    = $susScript->getByEmpresa($_SESSION['usuario']['empresa_id'] ?? 0);
+      $susMax    = (int)($susSub['max_sucursales'] ?? 3);
+    } catch (\Throwable $e) { $susCount = 0; $susMax = 3; }
+    ?>
+    <a href="<?= BASE_URL ?>comprador-sucursal/index" class="<?= ($activeMenu??'')==='mis_sucursales'?'active':'' ?>">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+      Mis sucursales
+      <span style="margin-left:auto;font-size:.68rem;color:#9CA3AF"><?= $susCount ?>/<?= $susMax > 0 ? $susMax : '∞' ?></span>
+    </a>
     <?php endif; ?>
 
     <div class="sidebar-section">Cuenta</div>

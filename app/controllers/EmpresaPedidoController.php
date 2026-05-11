@@ -36,6 +36,12 @@ class EmpresaPedidoController extends BaseController
         $usuarioModel = new UsuarioModel();
         $repartidores = $usuarioModel->getByRolEmpresa('repartidor', $empresaId);
 
+        $empresaModel = new EmpresaModel();
+        $empresaInfo  = $empresaModel->find($empresaId);
+
+        $configModel  = new ConfigModel();
+        $gmKey        = $configModel->get('google_maps_key', '');
+
         $flash      = $this->getFlash();
         $pageTitle  = 'Pedidos';
         $activeMenu = 'pedidos';
@@ -57,7 +63,10 @@ class EmpresaPedidoController extends BaseController
             return;
         }
 
-        echo json_encode($this->pedidoModel->getItemsPedido($pedidoId));
+        echo json_encode([
+            'items'      => $this->pedidoModel->getItemsPedido($pedidoId),
+            'sucursales' => $this->pedidoModel->getSucursalesPedido($pedidoId),
+        ]);
     }
 
     // Cambiar estado de un pedido (modal rápido)
@@ -89,7 +98,7 @@ class EmpresaPedidoController extends BaseController
 
         $this->log('Cambiar estado pedido', 'pedidos', "Pedido $pedidoId → $estado. $nota");
         $this->flash('success', 'Estado del pedido actualizado.');
-        $this->redirect('empresa-pedido');
+        $this->redirect('pedido/detalle/' . $pedidoId);
     }
 
     // Asignar tipo de entrega + repartidor + costo envío
@@ -275,9 +284,26 @@ class EmpresaPedidoController extends BaseController
         $this->redirect('empresa-pedido');
     }
 
-    // Helper privado: procesa upload de foto de entrega
-    private function _procesarFotoEntrega(int $pedidoId): void
+    // Asignar costos de envío por parada (pedido multi-sucursal)
+    public function asignarCostoEnvio(?string $p = null): void
     {
+        if (!$this->isPost()) {
+            $this->redirect('empresa-pedido');
+        }
+        $pedidoId = (int)$this->post('pedido_id');
+        if ($pedidoId <= 0 || !$this->pedidoModel->verificarPertenece($pedidoId, $this->empresaId())) {
+            $this->flash('error', 'Pedido no encontrado.');
+            $this->redirect('empresa-pedido');
+        }
+        $envios = (array)($_POST['envio'] ?? []);
+        $this->pedidoModel->asignarCostosEnvioParadas($pedidoId, $envios);
+        $this->log('Asignar costo envío paradas', 'pedidos', "Pedido $pedidoId — " . json_encode($envios));
+        $this->flash('success', 'Costos de envío guardados.');
+        $this->redirect('pedido/detalle/' . $pedidoId);
+    }
+
+    // Helper privado: procesa upload de foto de entrega
+    private function _procesarFotoEntrega(int $pedidoId): void    {
         $dir     = $_SERVER['DOCUMENT_ROOT'] . '/public/uploads/evidencias/';
         $ext     = strtolower(pathinfo($_FILES['foto']['name'], PATHINFO_EXTENSION));
         $allowed = ['jpg', 'jpeg', 'png', 'webp'];
