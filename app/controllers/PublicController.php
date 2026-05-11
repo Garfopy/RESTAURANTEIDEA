@@ -26,7 +26,50 @@ class PublicController extends BaseController
         $susModel = new SuscripcionModel();
         $planes   = $susModel->getPlanesActivos();
 
-        require ROOT_PATH . '/app/views/public/landing.php';
+        require ROOT_PATH . '/app/views/public/landing_carnihub.php';
+    }
+
+    // GET /taqueria → landing audiencia taquerías
+    public function taqueria(?string $p = null): void
+    {
+        $config       = new ConfigModel();
+        $appName      = $config->get('app_name',     APP_NAME);
+        $appLogo      = $config->get('app_logo',      '');
+        $colorPrimary = $config->get('color_primary', '#C8102E');
+        $contactEmail = $config->get('smtp_user',     'contacto@carnihub.mx');
+
+        require ROOT_PATH . '/app/views/public/landing_taqueria.php';
+    }
+
+    // GET /restaurantes → landing audiencia restaurantes
+    public function restaurantes(?string $p = null): void
+    {
+        $config       = new ConfigModel();
+        $appName      = $config->get('app_name',     APP_NAME);
+        $appLogo      = $config->get('app_logo',      '');
+        $colorPrimary = $config->get('color_primary', '#C8102E');
+        $contactEmail = $config->get('smtp_user',     'contacto@carnihub.mx');
+
+        require ROOT_PATH . '/app/views/public/landing_restaurantes.php';
+    }
+
+    // GET /carnihub → hub CarniHub (selector de audiencia + planes)
+    public function carnihub(?string $p = null): void
+    {
+        if (isset($_SESSION['usuario'])) {
+            $this->redirectSegunRol($_SESSION['usuario']['rol_slug'] ?? '');
+        }
+
+        $config       = new ConfigModel();
+        $appName      = $config->get('app_name',     APP_NAME);
+        $appLogo      = $config->get('app_logo',      '');
+        $colorPrimary = $config->get('color_primary', '#C8102E');
+        $contactEmail = $config->get('smtp_user',     'contacto@carnihub.mx');
+
+        $susModel = new SuscripcionModel();
+        $planes   = $susModel->getPlanesActivos();
+
+        require ROOT_PATH . '/app/views/public/landing_carnihub.php';
     }
 
     // GET planes/index

@@ -131,6 +131,9 @@
     /* ── Navbar scroll ── */
     .navbar { transition: background .3s, box-shadow .3s; }
     .navbar.scrolled { background: rgba(255,255,255,.97) !important; box-shadow: 0 4px 24px rgba(0,0,0,.08); }
+    .navbar.scrolled a:not(.btn-primary) { color: #374151 !important; }
+    .navbar.scrolled a:not(.btn-primary):hover { color: #111827 !important; background: rgba(0,0,0,.04) !important; }
+    .navbar.scrolled span { color: #374151 !important; }
 
     /* ── Shimmer en botón CTA ── */
     .btn-shimmer { position:relative; overflow:hidden; }
@@ -161,6 +164,46 @@
     /* ── Scroll indicator ── */
     @keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(8px)} }
     .scroll-arrow { animation: bounce 1.5s ease-in-out infinite; }
+
+    /* ── Audience cards (selector de público) ── */
+    .audience-card {
+      display: block;
+      text-decoration: none;
+      border: 1px solid #e2e8f0;
+      background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+      transition: transform .25s cubic-bezier(.34,1.56,.64,1), box-shadow .25s, border-color .25s;
+    }
+    .audience-card:hover {
+      transform: translateY(-8px);
+      border-color: color-mix(in srgb, var(--cp) 40%, transparent);
+      box-shadow: 0 24px 60px rgba(15, 23, 42, .14);
+      text-decoration: none;
+    }
+    .audience-card-featured {
+      border: 2px solid var(--cp) !important;
+      transform: scale(1.03);
+    }
+    .audience-card-featured:hover { transform: scale(1.03) translateY(-8px); }
+    .audience-icon {
+      width: 64px; height: 64px; border-radius: 18px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.75rem;
+      transition: transform .25s cubic-bezier(.34,1.56,.64,1);
+    }
+    .audience-card:hover .audience-icon { transform: scale(1.12) rotate(-5deg); }
+    .audience-chip {
+      display: inline-flex; font-size: .7rem; font-weight: 800;
+      letter-spacing: .08em; text-transform: uppercase;
+      padding: .25rem .75rem; border-radius: 9999px;
+      background: color-mix(in srgb, var(--cp) 12%, transparent);
+      color: var(--cp);
+    }
+    .audience-cta {
+      display: inline-flex; align-items: center; gap: .4rem;
+      font-weight: 700; font-size: .875rem; color: var(--cp);
+      transition: gap .2s;
+    }
+    .audience-card:hover .audience-cta { gap: .65rem; }
   </style>
 </head>
 <body class="bg-white text-gray-900">
@@ -176,6 +219,7 @@
       <?php endif; ?>
     </a>
     <div class="hidden md:flex items-center gap-1">
+      <a href="#roles"    class="text-sm font-medium text-white/70 px-4 py-2 rounded-lg hover:text-white hover:bg-white/10 transition-all">Experiencias</a>
       <a href="#features" class="text-sm font-medium text-white/70 px-4 py-2 rounded-lg hover:text-white hover:bg-white/10 transition-all">Funciones</a>
       <a href="#how"      class="text-sm font-medium text-white/70 px-4 py-2 rounded-lg hover:text-white hover:bg-white/10 transition-all">¿Cómo funciona?</a>
       <a href="#precios"  class="text-sm font-medium text-white/70 px-4 py-2 rounded-lg hover:text-white hover:bg-white/10 transition-all">Precios</a>
@@ -208,36 +252,36 @@
       </div>
 
       <h1 class="text-5xl md:text-6xl font-black leading-[1.1] mb-6">
-        <span class="text-gradient">Gestiona tu negocio</span>
+        <span class="text-gradient">Plataforma especializada</span>
         <br>
-        <span class="text-white">de carne desde</span>
+        <span class="text-white">en abastecimiento,</span>
         <br>
-        <span class="text-white">una sola plataforma</span>
+        <span class="text-white text-4xl">trazabilidad y logística para restaurantes, hoteles y taquerías</span>
       </h1>
 
       <p class="text-gray-400 text-lg leading-relaxed mb-10 max-w-lg">
-        Pedidos en línea, GPS de repartidores, inventario, aprobaciones y reportes.
-        Todo listo para usar. <span class="text-white/70 font-medium">Sin complicaciones.</span>
+        Centraliza compras, pedidos, entregas, crédito, devoluciones y monitoreo operativo desde una sola plataforma.
+        <span class="text-white/70 font-medium">Sin complicaciones.</span>
       </p>
 
       <div class="flex flex-col sm:flex-row gap-3 mb-14">
-        <a href="<?= BASE_URL ?>planes"
+        <a href="<?= BASE_URL ?>planes/registro"
            class="btn-primary btn-shimmer font-bold text-base px-8 py-4 rounded-xl text-center">
-          Comenzar ahora →
+          Solicitar demostración →
         </a>
-        <a href="#features"
+        <a href="#roles"
            class="btn-outline font-semibold text-base px-8 py-4 rounded-xl text-center">
-          Ver funciones
+          Explorar soluciones
         </a>
       </div>
 
       <!-- Stats -->
       <div class="flex gap-8 flex-wrap">
         <?php foreach ([
-          ['+500', 'Pedidos procesados'],
-          ['100%', 'En la nube'],
-          ['GPS',  'Rastreo en vivo'],
-          ['MXN',  'Cobros en pesos'],
+          ['+500', 'Pedidos conectados'],
+          ['100%', 'Trazabilidad'],
+          ['GPS',  'Tiempo real'],
+          ['Crédito',  'Empresarial'],
         ] as [$n, $l]): ?>
         <div>
           <div class="text-2xl font-black text-white stat-num"><?= $n ?></div>
@@ -321,6 +365,97 @@
     <svg class="scroll-arrow w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
       <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
     </svg>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════ SELECTOR DE AUDIENCIA -->
+<section id="roles" class="bg-slate-50 py-24">
+  <div class="max-w-6xl mx-auto px-6">
+    <div class="text-center mb-14 reveal">
+      <p class="text-xs font-bold uppercase tracking-widest text-primary mb-3">¿Qué tipo de negocio eres?</p>
+      <h2 class="text-3xl md:text-4xl font-extrabold text-gray-900 mb-4">Elige tu experiencia</h2>
+      <p class="text-gray-500 max-w-2xl mx-auto">
+        Tenemos una solución diseñada específicamente para tu tipo de negocio.
+        Selecciona y descubre cómo CarniHub transforma tu operación.
+      </p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+
+      <!-- Taquerías -->
+      <a href="<?= BASE_URL ?>distribuidora-carne-cerca-de-mi"
+         class="audience-card rounded-3xl p-8 reveal" style="transition-delay:0ms">
+        <div class="audience-icon mb-6" style="background:color-mix(in srgb,#f97316 12%,transparent)">🌮</div>
+        <span class="audience-chip mb-4 inline-block">Taquerías</span>
+        <h3 class="text-xl font-extrabold text-gray-900 mt-3 mb-3">Distribuidora de carne cerca de mí</h3>
+        <p class="text-sm text-gray-500 leading-relaxed mb-6">
+          Proveedores confiables con mayoreo de bistec, pastor preparado y entregas garantizadas para tu taquería o negocio de comida.
+        </p>
+        <ul class="space-y-2.5 mb-8">
+          <?php foreach ([
+            'Precio de bistec por mayoreo',
+            'Pastor preparado certificado',
+            'Carne a domicilio para negocio',
+            'Crédito empresarial disponible',
+          ] as $item): ?>
+          <li class="flex items-center gap-2.5 text-sm text-gray-600">
+            <svg class="w-4 h-4 flex-shrink-0 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
+            </svg>
+            <?= htmlspecialchars($item) ?>
+          </li>
+          <?php endforeach; ?>
+        </ul>
+        <span class="audience-cta">
+          Ver mi solución
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/>
+          </svg>
+        </span>
+      </a>
+
+      <!-- Restaurantes (destacado) -->
+      <a href="<?= BASE_URL ?>carnihub/cortes-de-carne-para-restaurantes"
+         class="audience-card audience-card-featured rounded-3xl p-8 reveal relative" style="transition-delay:100ms">
+        <div class="absolute top-5 right-5">
+          <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold text-white"
+                style="background:var(--cp)">
+            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+            </svg>
+            Premium
+          </span>
+        </div>
+        <div class="audience-icon mb-6" style="background:color-mix(in srgb,var(--cp) 12%,transparent)">🍽️</div>
+        <span class="audience-chip mb-4 inline-block">Restaurantes &amp; Hoteles</span>
+        <h3 class="text-xl font-extrabold text-gray-900 mt-3 mb-3">Cortes de carne premium con trazabilidad</h3>
+        <p class="text-sm text-gray-500 leading-relaxed mb-6">
+          Proveedores certificados TIF, trazabilidad completa, evidencia digital POD y control multi-sucursal para restaurantes y hoteles.
+        </p>
+        <ul class="space-y-2.5 mb-8">
+          <?php foreach ([
+            'Proveedor certificado TIF',
+            'Trazabilidad de productos cárnicos',
+            'Evidencia digital POD',
+            'Reportes de consumo por sucursal',
+          ] as $item): ?>
+          <li class="flex items-center gap-2.5 text-sm text-gray-600">
+            <svg class="w-4 h-4 flex-shrink-0 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
+            </svg>
+            <?= htmlspecialchars($item) ?>
+          </li>
+          <?php endforeach; ?>
+        </ul>
+        <span class="audience-cta">
+          Ver mi solución
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/>
+          </svg>
+        </span>
+      </a>
+
+    </div>
   </div>
 </section>
 

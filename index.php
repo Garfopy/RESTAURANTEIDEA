@@ -38,7 +38,26 @@ if ($path === '') {
     $ctrlSlug = 'landing';
     $action   = 'landing';
 }
-
+// ── Redirects 301: rutas antiguas → nuevas rutas SEO ─────────────────────
+$oldRouteRedirects = [
+    'taqueria'    => BASE_URL . 'distribuidora-carne-cerca-de-mi',
+    'restaurantes' => BASE_URL . 'carnihub/cortes-de-carne-para-restaurantes',
+    'cedis'       => BASE_URL . 'carnihub',
+];
+if (isset($oldRouteRedirects[$path])) {
+    header('Location: ' . $oldRouteRedirects[$path], true, 301);
+    exit;
+}
+// ── Nuevas rutas SEO HUB → PublicController ─────────────────────────────
+$seoRoutes = [
+    'distribuidora-carne-cerca-de-mi'             => 'taqueria',
+    'carnihub/cortes-de-carne-para-restaurantes'  => 'restaurantes',
+    'carnihub'                                    => 'carnihub',
+];
+if (isset($seoRoutes[$path])) {
+    $ctrlSlug = 'landing';
+    $action   = $seoRoutes[$path];
+}
 // ── Route map: URL slug → Controller class ────────────────────────────────────
 $routes = [
     // Auth (público)
@@ -85,6 +104,9 @@ $routes = [
     'planes'              => 'PublicController',
     // Landing page pública
     'landing'             => 'PublicController',
+    // Landings de audiencia
+    'taqueria'            => 'PublicController',
+    'restaurantes'        => 'PublicController',
 ];
 
 // ── Auth guard ────────────────────────────────────────────────────────────────
@@ -105,7 +127,13 @@ $publicPaths = [
     'planes/simularpago',
     'planes/aprobarpagotest',
     'suscripcion/webhook',
-    'landing/landing'
+    'landing/landing',
+    'taqueria/taqueria',
+    'restaurantes/restaurantes',
+    // Nuevas rutas SEO HUB
+    'landing/taqueria',
+    'landing/restaurantes',
+    'landing/carnihub',
 ];
 
 $currentPath = strtolower($ctrlSlug . '/' . $action);
