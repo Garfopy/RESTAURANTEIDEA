@@ -38,10 +38,25 @@ if ($path === '') {
     $ctrlSlug = 'landing';
     $action   = 'landing';
 }
-// ── Rutas de audiencia → PublicController ────────────────────────────────
-if (in_array($path, ['taqueria', 'restaurantes', 'cedis'], true)) {
-    $ctrlSlug = $path;
-    $action   = $path;
+// ── Redirects 301: rutas antiguas → nuevas rutas SEO ─────────────────────
+$oldRouteRedirects = [
+    'taqueria'    => BASE_URL . 'distribuidora-carne-cerca-de-mi',
+    'restaurantes' => BASE_URL . 'carnihub/cortes-de-carne-para-restaurantes',
+    'cedis'       => BASE_URL . 'carnihub/',
+];
+if (isset($oldRouteRedirects[$path])) {
+    header('Location: ' . $oldRouteRedirects[$path], true, 301);
+    exit;
+}
+// ── Nuevas rutas SEO HUB → PublicController ─────────────────────────────
+$seoRoutes = [
+    'distribuidora-carne-cerca-de-mi'             => 'taqueria',
+    'carnihub/cortes-de-carne-para-restaurantes'  => 'restaurantes',
+    'carnihub/'                                   => 'cedis',
+];
+if (isset($seoRoutes[$path])) {
+    $ctrlSlug = 'landing';
+    $action   = $seoRoutes[$path];
 }
 // ── Route map: URL slug → Controller class ────────────────────────────────────
 $routes = [
@@ -88,7 +103,7 @@ $routes = [
     'planes'              => 'PublicController',
     // Landing page pública
     'landing'             => 'PublicController',
-    // Landings de audiencia
+    // Landings de audiencia (mantenidas para compatibilidad)
     'taqueria'            => 'PublicController',
     'restaurantes'        => 'PublicController',
     'cedis'               => 'PublicController',
@@ -116,6 +131,10 @@ $publicPaths = [
     'taqueria/taqueria',
     'restaurantes/restaurantes',
     'cedis/cedis',
+    // Nuevas rutas SEO HUB (mapeadas a landing/taqueria|restaurantes|cedis)
+    'landing/taqueria',
+    'landing/restaurantes',
+    'landing/cedis',
 ];
 
 $currentPath = strtolower($ctrlSlug . '/' . $action);

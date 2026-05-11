@@ -12,7 +12,7 @@
   <title>Cortes de carne PREMIUM para restaurantes | Proveedor certificado TIF | <?= htmlspecialchars($appName) ?></title>
   <meta name="description" content="Encuentra cortes de carne para restaurantes con trazabilidad, entrega confiable y proveedores certificados TIF. Ideal para hoteles y comedores industriales.">
   <meta name="keywords" content="cortes de carne para restaurantes, Rastreo de transporte de alimentos, Trazabilidad de productos cárnicos, Logística de alimentos perecederos, Monitoreo de temperatura en transporte, Proveedor de carne certificado TIF, Venta de carne al mayoreo para hoteles, Cotización de carne para comedores, Proveedores de carne con crédito, Software de compras para restaurantes, Evidencia de entrega digital POD, Certificados sanitarios de carne, Reportes de consumo por sucursal, Sistema de control de calidad alimentos, Gestión de devoluciones alimentos, Pedidos multi-sucursal para negocios, Registro de incidencias logísticas">
-  <link rel="canonical" href="<?= BASE_URL ?>restaurantes">
+  <link rel="canonical" href="<?= BASE_URL ?>carnihub/cortes-de-carne-para-restaurantes">
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   <script type="application/ld+json">
@@ -730,9 +730,9 @@
       <div>
         <h4 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">Soluciones</h4>
         <ul class="space-y-2">
-          <li><a href="<?= BASE_URL ?>taqueria"      class="text-sm text-gray-500 hover:text-white transition-colors">Distribuidora de carne cerca de mí</a></li>
-          <li><a href="<?= BASE_URL ?>restaurantes"  class="text-sm text-white/60 font-semibold">→ Cortes de carne para restaurantes</a></li>
-          <li><a href="<?= BASE_URL ?>cedis"         class="text-sm text-gray-500 hover:text-white transition-colors">Software para CEDIS y carnicerías</a></li>
+          <li><a href="<?= BASE_URL ?>distribuidora-carne-cerca-de-mi"            class="text-sm text-gray-500 hover:text-white transition-colors">Distribuidora de carne cerca de mí</a></li>
+          <li><a href="<?= BASE_URL ?>carnihub/cortes-de-carne-para-restaurantes" class="text-sm text-white/60 font-semibold">→ Cortes de carne para restaurantes</a></li>
+          <li><a href="<?= BASE_URL ?>carnihub/"                                   class="text-sm text-gray-500 hover:text-white transition-colors">Software para CEDIS y carnicerias</a></li>
         </ul>
       </div>
       <div>

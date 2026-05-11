@@ -12,7 +12,7 @@
   <title>Distribuidora de carne cerca de mí | Carne para taquerías y restaurantes Querétaro | <?= htmlspecialchars($appName) ?></title>
   <meta name="description" content="Encuentra una distribuidora de carne cerca de ti con precios competitivos, entrega garantizada y carne de calidad para taquerías, restaurantes y negocios de comida. Facturación expedita.">
   <meta name="keywords" content="Distribuidora de carne cerca de mí, Proveedor de carne para taquería, Precio de bistec de res por mayoreo, Carne a domicilio para negocio, Venta de carne por caja, Pastor preparado para taquería mayoreo, Carnicería con servicio a restaurantes, Proveedores de carne que den crédito, Precio de kilo de carne de res hoy, Donde comprar carne barata y buena para negocio">
-  <link rel="canonical" href="<?= BASE_URL ?>taqueria">
+  <link rel="canonical" href="<?= BASE_URL ?>distribuidora-carne-cerca-de-mi">
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   <script type="application/ld+json">
@@ -625,9 +625,9 @@
       <div>
         <h4 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">Soluciones</h4>
         <ul class="space-y-2">
-          <li><a href="<?= BASE_URL ?>taqueria"      class="text-sm text-white/60 font-semibold">→ Distribuidora de carne cerca de mí</a></li>
-          <li><a href="<?= BASE_URL ?>restaurantes"  class="text-sm text-gray-500 hover:text-white transition-colors">Cortes de carne para restaurantes</a></li>
-          <li><a href="<?= BASE_URL ?>cedis"         class="text-sm text-gray-500 hover:text-white transition-colors">Software para CEDIS y carnicerías</a></li>
+          <li><a href="<?= BASE_URL ?>distribuidora-carne-cerca-de-mi"            class="text-sm text-white/60 font-semibold">→ Distribuidora de carne cerca de mí</a></li>
+          <li><a href="<?= BASE_URL ?>carnihub/cortes-de-carne-para-restaurantes" class="text-sm text-gray-500 hover:text-white transition-colors">Cortes de carne para restaurantes</a></li>
+          <li><a href="<?= BASE_URL ?>carnihub/"                                   class="text-sm text-gray-500 hover:text-white transition-colors">Software para CEDIS y carnicerias</a></li>
         </ul>
       </div>
       <div>

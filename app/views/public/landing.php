@@ -249,36 +249,36 @@
       </div>
 
       <h1 class="text-5xl md:text-6xl font-black leading-[1.1] mb-6">
-        <span class="text-gradient">Gestiona tu negocio</span>
+        <span class="text-gradient">Plataforma especializada</span>
         <br>
-        <span class="text-white">de carne desde</span>
+        <span class="text-white">en abastecimiento,</span>
         <br>
-        <span class="text-white">una sola plataforma</span>
+        <span class="text-white text-4xl">trazabilidad y logística para restaurantes, hoteles y taquerías</span>
       </h1>
 
       <p class="text-gray-400 text-lg leading-relaxed mb-10 max-w-lg">
-        Pedidos en línea, GPS de repartidores, inventario, aprobaciones y reportes.
-        Todo listo para usar. <span class="text-white/70 font-medium">Sin complicaciones.</span>
+        Centraliza compras, pedidos, entregas, crédito, devoluciones y monitoreo operativo desde una sola plataforma.
+        <span class="text-white/70 font-medium">Sin complicaciones.</span>
       </p>
 
       <div class="flex flex-col sm:flex-row gap-3 mb-14">
-        <a href="#roles"
+        <a href="<?= BASE_URL ?>planes/registro"
            class="btn-primary btn-shimmer font-bold text-base px-8 py-4 rounded-xl text-center">
-          Elegir mi experiencia →
+          Solicitar demostración →
         </a>
-        <a href="#features"
+        <a href="#roles"
            class="btn-outline font-semibold text-base px-8 py-4 rounded-xl text-center">
-          Ver funciones
+          Explorar soluciones
         </a>
       </div>
 
       <!-- Stats -->
       <div class="flex gap-8 flex-wrap">
         <?php foreach ([
-          ['+500', 'Pedidos procesados'],
-          ['100%', 'En la nube'],
-          ['GPS',  'Rastreo en vivo'],
-          ['MXN',  'Cobros en pesos'],
+          ['+500', 'Pedidos conectados'],
+          ['100%', 'Trazabilidad'],
+          ['GPS',  'Tiempo real'],
+          ['Crédito',  'Empresarial'],
         ] as [$n, $l]): ?>
         <div>
           <div class="text-2xl font-black text-white stat-num"><?= $n ?></div>
@@ -380,7 +380,7 @@
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
 
       <!-- Taquerías -->
-      <a href="<?= BASE_URL ?>taqueria"
+      <a href="<?= BASE_URL ?>distribuidora-carne-cerca-de-mi"
          class="audience-card rounded-3xl p-8 reveal" style="transition-delay:0ms">
         <div class="audience-icon mb-6" style="background:color-mix(in srgb,#f97316 12%,transparent)">🌮</div>
         <span class="audience-chip mb-4 inline-block">Taquerías</span>
@@ -412,7 +412,7 @@
       </a>
 
       <!-- Restaurantes (destacado) -->
-      <a href="<?= BASE_URL ?>restaurantes"
+      <a href="<?= BASE_URL ?>carnihub/cortes-de-carne-para-restaurantes"
          class="audience-card audience-card-featured rounded-3xl p-8 reveal relative" style="transition-delay:100ms">
         <div class="absolute top-5 right-5">
           <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold text-white"
@@ -452,8 +452,8 @@
         </span>
       </a>
 
-      <!-- CEDIS y Carnicerías -->
-      <a href="<?= BASE_URL ?>cedis"
+      <!-- CEDIS y Carnicerias -->
+      <a href="<?= BASE_URL ?>carnihub/"
          class="audience-card rounded-3xl p-8 reveal" style="transition-delay:200ms">
         <div class="audience-icon mb-6" style="background:color-mix(in srgb,#6366f1 12%,transparent)">🏭</div>
         <span class="audience-chip mb-4 inline-block">CEDIS &amp; Carnicerías</span>

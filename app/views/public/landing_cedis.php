@@ -12,7 +12,7 @@
   <title>Plataforma de abastecimiento productos cárnicos con visibilidad y trazabilidad a 1 click | <?= htmlspecialchars($appName) ?></title>
   <meta name="description" content="Optimiza compras, entregas, trazabilidad y logística inversa con CarniHub. Ideal para CEDIS de restaurantes, hoteles, taquerías y carnicerías.">
   <meta name="keywords" content="proveedores de carne con crédito, cotización de carne para comedores, precio de carne para restaurantes, carne por mayoreo para hoteles, proveedor de carne para cadenas restauranteras, proveedor de carne con entrega garantizada, proveedor de carne para CEDIS, compra de carne para restaurantes, compra de carne para hoteles, proveedor de carne para taquerías">
-  <link rel="canonical" href="<?= BASE_URL ?>cedis">
+  <link rel="canonical" href="<?= BASE_URL ?>carnihub/">
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   <script type="application/ld+json">
@@ -372,7 +372,7 @@
       <p class="text-white/70 text-sm font-medium mb-1">Para taquerías</p>
       <h3 class="text-2xl md:text-3xl font-extrabold text-white">Conoce a la distribuidora de carne más cerca de ti.</h3>
     </div>
-    <a href="<?= BASE_URL ?>taqueria"
+    <a href="<?= BASE_URL ?>distribuidora-carne-cerca-de-mi"
        class="flex-shrink-0 bg-white font-bold px-8 py-4 rounded-xl text-sm hover:bg-gray-100 transition-colors whitespace-nowrap"
        style="color:var(--cp)">
       Ver solución para taquerías →
@@ -518,7 +518,7 @@
       <p class="text-xs font-bold uppercase tracking-widest mb-2" style="color:var(--cp)">Para restaurantes</p>
       <h3 class="text-2xl md:text-3xl font-extrabold text-white">Cortes de carne premium para restaurantes y hoteles.</h3>
     </div>
-    <a href="<?= BASE_URL ?>restaurantes" class="flex-shrink-0 btn-primary btn-shimmer font-bold px-8 py-4 rounded-xl text-sm whitespace-nowrap">
+    <a href="<?= BASE_URL ?>carnihub/cortes-de-carne-para-restaurantes" class="flex-shrink-0 btn-primary btn-shimmer font-bold px-8 py-4 rounded-xl text-sm whitespace-nowrap">
       Ver solución para restaurantes →
     </a>
   </div>
@@ -710,10 +710,10 @@
       <div>
         <h4 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">Soluciones</h4>
         <ul class="space-y-2">
-          <li><a href="<?= BASE_URL ?>taqueria"      class="text-sm text-gray-500 hover:text-white transition-colors">Distribuidora de carne cerca de mí</a></li>
-          <li><a href="<?= BASE_URL ?>restaurantes"  class="text-sm text-gray-500 hover:text-white transition-colors">Cortes de carne para restaurantes</a></li>
-          <li><a href="<?= BASE_URL ?>restaurantes"  class="text-sm text-gray-500 hover:text-white transition-colors">Software de compras para restaurantes</a></li>
-          <li><a href="<?= BASE_URL ?>cedis"         class="text-sm text-white/60 font-semibold">→ Software para CEDIS y carnicerias</a></li>
+          <li><a href="<?= BASE_URL ?>distribuidora-carne-cerca-de-mi"            class="text-sm text-gray-500 hover:text-white transition-colors">Distribuidora de carne cerca de mí</a></li>
+          <li><a href="<?= BASE_URL ?>carnihub/cortes-de-carne-para-restaurantes" class="text-sm text-gray-500 hover:text-white transition-colors">Cortes de carne para restaurantes</a></li>
+          <li><a href="<?= BASE_URL ?>carnihub/cortes-de-carne-para-restaurantes" class="text-sm text-gray-500 hover:text-white transition-colors">Software de compras para restaurantes</a></li>
+          <li><a href="<?= BASE_URL ?>carnihub/"                                   class="text-sm text-white/60 font-semibold">→ Software para CEDIS y carnicerias</a></li>
         </ul>
       </div>
       <div>
