@@ -22,7 +22,9 @@ class PanelUsuarioController extends BaseController
         $resultado  = $this->usuarioModel->listadoConRol($filtros, $page);
         $usuarios   = $resultado['data'];
         $paginacion = $resultado;
-        $roles      = $this->usuarioModel->rolesPermitidosPorAdmin();
+        $roles      = $this->esSuperAdmin()
+            ? $this->usuarioModel->rolesPermitidosPorSuperAdmin()
+            : $this->usuarioModel->rolesPermitidosPorAdmin();
         $flash      = $this->getFlash();
         $pageTitle  = 'Usuarios';
         $activeMenu = 'usuarios';
@@ -35,7 +37,9 @@ class PanelUsuarioController extends BaseController
 
     public function nuevo(?string $p = null): void
     {
-        $roles        = $this->usuarioModel->rolesPermitidosPorAdmin();
+        $roles = $this->esSuperAdmin()
+            ? $this->usuarioModel->rolesPermitidosPorSuperAdmin()
+            : $this->usuarioModel->rolesPermitidosPorAdmin();
         $empresaModel = new EmpresaModel();
         $empresas     = $empresaModel->listadoSimple();
         $usuario      = null;
@@ -57,8 +61,19 @@ class PanelUsuarioController extends BaseController
 
         $rolSlug   = $this->post('rol_slug');
         $empresaId = (int)$this->post('empresa_id') ?: null;
+        $email     = trim($this->post('email'));
 
-        // admin_empresa requiere empresa_id; admin no
+        // Solo superadmin puede crear superadmin/admin
+        $rolesPermitidos = $this->esSuperAdmin()
+            ? ['superadmin', 'admin', 'admin_empresa']
+            : ['admin_empresa'];
+
+        if (!in_array($rolSlug, $rolesPermitidos, true)) {
+            $this->flash('error', 'No tienes permiso para crear este tipo de usuario.');
+            $this->redirect('panel-usuario/nuevo');
+        }
+
+        // admin_empresa requiere empresa_id; superadmin/admin no
         if ($rolSlug === 'admin_empresa' && !$empresaId) {
             $this->flash('error', 'Debes seleccionar una empresa para Admin Empresa.');
             $this->redirect('panel-usuario/nuevo');
@@ -70,27 +85,28 @@ class PanelUsuarioController extends BaseController
             $this->redirect('panel-usuario/nuevo');
         }
 
-        // Generar contraseña segura automáticamente
-        $password = PasswordHelper::generar(14);
-        $email = trim($this->post('email'));
+        // Validar email duplicado antes de intentar insertar
+        if ($this->usuarioModel->existeEmail($email)) {
+            $this->flash('error', 'El correo "' . $email . '" ya está registrado. No se puede crear el usuario.');
+            $this->redirect('panel-usuario/nuevo');
+        }
 
-        // ── Iniciar transacción ──
+        $password = PasswordHelper::generar(14);
+
         $db = Database::getInstance();
         $db->beginTransaction();
 
         try {
-            // 1. Generar token de verificación
             $tokenVerificacion = bin2hex(random_bytes(32));
             $tokenExpira = date('Y-m-d H:i:s', strtotime('+24 hours'));
 
-            // 2. Crear usuario en BD
             $id = $this->usuarioModel->crear([
                 'nombre'              => trim($this->post('nombre')),
                 'apellido_paterno'    => trim($this->post('apellido_paterno', '')),
                 'email'               => $email,
                 'telefono'            => trim($this->post('telefono', '')),
                 'rol_id'              => $rolRow['id'],
-                'empresa_id'          => $empresaId,
+                'empresa_id'          => ($rolSlug === 'admin_empresa') ? $empresaId : null,
                 'activo'              => 1,
                 'email_verificado'    => 0,
                 'token_verificacion'  => $tokenVerificacion,
@@ -98,32 +114,23 @@ class PanelUsuarioController extends BaseController
                 'created_by'          => $this->usuarioId(),
             ], $password);
 
-            // 3. Enviar email con credenciales y link de verificación
-            $emailService = new EmailService();
+            $emailService  = new EmailService();
             $usuarioCreado = $this->usuarioModel->find($id);
-            $emailEnviado = $emailService->enviarCredenciales($usuarioCreado, $password, null, $tokenVerificacion);
+            $emailEnviado  = $emailService->enviarCredenciales($usuarioCreado, $password, null, $tokenVerificacion);
 
-            if (!$emailEnviado) {
-                error_log("[PanelUsuarioController] No se pudo enviar email a usuario ID: $id");
-                // NO hacer rollback, el usuario ya está creado
-                // Admin puede reenviar email manualmente o compartir credenciales
-            }
-
-            // 4. Commit transacción
             $db->commit();
-
             $this->log('Crear usuario', 'usuarios', "ID: $id rol: $rolSlug email: $email");
 
-            $mensaje = 'Usuario creado correctamente. Se ha enviado un correo con las credenciales y el link de verificación.';
-            if (!$emailEnviado) {
-                $mensaje .= ' <strong>AVISO:</strong> No se pudo enviar el email. Credenciales: ' . htmlspecialchars($password);
+            if ($emailEnviado) {
+                $this->flash('success', "Usuario creado. Se envio el correo con credenciales a $email.");
+            } else {
+                $this->flash('success', "Usuario creado. No se pudo enviar el correo (revisa la configuracion SMTP). Contraseña temporal: $password");
             }
-            $this->flash('success', $mensaje);
             $this->redirect('panel-usuario/index');
 
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             $db->rollBack();
-            error_log("[PanelUsuarioController] Error al crear usuario: " . $e->getMessage());
+            error_log('[PanelUsuarioController] ' . $e->getMessage());
             $this->flash('error', 'No se pudo crear el usuario: ' . $e->getMessage());
             $this->redirect('panel-usuario/nuevo');
         }
@@ -137,7 +144,9 @@ class PanelUsuarioController extends BaseController
             $this->redirect('panel-usuario/index');
         }
 
-        $roles        = $this->usuarioModel->rolesPermitidosPorAdmin();
+        $roles = $this->esSuperAdmin()
+            ? $this->usuarioModel->rolesPermitidosPorSuperAdmin()
+            : $this->usuarioModel->rolesPermitidosPorAdmin();
         $empresaModel = new EmpresaModel();
         $empresas     = $empresaModel->listadoSimple();
         $flash        = $this->getFlash();

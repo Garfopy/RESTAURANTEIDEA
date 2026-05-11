@@ -36,11 +36,35 @@ $todosConId = array_reduce($planes, fn($ok, $p) =>
     <div style="display:flex;flex-direction:column;gap:16px">
       <?php foreach ($planes as $plan): ?>
       <div style="border:1px solid #E5E7EB;border-radius:8px;padding:14px">
-        <div style="font-size:.875rem;font-weight:700;color:#111827;margin-bottom:10px">
-          <?= htmlspecialchars($plan['nombre']) ?>
-          <span style="font-weight:400;color:#6B7280;font-size:.8rem">
-            ($<?= number_format($plan['precio_mensual'], 0, '.', ',') ?>/mes · $<?= number_format($plan['precio_anual'], 0, '.', ',') ?>/año)
-          </span>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div>
+            <span style="font-size:.875rem;font-weight:700;color:#111827">
+              <?= htmlspecialchars($plan['nombre']) ?>
+            </span>
+            <span style="font-weight:400;color:#6B7280;font-size:.8rem">
+              ($<?= number_format($plan['precio_mensual'], 0, '.', ',') ?>/mes · $<?= number_format($plan['precio_anual'], 0, '.', ',') ?>/año)
+            </span>
+          </div>
+          <a href="<?= BASE_URL ?>suscripcion/editarPlan/<?= (int)$plan['id'] ?>"
+             style="font-size:.78rem;padding:5px 12px;background:#EFF6FF;color:#1D4ED8;border-radius:6px;text-decoration:none;font-weight:600">
+            Editar límites
+          </a>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;font-size:.78rem;margin-bottom:10px">
+          <?php
+          $ilim = fn(int $v) => $v === 0 ? '∞' : $v;
+          $limites = [
+            'Usuarios'  => $ilim((int)$plan['max_usuarios']),
+            'Productos' => $ilim((int)$plan['max_productos']),
+            'Pedidos/mes'=> $ilim((int)$plan['max_pedidos_mes']),
+            'Sucursales'=> $ilim((int)$plan['max_sucursales']),
+          ];
+          foreach ($limites as $label => $val): ?>
+          <div style="background:#F9FAFB;border-radius:6px;padding:6px 8px;text-align:center">
+            <div style="color:#9CA3AF;font-size:.7rem"><?= $label ?></div>
+            <div style="font-weight:700;color:#111827"><?= $val ?></div>
+          </div>
+          <?php endforeach; ?>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:.8rem">
           <div>

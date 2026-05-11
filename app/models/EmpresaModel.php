@@ -57,4 +57,24 @@ class EmpresaModel extends BaseModel
             'SELECT id, razon_social FROM empresas WHERE activo = 1 ORDER BY razon_social'
         );
     }
+
+    public function existeRFCValor(string $rfc, ?int $excluirId = null): bool
+    {
+        $sql    = 'SELECT COUNT(*) FROM empresas WHERE rfc = ?';
+        $params = [$rfc];
+        if ($excluirId) { $sql .= ' AND id != ?'; $params[] = $excluirId; }
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return (int)$stmt->fetchColumn() > 0;
+    }
+
+    public function existeEmailValor(string $email, ?int $excluirId = null): bool
+    {
+        $sql    = 'SELECT COUNT(*) FROM empresas WHERE email = ?';
+        $params = [$email];
+        if ($excluirId) { $sql .= ' AND id != ?'; $params[] = $excluirId; }
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return (int)$stmt->fetchColumn() > 0;
+    }
 }

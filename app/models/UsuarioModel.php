@@ -56,6 +56,24 @@ class UsuarioModel extends BaseModel
         );
     }
 
+    /** Roles que el superadmin puede crear (admin, admin_empresa y otro superadmin) */
+    public function rolesPermitidosPorSuperAdmin(): array
+    {
+        return $this->query(
+            "SELECT * FROM roles WHERE slug IN ('superadmin','admin','admin_empresa') ORDER BY id"
+        );
+    }
+
+    public function existeEmail(string $email, ?int $excluirId = null): bool
+    {
+        $sql    = 'SELECT COUNT(*) FROM usuarios WHERE email = ?';
+        $params = [$email];
+        if ($excluirId) { $sql .= ' AND id != ?'; $params[] = $excluirId; }
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        return (int)$stmt->fetchColumn() > 0;
+    }
+
     public function listadoConRol(array $filtros = [], int $page = 1): array
     {
         $where  = ['u.activo = 1'];

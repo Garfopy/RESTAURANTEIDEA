@@ -18,32 +18,81 @@ class PanelController extends BaseController
     {
         $db = Database::getInstance();
 
-        // KPIs globales
-        $totalEmpresas  = (int)$db->query('SELECT COUNT(*) FROM empresas WHERE activo = 1')->fetchColumn();
-        $totalUsuarios  = (int)$db->query('SELECT COUNT(*) FROM usuarios WHERE activo = 1 AND rol_id > 1')->fetchColumn();
-        $pedidosMes     = (int)$db->query("SELECT COUNT(*) FROM pedidos WHERE MONTH(created_at) = MONTH(NOW()) AND YEAR(created_at) = YEAR(NOW())")->fetchColumn();
-        $ventasMes      = (float)$db->query("SELECT COALESCE(SUM(total),0) FROM pedidos WHERE estado != 'cancelado' AND MONTH(created_at) = MONTH(NOW()) AND YEAR(created_at) = YEAR(NOW())")->fetchColumn();
+        // ── KPIs principales ──────────────────────────────────────────────
+        $totalEmpresas       = (int)$db->query('SELECT COUNT(*) FROM empresas WHERE activo = 1')->fetchColumn();
+        $totalUsuarios       = (int)$db->query("SELECT COUNT(*) FROM usuarios u JOIN roles r ON r.id = u.rol_id WHERE u.activo = 1 AND r.slug NOT IN ('superadmin','admin')")->fetchColumn();
+        $pedidosMes          = (int)$db->query("SELECT COUNT(*) FROM pedidos WHERE MONTH(created_at)=MONTH(NOW()) AND YEAR(created_at)=YEAR(NOW())")->fetchColumn();
+        $ventasMes           = (float)$db->query("SELECT COALESCE(SUM(total),0) FROM pedidos WHERE estado != 'cancelado' AND MONTH(created_at)=MONTH(NOW()) AND YEAR(created_at)=YEAR(NOW())")->fetchColumn();
+        $empresasActivas     = (int)$db->query("SELECT COUNT(*) FROM empresas WHERE activo=1 AND suscripcion_estado='activo'")->fetchColumn();
+        $empresasSuspendidas = (int)$db->query("SELECT COUNT(*) FROM empresas WHERE activo=1 AND suscripcion_estado IN ('suspendido','sin_plan')")->fetchColumn();
 
-        // Últimos pedidos
+        // ── Ingresos SaaS (suma de suscripciones activas × precio plan) ───
+        $ingresosSaas = (float)$db->query(
+            "SELECT COALESCE(SUM(ps.precio_mensual),0)
+               FROM suscripciones s
+               JOIN planes_saas ps ON ps.id = s.plan_id
+              WHERE s.estado = 'activo'"
+        )->fetchColumn();
+
+        // ── Distribución de planes ────────────────────────────────────────
+        $distPlanes = $db->query(
+            "SELECT ps.nombre, COUNT(s.id) AS total
+               FROM planes_saas ps
+          LEFT JOIN suscripciones s ON s.plan_id = ps.id AND s.estado = 'activo'
+              WHERE ps.activo = 1
+           GROUP BY ps.id, ps.nombre
+           ORDER BY ps.precio_mensual ASC"
+        )->fetchAll();
+
+        // ── Pedidos por mes (últimos 6 meses) ────────────────────────────
+        $pedidosPorMes = $db->query(
+            "SELECT DATE_FORMAT(created_at,'%Y-%m') AS mes,
+                    COUNT(*) AS total,
+                    COALESCE(SUM(total),0) AS monto
+               FROM pedidos
+              WHERE created_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
+           GROUP BY mes ORDER BY mes ASC"
+        )->fetchAll();
+
+        // ── Empresas nuevas por mes (últimos 6 meses) ─────────────────────
+        $empresasNuevas = $db->query(
+            "SELECT DATE_FORMAT(created_at,'%Y-%m') AS mes, COUNT(*) AS total
+               FROM empresas
+              WHERE created_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
+           GROUP BY mes ORDER BY mes ASC"
+        )->fetchAll();
+
+        // ── Últimos pedidos ───────────────────────────────────────────────
         $ultimosPedidos = $db->query(
             "SELECT p.folio, p.estado, p.total, p.created_at,
                     e.razon_social AS empresa, u.nombre AS comprador
                FROM pedidos p
                JOIN empresas e ON e.id = p.empresa_id
                JOIN usuarios u ON u.id = p.comprador_id
-           ORDER BY p.created_at DESC LIMIT 10"
+           ORDER BY p.created_at DESC LIMIT 8"
         )->fetchAll();
 
-        // Alertas de stock bajo
+        // ── Stock bajo ────────────────────────────────────────────────────
         $stockBajo = $db->query(
-            'SELECT p.nombre, inv.stock, inv.umbral_minimo
+            "SELECT p.nombre, inv.stock, inv.umbral_minimo, e.razon_social AS empresa
                FROM inventario inv
-               JOIN productos p ON p.id = inv.producto_id
-              WHERE inv.stock <= inv.umbral_minimo AND p.activo = 1'
+               JOIN productos p  ON p.id  = inv.producto_id
+               JOIN empresas e   ON e.id  = p.empresa_id
+              WHERE inv.stock <= inv.umbral_minimo AND p.activo = 1 LIMIT 5"
         )->fetchAll();
 
-        $flash     = $this->getFlash();
-        $pageTitle = 'Dashboard';
+        // ── Actividad reciente ─────────────────────────────────────────────
+        $actividadReciente = $db->query(
+            "SELECT al.accion, al.modulo, al.created_at,
+                    COALESCE(u.nombre,'Sistema') AS nombre, r.slug AS rol_slug
+               FROM action_logs al
+          LEFT JOIN usuarios u ON u.id = al.usuario_id
+          LEFT JOIN roles r    ON r.id = u.rol_id
+           ORDER BY al.created_at DESC LIMIT 6"
+        )->fetchAll();
+
+        $flash      = $this->getFlash();
+        $pageTitle  = 'Dashboard';
         $activeMenu = 'dashboard';
 
         ob_start();

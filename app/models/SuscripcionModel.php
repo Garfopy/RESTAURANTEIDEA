@@ -18,6 +18,11 @@ class SuscripcionModel extends BaseModel
         );
     }
 
+    public function getPlanPorId(int $id): ?array
+    {
+        return $this->queryOne('SELECT * FROM planes_saas WHERE id = ?', [$id]);
+    }
+
     public function getByEmpresa(int $empresaId): ?array
     {
         return $this->queryOne(
@@ -185,6 +190,18 @@ class SuscripcionModel extends BaseModel
             'UPDATE suscripciones SET fecha_vencimiento = ? WHERE id = ?',
             [$nuevaFecha, $susId]
         );
+    }
+
+    public function actualizarLimitesPlan(int $planId, array $data): void
+    {
+        $permitidos = ['nombre','descripcion','precio_mensual','precio_anual',
+                       'max_usuarios','max_productos','max_pedidos_mes','max_sucursales'];
+        $campos = array_filter($data, fn($k) => in_array($k, $permitidos, true), ARRAY_FILTER_USE_KEY);
+        if (empty($campos)) return;
+        $sets   = implode(', ', array_map(fn($k) => "$k = ?", array_keys($campos)));
+        $params = array_values($campos);
+        $params[] = $planId;
+        $this->db->prepare("UPDATE planes_saas SET $sets WHERE id = ?")->execute($params);
     }
 
     public function guardarPaypalPlanId(int $planSaasId, string $paypalPlanId): void
