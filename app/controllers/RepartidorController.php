@@ -50,6 +50,22 @@ class RepartidorController extends BaseController
             $paradas = $stmt->fetchAll();
         }
 
+        // ── KPIs operativos del Repartidor ─────────────────────────────────
+        $pedidoModel = new PedidoModel();
+        $hoy   = date('Y-m-d');
+        $desde = date('Y-m-d', strtotime('-29 days'));
+
+        $resumenHoy        = $pedidoModel->paradasHoyRepartidor($repartidorId);
+        $kilosPendientes   = $pedidoModel->kilosPendientesHoy($repartidorId);
+        $proximaParada     = $pedidoModel->proximaParadaRepartidor($repartidorId);
+        $evidencia         = $pedidoModel->cumplimientoEvidencia($repartidorId, $desde, $hoy);
+        $incidencias       = $pedidoModel->incidenciasRutaRepartidor($repartidorId, $desde, $hoy);
+        $tiempoProm        = $pedidoModel->tiempoPromedioPorParada($repartidorId, $desde, $hoy);
+        $prodSemanal       = $pedidoModel->productividadSemanalRepartidor($repartidorId, 6);
+
+        // SLA estimado: 30 min por parada (umbral configurable a futuro)
+        $slaMinutosParada  = 30;
+
         $flash     = $this->getFlash();
         $pageTitle = 'Mis entregas de hoy';
 

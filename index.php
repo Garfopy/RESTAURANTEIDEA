@@ -1,4 +1,12 @@
-<?php
+Tarjeta Roja (Progreso): Paradas Completadas. Muestra cuántas entregas ha realizado frente al total programado en su ruta del día (ej. 5/12).
+
+Tarjeta Azul (Carga): Kilos Pendientes. Indica el peso total de carne que aún tiene en el vehículo. Ayuda a visualizar la descarga de la unidad.
+
+Tarjeta Verde (Efectividad): Entregas Exitosas. Porcentaje de pedidos entregados sin incidencias ni rechazos parciales.
+
+Tarjeta Naranja (Urgencia): Próxima Entrega. Muestra el folio del siguiente pedido y la hora compromiso de llegada.
+
+Tarjeta Púrpura (Cumplimiento): Evidencias Listas. Indica si ha subido correctamente las fotos y firmas de las entregas ya realizadas para asegurar su pago o comisión.<?php
 /**
  * CarniHub — Front Controller / Router v2.1
  *

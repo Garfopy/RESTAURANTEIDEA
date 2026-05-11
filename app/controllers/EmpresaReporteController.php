@@ -137,7 +137,10 @@ class EmpresaReporteController extends BaseController
         }
 
         if ($rol === 'repartidor') {
-            require ROOT_PATH . '/app/views/repartidor/reportes.php';
+            $flash = $this->getFlash();
+            $pageTitle = 'Reporte de rendimiento';
+            // Render standalone (sin sidebar de empresa) porque el repartidor usa UI móvil
+            require ROOT_PATH . '/app/views/repartidor/reporte_layout.php';
             return;
         }
 
@@ -386,6 +389,8 @@ class EmpresaReporteController extends BaseController
         }
 
         if ($rol === 'repartidor') {
+            $pedidoModel = new PedidoModel();
+
             $kpiStmt = $db->prepare(
                 "SELECT COUNT(*) AS paradas,
                         SUM(rd.estado = 'entregado') AS entregadas,
@@ -398,9 +403,9 @@ class EmpresaReporteController extends BaseController
             $kpiStmt->execute([$usuarioId, $desde, $hasta]);
             $r = $kpiStmt->fetch() ?: [];
             $paradas = (int)($r['paradas'] ?? 0);
-            $cumplimiento = $paradas > 0
-                ? (((int)($r['entregadas'] ?? 0) / $paradas) * 100)
-                : 0.0;
+            $entregadas = (int)($r['entregadas'] ?? 0);
+            $pendientes = (int)($r['pendientes'] ?? 0);
+            $cumplimiento = $paradas > 0 ? ($entregadas / $paradas) * 100 : 0.0;
 
             $stmt = $db->prepare(
                 "SELECT DATE(r.fecha) AS fecha, CONCAT('RUTA-', r.id) AS ruta,
@@ -414,36 +419,26 @@ class EmpresaReporteController extends BaseController
                   WHERE r.repartidor_id = ?
                     AND DATE(r.fecha) BETWEEN ? AND ?
                ORDER BY r.fecha DESC, rd.orden ASC
-                  LIMIT 120"
+                  LIMIT 80"
             );
             $stmt->execute([$usuarioId, $desde, $hasta]);
             $rows = $stmt->fetchAll();
 
-            $trendStmt = $db->prepare(
-                "SELECT DATE(r.fecha) AS d, COUNT(*) AS paradas, SUM(rd.estado='entregado') AS entregadas
-                   FROM ruta_detalle rd JOIN rutas r ON r.id = rd.ruta_id
-                  WHERE r.repartidor_id = ? AND DATE(r.fecha) BETWEEN ? AND ?
-               GROUP BY DATE(r.fecha) ORDER BY DATE(r.fecha)"
-            );
-            $trendStmt->execute([$usuarioId, $desde, $hasta]);
-            $trend = $trendStmt->fetchAll();
-
-            $estStmt = $db->prepare(
-                "SELECT rd.estado, COUNT(*) AS c
-                   FROM ruta_detalle rd JOIN rutas r ON r.id = rd.ruta_id
-                  WHERE r.repartidor_id = ? AND DATE(r.fecha) BETWEEN ? AND ?
-               GROUP BY rd.estado"
-            );
-            $estStmt->execute([$usuarioId, $desde, $hasta]);
-            $est = $estStmt->fetchAll();
+            // KPIs adicionales
+            $evidencia    = $pedidoModel->cumplimientoEvidencia($usuarioId, $desde, $hasta);
+            $incidencias  = $pedidoModel->incidenciasRutaRepartidor($usuarioId, $desde, $hasta);
+            $tiempoProm   = $pedidoModel->tiempoPromedioPorParada($usuarioId, $desde, $hasta);
+            $prodSemanal  = $pedidoModel->productividadSemanalRepartidor($usuarioId, 6);
 
             return [
-                'titulo' => 'Reporte de Distribución Diaria',
+                'titulo' => 'Reporte Semanal de Rendimiento — Repartidor',
                 'kpis' => [
-                    ['label' => 'Paradas del período', 'valor' => number_format((int)($r['paradas'] ?? 0)), 'hint' => 'Carga logística'],
-                    ['label' => 'Entregadas', 'valor' => number_format((int)($r['entregadas'] ?? 0)), 'hint' => 'Completadas'],
-                    ['label' => 'Pendientes', 'valor' => number_format((int)($r['pendientes'] ?? 0)), 'hint' => 'En proceso'],
-                    ['label' => 'Cumplimiento', 'valor' => number_format($cumplimiento, 1) . '%', 'hint' => 'Entregas / paradas'],
+                    ['label' => 'Paradas del período', 'valor' => number_format($paradas), 'hint' => 'Total programado'],
+                    ['label' => 'Entregas exitosas', 'valor' => number_format($entregadas), 'hint' => number_format($cumplimiento, 1) . '% del total'],
+                    ['label' => 'Cumplimiento de evidencia', 'valor' => number_format($evidencia['pct'], 1) . '%', 'hint' => $evidencia['completas'] . ' de ' . $evidencia['entregadas'] . ' con foto+firma'],
+                    ['label' => 'Incidencias', 'valor' => number_format($incidencias), 'hint' => 'Fallidas o parciales'],
+                    ['label' => 'Productividad de ruta', 'valor' => number_format($cumplimiento, 1) . '%', 'hint' => 'Entregadas / programadas'],
+                    ['label' => 'Tiempo promedio/parada', 'valor' => $tiempoProm > 0 ? number_format($tiempoProm, 0) . ' min' : '—', 'hint' => 'Entre entregas consecutivas'],
                 ],
                 'columnas' => ['Fecha', 'Ruta', 'Pedido', 'Sucursal', 'Estado', 'Hora entrega'],
                 'filas' => array_map(fn($x) => [
@@ -455,24 +450,21 @@ class EmpresaReporteController extends BaseController
                     $x['hora_entrega'],
                 ], $rows),
                 'notas' => [
-                    'Priorizar entregas de perecederos en la primera mitad de la ruta.',
-                    'Mantener monitoreo de tiempos de arribo para evitar desvíos de SLA.',
-                    'Rango de conservación recomendado para cadena fría: 0°C a 4°C durante la distribución.',
+                    'Cumplimiento general del período: ' . number_format($cumplimiento, 1) . '% (' . $entregadas . ' de ' . $paradas . ' paradas).',
+                    'Cumplimiento de evidencia (foto + firma): ' . number_format($evidencia['pct'], 1) . '%. Asegura el respaldo de cada entrega para validar tu pago.',
+                    'Incidencias en el período: ' . number_format($incidencias) . ' (paradas fallidas o parciales).',
+                    'Mantén la cadena de frío: 0°C a 4°C durante toda la ruta.',
+                    'Prioriza perecederos en la primera mitad de la ruta para reducir riesgos.',
                 ],
                 'graficas' => [
                     [
-                        'tipo' => 'line',
-                        'titulo' => 'Entregas diarias',
-                        'labels' => array_map(fn($x) => $x['d'], $trend),
-                        'data' => array_map(fn($x) => (int)$x['entregadas'], $trend),
-                        'label' => 'Entregadas',
-                    ],
-                    [
-                        'tipo' => 'doughnut',
-                        'titulo' => 'Estado de paradas',
-                        'labels' => array_map(fn($x) => strtoupper((string)$x['estado']), $est),
-                        'data' => array_map(fn($x) => (int)$x['c'], $est),
-                        'label' => 'Paradas',
+                        'tipo' => 'bar',
+                        'titulo' => 'Productividad semanal (entregadas vs intentos)',
+                        'labels' => array_map(fn($x) => 'Sem ' . substr((string)$x['yw'], 4) . ' (' . $x['desde'] . ')', $prodSemanal),
+                        'datasets' => [
+                            ['label' => 'Entregadas', 'data' => array_map(fn($x) => (int)$x['entregadas'], $prodSemanal), 'color' => '#10B981'],
+                            ['label' => 'Intentos',   'data' => array_map(fn($x) => (int)$x['intentos'],   $prodSemanal), 'color' => '#1D4ED8'],
+                        ],
                     ],
                 ],
             ];
