@@ -619,4 +619,69 @@ class PedidoModel extends BaseModel
             [$empresaId]
         );
     }
+
+    // ── KPIs operativos del Supervisor ───────────────────────────────────────
+
+    /**
+     * Pedidos pendientes de aprobación cuyo tiempo de espera supera $minutos.
+     * Indicador crítico de SLA: lo primero que el supervisor debe atender.
+     */
+    public function pedidosDemoradosAprobacion(int $empresaId, int $minutos = 15): int
+    {
+        $row = $this->queryOne(
+            "SELECT COUNT(*) AS n
+               FROM pedidos
+              WHERE empresa_id = ?
+                AND estado = 'pendiente'
+                AND TIMESTAMPDIFF(MINUTE, created_at, NOW()) > ?",
+            [$empresaId, $minutos]
+        );
+        return (int)($row['n'] ?? 0);
+    }
+
+    /**
+     * Excepciones de límite registradas en bitácora dentro del período.
+     * Cuenta intentos en los que el comprador excedió su límite de compra.
+     */
+    public function excepcionesLimite(int $empresaId, string $desde, string $hasta): int
+    {
+        $row = $this->queryOne(
+            "SELECT COUNT(*) AS n
+               FROM action_logs
+              WHERE empresa_id = ?
+                AND DATE(created_at) BETWEEN ? AND ?
+                AND (
+                    accion LIKE '%limite%'
+                 OR accion LIKE '%límite%'
+                 OR descripcion LIKE '%limite excedido%'
+                 OR descripcion LIKE '%límite excedido%'
+                 OR descripcion LIKE '%excede límite%'
+                 OR descripcion LIKE '%excede limite%'
+                )",
+            [$empresaId, $desde, $hasta]
+        );
+        return (int)($row['n'] ?? 0);
+    }
+
+    /**
+     * Incidencias de reparto: paradas marcadas como fallidas o pedidos en ruta
+     * cuya fecha de entrega ya venció sin completarse.
+     */
+    public function incidenciasReparto(int $empresaId, string $desde, string $hasta): int
+    {
+        $row = $this->queryOne(
+            "SELECT COUNT(*) AS n
+               FROM ruta_detalle rd
+               JOIN rutas   r ON r.id = rd.ruta_id
+               JOIN pedidos p ON p.id = rd.pedido_id
+              WHERE p.empresa_id = ?
+                AND DATE(r.fecha) BETWEEN ? AND ?
+                AND (
+                    rd.estado = 'fallido'
+                 OR (rd.estado = 'pendiente' AND r.fecha < CURDATE())
+                )",
+            [$empresaId, $desde, $hasta]
+        );
+        return (int)($row['n'] ?? 0);
+    }
 }

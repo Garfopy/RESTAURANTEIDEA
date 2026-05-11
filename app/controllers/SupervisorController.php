@@ -56,6 +56,11 @@ class SupervisorController extends BaseController
         $entregadosHoy  = $pedidoModel->countEntregadosHoy($empresaId);
         $pedidosHoy     = $pedidoModel->countPedidosHoy($empresaId);
 
+        // ── KPIs operativos críticos del Supervisor ────────────────────────
+        $sla_demorados      = $pedidoModel->pedidosDemoradosAprobacion($empresaId, 15);
+        $excepciones_limite = $pedidoModel->excepcionesLimite($empresaId, $desde, $hasta);
+        $incidencias_reparto = $pedidoModel->incidenciasReparto($empresaId, $desde, $hasta);
+
         // ── Analytics del período ──────────────────────────────────────────
         $kpis             = $pedidoModel->kpisResumen($empresaId, $desde, $hasta);
         $pedidosPorDia    = $pedidoModel->pedidosPorDia($empresaId, $desde, $hasta);

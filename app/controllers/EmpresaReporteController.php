@@ -16,8 +16,56 @@ class EmpresaReporteController extends BaseController
         $usuarioId = $this->usuarioId() ?? 0;
 
         $hoy = date('Y-m-d');
-        $desde = (string)$this->get('fecha_desde', date('Y-m-d', strtotime('-29 days')));
-        $hasta = (string)$this->get('fecha_hasta', $hoy);
+
+        // ── Presets de período (alineado con el dashboard del Supervisor) ──
+        $periodo = (string)$this->get('periodo', '30d');
+        $periodosValidos = ['hoy','7d','30d','90d','año','custom'];
+        if (!in_array($periodo, $periodosValidos, true)) {
+            $periodo = '30d';
+        }
+
+        switch ($periodo) {
+            case 'hoy':
+                $desde = $hoy; $hasta = $hoy;
+                $labelPeriodo = 'Hoy';
+                break;
+            case '7d':
+                $desde = date('Y-m-d', strtotime('-6 days')); $hasta = $hoy;
+                $labelPeriodo = 'Últimos 7 días';
+                break;
+            case '90d':
+                $desde = date('Y-m-d', strtotime('-89 days')); $hasta = $hoy;
+                $labelPeriodo = 'Últimos 90 días';
+                break;
+            case 'año':
+                $desde = date('Y-01-01'); $hasta = $hoy;
+                $labelPeriodo = 'Este año';
+                break;
+            case 'custom':
+                $desde = (string)$this->get('fecha_desde', date('Y-m-d', strtotime('-29 days')));
+                $hasta = (string)$this->get('fecha_hasta', $hoy);
+                $labelPeriodo = 'Período personalizado';
+                break;
+            default:
+                $desde = date('Y-m-d', strtotime('-29 days')); $hasta = $hoy;
+                $labelPeriodo = 'Últimos 30 días';
+        }
+
+        // Si vienen fechas explícitas (compatibilidad), respetarlas y forzar custom
+        $fechaDesdeIn = $this->get('fecha_desde');
+        $fechaHastaIn = $this->get('fecha_hasta');
+        if ($periodo === 'custom' || $fechaDesdeIn !== null || $fechaHastaIn !== null) {
+            if ($fechaDesdeIn !== null) {
+                $desde = (string)$fechaDesdeIn;
+            }
+            if ($fechaHastaIn !== null) {
+                $hasta = (string)$fechaHastaIn;
+            }
+            if ($fechaDesdeIn !== null || $fechaHastaIn !== null) {
+                $periodo = 'custom';
+                $labelPeriodo = 'Período personalizado';
+            }
+        }
 
         if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $desde)) {
             $desde = date('Y-m-d', strtotime('-29 days'));
@@ -51,6 +99,8 @@ class EmpresaReporteController extends BaseController
             'fecha_desde' => $desde,
             'fecha_hasta' => $hasta,
             'mostrar' => $mostrar,
+            'periodo' => $periodo,
+            'label_periodo' => $labelPeriodo,
         ];
 
         $tituloReporte = $reporte['titulo'];
@@ -604,15 +654,63 @@ class EmpresaReporteController extends BaseController
         $estStmt->execute([$empresaId, $desde, $hasta]);
         $est = $estStmt->fetchAll();
 
-        $titulo = $rol === 'supervisor'
-            ? 'Reporte Operativo de Supervisión'
-            : 'Reporte Ejecutivo de Empresa';
+        // ── Reporte específico para Supervisor (foco operativo, no comercial) ─
+        if ($rol === 'supervisor') {
+            $pedidoModel = new PedidoModel();
+            $slaDemorados      = $pedidoModel->pedidosDemoradosAprobacion($empresaId, 15);
+            $excepcionesLimite = $pedidoModel->excepcionesLimite($empresaId, $desde, $hasta);
+            $incidenciasReparto = $pedidoModel->incidenciasReparto($empresaId, $desde, $hasta);
 
-        $kpi4Label = $rol === 'supervisor' ? 'Stock crítico' : 'Ticket promedio';
-        $kpi4Valor = $rol === 'supervisor'
-            ? number_format($stockCritico)
-            : '$' . number_format((float)($r['ticket'] ?? 0), 2);
-        $kpi4Hint = $rol === 'supervisor' ? 'Productos en alerta' : 'Monto por pedido';
+            return [
+                'titulo' => 'Reporte Operativo de Supervisión',
+                'kpis' => [
+                    ['label' => 'SLA crítico (>15 min)', 'valor' => number_format($slaDemorados), 'hint' => 'Pedidos demorados sin aprobar'],
+                    ['label' => 'Excepciones de límite', 'valor' => number_format($excepcionesLimite), 'hint' => 'Intentos por encima del límite'],
+                    ['label' => 'Incidencias de reparto', 'valor' => number_format($incidenciasReparto), 'hint' => 'Paradas fallidas / vencidas'],
+                    ['label' => 'Pendientes del período', 'valor' => number_format($pendientes), 'hint' => 'Por aprobar'],
+                    ['label' => 'Entregados', 'valor' => number_format((int)($r['entregados'] ?? 0)), 'hint' => 'Pedidos cerrados'],
+                    ['label' => 'Stock crítico', 'valor' => number_format($stockCritico), 'hint' => 'Productos en alerta'],
+                ],
+                'columnas' => ['Fecha', 'Folio', 'Comprador', 'Estado', 'Total', 'Sucursales'],
+                'filas' => array_map(fn($x) => [
+                    $x['fecha'],
+                    $x['folio'],
+                    trim((string)$x['comprador']),
+                    strtoupper((string)$x['estado']),
+                    '$' . number_format((float)$x['total'], 2),
+                    (string)$x['sucursales'],
+                ], $rows),
+                'notas' => [
+                    'Pedidos demorados (>15 min sin aprobar): ' . number_format($slaDemorados) . '. Atender estos primero para sostener el SLA.',
+                    'Excepciones de límite registradas: ' . number_format($excepcionesLimite) . '. Revisar compradores que intentan exceder su tope.',
+                    'Incidencias de reparto: ' . number_format($incidenciasReparto) . ' (paradas fallidas o pendientes vencidas).',
+                    'Productos en stock crítico: ' . number_format($stockCritico) . '. Coordinar reabastecimiento con producción.',
+                    'Parámetro técnico recomendado de conservación: 0°C a 4°C en operación.',
+                ],
+                'graficas' => [
+                    [
+                        'tipo' => 'line',
+                        'titulo' => 'Pedidos diarios',
+                        'labels' => array_map(fn($x) => $x['d'], $trend),
+                        'data' => array_map(fn($x) => (int)$x['pedidos'], $trend),
+                        'label' => 'Pedidos',
+                    ],
+                    [
+                        'tipo' => 'doughnut',
+                        'titulo' => 'Pedidos por estado',
+                        'labels' => array_map(fn($x) => strtoupper((string)$x['estado']), $est),
+                        'data' => array_map(fn($x) => (int)$x['c'], $est),
+                        'label' => 'Pedidos',
+                    ],
+                ],
+            ];
+        }
+
+        $titulo = 'Reporte Ejecutivo de Empresa';
+
+        $kpi4Label = 'Ticket promedio';
+        $kpi4Valor = '$' . number_format((float)($r['ticket'] ?? 0), 2);
+        $kpi4Hint = 'Monto por pedido';
 
         return [
             'titulo' => $titulo,

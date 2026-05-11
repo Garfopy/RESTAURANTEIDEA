@@ -80,6 +80,12 @@ function periodoUrl(string $p, string $base): string {
                    <?= $periodo === 'custom' ? 'background:var(--color-primary);color:#fff;border:none' : 'background:#fff;color:#374151;border:1px solid #D1D5DB' ?>">
       Personalizado
     </button>
+    <span style="width:1px;height:22px;background:#E5E7EB;margin:0 4px"></span>
+    <a href="<?= $baseUrl ?>empresa-reporte/index?periodo=<?= urlencode($periodo) ?>&fecha_desde=<?= urlencode($desde) ?>&fecha_hasta=<?= urlencode($hasta) ?>"
+       style="padding:6px 14px;border-radius:6px;font-size:.8rem;font-weight:700;text-decoration:none;background:var(--color-primary,#C8102E);color:#fff;display:inline-flex;align-items:center;gap:6px">
+      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+      Generar reporte
+    </a>
   </div>
 </div>
 
@@ -103,37 +109,54 @@ function periodoUrl(string $p, string $base): string {
   </button>
 </form>
 
-<!-- ── FILA 1: KPIs rápidos (tiempo real + período) ─────────────────────── -->
-<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:20px">
+<!-- ── FILA 1: KPIs operativos críticos del Supervisor ─────────────────────
+     Foco: lo que necesita atención inmediata, no métricas comerciales.
+     ────────────────────────────────────────────────────────────────────── -->
+<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:14px;margin-bottom:20px">
 
-  <div style="background:linear-gradient(135deg,#C8102E,#9B0A22);border-radius:12px;padding:20px;color:#fff">
-    <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;opacity:.8;margin-bottom:8px">Pedidos totales</div>
-    <div style="font-size:2.2rem;font-weight:800;line-height:1"><?= number_format($totalPed) ?></div>
-    <div style="font-size:.75rem;opacity:.7;margin-top:6px"><?= htmlspecialchars($labelPeriodo) ?></div>
+  <!-- 1. SLA de aprobación crítica (rojo) -->
+  <div style="background:linear-gradient(135deg,<?= $sla_demorados > 0 ? '#DC2626,#991B1B' : '#6B7280,#4B5563' ?>);border-radius:12px;padding:18px;color:#fff;position:relative;overflow:hidden">
+    <?php if ($sla_demorados > 0): ?>
+      <div style="position:absolute;top:8px;right:8px;background:rgba(255,255,255,.2);font-size:.6rem;font-weight:800;padding:2px 6px;border-radius:4px;letter-spacing:.05em">URGENTE</div>
+    <?php endif; ?>
+    <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;opacity:.85;margin-bottom:8px">SLA crítico (&gt;15 min)</div>
+    <div style="font-size:2.2rem;font-weight:800;line-height:1"><?= number_format($sla_demorados) ?></div>
+    <div style="font-size:.72rem;opacity:.75;margin-top:6px">pedidos demorados sin aprobar</div>
   </div>
 
-  <div style="background:linear-gradient(135deg,#1D4ED8,#1E40AF);border-radius:12px;padding:20px;color:#fff">
-    <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;opacity:.8;margin-bottom:8px">Ingresos</div>
-    <div style="font-size:1.7rem;font-weight:800;line-height:1">$<?= number_format((float)($kpis['monto_total'] ?? 0), 0) ?></div>
-    <div style="font-size:.75rem;opacity:.7;margin-top:6px">MXN · <?= htmlspecialchars($labelPeriodo) ?></div>
-  </div>
-
-  <div style="background:linear-gradient(135deg,#059669,#047857);border-radius:12px;padding:20px;color:#fff">
-    <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;opacity:.8;margin-bottom:8px">Tasa de entrega</div>
-    <div style="font-size:2.2rem;font-weight:800;line-height:1"><?= $tasaEntrega ?>%</div>
-    <div style="font-size:.75rem;opacity:.7;margin-top:6px"><?= $entregados ?> entregados</div>
-  </div>
-
-  <div style="background:linear-gradient(135deg,#D97706,#B45309);border-radius:12px;padding:20px;color:#fff">
-    <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;opacity:.8;margin-bottom:8px">Pendientes ahora</div>
+  <!-- 2. Pendientes ahora -->
+  <div style="background:linear-gradient(135deg,#D97706,#B45309);border-radius:12px;padding:18px;color:#fff">
+    <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;opacity:.85;margin-bottom:8px">Pendientes ahora</div>
     <div style="font-size:2.2rem;font-weight:800;line-height:1"><?= count($pendientes) ?></div>
-    <div style="font-size:.75rem;opacity:.7;margin-top:6px"><?= count($enRuta) ?> en ruta</div>
+    <div style="font-size:.72rem;opacity:.75;margin-top:6px"><?= count($enRuta) ?> en ruta</div>
   </div>
 
-  <div style="background:linear-gradient(135deg,#7C3AED,#5B21B6);border-radius:12px;padding:20px;color:#fff">
-    <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;opacity:.8;margin-bottom:8px">Tiempo aprobación</div>
+  <!-- 3. Excepciones de límite -->
+  <div style="background:linear-gradient(135deg,#7C3AED,#5B21B6);border-radius:12px;padding:18px;color:#fff">
+    <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;opacity:.85;margin-bottom:8px">Excepciones de límite</div>
+    <div style="font-size:2.2rem;font-weight:800;line-height:1"><?= number_format($excepciones_limite) ?></div>
+    <div style="font-size:.72rem;opacity:.75;margin-top:6px">intentos por encima del límite</div>
+  </div>
+
+  <!-- 4. Incidencias de reparto -->
+  <div style="background:linear-gradient(135deg,#0EA5E9,#0369A1);border-radius:12px;padding:18px;color:#fff">
+    <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;opacity:.85;margin-bottom:8px">Incidencias de reparto</div>
+    <div style="font-size:2.2rem;font-weight:800;line-height:1"><?= number_format($incidencias_reparto) ?></div>
+    <div style="font-size:.72rem;opacity:.75;margin-top:6px">paradas fallidas / vencidas</div>
+  </div>
+
+  <!-- 5. Tasa de entrega -->
+  <div style="background:linear-gradient(135deg,#059669,#047857);border-radius:12px;padding:18px;color:#fff">
+    <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;opacity:.85;margin-bottom:8px">Tasa de entrega</div>
+    <div style="font-size:2.2rem;font-weight:800;line-height:1"><?= $tasaEntrega ?>%</div>
+    <div style="font-size:.72rem;opacity:.75;margin-top:6px"><?= $entregados ?> entregados</div>
+  </div>
+
+  <!-- 6. Tiempo aprobación promedio -->
+  <div style="background:linear-gradient(135deg,#1D4ED8,#1E40AF);border-radius:12px;padding:18px;color:#fff">
+    <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;opacity:.85;margin-bottom:8px">Tiempo aprobación</div>
     <div style="font-size:2rem;font-weight:800;line-height:1"><?= $avgLabel ?></div>
-    <div style="font-size:.75rem;opacity:.7;margin-top:6px">promedio del período</div>
+    <div style="font-size:.72rem;opacity:.75;margin-top:6px">promedio del período</div>
   </div>
 
 </div>

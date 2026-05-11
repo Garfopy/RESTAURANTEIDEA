@@ -6,11 +6,22 @@ $mostrarTabla    = in_array('tabla', $filtros['mostrar'] ?? [], true);
 $mostrarNotas    = in_array('notas', $filtros['mostrar'] ?? [], true);
 $reportIdSanitized = isset($reportId[0]) && $reportId[0] === '#' ? substr($reportId, 1) : $reportId;
 $graficas = $graficas ?? [];
+
+// Período actual y presets
+$periodoActual = $filtros['periodo'] ?? '30d';
+$labelPeriodoActual = $filtros['label_periodo'] ?? 'Últimos 30 días';
+$presetsPeriodo = [
+    'hoy' => 'Hoy',
+    '7d'  => '7 días',
+    '30d' => '30 días',
+    '90d' => '90 días',
+    'año' => 'Este año',
+];
 ?>
 <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:14px">
   <div>
     <h2 style="font-size:1.2rem;font-weight:800;color:#111827;margin:0">Módulo de Reportes</h2>
-    <p style="color:#6B7280;font-size:.85rem;margin-top:6px">Selecciona el rango y las secciones a incluir en el reporte y en el PDF.</p>
+    <p style="color:#6B7280;font-size:.85rem;margin-top:6px">Selecciona el período y las secciones a incluir en el reporte y en el PDF.</p>
   </div>
   <div style="display:flex;gap:8px;flex-wrap:wrap">
     <button type="button" onclick="descargarReporteXls()" style="background:#fff;border:1px solid #D1D5DB;color:#111827;font-weight:700;border-radius:8px;padding:8px 12px;font-size:.8rem">Descargar XLS</button>
@@ -18,13 +29,46 @@ $graficas = $graficas ?? [];
   </div>
 </div>
 
-<form method="GET" style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:14px;margin-bottom:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;align-items:end">
+<!-- Selector de período tipo botones (Hoy / 7 días / 30 días / 90 días / Este año / Personalizado) -->
+<div style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:14px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
   <div>
-    <label style="display:block;font-size:.72rem;font-weight:700;color:#6B7280;margin-bottom:4px">Fecha desde</label>
+    <div style="font-size:.7rem;color:#6B7280;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Período de análisis</div>
+    <div style="font-size:.95rem;font-weight:700;color:#111827"><?= htmlspecialchars($labelPeriodoActual) ?></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+    <?php foreach ($presetsPeriodo as $key => $lab): ?>
+      <?php
+        $href = '?periodo=' . urlencode($key);
+        // Conservar selecciones de "mostrar" como hidden via query
+        foreach (($filtros['mostrar'] ?? []) as $m) {
+            $href .= '&mostrar[]=' . urlencode($m);
+        }
+        $isActive = ($periodoActual === $key);
+      ?>
+      <a href="<?= htmlspecialchars($href) ?>"
+         style="padding:7px 14px;border-radius:8px;font-size:.78rem;font-weight:700;text-decoration:none;border:1px solid <?= $isActive ? 'var(--color-primary,#C8102E)' : '#D1D5DB' ?>;
+                background:<?= $isActive ? 'var(--color-primary,#C8102E)' : '#fff' ?>;color:<?= $isActive ? '#fff' : '#374151' ?>">
+        <?= htmlspecialchars($lab) ?>
+      </a>
+    <?php endforeach; ?>
+    <button type="button"
+            onclick="document.getElementById('rangoPersonalizado').style.display=document.getElementById('rangoPersonalizado').style.display==='none'?'flex':'none'"
+            style="padding:7px 14px;border-radius:8px;font-size:.78rem;font-weight:700;cursor:pointer;border:1px solid <?= $periodoActual === 'custom' ? 'var(--color-primary,#C8102E)' : '#D1D5DB' ?>;
+                   background:<?= $periodoActual === 'custom' ? 'var(--color-primary,#C8102E)' : '#fff' ?>;color:<?= $periodoActual === 'custom' ? '#fff' : '#374151' ?>">
+      Personalizado
+    </button>
+  </div>
+</div>
+
+<!-- Picker fechas + checkboxes de secciones -->
+<form method="GET" id="rangoPersonalizado" style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:14px;margin-bottom:16px;display:<?= $periodoActual === 'custom' ? 'grid' : 'none' ?>;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;align-items:end">
+  <input type="hidden" name="periodo" value="custom">
+  <div>
+    <label style="display:block;font-size:.72rem;font-weight:700;color:#6B7280;margin-bottom:4px">Desde</label>
     <input type="date" name="fecha_desde" value="<?= htmlspecialchars($filtros['fecha_desde']) ?>" style="width:100%;border:1px solid #D1D5DB;border-radius:8px;padding:8px 10px;font-size:.85rem">
   </div>
   <div>
-    <label style="display:block;font-size:.72rem;font-weight:700;color:#6B7280;margin-bottom:4px">Fecha hasta</label>
+    <label style="display:block;font-size:.72rem;font-weight:700;color:#6B7280;margin-bottom:4px">Hasta</label>
     <input type="date" name="fecha_hasta" value="<?= htmlspecialchars($filtros['fecha_hasta']) ?>" style="width:100%;border:1px solid #D1D5DB;border-radius:8px;padding:8px 10px;font-size:.85rem">
   </div>
   <div style="grid-column:1/-1;display:flex;gap:14px;align-items:center;flex-wrap:wrap">
@@ -36,9 +80,23 @@ $graficas = $graficas ?? [];
     <label style="font-size:.82rem;color:#374151"><input type="checkbox" name="mostrar[]" value="notas"    <?= $mostrarNotas ? 'checked' : '' ?>> Notas</label>
   </div>
   <div style="display:flex;justify-content:flex-end">
-    <button type="submit" style="background:#111827;color:#fff;border:none;border-radius:8px;padding:9px 14px;font-size:.8rem;font-weight:700">Aplicar filtros</button>
+    <button type="submit" style="background:var(--color-primary,#C8102E);color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:.8rem;font-weight:700">Aplicar</button>
   </div>
 </form>
+
+<!-- Form auxiliar para alternar secciones cuando el período NO es personalizado -->
+<?php if ($periodoActual !== 'custom'): ?>
+<form method="GET" style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:14px;margin-bottom:16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+  <input type="hidden" name="periodo" value="<?= htmlspecialchars($periodoActual) ?>">
+  <span style="font-size:.72rem;font-weight:700;color:#6B7280;text-transform:uppercase">Mostrar / incluir en PDF:</span>
+  <label style="font-size:.82rem;color:#374151"><input type="checkbox" name="mostrar[]" value="logo"     <?= $mostrarLogo ? 'checked' : '' ?>> Logo</label>
+  <label style="font-size:.82rem;color:#374151"><input type="checkbox" name="mostrar[]" value="kpis"     <?= $mostrarKpis ? 'checked' : '' ?>> KPIs</label>
+  <label style="font-size:.82rem;color:#374151"><input type="checkbox" name="mostrar[]" value="graficas" <?= $mostrarGraficas ? 'checked' : '' ?>> Gráficas</label>
+  <label style="font-size:.82rem;color:#374151"><input type="checkbox" name="mostrar[]" value="tabla"    <?= $mostrarTabla ? 'checked' : '' ?>> Tabla</label>
+  <label style="font-size:.82rem;color:#374151"><input type="checkbox" name="mostrar[]" value="notas"    <?= $mostrarNotas ? 'checked' : '' ?>> Notas</label>
+  <button type="submit" style="margin-left:auto;background:#111827;color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:.78rem;font-weight:700">Aplicar secciones</button>
+</form>
+<?php endif; ?>
 
 <div id="reporteTecnico" style="background:#fff;border:1px solid #E5E7EB;border-radius:14px;padding:20px;display:grid;gap:14px">
   <div style="border:1px solid #E5E7EB;border-radius:10px;padding:14px;display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:center">
