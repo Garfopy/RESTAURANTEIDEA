@@ -26,7 +26,7 @@ class PublicController extends BaseController
         $susModel = new SuscripcionModel();
         $planes   = $susModel->getPlanesActivos();
 
-        require ROOT_PATH . '/app/views/public/landing.php';
+        require ROOT_PATH . '/app/views/public/landing_carnihub.php';
     }
 
     // GET /taqueria → landing audiencia taquerías
