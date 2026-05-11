@@ -1,5 +1,5 @@
 # CarniHub — Plan v2.9.4
-**Versión:** 2.9.4 | **Fecha:** 2026-05-07 | **Stack:** PHP 8.3 · MySQL · Tailwind CDN · MVC sin framework
+**Versión:** 3.0.0 | **Fecha:** 2026-05-11 | **Stack:** PHP 8.3 · MySQL · Tailwind CDN · MVC sin framework
 
 ---
 
@@ -261,10 +261,10 @@ Login exitoso redirige según rol:
 |-----------|--------|--------|---------------|
 | BaseController | ✅ Completo | — | requireAdmin, requireEmpresa, requireComprador, requireSupervisor, requireAdminEmpresa, requireRepartidor, redirectSegunRol |
 | AuthController | ✅ Completo | Todos | Login con brute-force, logout, redirect por rol |
-| PanelController | ✅ Funcional | superadmin, admin | Dashboard con KPIs globales de plataforma |
+| PanelController | ✅ Completo | superadmin, admin | Dashboard con 6 KPIs, Chart.js (pedidos/monto, distribución planes), actividad reciente, alertas stock |
 | RepartidorController | ✅ Funcional | repartidor | Ruta del día, confirmar entrega, firma/foto POD, historial |
 | ApiController | ✅ Funcional | Autenticados | Precios escalonados AJAX, GPS tracking |
-| EmpresaController | ✅ Funcional | superadmin, admin | Listado y alta de empresas cliente |
+| EmpresaController | ✅ Funcional | superadmin, admin | Listado y alta de empresas cliente — **fix: valida RFC y email duplicado antes de insertar** |
 | EmpresaUsuarioController | ✅ Funcional | admin_empresa | Crea supervisor/comprador/repartidor para su empresa |
 | EmpresaDashboardController | ✅ Funcional | admin_empresa | Dashboard del productor (ventas, stock, equipo) |
 | CatalogoController | ✅ Funcional | comprador | Catálogo con filtros, detalle de producto |
@@ -272,19 +272,19 @@ Login exitoso redirige según rol:
 | CarritoController | ✅ Funcional | comprador | 4 pasos: productos → sucursales → resumen → confirmar |
 | PedidoController | ✅ Funcional | comprador, supervisor, admin_empresa | Historial, detalle, aprobación, tracking GPS, cancelar |
 | ConfigController | ✅ Completo | superadmin | general (logo+colores), apis (claves), correo (SMTP) |
-| PanelUsuarioController | ✅ Completo | superadmin, admin | CRUD usuarios de plataforma (admin, admin_empresa) + toggle |
+| PanelUsuarioController | ✅ Completo | superadmin, admin | CRUD usuarios plataforma + toggle — **fix: valida email duplicado; superadmin puede crear superadmin/admin/admin_empresa; EmailService envía credenciales** |
 | PanelLogisticaController | ✅ Funcional | superadmin, admin | Mapa global de rutas (solo monitoreo) |
 | EmpresaProductoController | ✅ Funcional | admin_empresa | CRUD catálogo de la empresa |
-| EmpresaInventarioController | ✅ Funcional | admin_empresa | Stock de la empresa — fix p.unidad aplicado |
-| EmpresaLogisticaController | ✅ Funcional | admin_empresa | Rutas de la empresa — fix query() protected aplicado |
-| SupervisorController | ⚠️ Esqueleto | supervisor | Panel dedicado — vistas pendientes |
-| CompradorController | ⚠️ Esqueleto | comprador | Portal de compras — vistas pendientes |
+| EmpresaInventarioController | ✅ Funcional | admin_empresa | Stock de la empresa |
+| EmpresaLogisticaController | ✅ Funcional | admin_empresa | Rutas de la empresa |
+| SupervisorController | ✅ Completo | supervisor | Dashboard analytics Chart.js, KPIs, pedidos, stock |
+| CompradorController | ✅ Funcional | comprador | Portal inicio con KPIs, últimos pedidos, en ruta |
 | EmpresaPedidoController | ✅ Funcional | admin_empresa | Pedidos de su empresa: index, aprobar, rechazar, asignarEntrega, cambiarEstado, subirFotoEntrega, personalizado, guardarPersonalizado |
-| PanelReporteController | ❌ Pendiente | superadmin, admin | Reportes globales de plataforma (solo lectura) |
+| PanelReporteController | ✅ Completo | superadmin, admin | **Reportes SaaS: ingresos por mes, distribución planes, estado suscripciones, top empresas, errores** |
 | RecurrenteController | ❌ Pendiente | comprador, admin_empresa | Plantillas de pedido automático |
 | LimiteController | ❌ Pendiente | supervisor, admin_empresa | Límites de compra |
 | EmpresaReporteController | ❌ Pendiente | admin_empresa | Reportes de su empresa |
-| SuscripcionController | ✅ Completo | superadmin, admin | Gestión suscripciones + webhook PayPal |
+| SuscripcionController | ✅ Completo | superadmin, admin | Gestión suscripciones + webhook PayPal + **editarPlan/guardarPlan (límites por plan)** |
 | EmpresaSuscripcionController | ✅ Completo | admin_empresa | Portal pago con PayPal |
 | PublicController | ✅ Completo | Público | Página de precios pública |
 | PagoController | ❌ Pendiente | comprador, admin_empresa | Comprobantes, PayPal, crédito |
@@ -296,12 +296,12 @@ Login exitoso redirige según rol:
 | Model | Estado |
 |-------|--------|
 | BaseModel | ✅ CRUD + paginate (query/queryOne/execute son protected — llamar solo desde models) |
-| UsuarioModel | ✅ getByEmail, getByEmpresa, rolesPermitidos, crear, getConRol, getRolPorSlug, getRolPorId, getRepartidoresGlobal, getRepartidoresPorEmpresa |
-| EmpresaModel | ✅ listado con filtros, estadísticas, listadoSimple |
-| ProductoModel | ✅ listadoConPrecio, getPrecioParaCantidad, getEscalonados, getCategorias, listadoAdmin, listadoInventario (fix: usa presentacion no unidad), ajustarStock, actualizarEscalonados, inicializarInventario, actualizarInventario |
-| PedidoModel | ✅ generarFolio, crear (transacción), listadoEmpresa, pendientesAprobacion, conDetalle, aprobar, rechazar, tracking, listadoGlobal, cambiarEstado, crearRuta, listadoConfirmadosPorEmpresa, getRutasActivas, getPosicionesActivas |
+| UsuarioModel | ✅ getByEmail, getByEmpresa, rolesPermitidos, crear, getConRol, getRolPorSlug, getRolPorId, getRepartidoresGlobal, getRepartidoresPorEmpresa, **rolesPermitidosPorSuperAdmin, existeEmail** |
+| EmpresaModel | ✅ listado con filtros, estadísticas, listadoSimple, **existeRFCValor, existeEmailValor** |
+| ProductoModel | ✅ listadoConPrecio, getPrecioParaCantidad, getEscalonados, getCategorias, listadoAdmin, listadoInventario, ajustarStock, actualizarEscalonados, inicializarInventario, actualizarInventario |
+| PedidoModel | ✅ generarFolio, crear (transacción), listadoEmpresa, pendientesAprobacion, conDetalle, aprobar, rechazar, tracking, listadoGlobal, cambiarEstado, crearRuta, listadoConfirmadosPorEmpresa, getRutasActivas, getPosicionesActivas, kpisResumen, pedidosPorDia, pedidosPorEstado, topProductos |
 | ConfigModel | ✅ get, set, getGrupo, getAll, guardarGrupo |
-| SuscripcionModel | ✅ getPlanesActivos, getPlanPorSlug, getByEmpresa, getByPaypalId, listado, crear, cambiarPlan, cambiarEstado, guardarPaypalId, activarDesdePaypal, renovar, verificarLimite |
+| SuscripcionModel | ✅ getPlanesActivos, getPlanPorSlug, **getPlanPorId**, getByEmpresa, getByPaypalId, listado, crear, cambiarPlan, cambiarEstado, guardarPaypalId, activarDesdePaypal, renovar, verificarLimite, **actualizarLimitesPlan** |
 | LogModel | ✅ registrar, registrarError, getBitacora |
 
 ### Vistas (en `app/views/`)
@@ -340,8 +340,10 @@ Login exitoso redirige según rol:
 | repartidor/inicio.php | ✅ Ruta del día (dark mode) | repartidor |
 | repartidor/entrega.php | ✅ Firma digital + GPS + foto | repartidor |
 | repartidor/historial.php | ✅ Historial de entregas | repartidor |
-| supervisor/dashboard.php | ❌ Pendiente | supervisor |
-| comprador/inicio.php | ❌ Pendiente | comprador |
+| panel/suscripciones/editar_plan.php | ✅ Nueva — superadmin edita nombre, precio, límites | superadmin |
+| panel/reportes/index.php | ✅ Nueva — reportes SaaS completos con Chart.js | superadmin, admin |
+| supervisor/dashboard.php | ✅ Completo | supervisor |
+| comprador/inicio.php | ✅ Funcional | comprador |
 
 ### Migración
 | Archivo | Estado |
@@ -1133,9 +1135,24 @@ Para funcionar offline sin Traccar:
 - [ ] `PanelReporteController` — ventas globales con gráficas Chart.js (solo lectura para superadmin)
 - [ ] Exportar Excel (PhpSpreadsheet) y PDF (Dompdf)
 
+### Sprint Fix-Bugs-Glitches — Correcciones y mejoras de plataforma ✅ EN PROGRESO (rama `sprint-fix-bugs-glitches`, 2026-05-11)
+
+**Bugs corregidos:**
+- [x] `EmpresaController::guardar()` — sin validación de RFC/email duplicados → ahora valida antes del INSERT y muestra alerta amigable; try-catch para capturar cualquier violación UNIQUE de MySQL
+- [x] `PanelUsuarioController::guardar()` — sin validación de email duplicado → ahora llama `UsuarioModel::existeEmail()` antes de insertar; mensaje de error descriptivo
+- [x] `PanelUsuarioController` — superadmin solo podía crear `admin_empresa`; ahora puede crear `superadmin`, `admin` y `admin_empresa` usando `rolesPermitidosPorSuperAdmin()`
+- [x] `PanelReporteController::index()` — solo redirigía a empresa-reporte (incorrecto); ahora implementación completa para panel de plataforma
+- [x] Sidebar panel — link "Reportes y analítica" apuntaba a `empresa-reporte/index` (portal empresa); corregido a `panel-reporte/index`
+
+**Mejoras añadidas:**
+- [x] Dashboard superadmin — 6 KPI cards (empresas, usuarios, pedidos, ventas, ingresos SaaS, suscripciones activas); gráficas Chart.js (pedidos+monto por mes, distribución de planes en dona); tabla últimos pedidos con empresa; actividad reciente; alertas stock con nombre de empresa
+- [x] Reportes SaaS (`panel-reporte/index`) — ingresos por mes, pedidos del sistema, distribución de planes, estado de suscripciones, top 5 empresas por volumen, empresas nuevas, tasa de errores (si existe tabla error_logs)
+- [x] Planes SaaS editables — `SuscripcionController::editarPlan()` + `guardarPlan()` + vista `editar_plan.php`; botón "Editar límites" en cada plan de `/suscripcion/configurar`; solo superadmin puede acceder
+- [x] Sidebar panel — enlace "Permisos de planes" (visible solo superadmin) → `suscripcion/configurar`
+
 ---
 
-## PAYPAL SUBSCRIPTIONS — CONFIGURACIÓN PASO A PASO
+### PAYPAL SUBSCRIPTIONS — CONFIGURACIÓN PASO A PASO
 
 > El botón "Configurar PayPal" en `/suscripcion/configurar` ya existe. Solo falta poner los Plan IDs reales.
 
