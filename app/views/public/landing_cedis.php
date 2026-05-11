@@ -9,7 +9,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Plataforma de abastecimiento para CEDIS | Trazabilidad y logística | <?= htmlspecialchars($appName) ?></title>
+  <title>Plataforma de abastecimiento productos cárnicos con visibilidad y trazabilidad a 1 click | <?= htmlspecialchars($appName) ?></title>
   <meta name="description" content="Optimiza compras, entregas, trazabilidad y logística inversa con CarniHub. Ideal para CEDIS de restaurantes, hoteles, taquerías y carnicerías.">
   <meta name="keywords" content="proveedores de carne con crédito, cotización de carne para comedores, precio de carne para restaurantes, carne por mayoreo para hoteles, proveedor de carne para cadenas restauranteras, proveedor de carne con entrega garantizada, proveedor de carne para CEDIS, compra de carne para restaurantes, compra de carne para hoteles, proveedor de carne para taquerías">
   <link rel="canonical" href="<?= BASE_URL ?>cedis">
@@ -34,7 +34,7 @@
       },
       {
         "@type": "Service",
-        "name": "Plataforma logística y abastecimiento para CEDIS",
+        "name": "Plataforma logística y abastecimiento para restaurantes",
         "provider": { "@type": "Organization", "name": "CarniHub" }
       },
       {
@@ -99,6 +99,20 @@
     .text-gradient { background: linear-gradient(135deg, #fff 30%, color-mix(in srgb,var(--cp) 80%,#fff)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
     .module-card { background: linear-gradient(180deg,#fff,#f8fafc); border: 1px solid #e2e8f0; border-radius: 1.25rem; padding: 1.5rem; transition: transform .25s cubic-bezier(.34,1.56,.64,1), box-shadow .25s; }
     .module-card:hover { transform: translateY(-6px); box-shadow: 0 16px 40px rgba(0,0,0,.08); }
+    /* ── Slider ── */
+    .slider-wrap { position:relative; overflow:hidden; min-height:82vh; }
+    .slide { position:absolute; inset:0; opacity:0; pointer-events:none; transition:opacity .8s ease; }
+    .slide.active { opacity:1; pointer-events:auto; }
+    .slider-arrow { position:absolute; top:50%; transform:translateY(-50%); z-index:30; background:rgba(255,255,255,.13); border:1px solid rgba(255,255,255,.3); color:#fff; width:52px; height:52px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:background .2s, border-color .2s, transform .2s; backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); }
+    .slider-arrow:hover { background:rgba(255,255,255,.28); border-color:rgba(255,255,255,.7); transform:translateY(-50%) scale(1.08); }
+    #slider-prev { left:20px; }
+    #slider-next { right:20px; }
+    .slider-dots { position:absolute; bottom:30px; left:50%; transform:translateX(-50%); display:flex; gap:10px; z-index:30; }
+    .slider-dot { width:10px; height:10px; border-radius:50%; background:rgba(255,255,255,.35); border:none; cursor:pointer; transition:background .25s, transform .25s; padding:0; }
+    .slider-dot.active { background:#fff; transform:scale(1.4); }
+    .slide-chip { display:inline-flex; align-items:center; gap:.5rem; padding:.4rem 1.1rem; border-radius:9999px; font-size:.72rem; font-weight:800; letter-spacing:.1em; text-transform:uppercase; margin-bottom:1.25rem; }
+    .slider-progress { position:absolute; bottom:0; left:0; height:3px; background:var(--cp); width:0%; z-index:30; }
+    .slider-progress.running { width:100%; transition:width 5s linear; }
   </style>
 </head>
 <body class="bg-white text-gray-900">
@@ -124,43 +138,151 @@
   </div>
 </nav>
 
-<!-- ══ HERO ══ -->
-<section class="hero-bg relative min-h-[85vh] flex flex-col justify-center overflow-hidden pt-16">
-  <div class="orb" style="width:500px;height:500px;background:var(--cp);top:-120px;right:-100px;"></div>
-  <div class="orb" style="width:350px;height:350px;background:#6366f1;bottom:-80px;left:-60px;"></div>
+<!-- ══ SLIDER HERO ══ -->
+<div class="slider-wrap pt-16" id="hero-slider">
 
-  <div class="max-w-6xl mx-auto px-6 py-24 md:py-32 relative z-10">
-    <div class="max-w-3xl">
-      <div class="flex items-center gap-2 mb-6 text-sm">
-        <a href="<?= BASE_URL ?>" class="text-white/50 hover:text-white/80 transition-colors">Inicio</a>
-        <span class="text-white/30">›</span>
-        <span class="text-white/70">CEDIS &amp; Carnicerías</span>
+  <!-- Slide 1: Controla entregas, incidencias y trazabilidad desde un solo sistema -->
+  <!-- alt-img: proveedor de carne para taquerías -->
+  <div class="slide active" data-slide="0" style="background:radial-gradient(ellipse 80% 60% at 50% -10%,color-mix(in srgb,var(--cp) 30%,transparent),transparent),linear-gradient(160deg,#0a0f1e 0%,#111827 55%,#1a2235 100%)">
+    <div class="orb" style="width:500px;height:500px;background:var(--cp);top:-120px;right:-100px;"></div>
+    <div class="orb" style="width:350px;height:350px;background:#6366f1;bottom:-80px;left:-60px;"></div>
+    <div class="max-w-6xl mx-auto px-6 py-20 md:py-28 relative z-10">
+      <div class="max-w-3xl">
+        <div class="slide-chip pulse-badge" style="background:color-mix(in srgb,var(--cp) 20%,transparent);border:1px solid color-mix(in srgb,var(--cp) 50%,transparent);color:var(--cp)">
+          <span class="w-2 h-2 rounded-full bg-primary animate-pulse inline-block"></span>
+          Plataforma para CEDIS · Trazabilidad a 1 click
+        </div>
+        <h2 class="text-4xl md:text-5xl lg:text-6xl font-black text-white leading-tight mb-5">
+          Controla entregas, incidencias<br>
+          <span class="text-gradient">y trazabilidad desde un solo sistema</span>
+        </h2>
+        <p class="text-gray-400 text-lg mb-8 max-w-xl leading-relaxed">
+          Visibilidad total sobre cada pedido, ruta y entrega. Diseñado para responsables de CEDIS y operaciones gastronómicas complejas.
+        </p>
+        <a href="<?= BASE_URL ?>planes/registro" class="btn-primary btn-shimmer inline-block font-bold px-8 py-4 rounded-xl">Solicitar demostración →</a>
       </div>
-      <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full mb-6 pulse-badge"
-           style="background:color-mix(in srgb,var(--cp) 20%,transparent);border:1px solid color-mix(in srgb,var(--cp) 50%,transparent)">
-        <span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
-        <span class="text-xs font-bold uppercase tracking-widest text-primary">Plataforma para CEDIS · Trazabilidad a 1 click</span>
+    </div>
+  </div>
+
+  <!-- Slide 2: Reduce mermas, devoluciones y pérdidas operativas -->
+  <!-- alt-img: proveedor de carne con entrega garantizada -->
+  <div class="slide" data-slide="1" style="background:radial-gradient(ellipse 80% 60% at 50% -10%,rgba(34,197,94,.25),transparent),linear-gradient(160deg,#0a0f1e 0%,#111827 55%,#0f1e14 100%)">
+    <div class="orb" style="width:500px;height:500px;background:#22c55e;top:-120px;right:-100px;"></div>
+    <div class="orb" style="width:350px;height:350px;background:var(--cp);bottom:-80px;left:-60px;"></div>
+    <div class="max-w-6xl mx-auto px-6 py-20 md:py-28 relative z-10">
+      <div class="max-w-3xl">
+        <div class="slide-chip" style="background:rgba(34,197,94,.18);border:1px solid rgba(34,197,94,.45);color:#22c55e">
+          <span class="w-2 h-2 rounded-full inline-block" style="background:#22c55e"></span>
+          Logística inversa · Devoluciones ágiles
+        </div>
+        <h2 class="text-4xl md:text-5xl lg:text-6xl font-black text-white leading-tight mb-5">
+          Reduce mermas, devoluciones<br>
+          <span style="background:linear-gradient(135deg,#fff 30%,#86efac);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">y pérdidas operativas en tus sucursales</span>
+        </h2>
+        <p class="text-gray-400 text-lg mb-8 max-w-xl leading-relaxed">
+          Trazabilidad documental, evidencia POD digital y seguimiento de incidencias para reducir conflictos con proveedores y pérdidas económicas.
+        </p>
+        <a href="<?= BASE_URL ?>planes/registro" class="inline-block font-bold px-8 py-4 rounded-xl" style="background:#22c55e;color:#fff">Ver gestión de mermas →</a>
       </div>
-      <h1 class="text-4xl md:text-5xl lg:text-6xl font-black leading-[1.1] mb-6">
-        <span class="text-gradient">Plataforma especializada</span><br>
-        <span class="text-white">en abastecimiento,</span><br>
-        <span class="text-white text-3xl md:text-4xl font-bold">trazabilidad y logística para CEDIS</span>
-      </h1>
-      <p class="text-gray-400 text-lg leading-relaxed mb-8 max-w-2xl">
-        CarniHub ayuda a responsables de CEDIS, cadenas de restaurantes, hoteles, taquerías y carnicerías
-        a optimizar <strong class="text-white/80">compras, logística, devoluciones e inventarios</strong>.
-        Todo desde un ecosistema digital diseñado para operaciones gastronómicas complejas.
-      </p>
-      <div class="flex flex-wrap gap-2 mb-8">
-        <?php foreach (['Multi-sucursal','Cadena de frío','POD digital','IIoT','Control de mermas'] as $tag): ?>
-        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold"
-              style="background:color-mix(in srgb,var(--cp) 15%,transparent);border:1px solid color-mix(in srgb,var(--cp) 35%,transparent);color:#fff"><?= htmlspecialchars($tag) ?></span>
-        <?php endforeach; ?>
+    </div>
+  </div>
+
+  <!-- Slide 3: Centraliza compras, crédito, facturación y pedidos multi-sucursal -->
+  <!-- alt-img: proveedores de carne con crédito -->
+  <div class="slide" data-slide="2" style="background:radial-gradient(ellipse 80% 60% at 50% -10%,rgba(245,158,11,.28),transparent),linear-gradient(160deg,#0a0f1e 0%,#111827 55%,#1e1a10 100%)">
+    <div class="orb" style="width:500px;height:500px;background:#f59e0b;top:-120px;right:-100px;"></div>
+    <div class="orb" style="width:350px;height:350px;background:var(--cp);bottom:-80px;left:-60px;"></div>
+    <div class="max-w-6xl mx-auto px-6 py-20 md:py-28 relative z-10">
+      <div class="max-w-3xl">
+        <div class="slide-chip" style="background:rgba(245,158,11,.18);border:1px solid rgba(245,158,11,.45);color:#f59e0b">
+          <span class="w-2 h-2 rounded-full inline-block" style="background:#f59e0b"></span>
+          Compras multi-sucursal · Crédito estructurado
+        </div>
+        <h2 class="text-4xl md:text-5xl lg:text-6xl font-black text-white leading-tight mb-5">
+          Centraliza compras, crédito,<br>
+          <span style="background:linear-gradient(135deg,#fff 30%,#fcd34d);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">facturación y pedidos multi-sucursal</span>
+        </h2>
+        <p class="text-gray-400 text-lg mb-8 max-w-xl leading-relaxed">
+          Control administrativo total sobre precios acordados, crédito con proveedores, facturación automática y conciliación sin errores.
+        </p>
+        <a href="<?= BASE_URL ?>planes/registro" class="inline-block font-bold px-8 py-4 rounded-xl" style="background:#f59e0b;color:#fff">Ver control de compras →</a>
       </div>
-      <div class="flex flex-col sm:flex-row gap-3">
-        <a href="<?= BASE_URL ?>planes/registro" class="btn-primary btn-shimmer font-bold text-base px-8 py-4 rounded-xl text-center">Solicitar demostración →</a>
-        <a href="#control" class="btn-outline font-semibold text-base px-8 py-4 rounded-xl text-center">Ver funcionalidades</a>
+    </div>
+  </div>
+
+  <!-- Slide 4: Monitorea unidades, rutas y cadena de frío en tiempo real -->
+  <!-- alt-img: proveedor de carne para cadenas restauranteras -->
+  <div class="slide" data-slide="3" style="background:radial-gradient(ellipse 80% 60% at 50% -10%,rgba(99,102,241,.28),transparent),linear-gradient(160deg,#0a0f1e 0%,#111827 55%,#0e1120 100%)">
+    <div class="orb" style="width:500px;height:500px;background:#6366f1;top:-120px;right:-100px;"></div>
+    <div class="orb" style="width:350px;height:350px;background:var(--cp);bottom:-80px;left:-60px;"></div>
+    <div class="max-w-6xl mx-auto px-6 py-20 md:py-28 relative z-10">
+      <div class="max-w-3xl">
+        <div class="slide-chip" style="background:rgba(99,102,241,.18);border:1px solid rgba(99,102,241,.45);color:#a5b4fc">
+          <span class="w-2 h-2 rounded-full inline-block" style="background:#a5b4fc"></span>
+          IIoT · Cadena de frío · Rutas
+        </div>
+        <h2 class="text-4xl md:text-5xl lg:text-6xl font-black text-white leading-tight mb-5">
+          Monitorea unidades, rutas<br>
+          <span style="background:linear-gradient(135deg,#fff 30%,#c7d2fe);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">y cadena de frío en tiempo real</span>
+        </h2>
+        <p class="text-gray-400 text-lg mb-8 max-w-xl leading-relaxed">
+          Visibilidad en tiempo real sobre temperatura, rutas y estado de activos para cadenas restauranteras con múltiples puntos de operación.
+        </p>
+        <a href="<?= BASE_URL ?>planes/registro" class="inline-block font-bold px-8 py-4 rounded-xl" style="background:#6366f1;color:#fff">Ver monitoreo IIoT →</a>
       </div>
+    </div>
+  </div>
+
+  <!-- Flecha izquierda -->
+  <button class="slider-arrow" id="slider-prev" aria-label="Diapositiva anterior">
+    <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+    </svg>
+  </button>
+
+  <!-- Flecha derecha -->
+  <button class="slider-arrow" id="slider-next" aria-label="Diapositiva siguiente">
+    <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+    </svg>
+  </button>
+
+  <!-- Dots de navegación -->
+  <div class="slider-dots" id="slider-dots">
+    <button class="slider-dot active" data-slide="0" aria-label="Diapositiva 1"></button>
+    <button class="slider-dot" data-slide="1" aria-label="Diapositiva 2"></button>
+    <button class="slider-dot" data-slide="2" aria-label="Diapositiva 3"></button>
+    <button class="slider-dot" data-slide="3" aria-label="Diapositiva 4"></button>
+  </div>
+
+  <!-- Barra de progreso -->
+  <div class="slider-progress" id="slider-progress"></div>
+</div>
+
+<!-- ══ H1 INTRO ══ -->
+<section id="intro" class="bg-white py-16">
+  <div class="max-w-6xl mx-auto px-6 reveal">
+    <div class="flex items-center gap-2 text-sm text-gray-400 mb-5">
+      <a href="<?= BASE_URL ?>" class="hover:text-gray-600 transition-colors">Inicio</a>
+      <span>›</span>
+      <span>CEDIS &amp; Carnicerías</span>
+    </div>
+    <h1 class="text-3xl md:text-4xl font-extrabold text-gray-900 mb-5">
+      Plataforma especializada en abastecimiento, trazabilidad y logística para CEDIS de cadenas restauranteras, hoteles, taquerías, comedores industriales
+    </h1>
+    <p class="text-gray-600 leading-relaxed max-w-3xl mb-4">
+      CarniHub ayuda a responsables de CEDIS, cadenas de restaurantes, hoteles, taquerías y carnicerías
+      a optimizar su operación completa desde un ecosistema digital diseñado para operaciones gastronómicas complejas.
+    </p>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-6 max-w-3xl">
+      <?php foreach (['Compras','Abastecimiento','Logística','Devoluciones','Entregas','Inventarios','Control multi-sucursal','Trazabilidad'] as $tag): ?>
+      <span class="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-bold border"
+            style="background:color-mix(in srgb,var(--cp) 8%,#fff);border-color:color-mix(in srgb,var(--cp) 25%,transparent);color:var(--cp)"><?= htmlspecialchars($tag) ?></span>
+      <?php endforeach; ?>
+    </div>
+    <div class="flex flex-col sm:flex-row gap-3">
+      <a href="<?= BASE_URL ?>planes/registro" class="btn-primary btn-shimmer inline-block font-bold text-base px-8 py-4 rounded-xl text-center">Solicitar demostración →</a>
+      <a href="#control" class="inline-block border-2 border-gray-200 font-semibold text-base px-8 py-4 rounded-xl text-gray-700 hover:border-gray-400 transition-colors text-center">Ver funcionalidades</a>
     </div>
   </div>
 </section>
@@ -590,7 +712,8 @@
         <ul class="space-y-2">
           <li><a href="<?= BASE_URL ?>taqueria"      class="text-sm text-gray-500 hover:text-white transition-colors">Distribuidora de carne cerca de mí</a></li>
           <li><a href="<?= BASE_URL ?>restaurantes"  class="text-sm text-gray-500 hover:text-white transition-colors">Cortes de carne para restaurantes</a></li>
-          <li><a href="<?= BASE_URL ?>cedis"         class="text-sm text-white/60 font-semibold">→ Software para CEDIS y carnicerías</a></li>
+          <li><a href="<?= BASE_URL ?>restaurantes"  class="text-sm text-gray-500 hover:text-white transition-colors">Software de compras para restaurantes</a></li>
+          <li><a href="<?= BASE_URL ?>cedis"         class="text-sm text-white/60 font-semibold">→ Software para CEDIS y carnicerias</a></li>
         </ul>
       </div>
       <div>
@@ -613,10 +736,62 @@
 window.addEventListener('scroll', () => {
   document.querySelector('.navbar').classList.toggle('scrolled', window.scrollY > 40);
 });
+// ── Scroll reveal ──
 const observer = new IntersectionObserver((entries) => {
   entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
 }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
 document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+// ── Slider ──
+(function () {
+  const INTERVAL = 5000;
+  const slides  = document.querySelectorAll('#hero-slider .slide');
+  const dots    = document.querySelectorAll('#slider-dots .slider-dot');
+  const bar     = document.getElementById('slider-progress');
+  let current   = 0;
+  let autoTimer = null;
+
+  function goTo(index) {
+    slides[current].classList.remove('active');
+    dots[current].classList.remove('active');
+    current = (index + slides.length) % slides.length;
+    slides[current].classList.add('active');
+    dots[current].classList.add('active');
+    resetProgress();
+  }
+
+  function resetProgress() {
+    if (!bar) return;
+    bar.classList.remove('running');
+    bar.style.transition = 'none';
+    bar.style.width = '0%';
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      bar.style.transition = '';
+      bar.classList.add('running');
+    }));
+  }
+
+  function startAuto() {
+    clearInterval(autoTimer);
+    autoTimer = setInterval(() => goTo(current + 1), INTERVAL);
+  }
+
+  document.getElementById('slider-prev').addEventListener('click', () => { goTo(current - 1); startAuto(); });
+  document.getElementById('slider-next').addEventListener('click', () => { goTo(current + 1); startAuto(); });
+  dots.forEach(dot => dot.addEventListener('click', () => { goTo(parseInt(dot.dataset.slide)); startAuto(); }));
+
+  // Swipe support
+  let touchStartX = 0;
+  const wrap = document.getElementById('hero-slider');
+  wrap.addEventListener('touchstart', e => { touchStartX = e.changedTouches[0].clientX; }, { passive: true });
+  wrap.addEventListener('touchend', e => {
+    const diff = touchStartX - e.changedTouches[0].clientX;
+    if (Math.abs(diff) > 50) { goTo(diff > 0 ? current + 1 : current - 1); startAuto(); }
+  }, { passive: true });
+
+  resetProgress();
+  startAuto();
+})();
 </script>
 </body>
 </html>
