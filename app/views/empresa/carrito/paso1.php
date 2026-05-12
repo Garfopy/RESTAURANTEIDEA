@@ -285,9 +285,29 @@ function cambiarCantidad(id, delta, precioBase, nombre, presentacion) {
 
 function quitarProducto(id, nombre) {
   if (!confirm('¿Quitar "' + nombre + '" del carrito?')) return;
-  const input = document.getElementById('qty-' + id);
-  if (input) { input.value = '0'; }
-  document.getElementById('carritoForm').submit();
+  const fd = new FormData();
+  fd.append('producto_id', id);
+  fetch('<?= BASE_URL ?>carrito/quitarProducto', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(d => {
+      if (!d.ok) return;
+      // Quitar fila de la tabla
+      const row = document.getElementById('row-' + id);
+      if (row) row.remove();
+      // Quitar del estado local y actualizar ticket
+      delete preciosProductos[id];
+      delete escalonadosMap[id];
+      renderTicket();
+      // Actualizar badge del carrito en el nav
+      const badge = document.getElementById('cartBadge');
+      if (badge) {
+        badge.textContent = d.total_items;
+        badge.style.display = d.total_items > 0 ? 'inline' : 'none';
+      }
+      // Si no quedan items, mostrar estado vacío
+      if (d.total_items === 0) location.reload();
+    })
+    .catch(() => alert('Error al quitar el producto.'));
 }
 
 function actualizarFila(id, precioBase, nombre, presentacion) {

@@ -58,10 +58,14 @@ class EmpresaComboController extends BaseController
             $this->redirect('empresa-combo/nuevo');
         }
 
+        $precioRaw = trim((string)$this->post('precio', ''));
+        $precio    = $precioRaw === '' ? null : round((float)$precioRaw, 2);
+
         $id = $this->comboModel->insert([
             'empresa_id'  => $empresaId,
             'nombre'      => $nombre,
             'descripcion' => trim($this->post('descripcion', '')) ?: null,
+            'precio'      => $precio,
             'activo'      => 1,
         ]);
 
@@ -124,9 +128,13 @@ class EmpresaComboController extends BaseController
             $this->redirect("empresa-combo/editar/$id");
         }
 
+        $precioRaw = trim((string)$this->post('precio', ''));
+        $precio    = $precioRaw === '' ? null : round((float)$precioRaw, 2);
+
         $this->comboModel->update($id, [
             'nombre'      => $nombre,
             'descripcion' => trim($this->post('descripcion', '')) ?: null,
+            'precio'      => $precio,
         ]);
 
         $this->comboModel->guardarItems(
