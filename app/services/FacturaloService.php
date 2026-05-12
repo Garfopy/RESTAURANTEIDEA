@@ -88,7 +88,7 @@ class FacturaloService {
             'payment_method'=> 'PPD',
             'use'           => 'G01',
             'series'        => 'CHB',
-            'folio_number'  => (int)($pedido['folio'] ?? 1),
+            'folio_number'  => max(1, (int)($pedido['folio'] ?? 1)),
         ];
 
         $invoice = $this->post('/invoices', $payload);
