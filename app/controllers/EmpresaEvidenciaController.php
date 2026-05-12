@@ -171,7 +171,7 @@ class EmpresaEvidenciaController extends BaseController
         // Generar el reporte HTML
         $html = $this->buildReporteHtml(
             $pedido, $empresa, $evidenciasRuta, $fotosDirectas,
-            $fotosAgregadas, $firmasAgregadas, $appLogo, $colorPrimary
+            $appLogo, $colorPrimary
         );
         $zip->addFromString('reporte_' . $pedido['folio'] . '.html', $html);
         $zip->close();
@@ -208,13 +208,19 @@ class EmpresaEvidenciaController extends BaseController
         return null;
     }
 
+    private function fileToDataUri(?string $fsPath): string
+    {
+        if (empty($fsPath) || !file_exists($fsPath)) return '';
+        $ext  = strtolower(pathinfo($fsPath, PATHINFO_EXTENSION));
+        $mime = match($ext) { 'png' => 'image/png', 'webp' => 'image/webp', 'gif' => 'image/gif', default => 'image/jpeg' };
+        return 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($fsPath));
+    }
+
     private function buildReporteHtml(
         array $pedido,
         ?array $empresa,
         array $evidenciasRuta,
         array $fotosDirectas,
-        array $fotosRef,
-        array $firmasRef,
         string $appLogo,
         string $colorPrimary
     ): string {
@@ -275,34 +281,43 @@ class EmpresaEvidenciaController extends BaseController
                 if (!empty($ev['nombre_receptor'])) {
                     $evSection .= '<div style="font-size:11px;color:#6B7280;margin-bottom:10px">Receptor: ' . htmlspecialchars($ev['nombre_receptor']) . '</div>';
                 }
-                if (!empty($fotosRef[$ev['id']])) {
-                    $evSection .= '<img src="./' . htmlspecialchars($fotosRef[$ev['id']]) . '" style="max-width:100%;border-radius:8px;margin-bottom:10px;display:block">';
+                if (!empty($ev['foto_path'])) {
+                    $fotoUri = $this->fileToDataUri($this->urlToFsPath($ev['foto_path']));
+                    if ($fotoUri) {
+                        $evSection .= '<img src="' . $fotoUri . '" style="max-width:100%;border-radius:8px;margin-bottom:10px;display:block">';
+                    }
                 }
-                if (!empty($firmasRef[$ev['id']])) {
-                    $evSection .= '<div style="font-size:11px;color:#6B7280;margin-bottom:4px">Firma del receptor:</div>';
-                    $evSection .= '<img src="./' . htmlspecialchars($firmasRef[$ev['id']]) . '" style="max-height:100px;border:1px solid #E5E7EB;border-radius:6px;background:#F9FAFB;padding:6px">';
+                if (!empty($ev['firma_path'])) {
+                    $firmaUri = $this->fileToDataUri($this->urlToFsPath($ev['firma_path']));
+                    if ($firmaUri) {
+                        $evSection .= '<div style="font-size:11px;color:#6B7280;margin-bottom:4px">Firma del receptor:</div>';
+                        $evSection .= '<img src="' . $firmaUri . '" style="max-height:100px;border:1px solid #E5E7EB;border-radius:6px;background:#F9FAFB;padding:6px">';
+                    }
                 }
                 $evSection .= '</div>';
             }
 
             foreach ($fotosDirectas as $fd) {
-                $filename = basename(parse_url($fd['foto_entrega_path'], PHP_URL_PATH));
+                $fdUri = $this->fileToDataUri($this->urlToFsPath($fd['foto_entrega_path']));
+                if (!$fdUri) continue;
                 $evSection .= '<div style="border:1px solid #E5E7EB;border-radius:10px;padding:14px;margin-bottom:14px">';
                 $evSection .= '<div style="font-weight:700;font-size:12px;margin-bottom:8px;color:#374151">';
                 $evSection .= htmlspecialchars($fd['sucursal_nombre'] ?? 'Entrega');
                 if (!empty($fd['fecha_llegada'])) $evSection .= ' — ' . date('d/m/Y H:i', strtotime($fd['fecha_llegada']));
                 $evSection .= '</div>';
-                $evSection .= '<img src="./fotos/' . htmlspecialchars($filename) . '" style="max-width:100%;border-radius:8px;display:block">';
+                $evSection .= '<img src="' . $fdUri . '" style="max-width:100%;border-radius:8px;display:block">';
                 $evSection .= '</div>';
             }
 
             // Foto directa del pedido principal
             if (!empty($pedido['foto_entrega_path'])) {
-                $filename = basename(parse_url($pedido['foto_entrega_path'], PHP_URL_PATH));
-                $evSection .= '<div style="border:1px solid #E5E7EB;border-radius:10px;padding:14px;margin-bottom:14px">';
-                $evSection .= '<div style="font-weight:700;font-size:12px;margin-bottom:8px;color:#374151">Foto de entrega</div>';
-                $evSection .= '<img src="./fotos/' . htmlspecialchars($filename) . '" style="max-width:100%;border-radius:8px;display:block">';
-                $evSection .= '</div>';
+                $pedFotoUri = $this->fileToDataUri($this->urlToFsPath($pedido['foto_entrega_path']));
+                if ($pedFotoUri) {
+                    $evSection .= '<div style="border:1px solid #E5E7EB;border-radius:10px;padding:14px;margin-bottom:14px">';
+                    $evSection .= '<div style="font-weight:700;font-size:12px;margin-bottom:8px;color:#374151">Foto de entrega</div>';
+                    $evSection .= '<img src="' . $pedFotoUri . '" style="max-width:100%;border-radius:8px;display:block">';
+                    $evSection .= '</div>';
+                }
             }
 
             $evSection .= '</div>';
@@ -386,7 +401,7 @@ table.items th:last-child{text-align:right}
 .total-row{display:flex;gap:60px;font-size:12px;color:#374151}
 .total-final{display:flex;gap:60px;background:{$color};color:#fff;font-weight:800;padding:8px 14px;border-radius:6px;font-size:14px;margin-top:4px}
 .footer{margin-top:24px;padding-top:12px;border-top:1px solid #E5E7EB;display:flex;justify-content:space-between;font-size:10px;color:#9CA3AF}
-@media print{body{background:#fff}.page{box-shadow:none;margin:0;padding:14mm}}
+@media print{body{background:#fff}.page{box-shadow:none;margin:0;padding:14mm}.no-print{display:none}}
 </style>
 </head>
 <body>
@@ -443,6 +458,54 @@ table.items th:last-child{text-align:right}
     <span>Documento de evidencia de entrega — Folio {$folio}</span>
   </div>
 </div>
+
+<div class="no-print" style="text-align:center;padding:18px 0 28px">
+  <button id="btn-pdf" onclick="generarPDF()"
+          style="padding:11px 30px;background:{$color};color:#fff;border:none;border-radius:8px;font-weight:700;font-size:.9rem;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.18)">
+    ↓ Guardar como PDF
+  </button>
+  <div id="pdf-status" style="margin-top:8px;font-size:.78rem;color:#6B7280;display:none"></div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+async function generarPDF() {
+  var btn = document.getElementById('btn-pdf');
+  var status = document.getElementById('pdf-status');
+  btn.textContent = 'Generando PDF...';
+  btn.disabled = true;
+  status.style.display = 'block';
+  status.textContent = 'Capturando contenido...';
+  try {
+    var pdf  = new window.jspdf.jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+    var page = document.querySelector('.page');
+    status.textContent = 'Procesando imágenes...';
+    var canvas = await html2canvas(page, {
+      scale: 2, useCORS: true, allowTaint: false,
+      logging: false, backgroundColor: '#ffffff'
+    });
+    var imgData = canvas.toDataURL('image/jpeg', 0.92);
+    var pageW = pdf.internal.pageSize.getWidth();
+    var pageH = pdf.internal.pageSize.getHeight();
+    var imgH  = (canvas.height * pageW) / canvas.width;
+    pdf.addImage(imgData, 'JPEG', 0, 0, pageW, imgH);
+    var remaining = imgH - pageH;
+    var page2 = 1;
+    while (remaining > 1) {
+      pdf.addPage();
+      pdf.addImage(imgData, 'JPEG', 0, -(page2 * pageH), pageW, imgH);
+      remaining -= pageH;
+      page2++;
+    }
+    pdf.save('evidencia_{$folio}.pdf');
+    status.textContent = 'PDF guardado correctamente.';
+  } catch(err) {
+    status.textContent = 'Error: ' + err.message;
+  }
+  btn.textContent = '↓ Guardar como PDF';
+  btn.disabled = false;
+}
+</script>
 </body>
 </html>
 HTML;
