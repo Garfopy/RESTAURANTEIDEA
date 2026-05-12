@@ -309,9 +309,7 @@ $tipoEntregaLabel = match ($pedido['tipo_entrega'] ?? '') {
     </svg>
     Imprimir / Guardar PDF
   </button>
-  <button type="button" class="btn-back" onclick="history.back()">
-    ← Volver
-  </button>
+  <a href="<?= BASE_URL ?>empresa-pedido/index" class="btn-back">← Volver</a>
 </div>
 
 <!-- Documento imprimible -->

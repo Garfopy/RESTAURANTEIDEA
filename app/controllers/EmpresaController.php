@@ -46,32 +46,61 @@ class EmpresaController extends BaseController
         if (!$this->isPost()) $this->redirect('panel-empresa/nueva');
 
         $empresaModel = new EmpresaModel();
-        $empresaId    = $empresaModel->insert([
-            'razon_social'    => $this->post('razon_social'),
-            'rfc'             => $this->post('rfc') ?: null,
-            'tipo_negocio'    => $this->post('tipo_negocio'),
-            'email'           => $this->post('email'),
-            'telefono'        => $this->post('telefono'),
-            'direccion_fiscal'=> $this->post('direccion_fiscal'),
-            'activo'          => 1,
-            'created_by'      => $this->usuarioId(),
-        ]);
+        $rfc          = trim($this->post('rfc') ?? '');
+        $email        = trim($this->post('email') ?? '');
 
-        $planId = (int)$this->post('plan_id', 1);
-        if (!$planId) $planId = 1;
+        // Validar RFC duplicado
+        if ($rfc && $empresaModel->existeRFCValor($rfc)) {
+            $this->flash('error', 'El RFC "' . $rfc . '" ya está registrado en otra empresa. No se puede continuar.');
+            $this->redirect('panel-empresa/nueva');
+        }
 
-        $susModel = new SuscripcionModel();
-        $susModel->crear([
-            'empresa_id'  => $empresaId,
-            'plan_id'     => $planId,
-            'estado'      => 'activo',
-            'ciclo'       => 'mensual',
-            'fecha_inicio'=> date('Y-m-d'),
-            'created_by'  => $this->usuarioId(),
-        ]);
+        // Validar email duplicado
+        if ($email && $empresaModel->existeEmailValor($email)) {
+            $this->flash('error', 'El correo "' . $email . '" ya está registrado en otra empresa. No se puede continuar.');
+            $this->redirect('panel-empresa/nueva');
+        }
 
-        $this->log('Crear empresa', 'empresa', "empresa_id=$empresaId plan_id=$planId");
-        $this->flash('success', 'Empresa creada y suscripción asignada.');
-        $this->redirect('panel-empresa/index');
+        try {
+            $empresaId = $empresaModel->insert([
+                'razon_social'    => trim($this->post('razon_social')),
+                'rfc'             => $rfc ?: null,
+                'tipo_negocio'    => $this->post('tipo_negocio'),
+                'email'           => $email ?: null,
+                'telefono'        => trim($this->post('telefono', '')),
+                'direccion_fiscal'=> trim($this->post('direccion_fiscal', '')),
+                'activo'          => 1,
+                'created_by'      => $this->usuarioId(),
+            ]);
+
+            $planId = (int)$this->post('plan_id', 1);
+            if (!$planId) $planId = 1;
+
+            $susModel = new SuscripcionModel();
+            $susModel->crear([
+                'empresa_id'  => $empresaId,
+                'plan_id'     => $planId,
+                'estado'      => 'activo',
+                'ciclo'       => 'mensual',
+                'fecha_inicio'=> date('Y-m-d'),
+                'created_by'  => $this->usuarioId(),
+            ]);
+
+            $this->log('Crear empresa', 'empresa', "empresa_id=$empresaId plan_id=$planId");
+            $this->flash('success', 'Empresa creada y suscripción asignada.');
+            $this->redirect('panel-empresa/index');
+
+        } catch (\Throwable $e) {
+            error_log('[EmpresaController] ' . $e->getMessage());
+            // Detectar violación de UNIQUE desde MySQL
+            if (str_contains($e->getMessage(), 'uq_rfc') || str_contains($e->getMessage(), "Duplicate entry") && str_contains($e->getMessage(), 'rfc')) {
+                $this->flash('error', 'El RFC ya está registrado en otra empresa.');
+            } elseif (str_contains($e->getMessage(), 'email')) {
+                $this->flash('error', 'El correo ya está registrado en otra empresa.');
+            } else {
+                $this->flash('error', 'No se pudo crear la empresa: ' . $e->getMessage());
+            }
+            $this->redirect('panel-empresa/nueva');
+        }
     }
 }

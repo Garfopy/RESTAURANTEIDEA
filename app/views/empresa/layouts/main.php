@@ -280,6 +280,10 @@ $esComprador   = $rol === 'comprador';
       <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
       Logística y rutas
     </a>
+    <a href="<?= BASE_URL ?>empresa-evidencia/index" class="<?= ($activeMenu??'')==='evidencias'?'active':'' ?>">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+      Evidencias de entrega
+    </a>
     <a href="<?= BASE_URL ?>limite/index" class="<?= ($activeMenu??'')==='limites'?'active':'' ?>">
       <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
       Límites de compra
@@ -322,6 +326,10 @@ $esComprador   = $rol === 'comprador';
         <span style="margin-left:auto;background:#DC2626;color:#fff;font-size:.62rem;font-weight:700;padding:2px 7px;border-radius:999px;line-height:1.4"><?= (int)$countPendientesSidebar ?></span>
       <?php endif; ?>
     </a>
+    <a href="<?= BASE_URL ?>empresa-evidencia/index" class="<?= ($activeMenu??'')==='evidencias'?'active':'' ?>">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+      Evidencias de entrega
+    </a>
 
     <div class="sidebar-section">Stock</div>
     <a href="<?= BASE_URL ?>empresa-inventario" class="<?= ($activeMenu??'')==='inventario'?'active':'' ?>">
@@ -342,18 +350,28 @@ $esComprador   = $rol === 'comprador';
       Inicio
     </a>
 
-    <div class="sidebar-section">Pedidos</div>
+    <div class="sidebar-section">Comprar</div>
     <a href="<?= BASE_URL ?>catalogo/index" class="<?= ($activeMenu??'')==='catalogo'?'active':'' ?>">
       <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
       Catálogo
     </a>
-    <a href="<?= BASE_URL ?>carrito/index" class="<?= ($activeMenu??'')==='carrito'?'active':'' ?>">
+    <a href="<?= BASE_URL ?>carrito/index" class="<?= ($activeMenu??'')==='carrito'?'active':'' ?>" style="position:relative">
       <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2 9m5-9v9m4-9v9m5-9l2 9"/></svg>
-      Hacer pedido
+      Carrito
+      <?php
+      $carritoCount = count($_SESSION['carrito']['items'] ?? []);
+      if ($carritoCount > 0):
+      ?>
+      <span style="margin-left:auto;background:var(--color-primary);color:#fff;font-size:.6rem;font-weight:700;padding:1px 6px;border-radius:999px;line-height:1.5"><?= $carritoCount ?></span>
+      <?php endif; ?>
     </a>
     <a href="<?= BASE_URL ?>pedido/index" class="<?= ($activeMenu??'')==='pedidos'?'active':'' ?>">
       <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
       Mis pedidos
+    </a>
+    <a href="<?= BASE_URL ?>empresa-evidencia/index" class="<?= ($activeMenu??'')==='evidencias'?'active':'' ?>">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+      Mis evidencias
     </a>
     <a href="<?= BASE_URL ?>recurrente/index" class="<?= ($activeMenu??'')==='recurrentes'?'active':'' ?>">
       <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>

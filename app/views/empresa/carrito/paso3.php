@@ -74,18 +74,25 @@ $gmKey = $configModel->get('google_maps_key', '');
     <!-- ── Distribución por sucursal ───────────────────────────────────── -->
     <?php if (!empty($misSucursales)): ?>
     <div id="bloque-dist" style="display:none;background:#fff;border-radius:12px;border:1px solid #E5E7EB;overflow:hidden;margin-bottom:16px">
-      <div style="padding:14px 16px;border-bottom:1px solid #F3F4F6;display:flex;justify-content:space-between;align-items:center">
-        <div>
-          <span style="font-weight:700;font-size:.9rem;color:#111827">Distribución por sucursal</span>
-          <div style="font-size:.75rem;color:#9CA3AF;margin-top:1px">Indica cuántos kg/piezas van a cada parada — la suma debe ser igual al total</div>
+      <div style="padding:14px 16px;border-bottom:1px solid #F3F4F6;background:#F9FAFB">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+          <div>
+            <span style="font-weight:700;font-size:.9rem;color:#111827">Distribución por sucursal</span>
+            <span id="dist-badge" style="margin-left:8px;font-size:.72rem;font-weight:600;padding:2px 9px;border-radius:999px;background:#E5E7EB;color:#6B7280"></span>
+          </div>
         </div>
-        <span id="dist-badge" style="font-size:.72rem;font-weight:600;padding:3px 10px;border-radius:999px;background:#F3F4F6;color:#6B7280"></span>
+        <p style="font-size:.78rem;color:#6B7280;margin:6px 0 0">Indica cuántos kg/piezas van a cada parada — usa los botones ± o escribe directamente. La suma debe igualar el total de cada producto.</p>
       </div>
-      <div style="overflow-x:auto">
-        <table id="tabla-dist" style="width:100%;border-collapse:collapse;font-size:.85rem"></table>
+      <div id="dist-cards" style="padding:14px 16px;display:flex;flex-direction:column;gap:12px"></div>
+      <!-- Hidden celda-rest spans for submit validation -->
+      <div id="dist-rest-spans" style="display:none">
+        <?php foreach ($items as $it): ?>
+        <span class="celda-rest" data-prodid="<?= (int)$it['producto_id'] ?>">0</span>
+        <?php endforeach; ?>
       </div>
-      <div id="dist-hint" style="padding:10px 16px;font-size:.72rem;color:#9CA3AF;border-top:1px solid #F3F4F6">
-        💡 Los precios de mayoreo se calculan sobre el total del pedido. La suma por producto debe igualar el total pedido.
+      <div id="dist-hint" style="padding:10px 16px;font-size:.78rem;color:#9CA3AF;border-top:1px solid #F3F4F6;display:flex;align-items:center;gap:6px">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        Los precios por volumen se calculan sobre el total del pedido.
       </div>
     </div>
     <!-- Toast notificación (exceso/advertencia distribución) -->
@@ -629,81 +636,106 @@ var SUCURSALES_MAP = <?= $_sucMapJs ?>;
     }
     bloqueD.style.display = '';
 
-    var tabla  = document.getElementById('tabla-dist');
-    var badge  = document.getElementById('dist-badge');
+    var distCards = document.getElementById('dist-cards');
+    var badge     = document.getElementById('dist-badge');
     if (badge) badge.textContent = paradasIds.length + ' parada' + (paradasIds.length > 1 ? 's' : '');
 
     // Guardar valores actuales antes de re-render
     var prevVals = {};
-    tabla.querySelectorAll('.dist-input').forEach(function(inp) {
-      var key = inp.dataset.prodid + '_' + inp.dataset.sucid;
-      prevVals[key] = inp.value;
-    });
+    if (distCards) {
+      distCards.querySelectorAll('.dist-input').forEach(function(inp) {
+        var key = inp.dataset.prodid + '_' + inp.dataset.sucid;
+        prevVals[key] = inp.value;
+      });
+    }
 
-    // Cabecera
-    var html = '<thead><tr style="background:#F9FAFB">';
-    html += '<th style="padding:10px 16px;text-align:left;color:#6B7280;font-weight:600;white-space:nowrap">Producto</th>';
-    html += '<th style="padding:10px 10px;text-align:center;color:#6B7280;font-weight:600">Total</th>';
-    paradasIds.forEach(function(sid, idx) {
-      var nom = (SUCURSALES_MAP && SUCURSALES_MAP[sid]) ? SUCURSALES_MAP[sid] : ('Parada ' + (idx + 1));
-      html += '<th style="padding:10px 8px;text-align:center;color:#6B7280;font-weight:600;min-width:110px">' + htmlEsc(nom) + '</th>';
-    });
-    html += '<th style="padding:10px 10px;text-align:center;color:#6B7280;font-weight:600;white-space:nowrap">Restante</th>';
-    html += '</tr></thead>';
+    if (!distCards) return;
 
-    // Filas de productos
-    html += '<tbody>';
+    var html = '';
     CART_ITEMS.forEach(function(item) {
-      html += '<tr style="border-top:1px solid #F3F4F6">';
-      html += '<td style="padding:10px 16px;font-weight:600;color:#111827">' + htmlEsc(item.nombre) +
-              '<div style="font-size:.72rem;color:#9CA3AF;font-weight:400">' + htmlEsc(item.presentacion) + '</div></td>';
-      html += '<td style="padding:10px;text-align:center;color:#374151;font-weight:700">' + nf(item.cantidad) + '</td>';
+      html += '<div style="background:#F9FAFB;border:1.5px solid #E5E7EB;border-radius:12px;overflow:hidden;transition:border-color .3s" id="dist-card-' + item.id + '">';
+      // Cabecera del producto
+      html += '<div style="padding:10px 14px;border-bottom:1px solid #F3F4F6;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">';
+      html += '<div><span style="font-weight:700;color:#111827">' + htmlEsc(item.nombre) + '</span><span style="font-size:.75rem;color:#9CA3AF;margin-left:6px">' + htmlEsc(item.presentacion) + '</span></div>';
+      html += '<div style="display:flex;align-items:center;gap:10px">';
+      html += '<span style="font-size:.82rem;color:#374151">Total: <strong style="color:var(--color-primary)">' + nf(item.cantidad) + ' ' + htmlEsc(item.presentacion) + '</strong></span>';
+      if (paradasIds.length > 1) {
+        html += '<button type="button" onclick="repartirIgualStep3(' + item.id + ',' + item.cantidad + ',' + paradasIds.length + ')" style="padding:5px 12px;background:#fff;border:1.5px solid #D1D5DB;border-radius:7px;font-size:.75rem;font-weight:600;color:#374151;cursor:pointer;font-family:inherit;white-space:nowrap;transition:all .15s" onmouseenter="this.style.borderColor=\'var(--color-primary)\';this.style.color=\'var(--color-primary)\'" onmouseleave="this.style.borderColor=\'#D1D5DB\';this.style.color=\'#374151\'">⚡ Repartir igual</button>';
+      }
+      html += '</div></div>';
+      // Barra de progreso
+      html += '<div style="padding:8px 14px 0">';
+      html += '<div style="height:5px;background:#E5E7EB;border-radius:999px;overflow:hidden;margin-bottom:10px"><div id="dist-bar-' + item.id + '" style="height:100%;background:#F59E0B;border-radius:999px;width:0%;transition:width .3s,background .3s"></div></div>';
+      html += '</div>';
+      // Inputs por parada
+      html += '<div style="padding:0 12px 12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px">';
       paradasIds.forEach(function(sid, idx) {
+        var nom    = (SUCURSALES_MAP && SUCURSALES_MAP[sid]) ? SUCURSALES_MAP[sid] : ('Parada ' + (idx + 1));
         var key    = item.id + '_' + sid;
         var defVal = (prevVals[key] !== undefined) ? prevVals[key] : (idx === 0 ? item.cantidad.toFixed(2) : '0.00');
-        html += '<td style="padding:6px 6px;text-align:center">' +
-                '<input type="number" form="form-pedido" ' +
-                'name="dist[' + item.id + '][' + sid + ']" ' +
-                'value="' + htmlEsc(defVal) + '" ' +
-                'min="0" max="' + item.cantidad + '" step="0.01" ' +
-                'class="dist-input" data-prodid="' + item.id + '" data-sucid="' + sid + '" data-total="' + item.cantidad + '" data-nombre="' + htmlEsc(item.nombre) + '" ' +
-                'style="width:90px;padding:6px 8px;border:1.5px solid #D1D5DB;border-radius:6px;font-size:.85rem;text-align:right;box-sizing:border-box;transition:border-color .15s,background .15s">' +
-                '</td>';
+        html += '<div style="background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:10px">';
+        html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px"><div style="width:20px;height:20px;border-radius:50%;background:var(--color-primary);color:#fff;font-size:.65rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">' + (idx+1) + '</div><div style="font-size:.8rem;font-weight:600;color:#111827;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + htmlEsc(nom) + '</div></div>';
+        html += '<div style="display:flex;align-items:center;gap:4px">';
+        html += '<button type="button" onclick="ajustarDistStep3(' + item.id + ',' + sid + ',-0.5,' + item.cantidad + ')" style="width:30px;height:30px;border:1px solid #D1D5DB;border-radius:6px;background:#F9FAFB;cursor:pointer;font-size:1rem;font-weight:700;color:#374151;display:flex;align-items:center;justify-content:center;flex-shrink:0;user-select:none;transition:all .15s" onmouseenter="this.style.borderColor=\'var(--color-primary)\';this.style.color=\'var(--color-primary)\'" onmouseleave="this.style.borderColor=\'#D1D5DB\';this.style.color=\'#374151\'">−</button>';
+        html += '<input type="number" form="form-pedido" name="dist[' + item.id + '][' + sid + ']" value="' + htmlEsc(defVal) + '" min="0" max="' + item.cantidad + '" step="0.01" class="dist-input" data-prodid="' + item.id + '" data-sucid="' + sid + '" data-total="' + item.cantidad + '" data-nombre="' + htmlEsc(item.nombre) + '" style="flex:1;padding:6px 4px;border:1.5px solid #D1D5DB;border-radius:6px;font-size:.9rem;text-align:center;font-weight:700;min-width:0;outline:none;transition:border-color .15s" onclick="this.select()" onfocus="this.style.borderColor=\'var(--color-primary)\'" onblur="this.style.borderColor=\'#D1D5DB\'">';
+        html += '<button type="button" onclick="ajustarDistStep3(' + item.id + ',' + sid + ',0.5,' + item.cantidad + ')" style="width:30px;height:30px;border:1px solid #D1D5DB;border-radius:6px;background:#F9FAFB;cursor:pointer;font-size:1rem;font-weight:700;color:#374151;display:flex;align-items:center;justify-content:center;flex-shrink:0;user-select:none;transition:all .15s" onmouseenter="this.style.borderColor=\'var(--color-primary)\';this.style.color=\'var(--color-primary)\'" onmouseleave="this.style.borderColor=\'#D1D5DB\';this.style.color=\'#374151\'">+</button>';
+        html += '</div>';
+        html += '</div>';
       });
-      html += '<td class="celda-rest" data-prodid="' + item.id + '" ' +
-              'style="padding:10px;text-align:center;font-size:.82rem;font-weight:700;color:#D97706">' + nf(item.cantidad) + '</td>';
-      html += '</tr>';
+      html += '</div>';
+      // Estado
+      html += '<div style="padding:6px 14px 10px;display:flex;align-items:center;gap:6px"><span id="dist-status-icon-' + item.id + '" style="font-size:.85rem">⏳</span><span id="dist-status-txt-' + item.id + '" style="font-size:.78rem;font-weight:600;color:#6B7280">Asignando…</span></div>';
+      html += '</div>';
     });
-    html += '</tbody>';
-    tabla.innerHTML = html;
 
-    tabla.querySelectorAll('.dist-input').forEach(function(inp) {
+    distCards.innerHTML = html;
+
+    distCards.querySelectorAll('.dist-input').forEach(function(inp) {
       inp.addEventListener('input', function() {
-        var prodId = parseInt(this.dataset.prodid);
-        var total  = parseFloat(this.dataset.total) || 0;
-        var val    = parseFloat(this.value);
+        var prodId  = parseInt(this.dataset.prodid);
+        var total   = parseFloat(this.dataset.total) || 0;
+        var val     = parseFloat(this.value);
         if (isNaN(val) || val < 0) { this.value = '0.00'; val = 0; }
-
-        // Sumar los otros inputs del mismo producto
         var sumOtros = 0;
         document.querySelectorAll('.dist-input[data-prodid="' + prodId + '"]').forEach(function(other) {
           if (other !== inp) sumOtros += parseFloat(other.value) || 0;
         });
-        var maxPermitido = Math.max(0, Math.round((total - sumOtros) * 1000) / 1000);
-        if (val > maxPermitido + 0.004) {
-          mostrarToast('⚠ No puedes asignar más de ' + nf(maxPermitido) + ' en esta celda — el total de ' + this.dataset.nombre + ' es ' + nf(total) + '.');
-          this.value = nf(maxPermitido);
-          this.style.borderColor = '#F59E0B';
-          this.style.background  = '#FFFBEB';
-        } else {
-          this.style.borderColor = '#D1D5DB';
-          this.style.background  = '';
+        var maxPerm = Math.max(0, Math.round((total - sumOtros) * 1000) / 1000);
+        if (val > maxPerm + 0.004) {
+          mostrarToast('⚠ No puedes asignar más de ' + nf(maxPerm) + ' — el total de ' + this.dataset.nombre + ' es ' + nf(total));
+          this.value = nf(maxPerm);
         }
         actualizarRestante(prodId);
       });
     });
     CART_ITEMS.forEach(function(item) { actualizarRestante(item.id); });
   }
+
+  window.ajustarDistStep3 = function(prodId, sucId, delta, totalProd) {
+    var input = document.querySelector('.dist-input[data-prodid="' + prodId + '"][data-sucid="' + sucId + '"]');
+    if (!input) return;
+    var val = parseFloat(input.value) || 0;
+    var sumOtros = 0;
+    document.querySelectorAll('.dist-input[data-prodid="' + prodId + '"]').forEach(function(other) {
+      if (other !== input) sumOtros += parseFloat(other.value) || 0;
+    });
+    var maxPerm = Math.max(0, Math.round((totalProd - sumOtros) * 1000) / 1000);
+    var nuevo = Math.max(0, Math.min(maxPerm, Math.round((val + delta) * 2) / 2));
+    input.value = nuevo > 0 ? nuevo : '0.00';
+    actualizarRestante(prodId);
+  };
+
+  window.repartirIgualStep3 = function(prodId, total, numParadas) {
+    if (numParadas === 0) return;
+    var inputs = document.querySelectorAll('.dist-input[data-prodid="' + prodId + '"]');
+    var base   = Math.floor((total / numParadas) * 2) / 2;
+    var suma   = 0;
+    inputs.forEach(function(inp, idx) {
+      if (idx < inputs.length - 1) { inp.value = base; suma += base; }
+      else { var rest = Math.round((total - suma) * 2) / 2; inp.value = rest > 0 ? rest : 0; }
+    });
+    actualizarRestante(prodId);
+  };
 
   function actualizarRestante(prodId) {
     var inputs = document.querySelectorAll('.dist-input[data-prodid="' + prodId + '"]');
@@ -715,31 +747,54 @@ var SUCURSALES_MAP = <?= $_sucMapJs ?>;
       if (v < 0) { inp.value = '0.00'; v = 0; }
       suma += v;
     });
-    var rest   = Math.round((total - suma) * 1000) / 1000;
-    var celda  = document.querySelector('.celda-rest[data-prodid="' + prodId + '"]');
-    if (!celda) return;
-    celda.textContent = nf(rest);
-    if (Math.abs(rest) < 0.005) {
-      celda.style.color = '#059669'; // verde — distribuido todo
-    } else if (rest > 0) {
-      celda.style.color = '#D97706'; // naranja — falta asignar
-    } else {
-      celda.style.color = '#DC2626'; // rojo — excedido (no debería ocurrir por el clamp)
+    suma = Math.round(suma * 1000) / 1000;
+    var completo = Math.abs(suma - total) < 0.005;
+    var pct      = total > 0 ? Math.min(100, (suma / total) * 100) : 0;
+
+    // Barra
+    var bar = document.getElementById('dist-bar-' + prodId);
+    if (bar) {
+      bar.style.width      = pct + '%';
+      bar.style.background = completo ? '#10B981' : '#F59E0B';
     }
-    // Actualizar hint con resumen
+    // Card border
+    var card = document.getElementById('dist-card-' + prodId);
+    if (card) card.style.borderColor = completo ? '#A7F3D0' : '#E5E7EB';
+
+    // Estado texto
+    var icon  = document.getElementById('dist-status-icon-' + prodId);
+    var stTxt = document.getElementById('dist-status-txt-' + prodId);
+    var rest  = Math.round((total - suma) * 1000) / 1000;
+    if (completo) {
+      if (icon)  icon.textContent  = '✅';
+      if (stTxt) { stTxt.textContent = 'Distribución completa'; stTxt.style.color = '#059669'; }
+    } else {
+      if (icon)  icon.textContent  = '⏳';
+      if (stTxt) { stTxt.textContent = 'Faltan ' + rest.toFixed(2) + ' por asignar'; stTxt.style.color = '#6B7280'; }
+    }
+
+    // celda-rest (usada por validación de submit)
+    var celda = document.querySelector('.celda-rest[data-prodid="' + prodId + '"]');
+    if (celda) {
+      celda.textContent  = nf(rest);
+      celda.style.color  = completo ? '#059669' : '#D97706';
+    }
+
+    // Hint global
     var todoBien = true;
     CART_ITEMS.forEach(function(item) {
-      var c = document.querySelector('.celda-rest[data-prodid="' + item.id + '"]');
-      if (c && Math.abs(parseFloat(c.textContent) || 0) >= 0.005) todoBien = false;
+      var c = document.querySelector('.dist-input[data-prodid="' + item.id + '"]');
+      if (!c) return;
+      var s2 = 0;
+      document.querySelectorAll('.dist-input[data-prodid="' + item.id + '"]').forEach(function(x) { s2 += parseFloat(x.value)||0; });
+      if (Math.abs(Math.round(s2*1000)/1000 - parseFloat(c.dataset.total)) >= 0.005) todoBien = false;
     });
     var hint = document.getElementById('dist-hint');
     if (hint) {
       if (todoBien) {
-        hint.innerHTML = '✅ Distribución completa. Puedes confirmar el pedido.';
-        hint.style.color = '#059669';
+        hint.innerHTML = '<span style="color:#059669;font-weight:700">✅ Distribución completa. Puedes confirmar el pedido.</span>';
       } else {
-        hint.innerHTML = '💡 Los precios de mayoreo se calculan sobre el total del pedido. La suma por producto debe igualar el total pedido.';
-        hint.style.color = '#9CA3AF';
+        hint.innerHTML = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> Los precios por volumen se calculan sobre el total del pedido.';
       }
     }
   }
