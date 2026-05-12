@@ -83,6 +83,7 @@ $routes = [
     'empresa-sucursal'    => 'EmpresaSucursalController',
     'empresa-vehiculo'    => 'EmpresaVehiculoController',
     'empresa-reporte'     => 'EmpresaReporteController',
+    'empresa-evidencia'   => 'EmpresaEvidenciaController',
     // Portal supervisor — solo supervisor
     'supervisor'          => 'SupervisorController',
     // Portal comprador — solo comprador
