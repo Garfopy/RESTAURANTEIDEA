@@ -348,8 +348,15 @@ HTML;
         $aprobadorNombre = htmlspecialchars($pedido['aprobador_nombre'] ?? '—');
         $fechaCreacion = date('d/m/Y', strtotime($pedido['created_at']));
         $fechaEntrega = !empty($pedido['fecha_entrega']) ? date('d/m/Y', strtotime($pedido['fecha_entrega'])) : '—';
-        $notas = htmlspecialchars($pedido['notas'] ?? '');
-        $dirEntrega = htmlspecialchars($pedido['direccion_entrega'] ?? '');
+        $notas       = htmlspecialchars($pedido['notas'] ?? '');
+        $dirEntrega  = htmlspecialchars($pedido['direccion_entrega'] ?? '');
+
+        // Pre-compute condicionales (heredoc no permite ternaries)
+        $rfcBr       = $rfc       ? $rfc . '<br>'       : '';
+        $dirFiscalBr = $dirFiscal ? $dirFiscal . '<br>' : '';
+        $telBr       = $tel       ? $tel . '<br>'       : '';
+        $notasHtml   = $notas ? '<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px"><span style="font-weight:700;color:#92400E">Notas del pedido:</span><div style="color:#374151;margin-top:3px">' . $notas . '</div></div>' : '';
+        $dirHtml     = $dirEntrega ? '<div style="border:1px solid #E5E7EB;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px"><div style="font-size:10px;font-weight:700;color:#6B7280;text-transform:uppercase;margin-bottom:3px">Dirección de entrega</div>' . $dirEntrega . '</div>' : '';
 
         return <<<HTML
 <!DOCTYPE html>
@@ -388,9 +395,9 @@ table.items th:last-child{text-align:right}
     <div class="logo-area">{$logoHtml}</div>
     <div class="empresa-info">
       <strong>{$razonSocial}</strong><br>
-      {$rfc}{$rfc ? '<br>' : ''}
-      {$dirFiscal}{$dirFiscal ? '<br>' : ''}
-      {$tel}{$tel ? '<br>' : ''}
+      {$rfcBr}
+      {$dirFiscalBr}
+      {$telBr}
       {$correo}
     </div>
   </div>
@@ -409,8 +416,8 @@ table.items th:last-child{text-align:right}
     <div><div class="meta-item">Aprobado por</div><div class="meta-val">{$aprobadorNombre}</div></div>
   </div>
 
-  {$notas ? '<div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px"><span style="font-weight:700;color:#92400E">Notas del pedido:</span><div style="color:#374151;margin-top:3px">' . $notas . '</div></div>' : ''}
-  {$dirEntrega ? '<div style="border:1px solid #E5E7EB;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px"><div style="font-size:10px;font-weight:700;color:#6B7280;text-transform:uppercase;margin-bottom:3px">Dirección de entrega</div>' . $dirEntrega . '</div>' : ''}
+  {$notasHtml}
+  {$dirHtml}
 
   <table class="items">
     <thead><tr>
