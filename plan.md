@@ -1143,19 +1143,24 @@ Para funcionar offline sin Traccar:
 - [x] `PanelUsuarioController` — superadmin solo podía crear `admin_empresa`; ahora puede crear `superadmin`, `admin` y `admin_empresa` usando `rolesPermitidosPorSuperAdmin()`
 - [x] `PanelReporteController::index()` — solo redirigía a empresa-reporte (incorrecto); ahora implementación completa para panel de plataforma
 - [x] Sidebar panel — link "Reportes y analítica" apuntaba a `empresa-reporte/index` (portal empresa); corregido a `panel-reporte/index`
+- [x] `PanelReporteController` — Fatal Error `fechaEspanol()` undefined → reemplazado con función anónima inline
+- [x] Inputs negativos en pedidos — `paso1.php`, `paso2.php`, `paso3.php` → no permiten cantidades < 0 y caps al máximo distribuible
+- [x] Estado "Excedido" en distribución → eliminado completamente; botones ± y typing limitados a máximo permitido
+- [x] Botón "← Volver" en recibo (`empresa/pedidos/pdf.php`) — usaba `history.back()` que falla en impresión/acceso directo; cambiado a `<a href>` explícito hacia `empresa-pedido/index`
 
 **Mejoras añadidas:**
-- [x] Dashboard superadmin — 6 KPI cards (empresas, usuarios, pedidos, ventas, ingresos SaaS, suscripciones activas); gráficas Chart.js (pedidos+monto por mes, distribución de planes en dona); tabla últimos pedidos con empresa; actividad reciente; alertas stock con nombre de empresa
-- [x] Reportes SaaS (`panel-reporte/index`) — ingresos por mes, pedidos del sistema, distribución de planes, estado de suscripciones, top 5 empresas por volumen, empresas nuevas, tasa de errores (si existe tabla error_logs)
-- [x] Planes SaaS editables — `SuscripcionController::editarPlan()` + `guardarPlan()` + vista `editar_plan.php`; botón "Editar límites" en cada plan de `/suscripcion/configurar`; solo superadmin puede acceder
-- [x] Sidebar panel — enlace "Permisos de planes" (visible solo superadmin) → `suscripcion/configurar`
+- [x] Dashboard superadmin — rediseñado con métricas puras SaaS (6 KPIs: empresas, suscripciones, ingresos SaaS/mes, usuarios, sucursales, entregas; 4 gráficas; tabla últimos pedidos; actividad reciente; stock bajo)
+- [x] Reportes SaaS (`panel-reporte/index`) — mismo formato que `empresa-reporte` con `tecnico.php`; 8 KPIs; 4 gráficas; tabla top empresas; 5 notas; selector de período; PDF/XLS
+- [x] Módulo almacenamiento (`admin-storage/index`) — superadmin puede ver uso por directorio, previsualizar archivos por rango de fechas vía AJAX, exportar ZIP+resumen HTML, eliminar con confirmación "ELIMINAR"; política de retención 60 días; historial de acciones en `action_logs`
+- [x] Dashboard — alerta naranja si hay archivos > 60 días en `entregas/` o `firmas/` con link directo al módulo de almacenamiento
+- [x] Nav sidebar — link "Almacenamiento" en sección Sistema (solo superadmin)
 
 **UX Comprador (2026-05-11):**
 - [x] Sidebar comprador — sección "Pedidos" renombrada a "Comprar"; "Hacer pedido" renombrado a "Carrito" con badge de items activos
-- [x] Catálogo (`empresa/catalogo/index.php`) — tarjetas rediseñadas: stripe de color en la parte superior, badge de categoría pill, precio más grande (1.5rem/bold), badge "🛒 en carrito" en la imagen si el producto ya fue agregado, badge de descuento por volumen en la imagen, botón "+ Agregar" con sombra y animación
-- [x] Carrito paso1 (`empresa/carrito/paso1.php`) — ahora muestra SOLO productos en el carrito (qty > 0); estado vacío con CTA "Explorar catálogo"; botones − y + de 38×38px con hover primary; input con `onclick="this.select()"` para edición directa; hint de uso visible; botón papelera por fila; ticket lateral mejorado con gradiente y total prominente
-- [x] Distribución paso2 (`empresa/carrito/paso2.php`) — rediseño completo: guía numerada con instrucciones, tarjeta por producto con barra de progreso animada (F59E0B→10B981→EF4444), botones ± por sucursal, botón "⚡ Repartir igual" automático, estado dinámico (⏳/✅/❌) con color
-- [x] Distribución paso3/resumen (`empresa/carrito/paso3.php`) — bloque distribución rediseñado de tabla a tarjetas card-based con ± buttons, barras de progreso y botón "⚡ Repartir igual"; inputs con `onclick="this.select()"`; ajustarDistStep3/repartirIgualStep3 funciones JS
+- [x] Catálogo (`empresa/catalogo/index.php`) — tarjetas rediseñadas
+- [x] Carrito paso1 (`empresa/carrito/paso1.php`) — rediseño completo
+- [x] Distribución paso2 (`empresa/carrito/paso2.php`) — rediseño completo
+- [x] Distribución paso3/resumen (`empresa/carrito/paso3.php`) — rediseño completo
 
 ---
 

@@ -70,6 +70,7 @@ $routes = [
     'panel-usuario'       => 'PanelUsuarioController',
     'panel-pedido'        => 'PanelPedidoController',
     'panel-reporte'       => 'PanelReporteController',
+    'admin-storage'       => 'AdminStorageController',
     'config'              => 'ConfigController',
     // Portal empresa — solo admin_empresa (gestión de su empresa)
     'empresa'             => 'EmpresaDashboardController',

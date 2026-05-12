@@ -108,6 +108,14 @@ class PanelController extends BaseController
         $pageTitle  = 'Dashboard';
         $activeMenu = 'dashboard';
 
+        $alertaStorage = 0;
+        $cutoffStorage = time() - 60 * 86400;
+        foreach (['entregas', 'firmas'] as $_sd) {
+            foreach (glob(UPLOAD_PATH . $_sd . '/*') ?: [] as $_sf) {
+                if (is_file($_sf) && filemtime($_sf) < $cutoffStorage) $alertaStorage++;
+            }
+        }
+
         ob_start();
         require ROOT_PATH . '/app/views/panel/dashboard.php';
         $content = ob_get_clean();
