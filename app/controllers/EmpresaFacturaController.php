@@ -9,11 +9,10 @@ class EmpresaFacturaController extends BaseController
     public function __construct()
     {
         parent::__construct();
-        $this->requireSupervisor(); // admin_empresa + supervisor
+        $this->requireSupervisor();
         $this->db = Database::getInstance();
     }
 
-    // ── Lista de facturas de la empresa ──────────────────────────────────────
     public function index(?string $p = null): void
     {
         $empresaId = $this->empresaId();
@@ -30,13 +29,12 @@ class EmpresaFacturaController extends BaseController
                FROM facturas f
                JOIN pedidos p ON p.id = f.pedido_id
               WHERE f.empresa_id = ?
-              ORDER BY f.fecha_emision DESC
+              ORDER BY f.created_at DESC
               LIMIT ? OFFSET ?'
         );
         $stmt->execute([$empresaId, $perPage, $offset]);
         $facturas = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        // Pedidos entregados sin factura (para generar desde aquí)
         $stPedidos = $this->db->prepare(
             'SELECT p.id, p.folio, p.total, p.created_at
                FROM pedidos p
@@ -51,7 +49,7 @@ class EmpresaFacturaController extends BaseController
 
         $totalPages = $total > 0 ? (int)ceil($total / $perPage) : 1;
         $flash      = $this->getFlash();
-        $pageTitle  = 'Facturas';
+        $pageTitle  = 'Facturas CFDI';
         $activeMenu = 'facturas';
 
         ob_start();
@@ -60,11 +58,9 @@ class EmpresaFacturaController extends BaseController
         require ROOT_PATH . '/app/views/empresa/layouts/main.php';
     }
 
-    // ── Generar CFDI para un pedido ──────────────────────────────────────────
     public function generar(?string $pedidoId = null): void
     {
         $this->requireAdminEmpresa();
-
         $pedidoId  = (int)$pedidoId;
         $empresaId = $this->empresaId();
 
@@ -73,7 +69,6 @@ class EmpresaFacturaController extends BaseController
             $this->redirect('empresa-factura/index');
         }
 
-        // Verificar que el pedido pertenece a esta empresa y está entregado
         $stPedido = $this->db->prepare(
             'SELECT id FROM pedidos WHERE id = ? AND empresa_id = ? AND estado = "entregado"'
         );
@@ -83,7 +78,6 @@ class EmpresaFacturaController extends BaseController
             $this->redirect('empresa-factura/index');
         }
 
-        // Verificar que no tenga factura ya
         $stExiste = $this->db->prepare('SELECT id FROM facturas WHERE pedido_id = ?');
         $stExiste->execute([$pedidoId]);
         if ($stExiste->fetch()) {
@@ -91,7 +85,7 @@ class EmpresaFacturaController extends BaseController
             $this->redirect('empresa-factura/index');
         }
 
-        $service  = new FacturaloService();
+        $service   = new FacturaloService();
         $resultado = $service->generarCFDI($pedidoId);
 
         if (!$resultado['ok']) {
@@ -104,11 +98,9 @@ class EmpresaFacturaController extends BaseController
         $this->redirect('empresa-factura/index');
     }
 
-    // ── Cancelar CFDI ────────────────────────────────────────────────────────
     public function cancelar(?string $uuid = null): void
     {
         $this->requireAdminEmpresa();
-
         $uuid      = preg_replace('/[^a-f0-9\-]/i', '', $uuid ?? '');
         $empresaId = $this->empresaId();
 
@@ -117,27 +109,29 @@ class EmpresaFacturaController extends BaseController
             $this->redirect('empresa-factura/index');
         }
 
-        // Verificar que la factura pertenece a esta empresa
         $stFact = $this->db->prepare(
-            'SELECT id FROM facturas WHERE uuid_cfdi = ? AND empresa_id = ?'
+            'SELECT f.monto, e.rfc FROM facturas f
+               JOIN empresas e ON e.id = f.empresa_id
+              WHERE f.uuid_cfdi = ? AND f.empresa_id = ?'
         );
         $stFact->execute([$uuid, $empresaId]);
-        if (!$stFact->fetch()) {
+        $factura = $stFact->fetch(PDO::FETCH_ASSOC);
+        if (!$factura) {
             $this->flash('error', 'Factura no encontrada.');
             $this->redirect('empresa-factura/index');
         }
 
         $service = new FacturaloService();
-        $ok      = $service->cancelarCFDI($uuid);
+        $ok      = $service->cancelarCFDI($uuid, $factura['rfc'] ?? '', (float)$factura['monto']);
 
         if ($ok) {
             $this->db->prepare(
                 'UPDATE facturas SET estado = "cancelada" WHERE uuid_cfdi = ?'
             )->execute([$uuid]);
             $this->log('Factura cancelada', 'facturas', 'UUID: ' . $uuid);
-            $this->flash('success', 'Factura cancelada.');
+            $this->flash('success', 'Solicitud de cancelación enviada al SAT.');
         } else {
-            $this->flash('error', 'No se pudo cancelar la factura. Verifica el token de API.');
+            $this->flash('error', 'No se pudo cancelar. Verifica las credenciales o intenta más tarde.');
         }
 
         $this->redirect('empresa-factura/index');
