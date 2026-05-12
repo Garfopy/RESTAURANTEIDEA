@@ -233,13 +233,15 @@ $esComprador   = $rol === 'comprador';
 <aside class="sidebar">
 
   <div class="sidebar-logo-area">
+    <a href="<?= BASE_URL ?>" style="display:inline-flex;align-items:center;text-decoration:none">
     <?php if ($appLogo): ?>
       <img src="<?= htmlspecialchars($appLogo) ?>" alt="Logo"
-           style="height:38px;max-width:180px;object-fit:contain;filter:brightness(0) invert(1)">
+           style="height:38px;max-width:180px;object-fit:contain">
     <?php else: ?>
       <img src="<?= BASE_URL ?>public/img/logo.svg" alt="<?= htmlspecialchars($appName) ?>"
-           style="height:38px;max-width:180px;object-fit:contain;filter:brightness(0) invert(1)">
+           style="height:38px;max-width:180px;object-fit:contain">
     <?php endif; ?>
+    </a>
     <?php if (!empty($empresa)): ?>
       <div class="sidebar-company" title="<?= htmlspecialchars($empresa['razon_social']) ?>">
         <?= htmlspecialchars($empresa['razon_social']) ?>
@@ -376,6 +378,21 @@ $esComprador   = $rol === 'comprador';
     <a href="<?= BASE_URL ?>recurrente/index" class="<?= ($activeMenu??'')==='recurrentes'?'active':'' ?>">
       <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
       Pedidos recurrentes
+    </a>
+    <?php
+    // Conteo de favoritos para mostrar en el sidebar
+    $favCount = 0;
+    try {
+      $favSidebarModel = new FavoritoModel();
+      $favCount = $favSidebarModel->contarPorUsuario($_SESSION['usuario']['id'] ?? 0);
+    } catch (\Throwable $e) { $favCount = 0; }
+    ?>
+    <a href="<?= BASE_URL ?>favorito/index" class="<?= ($activeMenu??'')==='favoritos'?'active':'' ?>">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.636l1.318-1.318a4.5 4.5 0 116.364 6.364L12 20.364l-7.682-7.682a4.5 4.5 0 010-6.364z"/></svg>
+      Mis favoritos
+      <?php if ($favCount > 0): ?>
+        <span style="margin-left:auto;background:#FEF2F2;color:var(--color-primary);font-size:.62rem;font-weight:700;padding:1px 7px;border-radius:999px;line-height:1.5"><?= $favCount ?></span>
+      <?php endif; ?>
     </a>
 
     <div class="sidebar-section">Mis ubicaciones</div>
