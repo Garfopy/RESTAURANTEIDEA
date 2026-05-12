@@ -68,15 +68,27 @@ $totalCarrito = count($itemsCarrito);
     <?php foreach ($combos as $combo): ?>
     <div style="background:#fff;border-radius:14px;border:1px solid #E5E7EB;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06);display:flex;flex-direction:column">
       <!-- Header del combo -->
+      <?php
+        // Precio fijo o calculado sumando items
+        $precioCombo = isset($combo['precio']) && $combo['precio'] !== null && $combo['precio'] > 0
+            ? (float)$combo['precio']
+            : array_reduce($combo['items'] ?? [], fn($carry, $item) => $carry + ((float)$item['precio_base'] * (float)$item['cantidad']), 0.0);
+        $esPrecioFijo = isset($combo['precio']) && $combo['precio'] !== null && $combo['precio'] > 0;
+      ?>
       <div style="background:linear-gradient(135deg,#1F2937 0%,#374151 100%);padding:16px 20px">
         <div style="font-size:.68rem;font-weight:700;color:rgba(255,255,255,.6);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Combo</div>
         <div style="font-size:1.05rem;font-weight:800;color:#fff;line-height:1.3"><?= htmlspecialchars($combo['nombre']) ?></div>
         <?php if (!empty($combo['descripcion'])): ?>
         <div style="font-size:.8rem;color:rgba(255,255,255,.7);margin-top:6px"><?= htmlspecialchars($combo['descripcion']) ?></div>
         <?php endif; ?>
-        <?php if (!empty($combo['precio'])): ?>
-        <div style="margin-top:10px;display:inline-block;background:var(--color-primary);color:#fff;font-size:.85rem;font-weight:800;padding:4px 12px;border-radius:999px">
-          $<?= number_format($combo['precio'], 2) ?> combo
+        <?php if ($precioCombo > 0): ?>
+        <div style="margin-top:10px;display:inline-flex;align-items:center;gap:6px">
+          <span style="background:var(--color-primary);color:#fff;font-size:.85rem;font-weight:800;padding:4px 12px;border-radius:999px">
+            $<?= number_format($precioCombo, 2) ?>
+          </span>
+          <?php if (!$esPrecioFijo): ?>
+          <span style="font-size:.68rem;color:rgba(255,255,255,.5)">precio estimado</span>
+          <?php endif; ?>
         </div>
         <?php endif; ?>
       </div>
