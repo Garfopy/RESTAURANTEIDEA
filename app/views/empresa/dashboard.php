@@ -507,7 +507,7 @@ new Chart(document.getElementById('chartMetodosPago'), {
     <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2"><circle cx="12" cy="12" r="10"/><path stroke-linecap="round" d="M12 8v4l2 2"/></svg>
     <div style="flex:1">
       <div style="font-weight:700;font-size:.9rem">Asistente CarniHub</div>
-      <div style="font-size:.72rem;opacity:.85">Powered by Gemini</div>
+      <div style="font-size:.72rem;opacity:.85">Asistente de datos</div>
     </div>
     <!-- Botón silenciar/activar voz -->
     <button id="ttsBtn" onclick="toggleTts()" title="Activar/silenciar voz"
