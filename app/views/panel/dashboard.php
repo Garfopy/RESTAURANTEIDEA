@@ -56,9 +56,9 @@ function estadoBadge(string $estado): string {
 <div style="background:#FFF7ED;border:1px solid #FED7AA;border-radius:10px;padding:12px 18px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:12px">
   <div style="display:flex;align-items:center;gap:10px">
     <svg width="18" height="18" fill="none" stroke="#B45309" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-    <span style="font-size:.875rem;color:#92400E"><strong><?= number_format($alertaStorage) ?> archivos</strong> superan los 60 días de retención.</span>
+    <span style="font-size:.875rem;color:#92400E"><strong><?= number_format($alertaStorage) ?> imagen(es)</strong> superan el tiempo de retención configurado.</span>
   </div>
-  <a href="<?= BASE_URL ?>admin-storage/index" style="padding:7px 16px;background:#F59E0B;color:#fff;border-radius:7px;text-decoration:none;font-weight:700;font-size:.8rem;white-space:nowrap">Gestionar almacenamiento →</a>
+  <a href="<?= BASE_URL ?>admin-storage/index" style="padding:7px 16px;background:#F59E0B;color:#fff;border-radius:7px;text-decoration:none;font-weight:700;font-size:.8rem;white-space:nowrap">Gestionar retención →</a>
 </div>
 <?php endif; ?>
 

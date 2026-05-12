@@ -109,7 +109,9 @@ class PanelController extends BaseController
         $activeMenu = 'dashboard';
 
         $alertaStorage = 0;
-        $cutoffStorage = time() - 60 * 86400;
+        $cfg           = new ConfigModel();
+        $diasRet       = max(1, (int)$cfg->get('retencion_fotos_evidencias_dias', '90'));
+        $cutoffStorage = time() - $diasRet * 86400;
         foreach (['entregas', 'firmas'] as $_sd) {
             foreach (glob(UPLOAD_PATH . $_sd . '/*') ?: [] as $_sf) {
                 if (is_file($_sf) && filemtime($_sf) < $cutoffStorage) $alertaStorage++;
