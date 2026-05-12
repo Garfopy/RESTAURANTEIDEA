@@ -61,7 +61,7 @@ class FacturaloService {
                 'quantity' => (float)$i['cantidad'],
                 'product'  => [
                     'description' => $i['nombre'],
-                    'product_key' => '50201506',
+                    'product_key' => '50304300',
                     'price'       => (float)$i['precio_unit'],
                     'unit_key'    => 'KGM',
                     'unit_name'   => 'Kilogramo',
