@@ -13,6 +13,7 @@ $itemsCarrito = $_SESSION['carrito']['items'] ?? [];
 $totalCarrito = count($itemsCarrito);
 
 // Helper para imágenes reales
+if (!function_exists('getProductImageUrl')) {
 function getProductImageUrl($prod) {
     // Si ya tiene imagen subida, usarla
     if (!empty($prod['imagen'])) {
@@ -40,6 +41,7 @@ function getProductImageUrl($prod) {
 
     // Fallback genérico
     return "https://source.unsplash.com/800x600/?raw+meat," . urlencode($prod['categoria_nombre']);
+}
 }
 ?>
 
@@ -144,6 +146,22 @@ function getProductImageUrl($prod) {
       <div style="position:absolute;bottom:10px;left:10px;background:#10B981;color:#fff;font-size:.65rem;font-weight:700;padding:3px 8px;border-radius:999px">
         ✦ Vol. desc.
       </div>
+      <?php endif; ?>
+      <?php
+        $esComprador = ($_SESSION['usuario']['rol_slug'] ?? '') === 'comprador';
+        $esFav = isset($favoritosSet) && isset($favoritosSet[$prod['id']]);
+      ?>
+      <?php if ($esComprador): ?>
+      <button type="button"
+              class="btn-fav <?= $esFav ? 'is-fav' : '' ?>"
+              data-producto-id="<?= (int)$prod['id'] ?>"
+              data-favorito="<?= $esFav ? '1' : '0' ?>"
+              onclick="toggleFavoritoCatalogo(event, this)"
+              aria-label="<?= $esFav ? 'Quitar de favoritos' : 'Agregar a favoritos' ?>"
+              title="<?= $esFav ? 'Quitar de favoritos' : 'Agregar a favoritos' ?>"
+              style="position:absolute;top:10px;<?= $estaEnCarrito ? 'left:10px' : 'right:10px' ?>;width:34px;height:34px;border-radius:50%;border:1px solid #E5E7EB;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.08);transition:transform .15s">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="<?= $esFav ? 'var(--color-primary)' : 'none' ?>" stroke="<?= $esFav ? 'var(--color-primary)' : '#9CA3AF' ?>" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.636l1.318-1.318a4.5 4.5 0 116.364 6.364L12 20.364l-7.682-7.682a4.5 4.5 0 010-6.364z"/></svg>
+      </button>
       <?php endif; ?>
     </div>
     <!-- Info -->
@@ -266,10 +284,28 @@ function getProductImageUrl($prod) {
 
 <!-- ═══════════════════════ Modal: Agregar al carrito ═══════════════════════ -->
 <div id="modalAgregar" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2001;align-items:center;justify-content:center">
-  <div style="background:#fff;border-radius:14px;width:460px;max-width:96vw;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)">
+  <div style="position:relative;width:460px;max-width:96vw">
+
+    <!-- Botón flotante: ver carrito (centrado vertical, fuera del recuadro a la derecha) -->
+    <a href="<?= BASE_URL ?>carrito/index" aria-label="Ver carrito" title="Ver carrito"
+       style="position:absolute;top:50%;right:-80px;transform:translateY(-50%);width:56px;height:56px;border-radius:50%;background:#fff;color:var(--color-primary);text-decoration:none;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 18px rgba(0,0,0,.25);border:2px solid var(--color-primary);z-index:2;transition:transform .15s, box-shadow .15s"
+       onmouseenter="this.style.transform='translateY(-50%) scale(1.08)';this.style.boxShadow='0 8px 22px rgba(0,0,0,.3)'"
+       onmouseleave="this.style.transform='translateY(-50%) scale(1)';this.style.boxShadow='0 6px 18px rgba(0,0,0,.25)'">
+      <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2 9m5-9v9m4-9v9m5-9l2 9"/></svg>
+    </a>
+
+  <div style="background:#fff;border-radius:14px;width:100%;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)">
 
     <!-- Header con gradiente -->
-    <div style="background:linear-gradient(135deg,var(--color-primary) 0%,#A00D24 100%);padding:18px 20px;border-radius:14px 14px 0 0">
+    <div style="position:relative;background:linear-gradient(135deg,var(--color-primary) 0%,#A00D24 100%);padding:18px 56px 18px 20px;border-radius:14px 14px 0 0">
+      <!-- Botón cerrar (X) en la esquina superior derecha -->
+      <button type="button" onclick="cerrarModalAgregar()" aria-label="Cerrar"
+              title="Cerrar"
+              style="position:absolute;top:10px;right:10px;width:34px;height:34px;border-radius:50%;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.15);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:1.2rem;line-height:1;font-family:inherit;transition:background .15s"
+              onmouseenter="this.style.background='rgba(255,255,255,.3)'"
+              onmouseleave="this.style.background='rgba(255,255,255,.15)'">
+        &times;
+      </button>
       <div style="font-size:.75rem;color:rgba(255,255,255,.8)" id="modAgrCategoria"></div>
       <h3 id="modAgrNombre" style="font-size:1.1rem;font-weight:800;color:#fff;margin:4px 0 0"></h3>
     </div>
@@ -334,6 +370,7 @@ function getProductImageUrl($prod) {
 
       <div id="modAgrFeedback" style="display:none;margin-top:12px;padding:10px 14px;border-radius:8px;font-size:.85rem;text-align:center;border:1px solid transparent"></div>
     </div>
+  </div>
   </div>
 </div>
 
@@ -626,4 +663,42 @@ function cerrarModalVerPrecios() {
 document.getElementById('modalVerPrecios').addEventListener('click', e => {
   if (e.target === document.getElementById('modalVerPrecios')) cerrarModalVerPrecios();
 });
+
+// ═══════════════ Favoritos (toggle AJAX) ═══════════════
+async function toggleFavoritoCatalogo(ev, btn) {
+  ev.preventDefault();
+  ev.stopPropagation();
+  const productoId = btn.dataset.productoId;
+  if (!productoId || btn.disabled) return;
+  btn.disabled = true;
+  const prevTransform = btn.style.transform;
+  btn.style.transform = 'scale(.85)';
+  try {
+    const fd = new FormData();
+    fd.append('producto_id', productoId);
+    const res = await fetch(BASE_URL_CAT + 'favorito/toggle', {
+      method: 'POST',
+      body: fd,
+      credentials: 'same-origin',
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Error');
+    const isFav = !!data.favorito;
+    btn.dataset.favorito = isFav ? '1' : '0';
+    btn.classList.toggle('is-fav', isFav);
+    btn.setAttribute('aria-label', isFav ? 'Quitar de favoritos' : 'Agregar a favoritos');
+    btn.title = isFav ? 'Quitar de favoritos' : 'Agregar a favoritos';
+    const svg = btn.querySelector('svg');
+    if (svg) {
+      svg.setAttribute('fill',  isFav ? 'var(--color-primary)' : 'none');
+      svg.setAttribute('stroke', isFav ? 'var(--color-primary)' : '#9CA3AF');
+    }
+  } catch (err) {
+    console.error('toggleFavoritoCatalogo', err);
+  } finally {
+    btn.disabled = false;
+    btn.style.transform = prevTransform || '';
+  }
+}
 </script>

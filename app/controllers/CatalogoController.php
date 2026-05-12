@@ -42,6 +42,14 @@ class CatalogoController extends BaseController
             $limitePorProducto[(int)$lim['producto_id']] = $lim;
         }
 
+        // Favoritos del usuario actual (solo aplica para comprador)
+        $favoritosIds = [];
+        if ($this->rolActual() === 'comprador') {
+            $favModel = new FavoritoModel();
+            $favoritosIds = $favModel->idsFavoritos($this->usuarioId() ?? 0);
+        }
+        $favoritosSet = array_flip($favoritosIds);
+
         $flash     = $this->getFlash();
         $pageTitle = 'Catálogo de productos';
         $activeMenu = 'catalogo';
