@@ -5,9 +5,13 @@ class FacturaloService {
     private string $rfc;
 
     public function __construct() {
-        $db = Database::getInstance();
-        $get = fn(string $k) => $db->query("SELECT valor FROM global_settings WHERE clave = '$k' LIMIT 1")->fetchColumn() ?: '';
-        $this->token = $get('facturalo_token');
+        $db  = Database::getInstance();
+        $get = function(string $k) use ($db): string {
+            $s = $db->prepare("SELECT valor FROM global_settings WHERE clave = ? LIMIT 1");
+            $s->execute([$k]);
+            return $s->fetchColumn() ?: '';
+        };
+        $this->token = $get('facturalo_token') ?: $get('facturalo_api_key');
         $this->rfc   = $get('facturalo_rfc');
     }
 

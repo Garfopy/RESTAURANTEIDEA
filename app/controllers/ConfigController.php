@@ -68,7 +68,7 @@ class ConfigController extends BaseController
                 'whatsapp_api_token', 'whatsapp_phone_id', 'whatsapp_numero_contacto',
                 'gemini_api_key',
                 'traccar_url', 'traccar_user', 'traccar_pass',
-                'facturalo_api_key',
+                'facturalo_token', 'facturalo_rfc',
                 'paypal_client_id', 'paypal_secret', 'paypal_mode',
                 'shelly_api_url', 'shelly_auth_key',
                 'hikvision_host', 'hikvision_user', 'hikvision_pass',

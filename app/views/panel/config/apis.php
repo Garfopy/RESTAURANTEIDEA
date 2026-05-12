@@ -168,14 +168,29 @@ function toggleVis(id) {
 
   <!-- Factura-lo -->
   <div style="background:#fff;border-radius:12px;border:1px solid #E5E7EB;padding:20px;margin-bottom:16px">
-    <h3 style="font-size:.85rem;font-weight:700;color:#111827;margin-bottom:14px">Factura-lo (CFDI)</h3>
-    <label class="form-label">API Key</label>
-    <div style="display:flex;max-width:400px">
-      <input type="password" id="facturalo_api_key" name="facturalo_api_key"
-             value="<?= $s('facturalo_api_key') ?>"
-             class="form-control" style="border-radius:6px 0 0 6px;border-right:none;font-family:monospace;font-size:.85rem">
-      <button type="button" onclick="toggleVis('facturalo_api_key')"
-              style="padding:0 12px;border:1px solid #E5E7EB;border-left:none;border-radius:0 6px 6px 0;background:#F9FAFB;cursor:pointer;font-size:.8rem;color:#6B7280;white-space:nowrap">Ver</button>
+    <h3 style="font-size:.85rem;font-weight:700;color:#111827;margin-bottom:4px">Factura-lo (CFDI Mexico)</h3>
+    <p style="font-size:.75rem;color:#6B7280;margin-bottom:14px">
+      Registrate gratis en <strong>factura-lo.mx</strong>, sube tu CSD (certificado SAT) y obtén tu token. Es el servicio que timbra las facturas oficiales.
+    </p>
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:14px">
+      <div>
+        <label class="form-label">Token de API</label>
+        <div style="display:flex">
+          <input type="password" id="facturalo_token" name="facturalo_token"
+                 value="<?= $s('facturalo_token') ?>"
+                 class="form-control" style="border-radius:6px 0 0 6px;border-right:none;font-family:monospace;font-size:.85rem"
+                 placeholder="token de factura-lo.mx">
+          <button type="button" onclick="toggleVis('facturalo_token')"
+                  style="padding:0 12px;border:1px solid #E5E7EB;border-left:none;border-radius:0 6px 6px 0;background:#F9FAFB;cursor:pointer;font-size:.8rem;color:#6B7280;white-space:nowrap">Ver</button>
+        </div>
+      </div>
+      <div>
+        <label class="form-label">RFC del emisor</label>
+        <input type="text" name="facturalo_rfc"
+               value="<?= $s('facturalo_rfc') ?>"
+               class="form-control" placeholder="XAXX010101000" style="text-transform:uppercase">
+        <p style="font-size:.72rem;color:#6B7280;margin-top:4px">RFC de CarniHub (el que emite las facturas)</p>
+      </div>
     </div>
   </div>
 
