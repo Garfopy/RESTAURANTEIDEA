@@ -291,7 +291,9 @@ function quitarProducto(id, nombre) {
 }
 
 function actualizarFila(id, precioBase, nombre, presentacion) {
-  const qty = parseFloat(document.getElementById('qty-' + id)?.value) || 0;
+  const input = document.getElementById('qty-' + id);
+  let qty = parseFloat(input?.value) || 0;
+  if (qty < 0) { if (input) input.value = ''; qty = 0; }
   const sub = document.getElementById('sub-' + id);
   if (!sub) return;
 

@@ -21,8 +21,6 @@ class PanelController extends BaseController
         // ── KPIs principales ──────────────────────────────────────────────
         $totalEmpresas       = (int)$db->query('SELECT COUNT(*) FROM empresas WHERE activo = 1')->fetchColumn();
         $totalUsuarios       = (int)$db->query("SELECT COUNT(*) FROM usuarios u JOIN roles r ON r.id = u.rol_id WHERE u.activo = 1 AND r.slug NOT IN ('superadmin','admin')")->fetchColumn();
-        $pedidosMes          = (int)$db->query("SELECT COUNT(*) FROM pedidos WHERE MONTH(created_at)=MONTH(NOW()) AND YEAR(created_at)=YEAR(NOW())")->fetchColumn();
-        $ventasMes           = (float)$db->query("SELECT COALESCE(SUM(total),0) FROM pedidos WHERE estado != 'cancelado' AND MONTH(created_at)=MONTH(NOW()) AND YEAR(created_at)=YEAR(NOW())")->fetchColumn();
         $empresasActivas     = (int)$db->query("SELECT COUNT(*) FROM empresas WHERE activo=1 AND suscripcion_estado='activo'")->fetchColumn();
         $empresasSuspendidas = (int)$db->query("SELECT COUNT(*) FROM empresas WHERE activo=1 AND suscripcion_estado IN ('suspendido','sin_plan')")->fetchColumn();
 
@@ -34,6 +32,26 @@ class PanelController extends BaseController
               WHERE s.estado = 'activo'"
         )->fetchColumn();
 
+        // ── Totales SaaS adicionales ──────────────────────────────────────
+        $totalSucursales = (int)$db->query(
+            "SELECT COUNT(*) FROM sucursales WHERE activo = 1"
+        )->fetchColumn();
+
+        $pedidosEntregados = (int)$db->query(
+            "SELECT COUNT(*) FROM pedidos WHERE estado = 'entregado'
+              AND MONTH(created_at)=MONTH(NOW()) AND YEAR(created_at)=YEAR(NOW())"
+        )->fetchColumn();
+
+        // ── Ingresos SaaS por mes (últimos 6 meses) ───────────────────────
+        $ingresosPorMes = $db->query(
+            "SELECT DATE_FORMAT(s.created_at,'%Y-%m') AS mes,
+                    COALESCE(SUM(ps.precio_mensual),0) AS ingresos
+               FROM suscripciones s
+               JOIN planes_saas ps ON ps.id = s.plan_id
+              WHERE s.created_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
+           GROUP BY mes ORDER BY mes ASC"
+        )->fetchAll();
+
         // ── Distribución de planes ────────────────────────────────────────
         $distPlanes = $db->query(
             "SELECT ps.nombre, COUNT(s.id) AS total
@@ -44,14 +62,9 @@ class PanelController extends BaseController
            ORDER BY ps.precio_mensual ASC"
         )->fetchAll();
 
-        // ── Pedidos por mes (últimos 6 meses) ────────────────────────────
-        $pedidosPorMes = $db->query(
-            "SELECT DATE_FORMAT(created_at,'%Y-%m') AS mes,
-                    COUNT(*) AS total,
-                    COALESCE(SUM(total),0) AS monto
-               FROM pedidos
-              WHERE created_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
-           GROUP BY mes ORDER BY mes ASC"
+        // ── Estado de suscripciones ───────────────────────────────────────
+        $estadoSus = $db->query(
+            "SELECT estado, COUNT(*) AS total FROM suscripciones GROUP BY estado"
         )->fetchAll();
 
         // ── Empresas nuevas por mes (últimos 6 meses) ─────────────────────

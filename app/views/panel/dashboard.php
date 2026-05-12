@@ -1,8 +1,8 @@
 <?php
-// Vista: Panel Dashboard (KPIs globales)
-// Variables: $totalEmpresas, $totalUsuarios, $pedidosMes, $ventasMes,
-//            $empresasActivas, $empresasSuspendidas, $ingresosSaas,
-//            $distPlanes, $pedidosPorMes, $empresasNuevas,
+// Vista: Panel Dashboard — métricas SaaS
+// Variables: $totalEmpresas, $totalUsuarios, $empresasActivas, $ingresosSaas,
+//            $totalSucursales, $pedidosEntregados, $ingresosPorMes,
+//            $distPlanes, $estadoSus, $empresasNuevas,
 //            $ultimosPedidos, $stockBajo, $actividadReciente
 
 function estadoBadge(string $estado): string {
@@ -32,16 +32,16 @@ function estadoBadge(string $estado): string {
 </div>
 <?php endif; ?>
 
-<!-- ── Fila 1: 6 KPI cards ── -->
+<!-- ── Fila 1: 6 KPI cards SaaS ── -->
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-bottom:20px">
   <?php
   $kpis = [
-    ['label'=>'Empresas activas',  'valor'=>$totalEmpresas,                              'bg'=>'#EFF6FF','text'=>'#1E40AF'],
-    ['label'=>'Usuarios activos',  'valor'=>$totalUsuarios,                              'bg'=>'#F0FDF4','text'=>'#166534'],
-    ['label'=>'Pedidos este mes',  'valor'=>number_format($pedidosMes),                  'bg'=>'#FFF7ED','text'=>'#9A3412'],
-    ['label'=>'Ventas este mes',   'valor'=>'$'.number_format($ventasMes,0,'.',','),     'bg'=>'#FFF1F2','text'=>'#9F1239'],
-    ['label'=>'Ingresos SaaS/mes', 'valor'=>'$'.number_format($ingresosSaas,0,'.',','), 'bg'=>'#F0FDF4','text'=>'#065F46'],
-    ['label'=>'Suscrip. activas',  'valor'=>$empresasActivas . ' / ' . $totalEmpresas,  'bg'=>'#EFF6FF','text'=>'#1D4ED8'],
+    ['label'=>'Empresas activas',     'valor'=>number_format($totalEmpresas),              'bg'=>'#EFF6FF','text'=>'#1E40AF'],
+    ['label'=>'Suscripciones activas','valor'=>number_format($empresasActivas),             'bg'=>'#F0FDF4','text'=>'#166534'],
+    ['label'=>'Ingresos SaaS/mes',    'valor'=>'$'.number_format($ingresosSaas,0,'.',','), 'bg'=>'#FFF1F2','text'=>'#9F1239'],
+    ['label'=>'Usuarios activos',     'valor'=>number_format($totalUsuarios),               'bg'=>'#FFF7ED','text'=>'#9A3412'],
+    ['label'=>'Sucursales activas',   'valor'=>number_format($totalSucursales),             'bg'=>'#EFF6FF','text'=>'#1D4ED8'],
+    ['label'=>'Entregas este mes',    'valor'=>number_format($pedidosEntregados),           'bg'=>'#F0FDF4','text'=>'#065F46'],
   ];
   foreach ($kpis as $k): ?>
   <div style="background:<?= $k['bg'] ?>;border-radius:12px;padding:16px 18px">
@@ -51,19 +51,19 @@ function estadoBadge(string $estado): string {
   <?php endforeach; ?>
 </div>
 
-<!-- ── Fila 2: Gráficas ── -->
+<!-- ── Fila 2: Ingresos SaaS + Distribución de planes ── -->
 <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:20px">
 
-  <!-- Pedidos + monto por mes -->
+  <!-- Ingresos SaaS por mes -->
   <div style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:20px">
-    <h3 style="font-size:.875rem;font-weight:700;color:#111827;margin:0 0 16px">Pedidos por mes (últimos 6 meses)</h3>
-    <canvas id="chartPedidos" height="90"></canvas>
+    <h3 style="font-size:.875rem;font-weight:700;color:#111827;margin:0 0 16px">Ingresos SaaS por mes (últimos 6 meses)</h3>
+    <canvas id="chartIngresos" height="90"></canvas>
   </div>
 
   <!-- Distribución de planes (dona) -->
   <div style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:20px">
     <h3 style="font-size:.875rem;font-weight:700;color:#111827;margin:0 0 16px">Distribución de planes</h3>
-    <canvas id="chartPlanes" height="160"></canvas>
+    <canvas id="chartPlanes" height="140"></canvas>
     <div style="margin-top:12px">
       <?php foreach ($distPlanes as $dp): ?>
       <div style="display:flex;justify-content:space-between;font-size:.78rem;color:#374151;padding:3px 0;border-bottom:1px solid #F3F4F6">
@@ -75,7 +75,32 @@ function estadoBadge(string $estado): string {
   </div>
 </div>
 
-<!-- ── Fila 3: Tabla pedidos + actividad ── -->
+<!-- ── Fila 3: Empresas nuevas + Estado suscripciones ── -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
+
+  <div style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:20px">
+    <h3 style="font-size:.875rem;font-weight:700;color:#111827;margin:0 0 14px">Empresas nuevas por mes</h3>
+    <canvas id="chartEmpresas" height="120"></canvas>
+  </div>
+
+  <div style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:20px">
+    <h3 style="font-size:.875rem;font-weight:700;color:#111827;margin:0 0 14px">Estado de suscripciones</h3>
+    <canvas id="chartEstado" height="120"></canvas>
+    <?php
+    $coloresEstado = ['activo'=>'#D1FAE5','suspendido'=>'#FEE2E2','cancelado'=>'#F3F4F6','pendiente_paypal'=>'#FEF3C7'];
+    $textosEstado  = ['activo'=>'#065F46','suspendido'=>'#991B1B','cancelado'=>'#374151','pendiente_paypal'=>'#92400E'];
+    ?>
+    <div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:6px">
+      <?php foreach ($estadoSus as $es): ?>
+      <span style="background:<?= $coloresEstado[$es['estado']] ?? '#F3F4F6' ?>;color:<?= $textosEstado[$es['estado']] ?? '#374151' ?>;padding:3px 10px;border-radius:999px;font-size:.75rem;font-weight:600">
+        <?= htmlspecialchars($es['estado']) ?>: <?= (int)$es['total'] ?>
+      </span>
+      <?php endforeach; ?>
+    </div>
+  </div>
+</div>
+
+<!-- ── Fila 4: Tabla pedidos + actividad ── -->
 <div style="display:grid;grid-template-columns:3fr 1fr;gap:16px;margin-bottom:20px">
 
   <!-- Últimos pedidos -->
@@ -147,31 +172,26 @@ function estadoBadge(string $estado): string {
 
 <script>
 (function() {
-  // ── Gráfica pedidos por mes ──
-  const pedMeses  = <?= json_encode(array_column($pedidosPorMes, 'mes')) ?>;
-  const pedTotals = <?= json_encode(array_map('intval', array_column($pedidosPorMes, 'total'))) ?>;
-  const pedMontos = <?= json_encode(array_map('floatval', array_column($pedidosPorMes, 'monto'))) ?>;
+  // ── Ingresos SaaS por mes ──
+  const ingMeses = <?= json_encode(array_column($ingresosPorMes, 'mes')) ?>;
+  const ingVals  = <?= json_encode(array_map('floatval', array_column($ingresosPorMes, 'ingresos'))) ?>;
 
-  new Chart(document.getElementById('chartPedidos'), {
+  new Chart(document.getElementById('chartIngresos'), {
     type: 'bar',
     data: {
-      labels: pedMeses,
+      labels: ingMeses,
       datasets: [
-        { label: 'Pedidos', data: pedTotals, backgroundColor: 'rgba(200,16,46,0.15)', borderColor: '#C8102E', borderWidth: 2, yAxisID: 'y', type: 'bar' },
-        { label: 'Monto ($)', data: pedMontos, borderColor: '#1D4ED8', backgroundColor: 'transparent', borderWidth: 2, tension: 0.4, yAxisID: 'y1', type: 'line', pointRadius: 4 }
+        { label: 'Ingresos SaaS ($)', data: ingVals, backgroundColor: 'rgba(200,16,46,0.15)', borderColor: '#C8102E', borderWidth: 2 }
       ]
     },
     options: {
-      responsive: true, interaction: { mode: 'index', intersect: false },
-      scales: {
-        y:  { position: 'left',  beginAtZero: true, ticks: { font: { size: 11 } } },
-        y1: { position: 'right', beginAtZero: true, grid: { drawOnChartArea: false }, ticks: { font: { size: 11 }, callback: v => '$' + v.toLocaleString() } }
-      },
-      plugins: { legend: { labels: { font: { size: 11 } } } }
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, ticks: { callback: v => '$' + v.toLocaleString() } } }
     }
   });
 
-  // ── Gráfica planes (dona) ──
+  // ── Distribución planes (dona) ──
   const planNombres = <?= json_encode(array_column($distPlanes, 'nombre')) ?>;
   const planTotals  = <?= json_encode(array_map('intval', array_column($distPlanes, 'total'))) ?>;
 
@@ -179,12 +199,35 @@ function estadoBadge(string $estado): string {
     type: 'doughnut',
     data: {
       labels: planNombres,
-      datasets: [{ data: planTotals, backgroundColor: ['#DBEAFE','#D1FAE5','#EDE9FE'], borderWidth: 2 }]
+      datasets: [{ data: planTotals, backgroundColor: ['#DBEAFE','#D1FAE5','#EDE9FE','#FEF3C7'], borderWidth: 2 }]
     },
-    options: {
-      responsive: true,
-      plugins: { legend: { display: false } }
-    }
+    options: { responsive: true, plugins: { legend: { display: false } } }
+  });
+
+  // ── Empresas nuevas por mes ──
+  const empMeses  = <?= json_encode(array_column($empresasNuevas, 'mes')) ?>;
+  const empTotals = <?= json_encode(array_map('intval', array_column($empresasNuevas, 'total'))) ?>;
+
+  new Chart(document.getElementById('chartEmpresas'), {
+    type: 'bar',
+    data: {
+      labels: empMeses,
+      datasets: [{ label: 'Empresas', data: empTotals, backgroundColor: 'rgba(92,33,182,0.15)', borderColor: '#5B21B6', borderWidth: 2 }]
+    },
+    options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+  });
+
+  // ── Estado suscripciones (dona) ──
+  const susEstados = <?= json_encode(array_column($estadoSus, 'estado')) ?>;
+  const susTotales = <?= json_encode(array_map('intval', array_column($estadoSus, 'total'))) ?>;
+
+  new Chart(document.getElementById('chartEstado'), {
+    type: 'doughnut',
+    data: {
+      labels: susEstados,
+      datasets: [{ data: susTotales, backgroundColor: ['#D1FAE5','#FEE2E2','#F3F4F6','#FEF3C7'], borderWidth: 2 }]
+    },
+    options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { font: { size: 10 } } } } }
   });
 })();
 </script>

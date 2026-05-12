@@ -177,7 +177,11 @@ function repartirIgual(prodId, total, numSucs) {
 function validarTotal(prodId) {
   const inputs  = document.querySelectorAll('.prod-' + prodId);
   let suma      = 0;
-  inputs.forEach(el => suma += parseFloat(el.value) || 0);
+  inputs.forEach(el => {
+    let v = parseFloat(el.value) || 0;
+    if (v < 0) { el.value = ''; v = 0; }
+    suma += v;
+  });
   suma          = Math.round(suma * 1000) / 1000;
   const total   = parseFloat(inputs[0]?.dataset.total || 0);
   const completo = Math.abs(suma - total) < 0.01;
