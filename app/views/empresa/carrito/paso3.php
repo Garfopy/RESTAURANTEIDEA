@@ -714,8 +714,13 @@ var SUCURSALES_MAP = <?= $_sucMapJs ?>;
   window.ajustarDistStep3 = function(prodId, sucId, delta, totalProd) {
     var input = document.querySelector('.dist-input[data-prodid="' + prodId + '"][data-sucid="' + sucId + '"]');
     if (!input) return;
-    var val   = parseFloat(input.value) || 0;
-    var nuevo = Math.max(0, Math.round((val + delta) * 2) / 2);
+    var val = parseFloat(input.value) || 0;
+    var sumOtros = 0;
+    document.querySelectorAll('.dist-input[data-prodid="' + prodId + '"]').forEach(function(other) {
+      if (other !== input) sumOtros += parseFloat(other.value) || 0;
+    });
+    var maxPerm = Math.max(0, Math.round((totalProd - sumOtros) * 1000) / 1000);
+    var nuevo = Math.max(0, Math.min(maxPerm, Math.round((val + delta) * 2) / 2));
     input.value = nuevo > 0 ? nuevo : '0.00';
     actualizarRestante(prodId);
   };
@@ -744,18 +749,17 @@ var SUCURSALES_MAP = <?= $_sucMapJs ?>;
     });
     suma = Math.round(suma * 1000) / 1000;
     var completo = Math.abs(suma - total) < 0.005;
-    var excedido = suma > total + 0.005;
     var pct      = total > 0 ? Math.min(100, (suma / total) * 100) : 0;
 
     // Barra
     var bar = document.getElementById('dist-bar-' + prodId);
     if (bar) {
       bar.style.width      = pct + '%';
-      bar.style.background = completo ? '#10B981' : (excedido ? '#EF4444' : '#F59E0B');
+      bar.style.background = completo ? '#10B981' : '#F59E0B';
     }
     // Card border
     var card = document.getElementById('dist-card-' + prodId);
-    if (card) card.style.borderColor = completo ? '#A7F3D0' : (excedido ? '#FECACA' : '#E5E7EB');
+    if (card) card.style.borderColor = completo ? '#A7F3D0' : '#E5E7EB';
 
     // Estado texto
     var icon  = document.getElementById('dist-status-icon-' + prodId);
@@ -764,9 +768,6 @@ var SUCURSALES_MAP = <?= $_sucMapJs ?>;
     if (completo) {
       if (icon)  icon.textContent  = '✅';
       if (stTxt) { stTxt.textContent = 'Distribución completa'; stTxt.style.color = '#059669'; }
-    } else if (excedido) {
-      if (icon)  icon.textContent  = '❌';
-      if (stTxt) { stTxt.textContent = 'Excedido en ' + Math.abs(rest).toFixed(2); stTxt.style.color = '#DC2626'; }
     } else {
       if (icon)  icon.textContent  = '⏳';
       if (stTxt) { stTxt.textContent = 'Faltan ' + rest.toFixed(2) + ' por asignar'; stTxt.style.color = '#6B7280'; }
@@ -776,7 +777,7 @@ var SUCURSALES_MAP = <?= $_sucMapJs ?>;
     var celda = document.querySelector('.celda-rest[data-prodid="' + prodId + '"]');
     if (celda) {
       celda.textContent  = nf(rest);
-      celda.style.color  = completo ? '#059669' : (excedido ? '#DC2626' : '#D97706');
+      celda.style.color  = completo ? '#059669' : '#D97706';
     }
 
     // Hint global

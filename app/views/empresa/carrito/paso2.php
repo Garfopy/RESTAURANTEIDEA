@@ -103,7 +103,7 @@ $distGuardada = $distribucion ?? [];
                  style="flex:1;padding:8px 6px;border:1.5px solid #D1D5DB;border-radius:8px;font-size:.95rem;text-align:center;font-weight:700;color:#111827;outline:none;min-width:0;transition:border-color .15s"
                  onfocus="this.style.borderColor='var(--color-primary)'"
                  onblur="this.style.borderColor='#D1D5DB'"
-                 oninput="validarTotal(<?= $prodId ?>)">
+                 oninput="onInputDist(this, <?= $prodId ?>)">
           <button type="button"
                   onclick="ajustarDistSuc(<?= $prodId ?>, <?= $suc['id'] ?>, 0.5, <?= $totalProd ?>)"
                   style="width:36px;height:36px;border:1.5px solid #D1D5DB;border-radius:8px;background:#fff;cursor:pointer;font-size:1.1rem;font-weight:700;color:#374151;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s;font-family:inherit;user-select:none"
@@ -149,9 +149,27 @@ $distGuardada = $distribucion ?? [];
 function ajustarDistSuc(prodId, sucId, delta, totalProd) {
   const input = document.getElementById('dist-' + prodId + '-' + sucId);
   if (!input) return;
-  const val   = parseFloat(input.value) || 0;
-  let nuevo   = Math.max(0, Math.round((val + delta) * 2) / 2);
+  const val = parseFloat(input.value) || 0;
+  let sumOtros = 0;
+  document.querySelectorAll('.prod-' + prodId).forEach(el => {
+    if (el !== input) sumOtros += parseFloat(el.value) || 0;
+  });
+  const maxPerm = Math.max(0, Math.round((totalProd - sumOtros) * 1000) / 1000);
+  let nuevo = Math.max(0, Math.min(maxPerm, Math.round((val + delta) * 2) / 2));
   input.value = nuevo > 0 ? nuevo : '';
+  validarTotal(prodId);
+}
+
+function onInputDist(input, prodId) {
+  let v = parseFloat(input.value) || 0;
+  if (v < 0) { input.value = ''; v = 0; }
+  let sumOtros = 0;
+  document.querySelectorAll('.prod-' + prodId).forEach(el => {
+    if (el !== input) sumOtros += parseFloat(el.value) || 0;
+  });
+  const totalProd = parseFloat(input.dataset.total) || 0;
+  const maxPerm = Math.max(0, Math.round((totalProd - sumOtros) * 1000) / 1000);
+  if (v > maxPerm + 0.004) { input.value = maxPerm > 0 ? maxPerm.toFixed(2) : ''; }
   validarTotal(prodId);
 }
 
@@ -185,7 +203,6 @@ function validarTotal(prodId) {
   suma          = Math.round(suma * 1000) / 1000;
   const total   = parseFloat(inputs[0]?.dataset.total || 0);
   const completo = Math.abs(suma - total) < 0.01;
-  const excedido = suma > total + 0.01;
   const pct      = total > 0 ? Math.min(100, (suma / total) * 100) : 0;
 
   // Barra de progreso
@@ -193,7 +210,7 @@ function validarTotal(prodId) {
   const txt = document.getElementById('progress-text-' + prodId);
   if (bar) {
     bar.style.width      = pct + '%';
-    bar.style.background = completo ? '#10B981' : (excedido ? '#EF4444' : '#F59E0B');
+    bar.style.background = completo ? '#10B981' : '#F59E0B';
   }
   if (txt) txt.textContent = suma.toFixed(2) + ' / ' + total.toFixed(2);
 
@@ -205,10 +222,6 @@ function validarTotal(prodId) {
     if (icon)  icon.textContent  = '✅';
     if (stTxt) { stTxt.textContent = 'Distribución completa — listo para continuar'; stTxt.style.color = '#059669'; }
     if (card)  { card.style.borderColor = '#A7F3D0'; card.style.background = ''; }
-  } else if (excedido) {
-    if (icon)  icon.textContent  = '❌';
-    if (stTxt) { stTxt.textContent = 'Excedido: reduce ' + (suma - total).toFixed(2); stTxt.style.color = '#DC2626'; }
-    if (card)  { card.style.borderColor = '#FECACA'; }
   } else {
     const falta = (total - suma).toFixed(2);
     if (icon)  icon.textContent  = '⏳';
