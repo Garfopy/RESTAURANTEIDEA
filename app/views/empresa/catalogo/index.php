@@ -282,25 +282,28 @@ function getProductImageUrl($prod) {
 
 <!-- ═══════════════════════ Modal: Agregar al carrito ═══════════════════════ -->
 <div id="modalAgregar" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2001;align-items:center;justify-content:center">
-  <div style="background:#fff;border-radius:14px;width:460px;max-width:96vw;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)">
+  <div style="position:relative;width:460px;max-width:96vw">
+
+    <!-- Botón flotante: ver carrito (fuera del recuadro, arriba-derecha) -->
+    <a href="<?= BASE_URL ?>carrito/index" aria-label="Ver carrito" title="Ver carrito"
+       style="position:absolute;top:-18px;right:-18px;width:48px;height:48px;border-radius:50%;background:#fff;color:var(--color-primary);text-decoration:none;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 18px rgba(0,0,0,.25);border:2px solid var(--color-primary);z-index:2;transition:transform .15s, box-shadow .15s"
+       onmouseenter="this.style.transform='scale(1.08)';this.style.boxShadow='0 8px 22px rgba(0,0,0,.3)'"
+       onmouseleave="this.style.transform='scale(1)';this.style.boxShadow='0 6px 18px rgba(0,0,0,.25)'">
+      <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2 9m5-9v9m4-9v9m5-9l2 9"/></svg>
+    </a>
+
+  <div style="background:#fff;border-radius:14px;width:100%;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)">
 
     <!-- Header con gradiente -->
-    <div style="position:relative;background:linear-gradient(135deg,var(--color-primary) 0%,#A00D24 100%);padding:18px 20px 18px 92px;border-radius:14px 14px 0 0">
-      <!-- Botón cerrar (X) en la esquina superior izquierda -->
+    <div style="position:relative;background:linear-gradient(135deg,var(--color-primary) 0%,#A00D24 100%);padding:18px 56px 18px 20px;border-radius:14px 14px 0 0">
+      <!-- Botón cerrar (X) en la esquina superior derecha -->
       <button type="button" onclick="cerrarModalAgregar()" aria-label="Cerrar"
               title="Cerrar"
-              style="position:absolute;top:10px;left:10px;width:34px;height:34px;border-radius:50%;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.15);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:1.1rem;line-height:1;font-family:inherit;transition:background .15s"
+              style="position:absolute;top:10px;right:10px;width:34px;height:34px;border-radius:50%;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.15);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:1.2rem;line-height:1;font-family:inherit;transition:background .15s"
               onmouseenter="this.style.background='rgba(255,255,255,.3)'"
               onmouseleave="this.style.background='rgba(255,255,255,.15)'">
         &times;
       </button>
-      <!-- Acceso rápido al carrito -->
-      <a href="<?= BASE_URL ?>carrito/index" aria-label="Ver carrito" title="Ver carrito"
-         style="position:absolute;top:10px;left:50px;width:34px;height:34px;border-radius:50%;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.15);color:#fff;text-decoration:none;display:flex;align-items:center;justify-content:center;transition:background .15s"
-         onmouseenter="this.style.background='rgba(255,255,255,.3)'"
-         onmouseleave="this.style.background='rgba(255,255,255,.15)'">
-        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2 9m5-9v9m4-9v9m5-9l2 9"/></svg>
-      </a>
       <div style="font-size:.75rem;color:rgba(255,255,255,.8)" id="modAgrCategoria"></div>
       <h3 id="modAgrNombre" style="font-size:1.1rem;font-weight:800;color:#fff;margin:4px 0 0"></h3>
     </div>
@@ -365,6 +368,7 @@ function getProductImageUrl($prod) {
 
       <div id="modAgrFeedback" style="display:none;margin-top:12px;padding:10px 14px;border-radius:8px;font-size:.85rem;text-align:center;border:1px solid transparent"></div>
     </div>
+  </div>
   </div>
 </div>
 
