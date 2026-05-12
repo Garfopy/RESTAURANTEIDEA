@@ -12,37 +12,7 @@ $puedeComprar = in_array($rol, ['admin_empresa','comprador'], true);
 $itemsCarrito = $_SESSION['carrito']['items'] ?? [];
 $totalCarrito = count($itemsCarrito);
 
-// Helper para imágenes reales
-if (!function_exists('getProductImageUrl')) {
-function getProductImageUrl($prod) {
-    // Si ya tiene imagen subida, usarla
-    if (!empty($prod['imagen'])) {
-        return htmlspecialchars($prod['imagen']);
-    }
-
-    // Mapeo de categorías a imágenes reales de Unsplash
-    $baseUrl = "https://images.unsplash.com/photo-";
-    $meatImages = [
-        'res'       => '1588347818579-a62e21b490b0?w=800&h=600&fit=crop&auto=format',
-        'cerdo'     => '1603048297172-c92544798d5a?w=800&h=600&fit=crop&auto=format',
-        'pollo'     => '1587593810167-a84920ea0781?w=800&h=600&fit=crop&auto=format',
-        'pescado'   => '1559847844-5315695dadae?w=800&h=600&fit=crop&auto=format',
-        'cordero'   => '1529692236671-f1f6cf9683ba?w=800&h=600&fit=crop&auto=format',
-        'embutidos' => '1589935512933-ac5c032fa7c8?w=800&h=600&fit=crop&auto=format',
-        'mariscos'  => '1615485736162-5bf79b76e4cc?w=800&h=600&fit=crop&auto=format',
-    ];
-
-    $categoryLower = strtolower($prod['categoria_nombre']);
-    foreach ($meatImages as $key => $imgId) {
-        if (strpos($categoryLower, $key) !== false) {
-            return $baseUrl . $imgId;
-        }
-    }
-
-    // Fallback genérico
-    return "https://source.unsplash.com/800x600/?raw+meat," . urlencode($prod['categoria_nombre']);
-}
-}
+// Helper para imágenes: getProductImageUrl() se carga desde app/helpers/ProductImageHelper.php
 ?>
 
 <style>
