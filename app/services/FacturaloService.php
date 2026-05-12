@@ -11,36 +11,45 @@ class FacturaloService {
     private string $cpEmisor;
     private string $plantilla;
 
-    public function __construct() {
-        $db  = Database::getInstance();
-        $get = function(string $k) use ($db): string {
-            $s = $db->prepare('SELECT valor FROM global_settings WHERE clave = ? LIMIT 1');
-            $s->execute([$k]);
-            return (string)($s->fetchColumn() ?: '');
-        };
+    public function __construct(int $empresaId) {
+        $db   = Database::getInstance();
+        $stmt = $db->prepare(
+            'SELECT facturalo_apikey, facturalo_ambiente, facturalo_rfc, facturalo_nombre,
+                    facturalo_regimen, facturalo_cp, facturalo_plantilla,
+                    facturalo_key_pem, facturalo_cer_pem, facturalo_csd_pass
+               FROM empresas WHERE id = ? LIMIT 1'
+        );
+        $stmt->execute([$empresaId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
 
-        $ambiente           = $get('facturalo_ambiente') ?: 'dev';
+        $ambiente           = $row['facturalo_ambiente'] ?? 'dev';
         $this->apiUrl       = "https://{$ambiente}.facturaloplus.com/api/rest/servicio/";
-        $this->apiKey       = $get('facturalo_apikey') ?: $get('facturalo_api_key') ?: $get('facturalo_token');
-        $this->keyPem       = $get('facturalo_key_pem');
-        $this->cerPem       = $get('facturalo_cer_pem');
-        $this->csdPass      = $get('facturalo_csd_pass');
-        $this->rfcEmisor    = $get('facturalo_rfc');
-        $this->nombreEmisor = $get('facturalo_nombre');
-        $this->regimenEmisor= $get('facturalo_regimen') ?: '601';
-        $this->cpEmisor     = $get('facturalo_cp') ?: '76000';
-        $this->plantilla    = $get('facturalo_plantilla') ?: '1';
+        $this->apiKey       = (string)($row['facturalo_apikey'] ?? '');
+        $this->keyPem       = (string)($row['facturalo_key_pem'] ?? '');
+        $this->cerPem       = (string)($row['facturalo_cer_pem'] ?? '');
+        $this->csdPass      = (string)($row['facturalo_csd_pass'] ?? '');
+        $this->rfcEmisor    = (string)($row['facturalo_rfc'] ?? '');
+        $this->nombreEmisor = (string)($row['facturalo_nombre'] ?? '');
+        $this->regimenEmisor= (string)($row['facturalo_regimen'] ?? '601');
+        $this->cpEmisor     = (string)($row['facturalo_cp'] ?? '76000');
+        $this->plantilla    = (string)($row['facturalo_plantilla'] ?? '1');
+    }
+
+    public function credencialesCompletas(): bool {
+        return !empty($this->apiKey) && !empty($this->keyPem) && !empty($this->cerPem) && !empty($this->rfcEmisor);
     }
 
     public function generarCFDI(int $pedidoId): array {
-        if (!$this->apiKey || !$this->keyPem || !$this->cerPem) {
-            return ['ok' => false, 'error' => 'Credenciales incompletas. Configura apikey, keyPEM y cerPEM en Panel → APIs.'];
+        if (!$this->credencialesCompletas()) {
+            return ['ok' => false, 'error' => 'Credenciales incompletas. Configura apikey, keyPEM, cerPEM y RFC en Facturación → Configuración.'];
         }
 
         $db   = Database::getInstance();
         $stmt = $db->prepare(
-            'SELECT p.*, e.razon_social, e.rfc AS rfc_empresa, e.regimen_fiscal, e.direccion_fiscal
-               FROM pedidos p JOIN empresas e ON e.id = p.empresa_id WHERE p.id = ?'
+            'SELECT p.*, u.nombre AS comprador_nombre
+               FROM pedidos p
+               LEFT JOIN usuarios u ON u.id = p.comprador_id
+              WHERE p.id = ?'
         );
         $stmt->execute([$pedidoId]);
         $pedido = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -88,8 +97,10 @@ class FacturaloService {
         $totalIva = round($totalIva, 2);
         $total    = round($subtotal + $totalIva, 2);
 
-        $rfcReceptor = $pedido['rfc_empresa'] ?: 'XAXX010101000';
-        $cpReceptor  = ltrim(substr($pedido['direccion_fiscal'] ?? '', 0, 5)) ?: '76000';
+        $rfcReceptor    = 'XAXX010101000';
+        $nombreReceptor = $pedido['comprador_nombre'] ?: 'Público en General';
+        $cpReceptor     = '06600';
+        $regimenReceptor = '616';
 
         $cfdi = [
             'Version'          => '4.0',
@@ -111,9 +122,9 @@ class FacturaloService {
             ],
             'Receptor' => [
                 'Rfc'                     => $rfcReceptor,
-                'Nombre'                  => $pedido['razon_social'],
+                'Nombre'                  => $nombreReceptor,
                 'DomicilioFiscalReceptor' => $cpReceptor,
-                'RegimenFiscalReceptor'   => $pedido['regimen_fiscal'] ?: '616',
+                'RegimenFiscalReceptor'   => $regimenReceptor,
                 'UsoCFDI'                 => 'G01',
             ],
             'Conceptos' => $conceptos,
@@ -130,7 +141,7 @@ class FacturaloService {
         ];
 
         $jsonB64  = base64_encode(json_encode($cfdi, JSON_UNESCAPED_UNICODE));
-        $response = $this->post('timbrarJSON2', [
+        $response = $this->callApi('timbrarJSON2', [
             'apikey'    => $this->apiKey,
             'jsonB64'   => $jsonB64,
             'keyPEM'    => $this->keyPem,
@@ -147,14 +158,12 @@ class FacturaloService {
         $xmlContent = $data['XML'] ?? '';
         $pdfBase64  = $data['PDF'] ?? '';
 
-        // Extraer UUID del XML timbrado
         $uuid = '';
         if (preg_match('/UUID="([^"]+)"/i', $xmlContent, $m)) {
             $uuid = $m[1];
         }
         if (!$uuid) return ['ok' => false, 'error' => 'No se pudo extraer UUID del XML timbrado'];
 
-        // Guardar archivos
         $dir = ROOT_PATH . '/public/uploads/facturas/';
         if (!is_dir($dir)) mkdir($dir, 0755, true);
         $xmlPath = 'public/uploads/facturas/' . $uuid . '.xml';
@@ -165,7 +174,6 @@ class FacturaloService {
             file_put_contents(ROOT_PATH . '/' . $pdfPath, base64_decode($pdfBase64));
         }
 
-        // Guardar en BD con los nombres de columna reales
         $ins = $db->prepare(
             'INSERT INTO facturas (pedido_id, empresa_id, uuid_cfdi, xml_path, pdf_path, serie, folio_fac, monto)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -187,20 +195,19 @@ class FacturaloService {
     }
 
     public function cancelarCFDI(string $uuid, string $rfcReceptor, float $total): bool {
-        if (!$this->apiKey || !$this->keyPem) return false;
+        if (!$this->credencialesCompletas()) return false;
 
-        // PEM → base64 DER (para keyCSD/cerCSD)
         $keyB64 = preg_replace('/\s+/', '', preg_replace('/-----[^-]+-----/', '', $this->keyPem));
         $cerB64 = preg_replace('/\s+/', '', preg_replace('/-----[^-]+-----/', '', $this->cerPem));
 
-        $response = $this->post('cancelar2', [
+        $response = $this->callApi('cancelar2', [
             'apikey'          => $this->apiKey,
             'keyCSD'          => $keyB64,
             'cerCSD'          => $cerB64,
             'passCSD'         => $this->csdPass,
             'uuid'            => $uuid,
             'rfcEmisor'       => $this->rfcEmisor,
-            'rfcReceptor'     => $rfcReceptor,
+            'rfcReceptor'     => $rfcReceptor ?: 'XAXX010101000',
             'total'           => $total,
             'motivo'          => '02',
             'folioSustitucion'=> '',
@@ -211,11 +218,11 @@ class FacturaloService {
     }
 
     public function consultarCreditos(): int {
-        $response = $this->post('consultarCreditosDisponibles', ['apikey' => $this->apiKey]);
+        $response = $this->callApi('consultarCreditosDisponibles', ['apikey' => $this->apiKey]);
         return (int)($response['data'] ?? 0);
     }
 
-    private function post(string $endpoint, array $fields): ?array {
+    private function callApi(string $endpoint, array $fields): ?array {
         if (!$this->apiKey) return null;
         $ctx = stream_context_create([
             'http' => [

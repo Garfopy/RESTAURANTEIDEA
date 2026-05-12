@@ -16,6 +16,7 @@ class EmpresaFacturaController extends BaseController
     public function index(?string $p = null): void
     {
         $empresaId = $this->empresaId();
+        $usuario   = $_SESSION['usuario'] ?? [];
         $page      = max(1, (int)$this->get('page', 1));
         $perPage   = 20;
         $offset    = ($page - 1) * $perPage;
@@ -46,6 +47,13 @@ class EmpresaFacturaController extends BaseController
         );
         $stPedidos->execute([$empresaId]);
         $pedidosSinFactura = $stPedidos->fetchAll(PDO::FETCH_ASSOC);
+
+        // Check empresa's own facturacion credentials
+        $stCfg = $this->db->prepare(
+            'SELECT facturalo_apikey FROM empresas WHERE id = ? LIMIT 1'
+        );
+        $stCfg->execute([$empresaId]);
+        $hayCredenciales = !empty($stCfg->fetchColumn());
 
         $totalPages = $total > 0 ? (int)ceil($total / $perPage) : 1;
         $flash      = $this->getFlash();
@@ -85,7 +93,7 @@ class EmpresaFacturaController extends BaseController
             $this->redirect('empresa-factura/index');
         }
 
-        $service   = new FacturaloService();
+        $service   = new FacturaloService($empresaId);
         $resultado = $service->generarCFDI($pedidoId);
 
         if (!$resultado['ok']) {
@@ -110,8 +118,7 @@ class EmpresaFacturaController extends BaseController
         }
 
         $stFact = $this->db->prepare(
-            'SELECT f.monto, e.rfc FROM facturas f
-               JOIN empresas e ON e.id = f.empresa_id
+            'SELECT f.monto FROM facturas f
               WHERE f.uuid_cfdi = ? AND f.empresa_id = ?'
         );
         $stFact->execute([$uuid, $empresaId]);
@@ -121,8 +128,8 @@ class EmpresaFacturaController extends BaseController
             $this->redirect('empresa-factura/index');
         }
 
-        $service = new FacturaloService();
-        $ok      = $service->cancelarCFDI($uuid, $factura['rfc'] ?? '', (float)$factura['monto']);
+        $service = new FacturaloService($empresaId);
+        $ok      = $service->cancelarCFDI($uuid, '', (float)$factura['monto']);
 
         if ($ok) {
             $this->db->prepare(

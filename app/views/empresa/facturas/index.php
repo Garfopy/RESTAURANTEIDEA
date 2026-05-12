@@ -2,22 +2,18 @@
 $esAdmin = ($usuario['rol_slug'] ?? '') === 'admin_empresa';
 $fmt     = fn($n) => '$' . number_format((float)$n, 2, '.', ',');
 $fecha   = fn($d) => $d ? date('d/m/Y H:i', strtotime($d)) : '—';
-
-// Verificar si hay token configurado
-$db    = Database::getInstance();
-$stTok = $db->prepare("SELECT valor FROM global_settings WHERE clave = 'facturalo_apikey' LIMIT 1");
-$stTok->execute();
-$hayToken = !empty($stTok->fetchColumn());
+// $hayCredenciales is set by EmpresaFacturaController
+$hayCredenciales = $hayCredenciales ?? false;
 ?>
 
-<?php if (!$hayToken && $esAdmin): ?>
+<?php if (!$hayCredenciales && $esAdmin): ?>
 <div style="background:#FEF3C7;border:1px solid #F59E0B;border-radius:12px;padding:16px 20px;margin-bottom:20px;display:flex;align-items:flex-start;gap:12px">
   <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#D97706" stroke-width="2" style="flex-shrink:0;margin-top:1px"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
   <div>
-    <p style="font-weight:700;font-size:.875rem;color:#92400E;margin-bottom:4px">API de facturación no configurada</p>
+    <p style="font-weight:700;font-size:.875rem;color:#92400E;margin-bottom:4px">Facturación no configurada</p>
     <p style="font-size:.82rem;color:#92400E">
-      El superadmin debe configurar las credenciales de <strong>FacturaLO Plus</strong> en
-      <em>Panel → Configuración → APIs y servicios</em>.
+      Configura tus credenciales de <strong>FacturaLO Plus</strong> en
+      <a href="<?= BASE_URL ?>empresa-config/facturacion" style="color:#92400E;font-weight:700;text-decoration:underline">Facturación → Configuración</a>.
     </p>
   </div>
 </div>
@@ -162,6 +158,6 @@ $hayToken = !empty($stTok->fetchColumn());
   <div style="background:#F9FAFB;border-radius:10px;padding:16px 20px;margin-top:8px;font-size:.83rem;color:#374151;line-height:1.7">
     <p><strong>CFDI</strong> es la factura electrónica oficial avalada por el SAT. Tiene un UUID único y se puede descargar en PDF y XML.</p>
     <p style="margin-top:8px"><strong>¿Cuándo puedo facturar?</strong> Solo pedidos con estado <em>Entregado</em>.</p>
-    <p style="margin-top:8px"><strong>¿Qué necesito?</strong> El superadmin debe configurar las credenciales de FacturaLO Plus (apikey + CSD PEM) en el panel de configuración.</p>
+    <p style="margin-top:8px"><strong>¿Qué necesito?</strong> Configura tus credenciales de FacturaLO Plus (apikey + CSD PEM) en <a href="<?= BASE_URL ?>empresa-config/facturacion" style="color:#374151;font-weight:600">Facturación → Configuración</a>.</p>
   </div>
 </details>
