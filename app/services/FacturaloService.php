@@ -85,7 +85,7 @@ class FacturaloService {
             ],
             'items'         => $lineItems,
             'payment_form'  => '03',
-            'payment_method'=> 'PPD',
+            'payment_method'=> 'PUE',
             'use'           => 'G01',
             'series'        => 'CHB',
             'folio_number'  => max(1, (int)($pedido['folio'] ?? 1)),
