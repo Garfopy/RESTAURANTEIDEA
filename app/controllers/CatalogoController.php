@@ -50,6 +50,23 @@ class CatalogoController extends BaseController
         }
         $favoritosSet = array_flip($favoritosIds);
 
+        // Combos disponibles según rol
+        $comboModel = new ComboModel();
+        $combos = [];
+        if ($this->rolActual() === 'comprador') {
+            $combosRaw = $comboModel->getCombosParaComprador($this->usuarioId(), $empresaId);
+            foreach ($combosRaw as $c) {
+                $c['items'] = $comboModel->getItems((int)$c['id']);
+                $combos[]   = $c;
+            }
+        } elseif (in_array($this->rolActual(), ['admin_empresa', 'supervisor'], true)) {
+            $combosRaw = $comboModel->listadoEmpresa($empresaId);
+            foreach ($combosRaw as $c) {
+                $c['items'] = $comboModel->getItems((int)$c['id']);
+                $combos[]   = $c;
+            }
+        }
+
         $flash     = $this->getFlash();
         $pageTitle = 'Catálogo de productos';
         $activeMenu = 'catalogo';

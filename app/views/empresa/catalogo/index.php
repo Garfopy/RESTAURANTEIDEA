@@ -55,6 +55,76 @@ $totalCarrito = count($itemsCarrito);
 }
 </style>
 
+<?php if (!empty($combos)): ?>
+<!-- ═══════════════════════ Sección: Combos asignados ═══════════════════════ -->
+<div style="margin-bottom:32px">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+    <div style="width:4px;height:28px;background:var(--color-primary);border-radius:2px"></div>
+    <h2 style="font-size:1.2rem;font-weight:800;color:#111827;margin:0">Combos disponibles</h2>
+    <span style="font-size:.78rem;color:#6B7280;font-weight:500"><?= count($combos) ?> combo<?= count($combos) !== 1 ? 's' : '' ?></span>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px">
+    <?php foreach ($combos as $combo): ?>
+    <div style="background:#fff;border-radius:14px;border:1px solid #E5E7EB;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06);display:flex;flex-direction:column">
+      <!-- Header del combo -->
+      <div style="background:linear-gradient(135deg,#1F2937 0%,#374151 100%);padding:16px 20px">
+        <div style="font-size:.68rem;font-weight:700;color:rgba(255,255,255,.6);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Combo</div>
+        <div style="font-size:1.05rem;font-weight:800;color:#fff;line-height:1.3"><?= htmlspecialchars($combo['nombre']) ?></div>
+        <?php if (!empty($combo['descripcion'])): ?>
+        <div style="font-size:.8rem;color:rgba(255,255,255,.7);margin-top:6px"><?= htmlspecialchars($combo['descripcion']) ?></div>
+        <?php endif; ?>
+        <?php if (!empty($combo['precio'])): ?>
+        <div style="margin-top:10px;display:inline-block;background:var(--color-primary);color:#fff;font-size:.85rem;font-weight:800;padding:4px 12px;border-radius:999px">
+          $<?= number_format($combo['precio'], 2) ?> combo
+        </div>
+        <?php endif; ?>
+      </div>
+
+      <!-- Items del combo -->
+      <div style="padding:14px 18px;flex:1">
+        <?php if (empty($combo['items'])): ?>
+        <p style="font-size:.82rem;color:#9CA3AF;font-style:italic;margin:0">Sin productos configurados.</p>
+        <?php else: ?>
+        <div style="font-size:.7rem;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Incluye:</div>
+        <ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px">
+          <?php foreach ($combo['items'] as $item): ?>
+          <li style="display:flex;align-items:center;gap:8px;font-size:.85rem;color:#374151">
+            <span style="width:6px;height:6px;border-radius:50%;background:var(--color-primary);flex-shrink:0"></span>
+            <span style="font-weight:600"><?= htmlspecialchars($item['producto_nombre']) ?></span>
+            <span style="margin-left:auto;font-weight:700;color:#111827;white-space:nowrap">
+              <?= number_format($item['cantidad'], 2) ?> <?= htmlspecialchars($item['presentacion']) ?>
+            </span>
+          </li>
+          <?php endforeach; ?>
+        </ul>
+        <?php endif; ?>
+      </div>
+
+      <!-- Acción -->
+      <?php if ($puedeComprar && $rol === 'comprador' && !empty($combo['items'])): ?>
+      <div style="padding:12px 18px;border-top:1px solid #F3F4F6">
+        <form method="POST" action="<?= BASE_URL ?>carrito/cargarCombo">
+          <input type="hidden" name="combo_id" value="<?= (int)$combo['id'] ?>">
+          <button type="submit"
+                  style="width:100%;padding:10px;background:var(--color-primary);color:#fff;border:none;border-radius:8px;font-size:.875rem;font-weight:700;cursor:pointer;transition:all .2s;font-family:inherit"
+                  onmouseenter="this.style.background='#A00D24'"
+                  onmouseleave="this.style.background='var(--color-primary)'">
+            🛒 Cargar combo en pedido
+          </button>
+        </form>
+      </div>
+      <?php elseif (!empty($combo['items'])): ?>
+      <div style="padding:12px 18px;border-top:1px solid #F3F4F6">
+        <div style="font-size:.78rem;color:#9CA3AF;text-align:center">Solo compradores pueden cargar combos</div>
+      </div>
+      <?php endif; ?>
+    </div>
+    <?php endforeach; ?>
+  </div>
+</div>
+<?php endif; ?>
+
 <!-- Filtros -->
 <form method="GET" action="<?= BASE_URL ?>catalogo/index" style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:flex-end">
   <div style="flex:1;min-width:180px">
