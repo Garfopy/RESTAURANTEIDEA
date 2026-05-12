@@ -79,6 +79,13 @@ function dismissFirstLoginBanner(userId) {
     <a href="<?= BASE_URL ?>pedido/aprobacion" style="font-size:.75rem;color:#9A3412;font-weight:600;text-decoration:underline">Revisar ahora</a>
   </div>
   <?php endif; ?>
+  <?php if (!empty($resumenRecurrentes) && $resumenRecurrentes['total_pedidos'] > 0): ?>
+  <a href="<?= BASE_URL ?>empresa/recurrentes" style="background:#F5F3FF;border-radius:12px;padding:18px;text-decoration:none;display:block">
+    <div style="font-size:.75rem;color:#5B21B6;font-weight:600;margin-bottom:6px">Patrones de compra</div>
+    <div style="font-size:1.75rem;font-weight:800;color:#5B21B6"><?= $resumenRecurrentes['compradores_unicos'] ?></div>
+    <div style="font-size:.72rem;color:#7C3AED;margin-top:2px">compradores · <?= $resumenRecurrentes['productos_distintos'] ?> productos</div>
+  </a>
+  <?php endif; ?>
 </div>
 
 <!-- Acciones rápidas (solo admin_empresa) -->
@@ -500,7 +507,7 @@ new Chart(document.getElementById('chartMetodosPago'), {
     <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2"><circle cx="12" cy="12" r="10"/><path stroke-linecap="round" d="M12 8v4l2 2"/></svg>
     <div style="flex:1">
       <div style="font-weight:700;font-size:.9rem">Asistente CarniHub</div>
-      <div style="font-size:.72rem;opacity:.85">Powered by Gemini</div>
+      <div style="font-size:.72rem;opacity:.85">Asistente de datos</div>
     </div>
     <!-- Botón silenciar/activar voz -->
     <button id="ttsBtn" onclick="toggleTts()" title="Activar/silenciar voz"
