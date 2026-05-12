@@ -60,7 +60,7 @@ class AdminStorageController extends BaseController
         )->fetchAll();
 
         $empresas = $db->query(
-            "SELECT id, nombre FROM empresas WHERE activo = 1 ORDER BY nombre"
+            "SELECT id, razon_social AS nombre FROM empresas WHERE activo = 1 ORDER BY razon_social"
         )->fetchAll();
 
         $flash      = $this->getFlash();
@@ -199,7 +199,7 @@ class AdminStorageController extends BaseController
         if ($empresa_id > 0) { $extra = ' AND p.empresa_id = ?'; $params[] = $empresa_id; }
 
         $stmt = $db->prepare(
-            "SELECT p.folio, e.nombre AS empresa, u.nombre AS comprador,
+            "SELECT p.folio, e.razon_social AS empresa, u.nombre AS comprador,
                     p.estado, p.direccion_entrega,
                     (SELECT SUM(pd.subtotal) FROM pedido_detalle pd WHERE pd.pedido_id = p.id) AS total,
                     p.created_at, p.ruta_iniciada_at, p.ruta_finalizada_at
