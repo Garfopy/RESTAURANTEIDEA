@@ -400,6 +400,24 @@ class CarritoController extends BaseController
         ]);
     }
 
+    public function quitarProducto(?string $p = null): void
+    {
+        header('Content-Type: application/json');
+        if (!$this->isPost()) {
+            echo json_encode(['ok' => false, 'msg' => 'Método no permitido']);
+            return;
+        }
+        $productoId = (int)$this->post('producto_id');
+        if ($productoId <= 0) {
+            echo json_encode(['ok' => false, 'msg' => 'ID inválido']);
+            return;
+        }
+        $carrito = $_SESSION['carrito']['items'] ?? [];
+        unset($carrito[$productoId]);
+        $_SESSION['carrito']['items'] = $carrito;
+        echo json_encode(['ok' => true, 'total_items' => count($carrito)]);
+    }
+
     public function vaciar(?string $p = null): void
     {
         $_SESSION['carrito'] = [];
