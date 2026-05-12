@@ -79,11 +79,11 @@ function dismissFirstLoginBanner(userId) {
     <a href="<?= BASE_URL ?>pedido/aprobacion" style="font-size:.75rem;color:#9A3412;font-weight:600;text-decoration:underline">Revisar ahora</a>
   </div>
   <?php endif; ?>
-  <?php if (!empty($resumenRecurrentes) && ($resumenRecurrentes['activos'] + $resumenRecurrentes['inactivos']) > 0): ?>
+  <?php if (!empty($resumenRecurrentes) && $resumenRecurrentes['total_pedidos'] > 0): ?>
   <a href="<?= BASE_URL ?>empresa/recurrentes" style="background:#F5F3FF;border-radius:12px;padding:18px;text-decoration:none;display:block">
-    <div style="font-size:.75rem;color:#5B21B6;font-weight:600;margin-bottom:6px">Plantillas recurrentes</div>
-    <div style="font-size:1.75rem;font-weight:800;color:#5B21B6"><?= $resumenRecurrentes['activos'] ?></div>
-    <div style="font-size:.72rem;color:#7C3AED;margin-top:2px">activas · <?= $resumenRecurrentes['inactivos'] ?> pausadas</div>
+    <div style="font-size:.75rem;color:#5B21B6;font-weight:600;margin-bottom:6px">Patrones de compra</div>
+    <div style="font-size:1.75rem;font-weight:800;color:#5B21B6"><?= $resumenRecurrentes['compradores_unicos'] ?></div>
+    <div style="font-size:.72rem;color:#7C3AED;margin-top:2px">compradores · <?= $resumenRecurrentes['productos_distintos'] ?> productos</div>
   </a>
   <?php endif; ?>
 </div>
@@ -147,60 +147,6 @@ function dismissFirstLoginBanner(userId) {
   </table>
   <?php endif; ?>
 </div>
-
-<?php if (!empty($proximasRecurrentes)): ?>
-<!-- Próximas ejecuciones recurrentes -->
-<div style="background:#fff;border-radius:12px;border:1px solid #E5E7EB;overflow:hidden;margin-top:16px">
-  <div style="padding:14px 18px;border-bottom:1px solid #F3F4F6;display:flex;justify-content:space-between;align-items:center">
-    <h2 style="font-size:.9rem;font-weight:700;color:#111827">
-      🔄 Próximas ejecuciones recurrentes
-    </h2>
-    <a href="<?= BASE_URL ?>empresa/recurrentes" style="font-size:.8rem;color:var(--color-primary);text-decoration:none;font-weight:600">Ver todo</a>
-  </div>
-  <table style="width:100%;border-collapse:collapse;font-size:.85rem">
-    <thead>
-      <tr style="background:#F9FAFB">
-        <th style="padding:10px 16px;text-align:left;color:#6B7280;font-weight:600">Plantilla</th>
-        <th style="padding:10px;text-align:left;color:#6B7280;font-weight:600">Frecuencia</th>
-        <th style="padding:10px;text-align:center;color:#6B7280;font-weight:600">Productos</th>
-        <th style="padding:10px;text-align:left;color:#6B7280;font-weight:600">Próxima fecha</th>
-      </tr>
-    </thead>
-    <tbody>
-      <?php foreach ($proximasRecurrentes as $rec): ?>
-      <?php
-        $diasRestantes = $rec['proximo_pedido']
-          ? (int)floor((strtotime($rec['proximo_pedido']) - time()) / 86400)
-          : null;
-        $freqColors = ['diario'=>['#FEF3C7','#92400E'],'semanal'=>['#DBEAFE','#1E40AF'],'quincenal'=>['#F5F3FF','#5B21B6']];
-        $fc = $freqColors[$rec['frecuencia']] ?? ['#F3F4F6','#374151'];
-      ?>
-      <tr style="border-top:1px solid #F3F4F6">
-        <td style="padding:10px 16px;font-weight:600;color:#111827"><?= htmlspecialchars($rec['nombre']) ?></td>
-        <td style="padding:10px">
-          <span style="background:<?= $fc[0] ?>;color:<?= $fc[1] ?>;padding:2px 8px;border-radius:999px;font-size:.72rem;font-weight:600">
-            <?= ucfirst(htmlspecialchars($rec['frecuencia'])) ?>
-          </span>
-        </td>
-        <td style="padding:10px;text-align:center;color:#374151"><?= (int)$rec['total_productos'] ?></td>
-        <td style="padding:10px;color:#6B7280;font-size:.8rem">
-          <?php if ($rec['proximo_pedido']): ?>
-            <?= date('d/m/Y', strtotime($rec['proximo_pedido'])) ?>
-            <?php if ($diasRestantes !== null): ?>
-              <span style="color:<?= $diasRestantes <= 1 ? '#DC2626' : ($diasRestantes <= 3 ? '#D97706' : '#6B7280') ?>;font-size:.7rem;font-weight:600;margin-left:4px">
-                <?= $diasRestantes === 0 ? 'Hoy' : ($diasRestantes === 1 ? 'Mañana' : "en {$diasRestantes}d") ?>
-              </span>
-            <?php endif; ?>
-          <?php else: ?>
-            <span style="color:#9CA3AF">Sin fecha</span>
-          <?php endif; ?>
-        </td>
-      </tr>
-      <?php endforeach; ?>
-    </tbody>
-  </table>
-</div>
-<?php endif; ?>
 
 <?php if (!empty($datosGraficas) && $rol !== 'comprador'): ?>
 <!-- ════════════════════════════════════════════════════════════════ -->

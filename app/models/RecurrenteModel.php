@@ -1,92 +1,121 @@
 <?php
 require_once ROOT_PATH . '/app/models/BaseModel.php';
 
+/**
+ * RecurrenteModel
+ * Estadísticas de patrones de compra frecuente basadas en el historial
+ * real de pedidos (pedidos + pedido_detalle + productos + usuarios).
+ */
 class RecurrenteModel extends BaseModel
 {
-    protected string $table = 'pedidos_recurrentes';
+    protected string $table = 'pedidos';
 
-    /** Resumen: activos, inactivos, prÃ³xima fecha de ejecuciÃ³n */
+    /** Resumen general: pedidos totales, compradores únicos, productos distintos */
     public function getResumen(int $empresaId): array
     {
         $row = $this->queryOne(
             "SELECT
-                COALESCE(SUM(activo = 1), 0) AS activos,
-                COALESCE(SUM(activo = 0), 0) AS inactivos,
-                MIN(CASE WHEN activo = 1 AND proximo_pedido >= CURDATE() THEN proximo_pedido END) AS proxima_fecha
-             FROM pedidos_recurrentes
-             WHERE empresa_id = ?",
+                COUNT(DISTINCT p.id)           AS total_pedidos,
+                COUNT(DISTINCT p.comprador_id) AS compradores_unicos,
+                COUNT(DISTINCT pd.producto_id) AS productos_distintos,
+                COALESCE(SUM(CASE WHEN p.estado != 'cancelado' THEN p.total ELSE 0 END), 0) AS monto_total
+             FROM pedidos p
+             LEFT JOIN pedido_detalle pd ON pd.pedido_id = p.id
+             WHERE p.empresa_id = ?",
             [$empresaId]
         );
         return [
-            'activos'       => (int)($row['activos']       ?? 0),
-            'inactivos'     => (int)($row['inactivos']     ?? 0),
-            'proxima_fecha' => $row['proxima_fecha']        ?? null,
+            'total_pedidos'       => (int)($row['total_pedidos']       ?? 0),
+            'compradores_unicos'  => (int)($row['compradores_unicos']  ?? 0),
+            'productos_distintos' => (int)($row['productos_distintos'] ?? 0),
+            'monto_total'         => (float)($row['monto_total']       ?? 0),
         ];
     }
 
-    /** Conteo agrupado por frecuencia (solo activos) */
-    public function getTopPorFrecuencia(int $empresaId): array
+    /** Top productos más pedidos por número de pedidos y cantidad acumulada */
+    public function getTopProductos(int $empresaId, int $limit = 10): array
     {
         return $this->query(
-            "SELECT frecuencia, COUNT(*) AS total
-               FROM pedidos_recurrentes
-              WHERE empresa_id = ? AND activo = 1
-              GROUP BY frecuencia
-              ORDER BY FIELD(frecuencia, 'diario', 'semanal', 'quincenal')",
-            [$empresaId]
-        );
-    }
-
-    /** Top productos mÃ¡s solicitados en plantillas activas */
-    public function getTopProductos(int $empresaId, int $limit = 8): array
-    {
-        return $this->query(
-            "SELECT pr.nombre, pr.presentacion,
-                    SUM(d.cantidad) AS cantidad_acumulada,
-                    COUNT(DISTINCT d.recurrente_id) AS en_plantillas
-               FROM plantilla_recurrente_detalle d
-               JOIN productos pr ON pr.id = d.producto_id
-               JOIN pedidos_recurrentes r ON r.id = d.recurrente_id
-              WHERE r.empresa_id = ? AND r.activo = 1
-              GROUP BY pr.id, pr.nombre, pr.presentacion
-              ORDER BY cantidad_acumulada DESC
-              LIMIT ?",
+            "SELECT
+                pr.nombre,
+                pr.presentacion,
+                SUM(pd.cantidad)               AS cantidad_total,
+                COUNT(DISTINCT p.id)           AS veces_pedido,
+                COUNT(DISTINCT p.comprador_id) AS compradores
+             FROM pedido_detalle pd
+             JOIN pedidos   p  ON p.id  = pd.pedido_id
+             JOIN productos pr ON pr.id = pd.producto_id
+             WHERE p.empresa_id = ? AND p.estado != 'cancelado'
+             GROUP BY pr.id, pr.nombre, pr.presentacion
+             ORDER BY veces_pedido DESC, cantidad_total DESC
+             LIMIT ?",
             [$empresaId, $limit]
         );
     }
 
-    /** Listado completo de plantillas con conteo de lÃ­neas */
-    public function getListado(int $empresaId): array
+    /** Pedidos agrupados por día de la semana (todos los días, incluso con 0) */
+    public function getPedidosPorDiaSemana(int $empresaId): array
+    {
+        $nombres = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+        $rows    = $this->query(
+            "SELECT DAYOFWEEK(created_at) AS dia_num, COUNT(*) AS total_pedidos
+             FROM pedidos
+             WHERE empresa_id = ? AND estado != 'cancelado'
+             GROUP BY DAYOFWEEK(created_at)
+             ORDER BY dia_num ASC",
+            [$empresaId]
+        );
+        $mapa = array_fill(1, 7, 0);
+        foreach ($rows as $r) {
+            $mapa[(int)$r['dia_num']] = (int)$r['total_pedidos'];
+        }
+        $result = [];
+        foreach ($mapa as $num => $total) {
+            $result[] = ['dia_nombre' => $nombres[$num - 1], 'total_pedidos' => $total];
+        }
+        return $result;
+    }
+
+    /** Top compradores más frecuentes */
+    public function getTopCompradores(int $empresaId, int $limit = 8): array
     {
         return $this->query(
-            "SELECT r.id, r.nombre, r.frecuencia, r.dia_semana, r.activo,
-                    r.proximo_pedido, r.created_at,
-                    COUNT(d.id) AS total_productos,
-                    u.nombre AS creado_por
-               FROM pedidos_recurrentes r
-               LEFT JOIN plantilla_recurrente_detalle d ON d.recurrente_id = r.id
-               LEFT JOIN usuarios u ON u.id = r.created_by
-              WHERE r.empresa_id = ?
-              GROUP BY r.id, r.nombre, r.frecuencia, r.dia_semana, r.activo,
-                       r.proximo_pedido, r.created_at, u.nombre
-              ORDER BY r.activo DESC, r.proximo_pedido ASC",
-            [$empresaId]
+            "SELECT
+                u.nombre                          AS comprador,
+                COUNT(DISTINCT p.id)              AS total_pedidos,
+                COALESCE(SUM(p.total), 0)         AS monto_total,
+                MAX(p.created_at)                 AS ultimo_pedido
+             FROM pedidos p
+             JOIN usuarios u ON u.id = p.comprador_id
+             WHERE p.empresa_id = ? AND p.estado != 'cancelado'
+             GROUP BY u.id, u.nombre
+             ORDER BY total_pedidos DESC
+             LIMIT ?",
+            [$empresaId, $limit]
         );
     }
 
-    /** PrÃ³ximas N ejecuciones programadas (activas, ordenadas por fecha) */
-    public function getProximasEjecuciones(int $empresaId, int $limit = 5): array
+    /** Productos pedidos repetidamente por el mismo comprador (patrón recurrente real) */
+    public function getProductosRecurrentes(int $empresaId, int $minVeces = 2, int $limit = 15): array
     {
         return $this->query(
-            "SELECT r.nombre, r.frecuencia, r.proximo_pedido,
-                    COUNT(d.id) AS total_productos
-               FROM pedidos_recurrentes r
-               LEFT JOIN plantilla_recurrente_detalle d ON d.recurrente_id = r.id
-              WHERE r.empresa_id = ? AND r.activo = 1
-              GROUP BY r.id, r.nombre, r.frecuencia, r.proximo_pedido
-              ORDER BY r.proximo_pedido ASC
-              LIMIT ?",
-            [$empresaId, $limit]
+            "SELECT
+                pr.nombre,
+                pr.presentacion,
+                u.nombre                          AS comprador,
+                COUNT(DISTINCT p.id)              AS veces_pedido,
+                SUM(pd.cantidad)                  AS cantidad_total,
+                MAX(p.created_at)                 AS ultimo_pedido
+             FROM pedido_detalle pd
+             JOIN pedidos   p  ON p.id  = pd.pedido_id
+             JOIN productos pr ON pr.id = pd.producto_id
+             JOIN usuarios  u  ON u.id  = p.comprador_id
+             WHERE p.empresa_id = ? AND p.estado != 'cancelado'
+             GROUP BY pr.id, pr.nombre, pr.presentacion, u.id, u.nombre
+             HAVING veces_pedido >= ?
+             ORDER BY veces_pedido DESC, cantidad_total DESC
+             LIMIT ?",
+            [$empresaId, $minVeces, $limit]
         );
     }
 }

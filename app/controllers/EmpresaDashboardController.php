@@ -55,12 +55,11 @@ class EmpresaDashboardController extends BaseController
         }
 
         // Resumen de pedidos recurrentes (solo admin_empresa y supervisor)
-        $resumenRecurrentes  = ['activos' => 0, 'inactivos' => 0, 'proxima_fecha' => null];
+        $resumenRecurrentes  = ['total_pedidos' => 0, 'compradores_unicos' => 0, 'productos_distintos' => 0, 'monto_total' => 0];
         $proximasRecurrentes = [];
         if (in_array($rol, ['admin_empresa', 'supervisor'], true)) {
-            $recModel            = new RecurrenteModel();
-            $resumenRecurrentes  = $recModel->getResumen($empresaId);
-            $proximasRecurrentes = $recModel->getProximasEjecuciones($empresaId, 5);
+            $recModel           = new RecurrenteModel();
+            $resumenRecurrentes = $recModel->getResumen($empresaId);
         }
 
         // Cargar empresa a sesión si no está
@@ -87,11 +86,12 @@ class EmpresaDashboardController extends BaseController
         $empresaId = $this->empresaId();
         $rol       = $this->rolActual();
 
-        $recModel     = new RecurrenteModel();
-        $resumen      = $recModel->getResumen($empresaId);
-        $frecuencias  = $recModel->getTopPorFrecuencia($empresaId);
-        $topProductos = $recModel->getTopProductos($empresaId);
-        $listado      = $recModel->getListado($empresaId);
+        $recModel            = new RecurrenteModel();
+        $resumen             = $recModel->getResumen($empresaId);
+        $topProductos        = $recModel->getTopProductos($empresaId, 10);
+        $diasSemana          = $recModel->getPedidosPorDiaSemana($empresaId);
+        $topCompradores      = $recModel->getTopCompradores($empresaId, 8);
+        $productosRecurrentes = $recModel->getProductosRecurrentes($empresaId, 2, 15);
 
         $flash      = $this->getFlash();
         $pageTitle  = 'Pedidos Recurrentes';
