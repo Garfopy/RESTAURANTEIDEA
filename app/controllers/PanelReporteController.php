@@ -201,7 +201,13 @@ class PanelReporteController extends BaseController
         $configModel = new ConfigModel();
         $logoUrl = $configModel->get('app_logo', BASE_URL . 'public/img/logo.svg') ?: BASE_URL . 'public/img/logo.svg';
 
-        $fechaReporte = $this->fechaEspanol(date('Y-m-d'));
+        $fechaReporte = (function(string $f): string {
+            $m = ['01'=>'Enero','02'=>'Febrero','03'=>'Marzo','04'=>'Abril','05'=>'Mayo',
+                  '06'=>'Junio','07'=>'Julio','08'=>'Agosto','09'=>'Septiembre',
+                  '10'=>'Octubre','11'=>'Noviembre','12'=>'Diciembre'];
+            [$y,$mo,$d] = explode('-', $f);
+            return (int)$d . ' de ' . ($m[$mo] ?? $mo) . ', ' . $y;
+        })(date('Y-m-d'));
         $reportId = '#CH-' . date('Ymd-His') . '-SA-' . strtoupper(bin2hex(random_bytes(2)));
 
         $filtros = [
