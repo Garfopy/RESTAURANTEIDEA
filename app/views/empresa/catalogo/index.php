@@ -286,11 +286,11 @@ function getProductImageUrl($prod) {
 <div id="modalAgregar" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2001;align-items:center;justify-content:center">
   <div style="position:relative;width:460px;max-width:96vw">
 
-    <!-- Botón flotante: ver carrito (fuera del recuadro, arriba-derecha) -->
+    <!-- Botón flotante: ver carrito (centrado vertical, fuera del recuadro a la derecha) -->
     <a href="<?= BASE_URL ?>carrito/index" aria-label="Ver carrito" title="Ver carrito"
-       style="position:absolute;top:-22px;right:-32px;width:52px;height:52px;border-radius:50%;background:#fff;color:var(--color-primary);text-decoration:none;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 18px rgba(0,0,0,.25);border:2px solid var(--color-primary);z-index:2;transition:transform .15s, box-shadow .15s"
-       onmouseenter="this.style.transform='scale(1.08)';this.style.boxShadow='0 8px 22px rgba(0,0,0,.3)'"
-       onmouseleave="this.style.transform='scale(1)';this.style.boxShadow='0 6px 18px rgba(0,0,0,.25)'">
+       style="position:absolute;top:50%;right:-80px;transform:translateY(-50%);width:56px;height:56px;border-radius:50%;background:#fff;color:var(--color-primary);text-decoration:none;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 18px rgba(0,0,0,.25);border:2px solid var(--color-primary);z-index:2;transition:transform .15s, box-shadow .15s"
+       onmouseenter="this.style.transform='translateY(-50%) scale(1.08)';this.style.boxShadow='0 8px 22px rgba(0,0,0,.3)'"
+       onmouseleave="this.style.transform='translateY(-50%) scale(1)';this.style.boxShadow='0 6px 18px rgba(0,0,0,.25)'">
       <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2 9m5-9v9m4-9v9m5-9l2 9"/></svg>
     </a>
 
