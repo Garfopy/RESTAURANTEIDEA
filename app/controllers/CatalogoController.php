@@ -54,13 +54,13 @@ class CatalogoController extends BaseController
         $comboModel = new ComboModel();
         $combos = [];
         if ($this->rolActual() === 'comprador') {
-            $combosRaw = $comboModel->getCombosParaComprador($this->usuarioId(), $empresaId);
+            $combosRaw = $comboModel->getCombosParaComprador($this->usuarioId(), $this->empresaId());
             foreach ($combosRaw as $c) {
                 $c['items'] = $comboModel->getItems((int)$c['id']);
                 $combos[]   = $c;
             }
         } elseif (in_array($this->rolActual(), ['admin_empresa', 'supervisor'], true)) {
-            $combosRaw = $comboModel->listadoEmpresa($empresaId);
+            $combosRaw = $comboModel->listadoEmpresa($this->empresaId());
             foreach ($combosRaw as $c) {
                 $c['items'] = $comboModel->getItems((int)$c['id']);
                 $combos[]   = $c;
