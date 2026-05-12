@@ -1,7 +1,7 @@
 <?php
 class FacturaloService {
-    private string $apiUrl;
-    private string $apiKey;
+    private string $baseUrl;
+    private string $token;
     private string $keyPem;
     private string $cerPem;
     private string $csdPass;
@@ -9,7 +9,6 @@ class FacturaloService {
     private string $nombreEmisor;
     private string $regimenEmisor;
     private string $cpEmisor;
-    private string $plantilla;
 
     public function __construct(int $empresaId) {
         $db   = Database::getInstance();
@@ -22,26 +21,27 @@ class FacturaloService {
         $stmt->execute([$empresaId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
 
-        $ambiente           = $row['facturalo_ambiente'] ?? 'dev';
-        $this->apiUrl       = "https://{$ambiente}.facturaloplus.com/api/rest/servicio/";
-        $this->apiKey       = (string)($row['facturalo_apikey'] ?? '');
-        $this->keyPem       = (string)($row['facturalo_key_pem'] ?? '');
-        $this->cerPem       = (string)($row['facturalo_cer_pem'] ?? '');
-        $this->csdPass      = (string)($row['facturalo_csd_pass'] ?? '');
-        $this->rfcEmisor    = (string)($row['facturalo_rfc'] ?? '');
-        $this->nombreEmisor = (string)($row['facturalo_nombre'] ?? '');
-        $this->regimenEmisor= (string)($row['facturalo_regimen'] ?? '601');
-        $this->cpEmisor     = (string)($row['facturalo_cp'] ?? '76000');
-        $this->plantilla    = (string)($row['facturalo_plantilla'] ?? '1');
+        $ambiente        = $row['facturalo_ambiente'] ?? 'dev';
+        $this->baseUrl   = $ambiente === 'app'
+            ? 'https://services.sw.com.mx'
+            : 'https://services.test.sw.com.mx';
+        $this->token          = (string)($row['facturalo_apikey'] ?? '');
+        $this->keyPem         = (string)($row['facturalo_key_pem'] ?? '');
+        $this->cerPem         = (string)($row['facturalo_cer_pem'] ?? '');
+        $this->csdPass        = (string)($row['facturalo_csd_pass'] ?? '');
+        $this->rfcEmisor      = (string)($row['facturalo_rfc'] ?? '');
+        $this->nombreEmisor   = (string)($row['facturalo_nombre'] ?? '');
+        $this->regimenEmisor  = (string)($row['facturalo_regimen'] ?? '601');
+        $this->cpEmisor       = (string)($row['facturalo_cp'] ?? '76000');
     }
 
     public function credencialesCompletas(): bool {
-        return !empty($this->apiKey) && !empty($this->keyPem) && !empty($this->cerPem) && !empty($this->rfcEmisor);
+        return !empty($this->token) && !empty($this->rfcEmisor);
     }
 
     public function generarCFDI(int $pedidoId): array {
         if (!$this->credencialesCompletas()) {
-            return ['ok' => false, 'error' => 'Credenciales incompletas. Configura apikey, keyPEM, cerPEM y RFC en Facturación → Configuración.'];
+            return ['ok' => false, 'error' => 'Credenciales incompletas. Configura el token y RFC en Facturación → Configuración.'];
         }
 
         $db   = Database::getInstance();
@@ -97,34 +97,32 @@ class FacturaloService {
         $totalIva = round($totalIva, 2);
         $total    = round($subtotal + $totalIva, 2);
 
-        $rfcReceptor    = 'XAXX010101000';
-        $nombreReceptor = $pedido['comprador_nombre'] ?: 'Público en General';
-        $cpReceptor     = '06600';
-        $regimenReceptor = '616';
-
         $cfdi = [
-            'Version'          => '4.0',
-            'Serie'            => 'CHB',
-            'Folio'            => $pedido['folio'],
-            'Fecha'            => date('Y-m-d\TH:i:s'),
-            'FormaPago'        => '03',
-            'SubTotal'         => $subtotal,
-            'Moneda'           => 'MXN',
-            'Total'            => $total,
-            'TipoDeComprobante'=> 'I',
-            'Exportacion'      => '01',
-            'MetodoPago'       => 'PPD',
-            'LugarExpedicion'  => $this->cpEmisor,
+            'Version'           => '4.0',
+            'Sello'             => '',
+            'Certificado'       => '',
+            'NoCertificado'     => '',
+            'Serie'             => 'CHB',
+            'Folio'             => $pedido['folio'],
+            'Fecha'             => date('Y-m-d\TH:i:s'),
+            'FormaPago'         => '03',
+            'SubTotal'          => $subtotal,
+            'Moneda'            => 'MXN',
+            'Total'             => $total,
+            'TipoDeComprobante' => 'I',
+            'Exportacion'       => '01',
+            'MetodoPago'        => 'PPD',
+            'LugarExpedicion'   => $this->cpEmisor,
             'Emisor'  => [
-                'Rfc'          => $this->rfcEmisor,
-                'Nombre'       => $this->nombreEmisor,
-                'RegimenFiscal'=> $this->regimenEmisor,
+                'Rfc'           => $this->rfcEmisor,
+                'Nombre'        => $this->nombreEmisor,
+                'RegimenFiscal' => $this->regimenEmisor,
             ],
             'Receptor' => [
-                'Rfc'                     => $rfcReceptor,
-                'Nombre'                  => $nombreReceptor,
-                'DomicilioFiscalReceptor' => $cpReceptor,
-                'RegimenFiscalReceptor'   => $regimenReceptor,
+                'Rfc'                     => 'XAXX010101000',
+                'Nombre'                  => $pedido['comprador_nombre'] ?: 'Público en General',
+                'DomicilioFiscalReceptor' => '06600',
+                'RegimenFiscalReceptor'   => '616',
                 'UsoCFDI'                 => 'G01',
             ],
             'Conceptos' => $conceptos,
@@ -140,26 +138,18 @@ class FacturaloService {
             ],
         ];
 
-        $jsonB64  = base64_encode(json_encode($cfdi, JSON_UNESCAPED_UNICODE));
-        $response = $this->callApi('timbrarJSON2', [
-            'apikey'    => $this->apiKey,
-            'jsonB64'   => $jsonB64,
-            'keyPEM'    => $this->keyPem,
-            'cerPEM'    => $this->cerPem,
-            'plantilla' => $this->plantilla,
-        ]);
+        $response = $this->callApi('/cfdi33/stamp/json/v4/', json_encode($cfdi, JSON_UNESCAPED_UNICODE));
 
-        if (!$response || (string)($response['code'] ?? '') !== '200') {
-            return ['ok' => false, 'error' => $response['message'] ?? 'Error al timbrar'];
+        if (!$response || ($response['status'] ?? '') !== 'success') {
+            $msg = $response['message'] ?? ($response['messageDetail'] ?? 'Error al timbrar con SW Sapien');
+            return ['ok' => false, 'error' => $msg];
         }
 
-        $data = $response['data'] ?? null;
-        if (is_string($data)) $data = json_decode($data, true);
-        $xmlContent = $data['XML'] ?? '';
-        $pdfBase64  = $data['PDF'] ?? '';
+        $data       = $response['data'] ?? [];
+        $xmlContent = $data['cfdi'] ?? '';
+        $uuid       = $data['uuid'] ?? '';
 
-        $uuid = '';
-        if (preg_match('/UUID="([^"]+)"/i', $xmlContent, $m)) {
+        if (!$uuid && preg_match('/UUID="([^"]+)"/i', $xmlContent, $m)) {
             $uuid = $m[1];
         }
         if (!$uuid) return ['ok' => false, 'error' => 'No se pudo extraer UUID del XML timbrado'];
@@ -167,73 +157,79 @@ class FacturaloService {
         $dir = ROOT_PATH . '/public/uploads/facturas/';
         if (!is_dir($dir)) mkdir($dir, 0755, true);
         $xmlPath = 'public/uploads/facturas/' . $uuid . '.xml';
-        $pdfPath = '';
         file_put_contents(ROOT_PATH . '/' . $xmlPath, $xmlContent);
-        if ($pdfBase64) {
-            $pdfPath = 'public/uploads/facturas/' . $uuid . '.pdf';
-            file_put_contents(ROOT_PATH . '/' . $pdfPath, base64_decode($pdfBase64));
-        }
 
-        $ins = $db->prepare(
+        $db->prepare(
             'INSERT INTO facturas (pedido_id, empresa_id, uuid_cfdi, xml_path, pdf_path, serie, folio_fac, monto)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+             VALUES (?, ?, ?, ?, NULL, ?, ?, ?)
              ON DUPLICATE KEY UPDATE
-               xml_path=VALUES(xml_path), pdf_path=VALUES(pdf_path), uuid_cfdi=VALUES(uuid_cfdi)'
-        );
-        $ins->execute([
+               xml_path=VALUES(xml_path), uuid_cfdi=VALUES(uuid_cfdi)'
+        )->execute([
             $pedidoId,
             $pedido['empresa_id'],
             $uuid,
             $xmlPath,
-            $pdfPath ?: null,
             'CHB',
             $pedido['folio'],
             $total,
         ]);
 
-        return ['ok' => true, 'uuid' => $uuid, 'xml_path' => $xmlPath, 'pdf_path' => $pdfPath];
+        return ['ok' => true, 'uuid' => $uuid, 'xml_path' => $xmlPath, 'pdf_path' => ''];
     }
 
     public function cancelarCFDI(string $uuid, string $rfcReceptor, float $total): bool {
-        if (!$this->credencialesCompletas()) return false;
+        if (!$this->credencialesCompletas() || empty($this->keyPem) || empty($this->cerPem)) {
+            return false;
+        }
 
-        $keyB64 = preg_replace('/\s+/', '', preg_replace('/-----[^-]+-----/', '', $this->keyPem));
-        $cerB64 = preg_replace('/\s+/', '', preg_replace('/-----[^-]+-----/', '', $this->cerPem));
+        // Strip PEM headers and encode as base64 for SW cancel endpoint
+        $b64Key = base64_encode(base64_decode(
+            preg_replace('/\s+/', '', preg_replace('/-----[^-]+-----/', '', $this->keyPem))
+        ));
+        $b64Cer = base64_encode(base64_decode(
+            preg_replace('/\s+/', '', preg_replace('/-----[^-]+-----/', '', $this->cerPem))
+        ));
 
-        $response = $this->callApi('cancelar2', [
-            'apikey'          => $this->apiKey,
-            'keyCSD'          => $keyB64,
-            'cerCSD'          => $cerB64,
-            'passCSD'         => $this->csdPass,
-            'uuid'            => $uuid,
-            'rfcEmisor'       => $this->rfcEmisor,
-            'rfcReceptor'     => $rfcReceptor ?: 'XAXX010101000',
-            'total'           => $total,
-            'motivo'          => '02',
-            'folioSustitucion'=> '',
-        ]);
+        $body = json_encode([
+            'rfc'              => $this->rfcEmisor,
+            'password'         => $this->csdPass,
+            'b64Cer'           => $b64Cer,
+            'b64Key'           => $b64Key,
+            'motivo'           => '02',
+            'folioSustitucion' => '',
+        ], JSON_UNESCAPED_UNICODE);
 
-        $code = (string)($response['code'] ?? '');
-        return in_array($code, ['201', '202'], true);
+        $response = $this->callApi('/cfdi33/cancel/csd/' . urlencode($uuid), $body);
+
+        $status = $response['status'] ?? '';
+        if ($status === 'success') return true;
+
+        // SW also returns success via cancelStatus codes 201/202
+        $cancelStatus = $response['data']['cancelStatus'] ?? '';
+        return in_array($cancelStatus, ['201', '202'], true);
     }
 
     public function consultarCreditos(): int {
-        $response = $this->callApi('consultarCreditosDisponibles', ['apikey' => $this->apiKey]);
-        return (int)($response['data'] ?? 0);
+        // SW Sapien does not expose a simple credit-count endpoint via token auth
+        return -1;
     }
 
-    private function callApi(string $endpoint, array $fields): ?array {
-        if (!$this->apiKey) return null;
+    private function callApi(string $path, string $jsonBody): ?array {
+        if (!$this->token) return null;
         $ctx = stream_context_create([
             'http' => [
                 'method'  => 'POST',
-                'header'  => "Content-Type: application/x-www-form-urlencoded\r\n",
-                'content' => http_build_query($fields),
+                'header'  => implode("\r\n", [
+                    'Authorization: Bearer ' . $this->token,
+                    'Content-Type: application/json',
+                    'Accept: application/json',
+                ]),
+                'content' => $jsonBody,
                 'timeout' => 30,
                 'ignore_errors' => true,
             ],
         ]);
-        $resp = @file_get_contents($this->apiUrl . $endpoint, false, $ctx);
+        $resp = @file_get_contents($this->baseUrl . $path, false, $ctx);
         if (!$resp) return null;
         return json_decode($resp, true);
     }
