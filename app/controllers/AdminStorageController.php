@@ -3,10 +3,10 @@ require_once ROOT_PATH . '/app/controllers/BaseController.php';
 
 class AdminStorageController extends BaseController
 {
-    const RETENTION_DAYS = 60;
     const MANAGED_DIRS = [
-        'entregas' => 'Fotos de entrega',
-        'firmas'   => 'Firmas de repartidor',
+        'entregas'     => 'Fotos de entrega',
+        'firmas'       => 'Firmas de repartidor',
+        'comprobantes' => 'Fotos de comprobante',
     ];
 
     public function __construct()
@@ -15,19 +15,39 @@ class AdminStorageController extends BaseController
         $this->requireAdmin();
     }
 
+    private function getDias(): array
+    {
+        $cfg = new ConfigModel();
+        return [
+            'evidencias' => max(1,  (int)$cfg->get('retencion_fotos_evidencias_dias', '90')),
+            'pedidos'    => max(1,  (int)$cfg->get('retencion_fotos_pedidos_dias',    '90')),
+            'logs'       => max(30, (int)$cfg->get('retencion_logs_dias',             '365')),
+        ];
+    }
+
     public function index(?string $p = null): void
     {
-        $dirs = [];
-        $totalSize  = 0;
-        $totalOld   = 0;
+        $dias = $this->getDias();
+
+        $diasPorDir = [
+            'entregas'     => $dias['evidencias'],
+            'firmas'       => $dias['evidencias'],
+            'comprobantes' => $dias['pedidos'],
+        ];
+
+        $dirs         = [];
+        $totalSize    = 0;
+        $totalAPurgar = 0;
 
         foreach (self::MANAGED_DIRS as $slug => $label) {
-            $info = $this->scanDir(UPLOAD_PATH . $slug, self::RETENTION_DAYS);
+            $d             = $diasPorDir[$slug];
+            $info          = $this->scanDir(UPLOAD_PATH . $slug, $d);
             $info['slug']  = $slug;
             $info['label'] = $label;
+            $info['dias']  = $d;
             $dirs[$slug]   = $info;
             $totalSize    += $info['total_size'];
-            $totalOld     += $info['old_count'];
+            $totalAPurgar += $info['old_count'];
         }
 
         $db = Database::getInstance();
@@ -35,12 +55,16 @@ class AdminStorageController extends BaseController
             "SELECT al.accion, al.descripcion, al.created_at, u.nombre
                FROM action_logs al
           LEFT JOIN usuarios u ON u.id = al.usuario_id
-              WHERE al.modulo = 'almacenamiento'
+              WHERE al.modulo = 'retencion'
            ORDER BY al.created_at DESC LIMIT 15"
         )->fetchAll();
 
+        $empresas = $db->query(
+            "SELECT id, razon_social AS nombre FROM empresas WHERE activo = 1 ORDER BY razon_social"
+        )->fetchAll();
+
         $flash      = $this->getFlash();
-        $pageTitle  = 'Gestión de almacenamiento';
+        $pageTitle  = 'Políticas de retención';
         $activeMenu = 'almacenamiento';
 
         ob_start();
@@ -49,166 +73,194 @@ class AdminStorageController extends BaseController
         require ROOT_PATH . '/app/views/panel/layouts/main.php';
     }
 
-    public function preview(?string $p = null): void
-    {
-        if (!$this->isPost()) { $this->json(['error' => 'method'], 405); }
-
-        $dir   = (string)$this->post('directorio', '');
-        $desde = (string)$this->post('fecha_desde', '');
-        $hasta = (string)$this->post('fecha_hasta', date('Y-m-d'));
-
-        if (!array_key_exists($dir, self::MANAGED_DIRS) && $dir !== 'ambos') {
-            $this->json(['error' => 'directorio inválido'], 400);
-        }
-        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $desde)) {
-            $this->json(['error' => 'fecha inválida'], 400);
-        }
-
-        $slugs = $dir === 'ambos' ? array_keys(self::MANAGED_DIRS) : [$dir];
-        $count = 0;
-        $size  = 0;
-        $oldest = PHP_INT_MAX;
-        $newest = 0;
-
-        foreach ($slugs as $slug) {
-            $files = $this->getFilesInRange(UPLOAD_PATH . $slug, $desde, $hasta);
-            foreach ($files as $f) {
-                $count++;
-                $size += $f['size'];
-                if ($f['mtime'] < $oldest) $oldest = $f['mtime'];
-                if ($f['mtime'] > $newest) $newest = $f['mtime'];
-            }
-        }
-
-        $this->json([
-            'count'       => $count,
-            'size_bytes'  => $size,
-            'size_label'  => $this->formatSize($size),
-            'oldest'      => $oldest !== PHP_INT_MAX ? date('d/m/Y', $oldest) : null,
-            'newest'      => $newest > 0             ? date('d/m/Y', $newest) : null,
-        ]);
-    }
-
-    public function exportarZip(?string $p = null): void
+    public function guardar(?string $p = null): void
     {
         if (!$this->isPost()) { $this->redirect('admin-storage/index'); }
 
-        $dir   = (string)$this->post('directorio', '');
-        $desde = (string)$this->post('fecha_desde', '');
-        $hasta = (string)$this->post('fecha_hasta', date('Y-m-d'));
+        $diasEv   = max(1,  (int)$this->post('retencion_fotos_evidencias_dias', '90'));
+        $diasPed  = max(1,  (int)$this->post('retencion_fotos_pedidos_dias',    '90'));
+        $diasLogs = max(30, (int)$this->post('retencion_logs_dias',             '365'));
 
-        if (!array_key_exists($dir, self::MANAGED_DIRS) && $dir !== 'ambos') {
-            $this->flash('error', 'Directorio inválido.');
-            $this->redirect('admin-storage/index');
-        }
-        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $desde) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $hasta)) {
-            $this->flash('error', 'Fechas inválidas.');
-            $this->redirect('admin-storage/index');
-        }
-        if ($desde > $hasta) [$desde, $hasta] = [$hasta, $desde];
+        $cfg = new ConfigModel();
+        $cfg->set('retencion_fotos_evidencias_dias', (string)$diasEv);
+        $cfg->set('retencion_fotos_pedidos_dias',    (string)$diasPed);
+        $cfg->set('retencion_logs_dias',             (string)$diasLogs);
 
-        $slugs = $dir === 'ambos' ? array_keys(self::MANAGED_DIRS) : [$dir];
-        $allFiles = [];
-        foreach ($slugs as $slug) {
-            foreach ($this->getFilesInRange(UPLOAD_PATH . $slug, $desde, $hasta) as $f) {
-                $f['dir'] = $slug;
-                $allFiles[] = $f;
-            }
-        }
+        $this->log('guardar_retencion', 'retencion',
+            "evidencias={$diasEv}d, pedidos={$diasPed}d, logs={$diasLogs}d");
 
-        if (empty($allFiles)) {
-            $this->flash('error', 'No se encontraron archivos en ese rango.');
-            $this->redirect('admin-storage/index');
-        }
-
-        $zipPath = sys_get_temp_dir() . '/carnihub_storage_' . date('Ymd_His') . '.zip';
-        $zip = new ZipArchive();
-        if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
-            $this->flash('error', 'No se pudo crear el archivo ZIP.');
-            $this->redirect('admin-storage/index');
-        }
-
-        foreach ($allFiles as $f) {
-            $zip->addFile($f['path'], $f['dir'] . '/' . $f['name']);
-        }
-
-        $resumenHtml = $this->buildResumenHtml($allFiles, $desde, $hasta);
-        $zip->addFromString('_resumen.html', $resumenHtml);
-        $zip->close();
-
-        $this->log('exportar_zip', 'almacenamiento',
-            "ZIP exportado: dirs=$dir, desde=$desde, hasta=$hasta, archivos=" . count($allFiles));
-
-        $filename = 'carnihub_storage_' . $desde . '_' . $hasta . '.zip';
-        header('Content-Type: application/zip');
-        header('Content-Disposition: attachment; filename="' . $filename . '"');
-        header('Content-Length: ' . filesize($zipPath));
-        header('Pragma: no-cache');
-        readfile($zipPath);
-        unlink($zipPath);
-        exit;
-    }
-
-    public function eliminar(?string $p = null): void
-    {
-        if (!$this->isPost()) { $this->redirect('admin-storage/index'); }
-
-        $confirmacion = (string)$this->post('confirmacion', '');
-        if ($confirmacion !== 'ELIMINAR') {
-            $this->flash('error', 'Confirmación incorrecta. Escribe ELIMINAR para continuar.');
-            $this->redirect('admin-storage/index');
-        }
-
-        $dir   = (string)$this->post('directorio', '');
-        $desde = (string)$this->post('fecha_desde', '');
-        $hasta = (string)$this->post('fecha_hasta', date('Y-m-d'));
-
-        if (!array_key_exists($dir, self::MANAGED_DIRS) && $dir !== 'ambos') {
-            $this->flash('error', 'Directorio inválido.');
-            $this->redirect('admin-storage/index');
-        }
-        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $desde) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $hasta)) {
-            $this->flash('error', 'Fechas inválidas.');
-            $this->redirect('admin-storage/index');
-        }
-        if ($desde > $hasta) [$desde, $hasta] = [$hasta, $desde];
-
-        $slugs = $dir === 'ambos' ? array_keys(self::MANAGED_DIRS) : [$dir];
-        $deleted = 0;
-        $sizeFreed = 0;
-
-        foreach ($slugs as $slug) {
-            $files = $this->getFilesInRange(UPLOAD_PATH . $slug, $desde, $hasta);
-            foreach ($files as $f) {
-                $sizeFreed += $f['size'];
-                if (@unlink($f['path'])) $deleted++;
-            }
-        }
-
-        $this->log('eliminar_archivos', 'almacenamiento',
-            "Eliminados: dirs=$dir, desde=$desde, hasta=$hasta, count=$deleted, liberado=" . $this->formatSize($sizeFreed));
-
-        $this->flash('success', "$deleted archivo(s) eliminados — " . $this->formatSize($sizeFreed) . " liberados.");
+        $this->flash('success', 'Políticas de retención guardadas.');
         $this->redirect('admin-storage/index');
     }
 
-    // ── Helpers privados ─────────────────────────────────────────────
+    public function purgar(?string $p = null): void
+    {
+        if (!$this->isPost()) { $this->redirect('admin-storage/index'); }
+
+        $conf = (string)$this->post('confirmacion', '');
+        if ($conf !== 'PURGAR') {
+            $this->flash('error', 'Escribe PURGAR para confirmar la purga.');
+            $this->redirect('admin-storage/index');
+        }
+
+        $dias    = $this->getDias();
+        $db      = Database::getInstance();
+        $nFiles  = 0;
+        $freed   = 0;
+        $migrada = false;
+
+        // -- Evidencias (firma_path + foto_path) --
+        $cutoffEv = date('Y-m-d H:i:s', time() - $dias['evidencias'] * 86400);
+        $hasColEv = $db->query("SHOW COLUMNS FROM evidencias_entrega LIKE 'imagenes_purgadas_at'")->fetch();
+
+        if ($hasColEv) {
+            $migrada = true;
+            $stmt = $db->prepare(
+                "SELECT id, firma_path, foto_path FROM evidencias_entrega
+                  WHERE entregado_at < ? AND imagenes_purgadas_at IS NULL
+                    AND (firma_path IS NOT NULL OR foto_path IS NOT NULL)"
+            );
+            $stmt->execute([$cutoffEv]);
+            foreach ($stmt->fetchAll() as $ev) {
+                foreach (['firma_path', 'foto_path'] as $col) {
+                    if (!empty($ev[$col])) {
+                        $abs = $this->urlToPath($ev[$col]);
+                        if ($abs && is_file($abs)) {
+                            $freed += filesize($abs);
+                            @unlink($abs);
+                            $nFiles++;
+                        }
+                    }
+                }
+                $db->prepare(
+                    "UPDATE evidencias_entrega SET firma_path=NULL, foto_path=NULL, imagenes_purgadas_at=NOW() WHERE id=?"
+                )->execute([$ev['id']]);
+            }
+        }
+
+        // -- Pedidos (foto_comprobante_path + foto_entrega_path) --
+        $cutoffPed = date('Y-m-d H:i:s', time() - $dias['pedidos'] * 86400);
+        $hasColPed = $db->query("SHOW COLUMNS FROM pedidos LIKE 'imagenes_purgadas_at'")->fetch();
+
+        if ($hasColPed) {
+            $migrada = true;
+            $stmt = $db->prepare(
+                "SELECT id, foto_comprobante_path, foto_entrega_path FROM pedidos
+                  WHERE created_at < ? AND imagenes_purgadas_at IS NULL
+                    AND (foto_comprobante_path IS NOT NULL OR foto_entrega_path IS NOT NULL)"
+            );
+            $stmt->execute([$cutoffPed]);
+            foreach ($stmt->fetchAll() as $ped) {
+                foreach (['foto_comprobante_path', 'foto_entrega_path'] as $col) {
+                    if (!empty($ped[$col])) {
+                        $abs = $this->urlToPath($ped[$col]);
+                        if ($abs && is_file($abs)) {
+                            $freed += filesize($abs);
+                            @unlink($abs);
+                            $nFiles++;
+                        }
+                    }
+                }
+                $db->prepare(
+                    "UPDATE pedidos SET foto_comprobante_path=NULL, foto_entrega_path=NULL, imagenes_purgadas_at=NOW() WHERE id=?"
+                )->execute([$ped['id']]);
+            }
+        }
+
+        if (!$migrada) {
+            $this->flash('error', 'Ejecuta la migración 019_retencion_politicas.sql en la BD antes de usar la purga inteligente.');
+            $this->redirect('admin-storage/index');
+        }
+
+        $this->log('purgar_imagenes', 'retencion',
+            "Purgados: {$nFiles} archivos, liberado: " . $this->formatSize($freed));
+
+        $this->flash('success',
+            "{$nFiles} imagen(es) eliminada(s) del disco — " . $this->formatSize($freed) . " liberados. Historial de pedidos y evidencias conservado.");
+        $this->redirect('admin-storage/index');
+    }
+
+    public function exportarCsv(?string $p = null): void
+    {
+        if (!$this->isPost()) { $this->redirect('admin-storage/index'); }
+
+        $empresa_id = (int)$this->post('empresa_id', 0);
+        $desde      = (string)$this->post('fecha_desde', date('Y-01-01'));
+        $hasta      = (string)$this->post('fecha_hasta', date('Y-m-d'));
+
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $desde) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $hasta)) {
+            $this->flash('error', 'Fechas inválidas.');
+            $this->redirect('admin-storage/index');
+        }
+
+        $db     = Database::getInstance();
+        $params = [$desde . ' 00:00:00', $hasta . ' 23:59:59'];
+        $extra  = '';
+        if ($empresa_id > 0) { $extra = ' AND p.empresa_id = ?'; $params[] = $empresa_id; }
+
+        $stmt = $db->prepare(
+            "SELECT p.folio, e.razon_social AS empresa, u.nombre AS comprador,
+                    p.estado, p.direccion_entrega,
+                    (SELECT SUM(pd.subtotal) FROM pedido_detalle pd WHERE pd.pedido_id = p.id) AS total,
+                    p.created_at, p.ruta_iniciada_at, p.ruta_finalizada_at
+               FROM pedidos p
+               JOIN empresas e ON e.id = p.empresa_id
+               JOIN usuarios u ON u.id = p.comprador_id
+              WHERE p.created_at BETWEEN ? AND ?{$extra}
+           ORDER BY p.created_at DESC"
+        );
+        $stmt->execute($params);
+        $pedidos = $stmt->fetchAll();
+
+        $filename = 'carnihub_pedidos_' . $desde . '_' . $hasta . '.csv';
+        header('Content-Type: text/csv; charset=UTF-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Pragma: no-cache');
+
+        $out = fopen('php://output', 'w');
+        fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF)); // BOM UTF-8
+        fputcsv($out, ['Folio', 'Empresa', 'Comprador', 'Estado', 'Total MXN', 'Dirección entrega', 'Creado', 'Ruta iniciada', 'Ruta finalizada']);
+        foreach ($pedidos as $row) {
+            fputcsv($out, [
+                $row['folio'],
+                $row['empresa'],
+                $row['comprador'],
+                $row['estado'],
+                number_format((float)($row['total'] ?? 0), 2, '.', ''),
+                $row['direccion_entrega'] ?? '',
+                $row['created_at'],
+                $row['ruta_iniciada_at'] ?? '',
+                $row['ruta_finalizada_at'] ?? '',
+            ]);
+        }
+        fclose($out);
+        exit;
+    }
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    private function urlToPath(string $url): ?string
+    {
+        $rel = ltrim(str_replace(UPLOAD_URL, '', $url), '/');
+        return UPLOAD_PATH . $rel;
+    }
 
     private function scanDir(string $path, int $retentionDays): array
     {
-        $cutoff     = time() - $retentionDays * 86400;
-        $totalSize  = 0;
-        $count      = 0;
-        $oldCount   = 0;
-        $oldestTs   = PHP_INT_MAX;
-        $newestTs   = 0;
-        $oldest10   = [];
+        $cutoff    = time() - $retentionDays * 86400;
+        $totalSize = 0;
+        $count     = 0;
+        $oldCount  = 0;
+        $oldestTs  = PHP_INT_MAX;
+        $newestTs  = 0;
+        $oldest10  = [];
 
         if (!is_dir($path)) {
-            return ['total_size'=>0,'count'=>0,'old_count'=>0,'oldest'=>null,'newest'=>null,'oldest10'=>[],'label_size'=>'0 B'];
+            return ['total_size' => 0, 'count' => 0, 'old_count' => 0,
+                    'oldest' => null, 'newest' => null, 'oldest10' => [], 'label_size' => '0 B'];
         }
 
-        foreach (glob($path . '/*') as $file) {
+        foreach (glob($path . '/*') ?: [] as $file) {
             if (!is_file($file)) continue;
             $mtime = filemtime($file);
             $size  = filesize($file);
@@ -234,78 +286,11 @@ class AdminStorageController extends BaseController
         ];
     }
 
-    private function getFilesInRange(string $path, string $desde, string $hasta): array
-    {
-        $files  = [];
-        $tsFrom = strtotime($desde . ' 00:00:00');
-        $tsTo   = strtotime($hasta . ' 23:59:59');
-
-        if (!is_dir($path)) return $files;
-
-        foreach (glob($path . '/*') as $file) {
-            if (!is_file($file)) continue;
-            $mtime = filemtime($file);
-            if ($mtime >= $tsFrom && $mtime <= $tsTo) {
-                $files[] = [
-                    'path'  => $file,
-                    'name'  => basename($file),
-                    'size'  => filesize($file),
-                    'mtime' => $mtime,
-                ];
-            }
-        }
-        return $files;
-    }
-
     private function formatSize(int $bytes): string
     {
         if ($bytes >= 1073741824) return round($bytes / 1073741824, 1) . ' GB';
         if ($bytes >= 1048576)    return round($bytes / 1048576, 1)    . ' MB';
         if ($bytes >= 1024)       return round($bytes / 1024, 1)       . ' KB';
         return $bytes . ' B';
-    }
-
-    private function buildResumenHtml(array $files, string $desde, string $hasta): string
-    {
-        $now       = date('d/m/Y H:i');
-        $totalSize = (int)array_sum(array_column($files, 'size'));
-        $labelSize = $this->formatSize($totalSize);
-        $fileCount = count($files);
-        $rows = '';
-        foreach ($files as $f) {
-            $fecha    = date('d/m/Y H:i', $f['mtime']);
-            $label    = $this->formatSize($f['size']);
-            $fileRef  = htmlspecialchars($f['dir'] . '/' . $f['name']);
-            $rows .= "<tr><td style=\"padding:6px 10px;border-bottom:1px solid #E5E7EB\">{$fileRef}</td>"
-                   . "<td style=\"padding:6px 10px;border-bottom:1px solid #E5E7EB;text-align:right\">{$label}</td>"
-                   . "<td style=\"padding:6px 10px;border-bottom:1px solid #E5E7EB\">{$fecha}</td></tr>";
-        }
-        return <<<HTML
-<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<title>Resumen de exportación — CarniHub</title>
-<style>
-  body{font-family:Arial,sans-serif;font-size:13px;color:#111827;padding:30px}
-  h1{font-size:18px;margin-bottom:4px}
-  .meta{color:#6B7280;font-size:12px;margin-bottom:20px}
-  table{width:100%;border-collapse:collapse}
-  thead tr{background:#F3F4F6}
-  th{padding:8px 10px;text-align:left;font-size:12px;color:#374151;border-bottom:2px solid #E5E7EB}
-  .footer{margin-top:20px;font-size:11px;color:#9CA3AF}
-</style>
-</head>
-<body>
-<h1>Resumen de exportación de archivos</h1>
-<div class="meta">Período: {$desde} al {$hasta} &nbsp;|&nbsp; Generado: {$now} &nbsp;|&nbsp; Total: {$labelSize} ({$fileCount} archivos)</div>
-<table>
-<thead><tr><th>Archivo</th><th style="text-align:right">Tamaño</th><th>Fecha modificación</th></tr></thead>
-<tbody>{$rows}</tbody>
-</table>
-<div class="footer">Este archivo forma parte de la exportación de almacenamiento de CarniHub. Puede imprimirse como PDF desde el navegador.</div>
-</body>
-</html>
-HTML;
     }
 }

@@ -1286,4 +1286,85 @@ Todos se configuran desde `/config/apis` y `/config/correo` (solo visible para s
 
 ---
 
-*Última actualización: 2026-05-07 — v2.9.5 (GPS map matching OSRM, filtro distancia jitter, precisión en display, documentación GPS offline)*
+---
+
+## MÓDULO: POLÍTICAS DE RETENCIÓN DE ARCHIVOS (Sprint Retención)
+
+**Branch:** `sprint-retencion-politicas` | **Migración:** `019_retencion_politicas.sql`
+
+### Contexto y decisión de diseño
+El módulo "Gestión de Almacenamiento" (ruta `/admin-storage`) se elimina y se reemplaza por **"Políticas de Retención"**, un módulo de configuración más inteligente. La razón central: los **datos de pedidos nunca se borran** — son el historial operativo y la base para futura analítica/logística. Solo se purgan los **archivos físicos** (imágenes) que consumen espacio en disco.
+
+**Regla general:**
+- Tablas `pedidos`, `pedido_detalle`, `pedido_historial`, `pedido_sucursal`, `evidencias_entrega` → **NUNCA se borran registros**
+- Archivos físicos en `public/uploads/firmas/`, `public/uploads/entregas/`, `public/uploads/comprobantes/` → se purgan según retención configurada
+- Al purgar un archivo: se hace `unlink()` + se pone el `_path` en NULL en la BD + se registra `imagenes_purgadas_at`
+
+### Cambios en BD (migración 019)
+
+| Cambio | Detalle |
+|--------|---------|
+| `global_settings`: `retencion_fotos_evidencias_dias` | Días antes de purgar firmas y fotos de evidencias (default 90) |
+| `global_settings`: `retencion_fotos_pedidos_dias` | Días antes de purgar fotos de pedidos/comprobantes (default 90) |
+| `global_settings`: `retencion_logs_dias` | Días antes de purgar registros de `action_logs` (default 365) |
+| `evidencias_entrega.imagenes_purgadas_at` | NULL = aún tiene archivos; datetime = fecha de purga |
+| `pedidos.imagenes_purgadas_at` | NULL = aún tiene archivos; datetime = fecha de purga |
+| `pedido_sucursal.imagen_purgada_at` | NULL = aún tiene archivos; datetime = fecha de purga |
+
+### Lo que implementa el nuevo módulo
+
+**Panel superadmin `/panel-retencion/` (reemplaza `/admin-storage/`):**
+1. **Configurar tiempos** — formulario con los 3 campos de retención (evidencias, pedidos, logs)
+2. **Vista de impacto** — cuántos archivos y cuántos MB se purgarán con la configuración actual
+3. **Ejecutar purga manual** — purga controlada con confirmación, registra en `action_logs`
+4. **Exportar CSV** — exporta pedidos en rango de fechas (todos los datos, sin imágenes) para archivar
+
+**Portal empresa (nuevo) `/empresa-historial/`:**
+- Filtro por año/rango de fechas para ver pedidos históricos (hace 1 año, 2 años, etc.)
+- Exportar CSV del historial
+- Columna visual "imágenes disponibles / purgadas" para transparencia
+
+### Flujo de purga
+```
+superadmin configura → retencion_fotos_evidencias_dias = 90
+                     ↓
+cron o purga manual → busca evidencias_entrega WHERE entregado_at < NOW() - 90 días
+                                                    AND imagenes_purgadas_at IS NULL
+                     ↓
+por cada registro → unlink(firma_path), unlink(foto_path)
+                 → UPDATE evidencias_entrega SET firma_path=NULL, foto_path=NULL,
+                                                 imagenes_purgadas_at=NOW()
+                 → log en action_logs
+                     ↓
+registro en BD sigue intacto para historial y analítica
+```
+
+### Columnas afectadas por purga
+
+| Tabla | Columna purgada | Columna de control |
+|-------|-----------------|-------------------|
+| `evidencias_entrega` | `firma_path`, `foto_path` | `imagenes_purgadas_at` |
+| `pedidos` | `foto_comprobante_path`, `foto_entrega_path` | `imagenes_purgadas_at` |
+| `pedido_sucursal` | `foto_entrega_path` | `imagen_purgada_at` |
+
+### Exportación CSV
+
+Campos exportados en CSV de pedidos:
+`folio, empresa, comprador, sucursal, estado, total, created_at, ruta_iniciada_at, ruta_finalizada_at, direccion_entrega`
+(sin rutas de imágenes — ya purgadas o irrelevantes para analítica)
+
+### Pendiente implementar (tareas del sprint)
+- [ ] Nuevo controller `PanelRetencionController` (reemplaza `AdminStorageController`)
+- [ ] Vista `panel/retencion/index.php` — config + estadísticas
+- [ ] Método `purgarImagenes()` en nuevo `RetencionModel`
+- [ ] Endpoint `GET /panel-retencion/index`
+- [ ] Endpoint `POST /panel-retencion/guardar` — guarda días en `global_settings`
+- [ ] Endpoint `POST /panel-retencion/ejecutarPurga` — purga manual con confirmación
+- [ ] Endpoint `GET /panel-retencion/exportarCsv` — descarga CSV pedidos por rango
+- [ ] Controller `EmpresaHistorialController` + vista para filtro histórico empresa
+- [ ] Eliminar `AdminStorageController.php` y vista `panel/storage/`
+- [ ] Actualizar sidebar para quitar link "Almacenamiento" y poner "Retención"
+
+---
+
+*Última actualización: 2026-05-12 — v3.1.0-plan (políticas de retención, historial empresa, exportación CSV)*
