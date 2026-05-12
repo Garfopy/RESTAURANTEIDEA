@@ -41,7 +41,7 @@
              onmouseenter="this.style.boxShadow='0 10px 28px rgba(0,0,0,.10)';this.style.transform='translateY(-3px)'"
              onmouseleave="this.style.boxShadow='none';this.style.transform='translateY(0)'">
           <div style="height:170px;background:linear-gradient(135deg,#F9FAFB 0%,#F3F4F6 100%);display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative">
-            <img src="<?= function_exists('getProductImageUrl') ? getProductImageUrl($prod) : (BASE_URL.'public/img/placeholder.png') ?>"
+            <img src="<?= getProductImageUrl($prod) ?>"
                  alt="<?= htmlspecialchars($prod['nombre']) ?>"
                  loading="lazy"
                  style="width:100%;height:100%;object-fit:cover"
