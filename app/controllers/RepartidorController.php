@@ -351,16 +351,19 @@ class RepartidorController extends BaseController
         $repartidorId = $this->usuarioId();
         $db = Database::getInstance();
 
-        // Verificar que la parada pertenece a este repartidor
+        // Verificar que la parada pertenece a este repartidor y obtener pedido+sucursal
         $stmt = $db->prepare(
-            'SELECT rd.id FROM ruta_detalle rd
+            'SELECT rd.id, rd.pedido_id, rd.sucursal_id FROM ruta_detalle rd
                JOIN rutas r ON r.id = rd.ruta_id
               WHERE rd.id = ? AND r.repartidor_id = ?'
         );
         $stmt->execute([$paradaId, $repartidorId]);
-        if (!$stmt->fetch()) {
+        $paradaRow = $stmt->fetch();
+        if (!$paradaRow) {
             $this->redirect('repartidor/inicio');
         }
+        $pedidoIdParada   = (int)$paradaRow['pedido_id'];
+        $sucursalIdParada = (int)$paradaRow['sucursal_id'];
 
         // Procesar firma (base64 → archivo)
         $firmaPath = null;
@@ -374,11 +377,18 @@ class RepartidorController extends BaseController
             $fotoPath = $this->guardarFoto($_FILES['foto'], $paradaId);
         }
 
-        // Guardar evidencia
+        // Guardar evidencia en tabla dedicada (rutas formales)
         $db->prepare(
             'INSERT INTO evidencias_entrega (ruta_detalle_id, nombre_receptor, firma_path, foto_path)
              VALUES (?, ?, ?, ?)'
         )->execute([$paradaId, $this->post('nombre_receptor'), $firmaPath, $fotoPath]);
+
+        // Sincronizar en pedido_sucursal para que el detalle del pedido muestre firma y foto
+        $db->prepare(
+            "UPDATE pedido_sucursal
+                SET estado = 'entregado', firma_path = ?, foto_entrega_path = ?, fecha_llegada = NOW()
+              WHERE pedido_id = ? AND sucursal_id = ?"
+        )->execute([$firmaPath, $fotoPath, $pedidoIdParada, $sucursalIdParada]);
 
         // Actualizar estado de parada
         $db->prepare(
@@ -386,11 +396,7 @@ class RepartidorController extends BaseController
         )->execute([$paradaId]);
 
         // Actualizar estado del pedido si todas las paradas están entregadas
-        $stmt = $db->prepare(
-            'SELECT pedido_id FROM ruta_detalle WHERE id = ?'
-        );
-        $stmt->execute([$paradaId]);
-        $pedidoId = (int)($stmt->fetch()['pedido_id'] ?? 0);
+        $pedidoId = $pedidoIdParada;
 
         if ($pedidoId) {
             $stmt2 = $db->prepare(

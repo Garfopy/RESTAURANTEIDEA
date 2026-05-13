@@ -197,7 +197,7 @@ function tiempoTranscurrido(string $desde, string $hasta): string {
              title="Ver firma completa"
              style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:2px;text-decoration:none">
             <img src="<?= htmlspecialchars($ps['firma_path']) ?>" alt="Firma del receptor"
-                 style="width:100px;height:52px;object-fit:contain;border-radius:8px;border:2px solid #BFDBFE;background:#fff;filter:invert(1);display:block;box-shadow:0 1px 4px rgba(0,0,0,.1)">
+                 style="width:100px;height:52px;object-fit:contain;border-radius:8px;border:2px solid #BFDBFE;background:#fff;display:block;box-shadow:0 1px 4px rgba(0,0,0,.1)">
             <span style="font-size:.6rem;color:#3B82F6;font-weight:700">✍ Ver firma</span>
           </a>
           <?php endif; ?>

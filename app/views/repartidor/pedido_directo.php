@@ -552,9 +552,30 @@ function previewGaleriaDir(input) {
   };
 
   window._getFirmaDataDir = function() {
-    var vacio = !ctx.getImageData(0, 0, canvas.width, canvas.height).data.some(function(c){ return c !== 0; });
+    var imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    var vacio = !imgData.data.some(function(c){ return c !== 0; });
     if (vacio) return null;
-    return canvas.toDataURL('image/png');
+    // Exportar negro sobre blanco para que la imagen sea legible en cualquier contexto
+    // (pestaña nueva, ZIP, PDF). El canvas visual del repartidor no cambia.
+    var tmp = document.createElement('canvas');
+    tmp.width  = canvas.width;
+    tmp.height = canvas.height;
+    var tmpCtx = tmp.getContext('2d');
+    tmpCtx.fillStyle = '#FFFFFF';
+    tmpCtx.fillRect(0, 0, tmp.width, tmp.height);
+    var d = imgData.data;
+    for (var i = 0; i < d.length; i += 4) {
+      if (d[i + 3] > 10) {          // píxel con trazo → invertir color
+        d[i]     = 255 - d[i];
+        d[i + 1] = 255 - d[i + 1];
+        d[i + 2] = 255 - d[i + 2];
+        d[i + 3] = 255;             // forzar opaco
+      } else {                      // píxel vacío → transparente (el fondo blanco lo cubre)
+        d[i + 3] = 0;
+      }
+    }
+    tmpCtx.putImageData(imgData, 0, 0);
+    return tmp.toDataURL('image/png');
   };
 })();
 
