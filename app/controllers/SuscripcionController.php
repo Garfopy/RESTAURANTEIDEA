@@ -61,18 +61,28 @@ class SuscripcionController extends BaseController
             $planes    = $model->getPlanesActivos();
             $paypal    = new PayPalSuscripcionService();
             $resultado = $paypal->sincronizarPlanes($planes);
+            $modo      = $paypal->getMode();
 
             foreach ($resultado as $planId => $ids) {
-                if (!empty($ids['mensual'])) {
-                    $model->guardarPaypalPlanId($planId, $ids['mensual']);
-                }
-                if (!empty($ids['anual'])) {
-                    $model->guardarPaypalPlanIdAnual($planId, $ids['anual']);
+                if ($modo === 'live') {
+                    if (!empty($ids['mensual'])) {
+                        $model->guardarPaypalPlanIdLive($planId, $ids['mensual']);
+                    }
+                    if (!empty($ids['anual'])) {
+                        $model->guardarPaypalPlanIdAnualLive($planId, $ids['anual']);
+                    }
+                } else {
+                    if (!empty($ids['mensual'])) {
+                        $model->guardarPaypalPlanId($planId, $ids['mensual']);
+                    }
+                    if (!empty($ids['anual'])) {
+                        $model->guardarPaypalPlanIdAnual($planId, $ids['anual']);
+                    }
                 }
             }
 
             $this->log('Sincronizar planes PayPal', 'suscripcion');
-            $this->flash('success', 'Planes sincronizados con PayPal correctamente.');
+            $this->flash('success', 'Planes sincronizados con PayPal correctamente (modo: ' . strtoupper($modo) . ').');
         } catch (\Throwable $e) {
             $this->flash('error', 'Error al sincronizar con PayPal: ' . $e->getMessage());
         }
@@ -156,6 +166,14 @@ class SuscripcionController extends BaseController
         $planId = (int)$p;
         $model  = new SuscripcionModel();
 
+        // Comparar precios antes de actualizar para detectar cambio
+        $planAnterior    = $model->getPlanPorId($planId);
+        $nuevoPrecioMes  = (float)str_replace(',', '', $this->post('precio_mensual', '0'));
+        $nuevoPrecioAnual= (float)str_replace(',', '', $this->post('precio_anual', '0'));
+        $cambioPrecios   = $planAnterior &&
+            ((float)$planAnterior['precio_mensual'] !== $nuevoPrecioMes ||
+             (float)$planAnterior['precio_anual']   !== $nuevoPrecioAnual);
+
         $maxUsuarios  = (int)$this->post('max_usuarios', 0);
         $maxProductos = (int)$this->post('max_productos', 0);
         $maxPedidos   = (int)$this->post('max_pedidos_mes', 0);
@@ -164,16 +182,25 @@ class SuscripcionController extends BaseController
         $model->actualizarLimitesPlan($planId, [
             'nombre'         => trim($this->post('nombre')),
             'descripcion'    => trim($this->post('descripcion', '')),
-            'precio_mensual' => (float)str_replace(',', '', $this->post('precio_mensual', '0')),
-            'precio_anual'   => (float)str_replace(',', '', $this->post('precio_anual', '0')),
+            'precio_mensual' => $nuevoPrecioMes,
+            'precio_anual'   => $nuevoPrecioAnual,
             'max_usuarios'   => $maxUsuarios,
             'max_productos'  => $maxProductos,
             'max_pedidos_mes'=> $maxPedidos,
             'max_sucursales' => $maxSucursales,
         ]);
 
-        $this->log('Editar plan', 'suscripcion', "plan_id=$planId");
-        $this->flash('success', 'Plan actualizado correctamente.');
+        // Si cambiaron los precios, limpiar IDs de PayPal del modo activo
+        if ($cambioPrecios) {
+            $cfg  = new ConfigModel();
+            $modo = $cfg->get('paypal_mode', 'sandbox');
+            $model->limpiarPaypalPlanIds($planId, $modo);
+            $this->log('Editar plan (precios cambiados)', 'suscripcion', "plan_id=$planId modo=$modo");
+            $this->flash('success', 'Plan actualizado. Los precios cambiaron: sincroniza con PayPal para aplicar el nuevo precio en el checkout.');
+        } else {
+            $this->log('Editar plan', 'suscripcion', "plan_id=$planId");
+            $this->flash('success', 'Plan actualizado correctamente.');
+        }
         $this->redirect('suscripcion/configurar');
     }
 

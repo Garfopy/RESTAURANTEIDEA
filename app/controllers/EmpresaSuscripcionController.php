@@ -55,7 +55,8 @@ class EmpresaSuscripcionController extends BaseController
             $this->redirect('empresa-suscripcion/planes');
         }
 
-        if (empty($planData['paypal_plan_id']) && empty($planData['paypal_plan_id_anual'])) {
+        if (empty($planData['paypal_plan_id']) && empty($planData['paypal_plan_id_anual'])
+            && empty($planData['paypal_plan_id_live']) && empty($planData['paypal_plan_id_anual_live'])) {
             $this->flash('error', 'Este plan aún no tiene configurado el pago con PayPal. Contacta a soporte.');
             $this->redirect('empresa-suscripcion/planes');
         }
@@ -64,9 +65,24 @@ class EmpresaSuscripcionController extends BaseController
             $returnUrl = BASE_URL . 'empresa-suscripcion/retorno';
             $cancelUrl = BASE_URL . 'empresa-suscripcion/cancelado';
 
-            $paypalPlanId = ($ciclo === 'anual' && !empty($planData['paypal_plan_id_anual']))
-                ? $planData['paypal_plan_id_anual']
-                : $planData['paypal_plan_id'];
+            // Seleccionar ID de PayPal según modo activo
+            $cfg  = new ConfigModel();
+            $modo = $cfg->get('paypal_mode', 'sandbox');
+
+            if ($modo === 'live') {
+                $paypalPlanId = ($ciclo === 'anual' && !empty($planData['paypal_plan_id_anual_live']))
+                    ? $planData['paypal_plan_id_anual_live']
+                    : ($planData['paypal_plan_id_live'] ?? '');
+            } else {
+                $paypalPlanId = ($ciclo === 'anual' && !empty($planData['paypal_plan_id_anual']))
+                    ? $planData['paypal_plan_id_anual']
+                    : ($planData['paypal_plan_id'] ?? '');
+            }
+
+            if (empty($paypalPlanId)) {
+                $this->flash('error', 'El plan no está sincronizado con PayPal para el modo actual. Contacta a soporte.');
+                $this->redirect('empresa-suscripcion/planes');
+            }
 
             $paypal   = new PayPalSuscripcionService();
             $resultado = $paypal->crearSuscripcion($paypalPlanId, $returnUrl, $cancelUrl);

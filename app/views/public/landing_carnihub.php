@@ -1320,7 +1320,10 @@
 <script>
 // Navbar scroll
 window.addEventListener('scroll', () => {
-  document.querySelector('.navbar').classList.toggle('scrolled', window.scrollY > 40);
+  const isScrolled = window.scrollY > 40;
+  document.querySelector('.navbar').classList.toggle('scrolled', isScrolled);
+  var btn = document.getElementById('menu-toggle');
+  if (btn) btn.style.color = isScrolled ? '#374151' : '#fff';
   if (typeof closeMobileMenu === 'function') closeMobileMenu();
 });
 
