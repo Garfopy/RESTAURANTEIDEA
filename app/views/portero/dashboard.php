@@ -16,7 +16,7 @@
 <body>
 <div class="topbar">
   <div style="font-weight:700">🚪 Portero — <?= htmlspecialchars($restaurante['nombre'] ?? '') ?></div>
-  <a href="<?= BASE_URL ?>auth/login" style="color:#9CA3AF;font-size:.8rem">Salir</a>
+  <a href="<?= BASE_URL ?>auth/logout" style="color:#9CA3AF;font-size:.8rem">Salir</a>
 </div>
 
 <div style="padding:28px;max-width:480px;margin:0 auto">

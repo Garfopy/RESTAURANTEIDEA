@@ -19,7 +19,7 @@
   <div style="font-weight:700;font-size:1rem">🍽 Mesero — <?= htmlspecialchars($restaurante['nombre'] ?? '') ?></div>
   <div style="display:flex;gap:12px;align-items:center">
     <a href="<?= BASE_URL ?>rest-pedido/nuevo" style="padding:8px 14px;background:#C8102E;color:#fff;border-radius:8px;font-size:.85rem;text-decoration:none;font-weight:500">+ Pedido</a>
-    <a href="<?= BASE_URL ?>auth/login" style="color:#6B7280;font-size:.8rem">Salir</a>
+    <a href="<?= BASE_URL ?>auth/logout" style="color:#6B7280;font-size:.8rem">Salir</a>
   </div>
 </div>
 

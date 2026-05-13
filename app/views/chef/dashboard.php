@@ -25,7 +25,7 @@
   </div>
   <div style="display:flex;align-items:center;gap:16px">
     <div id="clock" style="font-size:1rem;color:#9CA3AF"></div>
-    <a href="<?= BASE_URL ?>auth/login" style="color:#6B7280;font-size:.8rem">Salir</a>
+    <a href="<?= BASE_URL ?>auth/logout" style="color:#6B7280;font-size:.8rem">Salir</a>
   </div>
 </div>
 
