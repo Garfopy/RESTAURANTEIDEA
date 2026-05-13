@@ -38,6 +38,9 @@ class SuscripcionController extends BaseController
         $model  = new SuscripcionModel();
         $planes = $model->getPlanesActivos();
 
+        $cfg        = new ConfigModel();
+        $modoActivo = $cfg->get('paypal_mode', 'sandbox');
+
         $flash      = $this->getFlash();
         $pageTitle  = 'Configurar PayPal';
         $activeMenu = 'suscripciones';
