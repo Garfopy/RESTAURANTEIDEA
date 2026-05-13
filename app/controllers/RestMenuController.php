@@ -94,6 +94,50 @@ class RestMenuController extends BaseController
         $this->redirect('rest-menu/index');
     }
 
+    public function detalle(?string $id = null): void
+    {
+        $restauranteId = $this->restauranteId();
+        $platillo = $this->model->getPlatilloConReceta((int)$id);
+        if (!$platillo || ($platillo['restaurante_id'] ?? 0) != $restauranteId) {
+            $this->redirect('rest-menu/index');
+        }
+
+        $porciones  = (int)($platillo['receta']['porciones_base'] ?? 1);
+        $costoTotal = 0.0;
+
+        foreach ($platillo['ingredientes'] as &$ing) {
+            $costoUnit = (float)($ing['costo_unitario'] ?? 0);
+            $mainUnit  = $ing['unidad_principal'] ?? $ing['unidad'];
+            $cantConv  = $this->convertirUnidad((float)$ing['cantidad'], $ing['unidad'], $mainUnit);
+            $costoIng  = $cantConv * $costoUnit;
+            $ing['costo_por_unidad_receta'] = $costoUnit;
+            $ing['costo_total_ing']         = $costoIng;
+            $costoTotal += $costoIng;
+        }
+        unset($ing);
+
+        $platillo['costo_total']      = $costoTotal;
+        $platillo['costo_por_porcion'] = $porciones > 0 ? $costoTotal / $porciones : 0;
+
+        $pageTitle  = $platillo['nombre'];
+        $activeMenu = 'rest_menu';
+        $this->render('restaurante/menu/detalle', compact('platillo','porciones','pageTitle','activeMenu'));
+    }
+
+    private function convertirUnidad(float $q, string $desde, string $hasta): float
+    {
+        $d = strtolower(trim($desde));
+        $h = strtolower(trim($hasta));
+        if ($d === $h) return $q;
+        $map = [
+            'g_kg'  => 1e-3, 'kg_g'  => 1e3,
+            'mg_g'  => 1e-3, 'g_mg'  => 1e3,
+            'mg_kg' => 1e-6, 'kg_mg' => 1e6,
+            'ml_l'  => 1e-3, 'l_ml'  => 1e3,
+        ];
+        return $q * ($map[$d.'_'.$h] ?? 1.0);
+    }
+
     public function eliminar(?string $id = null): void
     {
         $this->model->update((int)$id, ['activo' => 0]);

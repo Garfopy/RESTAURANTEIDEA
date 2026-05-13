@@ -3,7 +3,7 @@
 <style>
 .inv-grid {
   display:grid;
-  grid-template-columns:repeat(auto-fill,minmax(240px,1fr));
+  grid-template-columns:repeat(auto-fill,minmax(290px,1fr));
   gap:16px;
   margin-bottom:32px;
 }
@@ -66,12 +66,6 @@
   display:flex;gap:6px;
 }
 .inv-card-actions .btn { flex:1;justify-content:center;font-size:.78rem;padding:5px 8px; }
-.btn-entrada { background:#DCFCE7;color:#166534;border:1.5px solid #86EFAC;border-radius:8px;
-               padding:5px 8px;font-size:.78rem;font-weight:600;cursor:pointer;transition:.15s;flex:1;text-align:center; }
-.btn-salida  { background:#FEE2E2;color:#991B1B;border:1.5px solid #FCA5A5;border-radius:8px;
-               padding:5px 8px;font-size:.78rem;font-weight:600;cursor:pointer;transition:.15s;flex:1;text-align:center; }
-.btn-entrada:hover { background:#BBF7D0; }
-.btn-salida:hover  { background:#FCA5A5; }
 
 /* Movements table */
 .mov-row { display:grid;grid-template-columns:90px 1fr 80px 90px 80px;gap:8px;
@@ -136,7 +130,7 @@
       ❓ Guía
     </button>
   </div>
-  <button onclick="rstModal('modalIng')" class="btn btn-primary btn-sm" style="white-space:nowrap">
+  <button onclick="resetIngForm(); rstModal('modalIng')" class="btn btn-primary btn-sm" style="white-space:nowrap">
     + Ingrediente
   </button>
 </div>
@@ -199,12 +193,10 @@
   </div>
 
   <div class="inv-card-actions">
-    <button onclick="abrirMovimientoTipo(<?= $ing['id'] ?>, '<?= htmlspecialchars($ing['nombre'], ENT_QUOTES) ?>', 'entrada')"
-            class="btn-entrada">＋ Entrada</button>
-    <button onclick="abrirMovimientoTipo(<?= $ing['id'] ?>, '<?= htmlspecialchars($ing['nombre'], ENT_QUOTES) ?>', 'salida')"
-            class="btn-salida">－ Salida</button>
-    <button onclick='editIngrediente(<?= htmlspecialchars(json_encode($ing), ENT_QUOTES) ?>)'
-            class="btn btn-outline btn-sm" style="padding:5px 10px;font-size:.78rem;white-space:nowrap" title="Editar">Editar</button>
+    <button onclick='abrirModificar(<?= htmlspecialchars(json_encode($ing), ENT_QUOTES) ?>)'
+            class="btn btn-primary" style="flex:1;justify-content:center;font-size:.82rem;padding:8px 12px">
+      Modificar
+    </button>
   </div>
 </div>
 <?php endforeach; ?>
@@ -376,21 +368,11 @@ sort($ingCategorias);
           </div>
         </div>
 
-        <!-- Stock -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
-          <div class="form-group" style="margin-bottom:0">
-            <label class="form-label">Stock inicial</label>
-            <div style="display:flex;align-items:center;gap:6px">
-              <input type="number" name="stock_inicial" id="ingStockInicial" class="form-input"
-                     value="0" min="0" step="0.001" placeholder="0.000">
-              <span id="unidadStockLabel" style="color:#9CA3AF;font-size:.8rem;white-space:nowrap">kg</span>
-            </div>
-          </div>
-          <div class="form-group" style="margin-bottom:0">
-            <label class="form-label">Proveedor <span style="color:#9CA3AF;font-weight:400">(libre)</span></label>
-            <input type="text" name="proveedor_nombre" id="ingProveedor" class="form-input"
-                   placeholder="Ej: Mercado, Walmart, Don José">
-          </div>
+        <!-- Proveedor -->
+        <div class="form-group" style="margin-bottom:14px">
+          <label class="form-label">Proveedor <span style="color:#9CA3AF;font-weight:400">(libre)</span></label>
+          <input type="text" name="proveedor_nombre" id="ingProveedor" class="form-input"
+                 placeholder="Ej: Mercado, Walmart, Don José">
         </div>
 
       </div>
@@ -431,17 +413,10 @@ sort($ingCategorias);
           <input type="text" id="ingNombreCh" class="form-input" readonly
                  style="background:#FAF5FF;color:#5B21B6;font-weight:600" placeholder="Selecciona un producto de arriba">
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-          <div class="form-group">
-            <label class="form-label">Stock inicial a registrar</label>
-            <input type="number" name="stock_inicial_ch" id="ingStockCh" class="form-input"
-                   value="0" min="0" step="0.001">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Stock mínimo (alerta)</label>
-            <input type="number" name="stock_minimo_ch" id="ingMinimoCh" class="form-input"
-                   value="0" min="0" step="0.001">
-          </div>
+        <div class="form-group">
+          <label class="form-label">Stock mínimo (alerta)</label>
+          <input type="number" name="stock_minimo_ch" id="ingMinimoCh" class="form-input"
+                 value="0" min="0" step="0.001">
         </div>
       </div>
 
@@ -453,52 +428,143 @@ sort($ingCategorias);
   </div>
 </div>
 
-<!-- Modal movimiento de stock -->
-<div id="modalMov" class="rst-modal-backdrop">
-  <div class="rst-modal rst-modal-sm">
+<!-- Modal Modificar ingrediente (movimiento + editar) -->
+<div id="modalModificar" class="rst-modal-backdrop">
+  <div class="rst-modal" style="max-width:530px">
     <div class="rst-modal-header">
-      <div>
-        <div class="rst-modal-title">Movimiento de Stock</div>
-        <div id="movIngNombre" style="font-size:.82rem;color:#6B7280;margin-top:2px"></div>
-      </div>
-      <button class="rst-modal-close" onclick="rstModal('modalMov')">✕</button>
-    </div>
-    <form method="POST" action="<?= BASE_URL ?>rest-inventario/movimiento">
-      <input type="hidden" name="ingrediente_id" id="movIngId">
-      <div class="form-group">
-        <label class="form-label">Tipo de movimiento</label>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px">
-          <?php
-          $tipos = [
-            ['val'=>'entrada', 'label'=>'Entrada',  'cls'=>'badge-green',  'desc'=>'Suma al stock'],
-            ['val'=>'salida',  'label'=>'Salida',   'cls'=>'badge-red',    'desc'=>'Resta del stock'],
-            ['val'=>'merma',   'label'=>'Merma',    'cls'=>'badge-amber',  'desc'=>'Pérdida/daño'],
-            ['val'=>'ajuste',  'label'=>'Ajuste',   'cls'=>'badge-blue',   'desc'=>'Corrección manual'],
-          ];
-          foreach ($tipos as $t):
-          ?>
-          <label style="display:flex;align-items:center;gap:8px;padding:9px 12px;border:2px solid #E5E7EB;
-                        border-radius:8px;cursor:pointer;transition:.15s" class="tipo-lbl">
-            <input type="radio" name="tipo" value="<?= $t['val'] ?>" style="display:none" class="tipo-radio">
-            <span class="badge <?= $t['cls'] ?>"><?= $t['label'] ?></span>
-            <span style="font-size:.78rem;color:#6B7280"><?= $t['desc'] ?></span>
-          </label>
-          <?php endforeach; ?>
+      <div style="flex:1;min-width:0">
+        <div class="rst-modal-title" id="modifNombre">Ingrediente</div>
+        <div style="font-size:.78rem;color:#6B7280;margin-top:2px">
+          Stock: <strong id="modifStockActual">0</strong> <span id="modifUnidadPrincipal">kg</span>
+          &nbsp;·&nbsp; $<span id="modifCostoU">0.00</span>/<span id="modifUnidadCosto">kg</span>
         </div>
       </div>
-      <div class="form-group">
-        <label class="form-label">Cantidad</label>
-        <input type="number" name="cantidad" class="form-input" step="0.001" min="0.001" required placeholder="0.000">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Motivo <span style="color:#9CA3AF;font-weight:400">(opcional)</span></label>
-        <input type="text" name="motivo" class="form-input" placeholder="Ej: Compra del día, Desperdicio, Inventario físico">
-      </div>
-      <div class="rst-modal-footer">
-        <button type="button" onclick="rstModal('modalMov')" class="btn btn-outline">Cancelar</button>
-        <button type="submit" class="btn btn-primary">Registrar</button>
-      </div>
-    </form>
+      <button class="rst-modal-close" onclick="rstModal('modalModificar')">✕</button>
+    </div>
+
+    <div class="rst-tabs" id="modifTabs">
+      <button class="rst-tab active" onclick="switchModifTab('mov')">Movimiento de stock</button>
+      <button class="rst-tab" onclick="switchModifTab('edit')">Editar datos</button>
+    </div>
+
+    <!-- Tab: Movimiento -->
+    <div class="rst-tab-panel active" id="panelModifMov">
+      <form method="POST" action="<?= BASE_URL ?>rest-inventario/movimiento" id="formModifMov"
+            onsubmit="return prepararMovimiento()">
+        <input type="hidden" name="ingrediente_id" id="modifIngId">
+        <input type="hidden" name="cantidad" id="modifCantFinal">
+
+        <div class="form-group">
+          <label class="form-label">Tipo de movimiento</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px">
+            <?php
+            $tiposM = [
+              ['val'=>'entrada','label'=>'Entrada', 'cls'=>'badge-green', 'desc'=>'Suma al stock'],
+              ['val'=>'salida', 'label'=>'Salida',  'cls'=>'badge-red',   'desc'=>'Resta del stock'],
+              ['val'=>'merma',  'label'=>'Merma',   'cls'=>'badge-amber', 'desc'=>'Pérdida/daño'],
+              ['val'=>'ajuste', 'label'=>'Ajuste',  'cls'=>'badge-blue',  'desc'=>'Corrección manual'],
+            ];
+            foreach ($tiposM as $t):
+            ?>
+            <label style="display:flex;align-items:center;gap:8px;padding:9px 12px;border:2px solid #E5E7EB;
+                          border-radius:8px;cursor:pointer;transition:.15s" class="mtipo-lbl">
+              <input type="radio" name="tipo" value="<?= $t['val'] ?>" style="display:none" class="mtipo-radio"
+                     onchange="calcModifConversion()">
+              <span class="badge <?= $t['cls'] ?>"><?= $t['label'] ?></span>
+              <span style="font-size:.78rem;color:#6B7280"><?= $t['desc'] ?></span>
+            </label>
+            <?php endforeach; ?>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Cantidad</label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input type="number" id="modifCantInput" class="form-input" style="flex:2"
+                   step="0.001" min="0.001" placeholder="0.000"
+                   oninput="calcModifConversion()">
+            <select id="modifCantUnidad" class="form-select" style="flex:0 0 80px"
+                    onchange="calcModifConversion()">
+            </select>
+          </div>
+          <div id="modifConvPrev" style="display:none;margin-top:7px;padding:8px 12px;
+               border-radius:8px;font-size:.8rem;line-height:1.6"></div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Motivo <span style="color:#9CA3AF;font-weight:400">(opcional)</span></label>
+          <input type="text" name="motivo" class="form-input"
+                 placeholder="Ej: Compra del día, Desperdicio, Inventario físico">
+        </div>
+
+        <div class="rst-modal-footer">
+          <button type="button" onclick="rstModal('modalModificar')" class="btn btn-outline">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Registrar movimiento</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Tab: Editar datos -->
+    <div class="rst-tab-panel" id="panelModifEdit">
+      <form method="POST" action="<?= BASE_URL ?>rest-inventario/guardar" id="formModifEdit">
+        <input type="hidden" name="id" id="modifEditId">
+        <input type="hidden" name="proveedor_carnihub" id="modifEditCarnihub" value="0">
+        <input type="hidden" name="carnihub_producto_id" id="modifEditCarnihubId" value="">
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="form-group" style="grid-column:span 2">
+            <label class="form-label">Nombre *</label>
+            <input type="text" name="nombre" id="modifEditNombre" class="form-input" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Categoría</label>
+            <input type="text" name="categoria" id="modifEditCategoria" class="form-input" list="dlCatIng">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Unidad de medida</label>
+            <select name="unidad_principal" id="modifEditUnidad" class="form-select"
+                    onchange="document.getElementById('modifEditUnidadLabel').textContent=this.value;
+                              document.getElementById('modifEditUnidadWarn').style.display='block'">
+              <option value="kg">kg — kilogramo</option>
+              <option value="g">g — gramo</option>
+              <option value="L">L — litro</option>
+              <option value="ml">ml — mililitro</option>
+              <option value="pza">pza — pieza</option>
+              <option value="caja">caja</option>
+              <option value="bolsa">bolsa</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Costo/<span id="modifEditUnidadLabel">kg</span></label>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="color:#6B7280;font-weight:600">$</span>
+              <input type="number" name="costo_unitario" id="modifEditCosto" class="form-input"
+                     min="0" step="0.0001" placeholder="0.00">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Stock mínimo (alerta)</label>
+            <input type="number" name="stock_minimo" id="modifEditMinimo" class="form-input"
+                   min="0" step="0.001" placeholder="0.000">
+          </div>
+          <div class="form-group" id="modifEditProvWrap">
+            <label class="form-label">Proveedor</label>
+            <input type="text" name="proveedor_nombre" id="modifEditProveedor" class="form-input"
+                   placeholder="Ej: Mercado, Walmart">
+          </div>
+        </div>
+
+        <div id="modifEditUnidadWarn" style="display:none;background:#FEF3C7;border:1px solid #FDE68A;
+             border-radius:8px;padding:8px 12px;font-size:.75rem;color:#92400E;margin-bottom:12px">
+          ⚠️ Cambiar la unidad no convierte el stock existente.
+        </div>
+
+        <div class="rst-modal-footer">
+          <button type="button" onclick="rstModal('modalModificar')" class="btn btn-outline">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar cambios</button>
+        </div>
+      </form>
+    </div>
   </div>
 </div>
 
@@ -542,37 +608,24 @@ function seleccionarCarniHub(id, nombre) {
   event.currentTarget.style.background = 'var(--cp-light)';
 }
 
-document.querySelectorAll('.tipo-lbl').forEach(lbl => {
-  const radio = lbl.querySelector('.tipo-radio');
-  lbl.addEventListener('click', () => {
-    document.querySelectorAll('.tipo-lbl').forEach(l => l.style.borderColor = '#E5E7EB');
-    lbl.style.borderColor = 'var(--cp)';
-    radio.checked = true;
-  });
-});
-const firstLbl = document.querySelector('.tipo-lbl');
-if (firstLbl) firstLbl.click();
+function resetIngForm() {
+  document.getElementById('ingId').value = '';
+  document.getElementById('ingNombre').value = '';
+  document.getElementById('ingCategoria').value = '';
+  document.getElementById('ingCosto').value = '0';
+  document.getElementById('ingMinimo').value = '0';
+  document.getElementById('ingProveedor').value = '';
+  document.getElementById('modalIngTitle').textContent = 'Nuevo Ingrediente';
+  document.getElementById('modalIngSub').textContent = 'Proveedor externo';
+  switchTab('ext');
+  calcCostos();
+}
 
-function abrirMovimiento(id, nombre) {
-  document.getElementById('movIngId').value = id;
-  document.getElementById('movIngNombre').textContent = nombre;
-  document.getElementById('modalMov').classList.add('open');
-}
-function abrirMovimientoTipo(id, nombre, tipo) {
-  abrirMovimiento(id, nombre);
-  // Pre-select the movement type
-  document.querySelectorAll('.tipo-radio').forEach(r => r.checked = r.value === tipo);
-  document.querySelectorAll('.tipo-lbl').forEach(lbl => {
-    const r = lbl.querySelector('.tipo-radio');
-    lbl.style.borderColor = r.value === tipo ? 'var(--cp)' : '#E5E7EB';
-  });
-}
 function calcCostos() {
   const costo  = parseFloat(document.getElementById('ingCosto').value) || 0;
   const unidad = document.getElementById('ingUnidad').value;
   document.getElementById('unidadLabel').textContent = unidad;
   document.getElementById('unidadMinLabel').textContent = unidad;
-  document.getElementById('unidadStockLabel').textContent = unidad;
   let items = [];
   if (costo > 0) {
     if (unidad === 'kg') {
@@ -589,22 +642,134 @@ function calcCostos() {
   document.getElementById('calcCostosWrap').style.display = items.length ? 'block' : 'none';
 }
 
-function editIngrediente(i) {
-  switchTab('ext');
-  document.getElementById('ingId').value         = i.id;
-  document.getElementById('ingNombre').value     = i.nombre;
-  const uSel = document.getElementById('ingUnidad');
+// ── Modal Modificar ──────────────────────────────────────────
+let modifIng = null;
+
+function abrirModificar(ing) {
+  modifIng = ing;
+  document.getElementById('modifNombre').textContent = ing.nombre;
+  document.getElementById('modifStockActual').textContent = parseFloat(ing.stock||0).toFixed(3);
+  document.getElementById('modifUnidadPrincipal').textContent = ing.unidad_principal;
+  document.getElementById('modifCostoU').textContent = parseFloat(ing.costo_unitario||0).toFixed(2);
+  document.getElementById('modifUnidadCosto').textContent = ing.unidad_principal;
+
+  // Tab movimiento
+  document.getElementById('modifIngId').value = ing.id;
+  document.getElementById('modifCantInput').value = '';
+  document.getElementById('modifCantFinal').value = '';
+  document.getElementById('modifConvPrev').style.display = 'none';
+  setupModifUnidades(ing.unidad_principal);
+  const firstMtipo = document.querySelector('.mtipo-lbl');
+  if (firstMtipo) firstMtipo.click();
+
+  // Tab editar
+  document.getElementById('modifEditId').value = ing.id;
+  document.getElementById('modifEditCarnihub').value = ing.proveedor_carnihub ? '1' : '0';
+  document.getElementById('modifEditCarnihubId').value = ing.carnihub_producto_id || '';
+  document.getElementById('modifEditNombre').value = ing.nombre;
+  document.getElementById('modifEditCategoria').value = ing.categoria || '';
+  const uSel = document.getElementById('modifEditUnidad');
   let found = false;
-  for (let o of uSel.options) { if (o.value === i.unidad_principal) { o.selected = true; found = true; break; } }
-  if (!found) { const opt = new Option(i.unidad_principal, i.unidad_principal, true, true); uSel.add(opt); }
-  document.getElementById('ingCategoria').value  = i.categoria || '';
-  document.getElementById('ingCosto').value      = i.costo_unitario;
-  document.getElementById('ingMinimo').value     = i.stock_minimo;
-  document.getElementById('ingProveedor').value  = i.proveedor_nombre || '';
-  document.getElementById('modalIngTitle').textContent = 'Editar Ingrediente';
-  document.getElementById('modalIngSub').textContent   = 'Proveedor externo';
-  document.getElementById('modalIng').classList.add('open');
-  calcCostos();
+  for (let o of uSel.options) {
+    if (o.value === ing.unidad_principal) { o.selected = true; found = true; break; }
+  }
+  if (!found) { uSel.add(new Option(ing.unidad_principal, ing.unidad_principal, true, true)); }
+  document.getElementById('modifEditUnidadLabel').textContent = ing.unidad_principal;
+  document.getElementById('modifEditCosto').value = ing.costo_unitario || 0;
+  document.getElementById('modifEditMinimo').value = ing.stock_minimo || 0;
+  document.getElementById('modifEditProveedor').value = ing.proveedor_nombre || '';
+  document.getElementById('modifEditProvWrap').style.display = ing.proveedor_carnihub ? 'none' : '';
+  document.getElementById('modifEditUnidadWarn').style.display = 'none';
+
+  switchModifTab('mov');
+  document.getElementById('modalModificar').classList.add('open');
+}
+
+function switchModifTab(tab) {
+  document.querySelectorAll('#modifTabs .rst-tab').forEach((t, i) => {
+    t.classList.toggle('active', (tab==='mov' && i===0) || (tab==='edit' && i===1));
+  });
+  document.getElementById('panelModifMov').classList.toggle('active', tab === 'mov');
+  document.getElementById('panelModifEdit').classList.toggle('active', tab === 'edit');
+}
+
+document.querySelectorAll('.mtipo-lbl').forEach(lbl => {
+  const radio = lbl.querySelector('.mtipo-radio');
+  lbl.addEventListener('click', () => {
+    document.querySelectorAll('.mtipo-lbl').forEach(l => l.style.borderColor = '#E5E7EB');
+    lbl.style.borderColor = 'var(--cp)';
+    radio.checked = true;
+    calcModifConversion();
+  });
+});
+
+function setupModifUnidades(mainUnit) {
+  const sel = document.getElementById('modifCantUnidad');
+  sel.innerHTML = '';
+  const grupos = {
+    'kg':['g','kg'],'g':['g','kg','mg'],'mg':['mg','g','kg'],
+    'L':['ml','L'],'l':['ml','L'],'ml':['ml','L'],'mL':['ml','L'],
+    'pza':['pza'],'caja':['caja'],'bolsa':['bolsa'],
+  };
+  const units = grupos[mainUnit] || [mainUnit];
+  units.forEach(u => {
+    const opt = new Option(u, u);
+    if (u === mainUnit) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+function convUnidad(q, desde, hasta) {
+  const d = desde.toLowerCase();
+  const h = hasta.toLowerCase();
+  if (d === h) return q;
+  const map = {
+    'g_kg':1e-3,'kg_g':1e3,'mg_g':1e-3,'g_mg':1e3,'mg_kg':1e-6,'kg_mg':1e6,
+    'ml_l':1e-3,'l_ml':1e3,
+  };
+  return q * (map[d+'_'+h] || 1);
+}
+
+function calcModifConversion() {
+  if (!modifIng) return;
+  const cant = parseFloat(document.getElementById('modifCantInput').value) || 0;
+  const fromU = document.getElementById('modifCantUnidad').value;
+  const mainU = modifIng.unidad_principal;
+  const converted = convUnidad(cant, fromU, mainU);
+  document.getElementById('modifCantFinal').value = converted.toFixed(6);
+
+  const tipo = document.querySelector('.mtipo-radio:checked')?.value || 'entrada';
+  const resta = ['salida','merma'].includes(tipo);
+  const stockActual = parseFloat(modifIng.stock) || 0;
+  const stockNuevo = resta ? Math.max(0, stockActual - converted) : stockActual + converted;
+
+  const prev = document.getElementById('modifConvPrev');
+  if (cant > 0) {
+    let html = '';
+    if (fromU.toLowerCase() !== mainU.toLowerCase()) {
+      html += `<strong>${cant} ${fromU}</strong> = <strong>${converted.toFixed(4)} ${mainU}</strong><br>`;
+    }
+    const color = resta ? '#991B1B' : '#166534';
+    html += `Stock: ${stockActual.toFixed(3)} → <strong style="color:${color}">${stockNuevo.toFixed(3)} ${mainU}</strong>`;
+    prev.innerHTML = html;
+    prev.style.background = resta ? '#FEF2F2' : '#F0FDF4';
+    prev.style.border = `1px solid ${resta ? '#FECACA' : '#BBF7D0'}`;
+    prev.style.color = resta ? '#991B1B' : '#166534';
+    prev.style.display = 'block';
+  } else {
+    prev.style.display = 'none';
+  }
+}
+
+function prepararMovimiento() {
+  const cant = parseFloat(document.getElementById('modifCantInput').value) || 0;
+  if (cant <= 0) { alert('Ingresa una cantidad mayor a 0'); return false; }
+  if (!document.querySelector('.mtipo-radio:checked')) { alert('Selecciona el tipo de movimiento'); return false; }
+  if (!document.getElementById('modifCantFinal').value) {
+    const fromU = document.getElementById('modifCantUnidad').value;
+    document.getElementById('modifCantFinal').value = convUnidad(cant, fromU, modifIng.unidad_principal).toFixed(6);
+  }
+  return true;
 }
 </script>
 

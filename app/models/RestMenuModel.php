@@ -76,7 +76,7 @@ class RestMenuModel extends BaseModel
     public function getIngredientesReceta(int $recetaId): array
     {
         return $this->query(
-            "SELECT ri.*, i.nombre AS ingrediente_nombre, i.unidad_principal
+            "SELECT ri.*, i.nombre AS ingrediente_nombre, i.unidad_principal, i.costo_unitario
              FROM rest_receta_ingredientes ri
              JOIN rest_ingredientes i ON i.id = ri.ingrediente_id
              WHERE ri.receta_id = ?",

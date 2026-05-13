@@ -116,6 +116,8 @@
         <div class="menu-card-actions">
           <a href="<?= BASE_URL ?>rest-menu/form/<?= $p['id'] ?>"
              style="background:#EFF6FF;color:#1D4ED8">Editar</a>
+          <a href="<?= BASE_URL ?>rest-menu/detalle/<?= $p['id'] ?>"
+             style="background:#F0FDF4;color:#16A34A">Ver costos</a>
           <a href="<?= BASE_URL ?>rest-menu/toggleDisponible/<?= $p['id'] ?>"
              style="background:#F9FAFB;color:#6B7280">
             <?= $p['disponible'] ? 'Pausar' : 'Activar' ?>
