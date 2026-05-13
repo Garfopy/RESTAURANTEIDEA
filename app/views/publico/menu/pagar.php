@@ -117,7 +117,7 @@
     </div>
 
     <!-- Botón pagar -->
-    <form method="POST" action="<?= BASE_URL ?>rest-ticket/confirmarPago/<?= (int)($ticket['id'] ?? 0) ?>" id="formPago">
+    <form method="POST" action="<?= BASE_URL ?>menu/confirmarPago/<?= htmlspecialchars($restaurante['slug'] ?? '') ?>/<?= (int)($ticket['id'] ?? 0) ?>" id="formPago">
       <input type="hidden" name="metodo_pago" id="inpMetodo" value="efectivo">
       <input type="hidden" name="propina" id="inpPropina" value="0">
       <button type="submit" class="btn btn-primary btn-lg" style="width:100%;justify-content:center;border-radius:12px">

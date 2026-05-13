@@ -14,7 +14,8 @@ $activeMenu = $activeMenu ?? '';
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><?= htmlspecialchars($pageTitle ?? 'Restaurante') ?> — <?= htmlspecialchars($restNombre) ?></title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="<?= BASE_URL ?>public/css/restaurant.css">
+  <link rel="stylesheet" href="<?= BASE_URL ?>public/css/restaurant.css?v=<?= @filemtime(ROOT_PATH . '/public/css/restaurant.css') ?: time() ?>">
+  <style>.rst-modal-backdrop{display:none}.rst-modal-backdrop.open{display:flex}</style>
   <script src="<?= BASE_URL ?>public/js/chart.umd.min.js"></script>
   <style>
     :root {

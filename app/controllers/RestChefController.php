@@ -37,7 +37,6 @@ class RestChefController extends BaseController
     {
         $this->model->cambiarEstadoItem((int)$itemId, 'listo');
 
-        // Si todos los items del pedido están listos, marcar pedido como listo
         $db   = Database::getInstance();
         $stmt = $db->prepare(
             "SELECT pedido_id FROM rest_pedido_items WHERE id = ?"
@@ -53,6 +52,17 @@ class RestChefController extends BaseController
             $stmt2->execute([$pedidoId]);
             if ((int)$stmt2->fetchColumn() === 0) {
                 $this->model->cambiarEstadoPedido($pedidoId, 'listo');
+
+                // Descuento automático de inventario por receta
+                try {
+                    (new RestInventarioModel())->descontarPorOrden(
+                        $pedidoId,
+                        $this->restauranteId(),
+                        $this->usuarioId()
+                    );
+                } catch (\Throwable $e) {
+                    error_log('descontarPorOrden falló pedido ' . $pedidoId . ': ' . $e->getMessage());
+                }
             }
         }
 

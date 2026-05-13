@@ -71,6 +71,14 @@ class RestTicketModel extends BaseModel
         );
     }
 
+    public function actualizarPropina(int $ticketId, float $propina): bool
+    {
+        return $this->execute(
+            "UPDATE rest_tickets SET propina = ?, total = subtotal + ? WHERE id = ?",
+            [$propina, $propina, $ticketId]
+        );
+    }
+
     public function listar(int $restauranteId, int $page = 1): array
     {
         $sql = "SELECT t.*, m.nombre AS mesa_nombre, v.qr_code

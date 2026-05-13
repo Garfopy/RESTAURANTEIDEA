@@ -33,6 +33,30 @@ $ctrlSlug = strtolower($segments[0] ?? 'auth');
 $action   = $segments[1] ?? 'index';
 $param    = $segments[2] ?? null;
 
+// Rutas públicas con slug en URL: /menu/{slug}, /menu/{slug}/ordenar, /menu/{slug}/pagar/{visitaId}, /acceso/{slug}
+// Convención esperada por los controllers: param = "slug" o "slug/visitaId" (concat de segmentos restantes)
+if (in_array($ctrlSlug, ['menu', 'acceso'], true)) {
+    $knownActions = ['index','ordenar','pagar','confirmarPago','confirmacion','login'];
+    if ($action !== '' && in_array($action, $knownActions, true)) {
+        // Forma /menu/{accion}/{slug}/{...} — concatenar segmentos a partir del 2
+        $rest  = array_slice($segments, 2);
+        $param = $rest ? implode('/', $rest) : null;
+    } else {
+        // Forma /menu/{slug}/{accion?}/{...} — el slug viene primero
+        $slug  = $action;
+        $sub   = $segments[2] ?? '';
+        if ($sub && in_array($sub, $knownActions, true)) {
+            $action = $sub;
+            $rest   = array_slice($segments, 3);
+            $param  = $slug . ($rest ? '/' . implode('/', $rest) : '');
+        } else {
+            // /menu/{slug} → index del slug
+            $action = 'index';
+            $param  = $slug;
+        }
+    }
+}
+
 // ── Ruta raíz → landing pública ──────────────────────────────────────────────
 if ($path === '') {
     $ctrlSlug = 'landing';
@@ -163,6 +187,7 @@ $publicPaths = [
     'menu/index',
     'menu/ordenar',
     'menu/pagar',
+    'menu/confirmarPago',
     'menu/confirmacion',
     // Acceso staff (login por slug de restaurante)
     'acceso/index',

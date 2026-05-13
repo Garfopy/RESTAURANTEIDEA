@@ -137,4 +137,37 @@ class RestPublicoController extends BaseController
         $pageTitle = 'Pagar cuenta';
         $this->render('publico/menu/pagar', compact('restaurante','ticket','pageTitle'));
     }
+
+    // POST /menu/{slug}/confirmarPago/{ticketId} — endpoint PÚBLICO (sin login)
+    public function confirmarPago(?string $slug = null): void
+    {
+        if (!$this->isPost()) $this->redirect('menu/' . $slug);
+
+        $parts    = explode('/', $slug ?? '');
+        $realSlug = $parts[0] ?? '';
+        $ticketId = (int)($parts[1] ?? 0);
+
+        $restaurante = $this->restModel->getBySlug($realSlug);
+        $ticket      = $this->ticketModel->find($ticketId);
+        if (!$restaurante || !$ticket || (int)$ticket['restaurante_id'] !== (int)$restaurante['id']) {
+            http_response_code(404);
+            die('<h1>Ticket no válido</h1>');
+        }
+
+        $metodo  = $this->post('metodo_pago', 'efectivo');
+        $propina = max(0.0, (float)$this->post('propina', 0));
+
+        // Si propina cambió, recalcular total
+        if ($propina !== (float)$ticket['propina']) {
+            $this->ticketModel->actualizarPropina($ticketId, $propina);
+        }
+
+        $this->ticketModel->marcarPagado($ticketId, $metodo, null);
+        $this->visitaModel->marcarPagada((int)$ticket['visita_id']);
+
+        // Limpia cookie de visita para que el comensal no quede pegado
+        setcookie('visita_' . $restaurante['id'], '', time() - 1, '/');
+
+        $this->redirect('menu/' . $realSlug . '/pagar/' . $ticket['visita_id']);
+    }
 }
