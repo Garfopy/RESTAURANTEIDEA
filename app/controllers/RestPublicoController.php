@@ -37,8 +37,20 @@ class RestPublicoController extends BaseController
             $mesa = (new RestMesaModel())->getByQr($mesaQr);
         }
 
+        // Recuperar visita previa de cookie (para agregar más pedidos a la misma visita)
+        $cookieName = 'visita_' . $restaurante['id'];
+        $visitaId   = (int)($_COOKIE[$cookieName] ?? 0);
+        if ($visitaId) {
+            $visita = $this->visitaModel->find($visitaId);
+            // Si la visita ya terminó, ignorar cookie
+            if (!$visita || in_array($visita['estado'], ['pagada','cancelada'])) {
+                $visitaId = 0;
+                setcookie($cookieName, '', time() - 1, '/');
+            }
+        }
+
         $pageTitle = $restaurante['nombre'];
-        $this->render('publico/menu/index', compact('restaurante','categorias','platillos','mesa','pageTitle'));
+        $this->render('publico/menu/index', compact('restaurante','categorias','platillos','mesa','visitaId','pageTitle'));
     }
 
     public function ordenar(?string $slug = null): void
@@ -59,6 +71,9 @@ class RestPublicoController extends BaseController
                 $restauranteId,
                 $mesa ? (int)$mesa['id'] : null
             );
+            // Guardar en cookie por 4 horas
+            $cookieName = 'visita_' . $restauranteId;
+            setcookie($cookieName, (string)$visitaId, time() + 4 * 3600, '/');
         }
 
         $platillosIds = $this->post('platillo_id', []);

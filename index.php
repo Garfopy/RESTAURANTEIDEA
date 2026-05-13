@@ -129,6 +129,8 @@ $routes = [
     'rest-portero'        => 'RestPorteroController',
     // Menú público (sin login)
     'menu'                => 'RestPublicoController',
+    // Portal acceso staff por slug de restaurante
+    'acceso'              => 'StaffAccesoController',
 ];
 
 // ── Auth guard ────────────────────────────────────────────────────────────────
@@ -161,11 +163,14 @@ $publicPaths = [
     'menu/ordenar',
     'menu/pagar',
     'menu/confirmacion',
+    // Acceso staff (login por slug de restaurante)
+    'acceso/index',
+    'acceso/login',
 ];
 
 $currentPath = strtolower($ctrlSlug . '/' . $action);
 
-if (!isset($_SESSION['usuario']) && !in_array($currentPath, $publicPaths, true) && $ctrlSlug !== 'menu') {
+if (!isset($_SESSION['usuario']) && !in_array($currentPath, $publicPaths, true) && $ctrlSlug !== 'menu' && $ctrlSlug !== 'acceso') {
     header('Location: ' . BASE_URL . 'auth/login');
     exit;
 }

@@ -432,30 +432,10 @@ $esComprador   = $rol === 'comprador';
     <?php /* ── MI RESTAURANTE (comprador con restaurante_activo) ─── */ ?>
     <?php if ($esComprador && !empty($_SESSION['usuario']['restaurante_activo'])): ?>
     <div class="sidebar-section">Mi Restaurante</div>
-    <?php
-      $restActivo = null;
-      try {
-        $restId = $_SESSION['restaurante_activo_id'] ?? null;
-        if (!$restId) {
-          $restM  = new RestauranteModel();
-          $rests  = $restM->getByComprador((int)($_SESSION['usuario']['id'] ?? 0));
-          $restId = $rests[0]['id'] ?? null;
-          if ($restId) $_SESSION['restaurante_activo_id'] = $restId;
-        }
-        if ($restId) $restActivo = (new RestauranteModel())->find((int)$restId);
-      } catch (\Throwable $e) {}
-    ?>
-    <a href="<?= BASE_URL ?>restaurante/dashboard">
-      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
-      <?= htmlspecialchars($restActivo['nombre'] ?? 'Mi Restaurante') ?>
+    <a href="<?= BASE_URL ?>restaurante/seleccionar" class="<?= ($activeMenu??'')==='mis_locales'?'active':'' ?>">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-2 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+      Ver mis locales
     </a>
-    <a href="<?= BASE_URL ?>rest-pedido/index" style="padding-left:36px;font-size:.8rem">Pedidos activos</a>
-    <a href="<?= BASE_URL ?>rest-mesa/index" style="padding-left:36px;font-size:.8rem">Mesas</a>
-    <a href="<?= BASE_URL ?>rest-finanzas/dashboard" style="padding-left:36px;font-size:.8rem">Financiero</a>
-    <a href="<?= BASE_URL ?>rest-inventario/index" style="padding-left:36px;font-size:.8rem">Inventario</a>
-    <?php endif; ?>
-    <?php if ($esComprador && empty($_SESSION['usuario']['restaurante_activo'])): ?>
-    <?php /* Comprador sin módulo restaurante — no mostrar sección */ ?>
     <?php endif; ?>
 
     <div class="sidebar-section">Cuenta</div>
