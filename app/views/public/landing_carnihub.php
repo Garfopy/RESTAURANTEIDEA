@@ -1457,6 +1457,11 @@ window.addEventListener('scroll', () => {
   document.querySelector('.navbar').classList.toggle('scrolled', isScrolled);
   var btn = document.getElementById('menu-toggle');
   if (btn) btn.style.color = isScrolled ? '#374151' : '#fff';
+  // Actualizar color de links del menú móvil según fondo
+  var linkColor = isScrolled ? '#374151' : 'rgba(255,255,255,.8)';
+  document.querySelectorAll('.mobile-menu-link').forEach(function(a) {
+    a.style.color = linkColor;
+  });
   if (typeof closeMobileMenu === 'function') closeMobileMenu();
 });
 

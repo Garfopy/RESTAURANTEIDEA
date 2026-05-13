@@ -51,10 +51,18 @@ $paginacion    = $resultado          ?? [];
     </a>
     <?php endif; ?>
   </form>
-  <a href="<?= BASE_URL ?>suscripcion/configurar"
-     style="padding:9px 16px;background:var(--color-primary);color:#fff;border-radius:8px;text-decoration:none;font-weight:600;font-size:.875rem">
-    Configurar PayPal
-  </a>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <?php foreach ($planes as $pl): ?>
+    <a href="<?= BASE_URL ?>suscripcion/editarPlan/<?= (int)$pl['id'] ?>"
+       style="padding:9px 14px;background:#F0FDF4;color:#166534;border:1px solid #BBF7D0;border-radius:8px;text-decoration:none;font-weight:600;font-size:.8rem;white-space:nowrap">
+      ✏️ <?= htmlspecialchars($pl['nombre']) ?>
+    </a>
+    <?php endforeach; ?>
+    <a href="<?= BASE_URL ?>suscripcion/configurar"
+       style="padding:9px 16px;background:var(--color-primary);color:#fff;border-radius:8px;text-decoration:none;font-weight:600;font-size:.875rem">
+      Configurar PayPal
+    </a>
+  </div>
 </div>
 
 <?php if (empty($suscripciones)): ?>
