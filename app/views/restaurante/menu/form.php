@@ -26,14 +26,6 @@
   <div class="rst-card" style="padding:28px;margin-bottom:0">
     <form method="POST" action="<?= BASE_URL ?>rest-menu/guardar" id="formPlatillo">
       <input type="hidden" name="id" value="<?= (int)($platillo['id'] ?? 0) ?>">
-      <!-- Datalist para búsqueda de ingredientes -->
-      <datalist id="dlIngredientes">
-        <?php foreach ($ingredientes as $i): ?>
-        <option value="<?= htmlspecialchars($i['nombre'], ENT_QUOTES) ?>"
-                data-id="<?= $i['id'] ?>"
-                data-unidad="<?= htmlspecialchars($i['unidad_principal'], ENT_QUOTES) ?>">
-        <?php endforeach; ?>
-      </datalist>
 
       <!-- ── Paso 1: Información básica ── -->
       <div class="wpane active" data-pane="1">
@@ -190,16 +182,18 @@
         <div id="ingredientes-lista">
           <?php foreach (($platillo['ingredientes'] ?? []) as $ing): ?>
           <div class="ing-row">
-            <div style="position:relative">
-              <input type="text" class="form-input ing-search" list="dlIngredientes"
-                     placeholder="Buscar ingrediente…"
+            <div class="ing-picker-wrap">
+              <input type="text" class="form-input ing-search"
+                     placeholder="Buscar ingrediente…" autocomplete="off"
                      value="<?= htmlspecialchars($ing['ingrediente_nombre'] ?? '') ?>"
-                     oninput="onIngSearch(this)" autocomplete="off">
+                     oninput="ingFiltrar(this)" onfocus="ingAbrir(this)">
               <input type="hidden" name="ingrediente_id[]" class="ing-id-hidden"
-                     value="<?= $ing['ingrediente_id'] ?>">
+                     value="<?= (int)$ing['ingrediente_id'] ?>">
+              <div class="ing-dd"></div>
+              <div class="ing-costo-hint"></div>
             </div>
             <input type="number" name="cantidad[]" step="0.001" min="0" placeholder="Cant."
-                   value="<?= $ing['cantidad'] ?>" class="form-input"
+                   value="<?= htmlspecialchars($ing['cantidad']) ?>" class="form-input"
                    oninput="calcRowCosto(this.closest('.ing-row'))">
             <select name="unidad[]" class="form-select ing-unidad"
                     onchange="calcRowCosto(this.closest('.ing-row'))">
@@ -211,7 +205,7 @@
               <?php endforeach; ?>
             </select>
             <label style="display:flex;align-items:center;gap:4px;font-size:.75rem;color:#6B7280;cursor:pointer;white-space:nowrap" title="No descuenta stock, solo aparece en la info del cliente">
-              <input type="checkbox" name="es_informativo[]" value="<?= $ing['ingrediente_id'] ?>"
+              <input type="checkbox" name="es_informativo[]" value="<?= (int)$ing['ingrediente_id'] ?>"
                      <?= ($ing['es_informativo'] ?? 0) ? 'checked' : '' ?> style="cursor:pointer">
               Solo info
             </label>
@@ -233,7 +227,7 @@
         <!-- Banner costo estimado -->
         <div id="costoTotalBanner" style="display:none;margin-top:12px;padding:12px 16px;
              background:#F0FDF4;border:1.5px solid #86EFAC;border-radius:10px;
-             display:flex;align-items:center;justify-content:space-between;gap:12px">
+             align-items:center;justify-content:space-between;gap:12px">
           <div style="font-size:.85rem;color:#166534;font-weight:600">Costo de ingredientes (estimado):</div>
           <div id="costoTotalTexto" style="font-size:.95rem;font-weight:800;color:#15803D"></div>
         </div>
@@ -288,9 +282,18 @@
   .wpane{display:none;animation:fadeIn .25s ease both}
   .wpane.active{display:block}
   @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-  .ing-row{display:grid;grid-template-columns:2fr 80px 95px auto auto;gap:8px;margin-bottom:8px;align-items:center}
+  .ing-row{display:grid;grid-template-columns:2fr 80px 95px auto auto;gap:8px;margin-bottom:8px;align-items:start}
+  .ing-picker-wrap{position:relative}
+  .ing-dd{display:none;position:absolute;top:calc(100% + 2px);left:0;right:0;
+          z-index:200;background:#fff;border:1.5px solid #E5E7EB;border-radius:10px;
+          box-shadow:0 6px 24px rgba(0,0,0,.12);max-height:220px;overflow-y:auto}
+  .ing-opt{padding:8px 12px;cursor:pointer;display:flex;align-items:center;
+           justify-content:space-between;gap:8px;border-bottom:1px solid #F3F4F6}
+  .ing-opt:last-child{border-bottom:none}
+  .ing-opt:hover{background:#F9FAFB}
+  .ing-costo-hint{font-size:.72rem;color:#6B7280;padding:2px 2px 0;min-height:14px;line-height:1.3}
   .btn-icon-danger{padding:8px 12px;background:#FEE2E2;color:#991B1B;border:none;border-radius:8px;
-                   cursor:pointer;font-size:.85rem;transition:.15s}
+                   cursor:pointer;font-size:.85rem;transition:.15s;align-self:start;margin-top:1px}
   .btn-icon-danger:hover{background:#FCA5A5;color:#7F1D1D}
   .wizard-nav{display:flex;gap:10px;justify-content:space-between;margin-top:24px;padding-top:18px;border-top:1px solid #F3F4F6}
   .alergen-lbl input:checked ~ * { /* handled via JS */ }
@@ -298,10 +301,7 @@
 </style>
 
 <script>
-const ingredientesMap = <?= json_encode(array_combine(
-  array_column($ingredientes, 'nombre'),
-  array_values($ingredientes)
-)) ?>;
+const ingredientesArr = <?= json_encode(array_values($ingredientes)) ?>;
 const catNames = <?= json_encode(array_column($categorias, 'nombre', 'id')) ?>;
 
 // Alérgenos: toggle visual
@@ -320,12 +320,9 @@ function goStep(n) {
     if (isNaN(precio) || precio <= 0) { alert('Indica un precio válido.'); return; }
   }
   if (n > 2) {
-    const ids = [...document.querySelectorAll('#ingredientes-lista .ing-id-hidden')];
-    const filled = ids.some(h => h.value && h.value !== '');
-    if (!filled) {
-      document.getElementById('recetaError').style.display = 'block';
-      return;
-    }
+    const filled = [...document.querySelectorAll('#ingredientes-lista .ing-id-hidden')]
+      .some(h => h.value && h.value !== '0' && h.value !== '');
+    if (!filled) { document.getElementById('recetaError').style.display = 'block'; return; }
     document.getElementById('recetaError').style.display = 'none';
   }
   document.querySelectorAll('.wstep').forEach(s => {
@@ -342,42 +339,122 @@ function goStep(n) {
 
 // ── Conversión de unidades ──
 function convUnidadReceta(q, desde, hasta) {
-  const d = desde.toLowerCase();
-  const h = hasta.toLowerCase();
+  const d = desde.toLowerCase(), h = hasta.toLowerCase();
   if (d === h) return q;
   const m = {
     'g_kg':1e-3,'kg_g':1e3,'mg_g':1e-3,'g_mg':1e3,'mg_kg':1e-6,'kg_mg':1e6,
-    'ml_l':1e-3,'l_ml':1e3,'ml_l':1e-3,
+    'ml_l':1e-3,'l_ml':1e3,
   };
   return q * (m[d+'_'+h] || 1);
 }
 
+// ── Grupos de unidades por unidad principal ──
+function ingUnidades(u) {
+  u = (u || '').toLowerCase();
+  if (['kg','g','mg'].includes(u)) return ['g','kg','mg'];
+  if (['l','ml','lt','litro','ltr'].includes(u)) return ['ml','L'];
+  if (u === 'pza') return ['pza'];
+  if (u === 'caja') return ['caja'];
+  if (u === 'bolsa') return ['bolsa'];
+  return ['g','kg','mg','L','ml','pza','caja','bolsa'];
+}
+
+// ── Construir opciones del dropdown ──
+function ingBuildOpts(query) {
+  query = (query || '').toLowerCase().trim();
+  const list = query
+    ? ingredientesArr.filter(i => i.nombre.toLowerCase().includes(query))
+    : ingredientesArr;
+  if (!list.length) {
+    return '<div style="padding:12px;color:#9CA3AF;font-size:.82rem;text-align:center">Sin resultados</div>';
+  }
+  return list.slice(0, 25).map(i => {
+    const costoStr = parseFloat(i.costo_unitario) > 0
+      ? `$${parseFloat(i.costo_unitario).toFixed(2)}/${i.unidad_principal}` : '';
+    const catStr = i.categoria || '';
+    const nombre = i.nombre.replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const cat    = catStr.replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return `<div class="ing-opt"
+      onmousedown="ingSeleccionar(event,this)"
+      data-id="${i.id}"
+      data-nombre="${nombre.replace(/"/g,'&quot;')}"
+      data-unidad="${(i.unidad_principal||'').replace(/"/g,'&quot;')}"
+      data-costo="${parseFloat(i.costo_unitario)||0}"
+      data-cat="${cat.replace(/"/g,'&quot;')}">
+      <div>
+        <div style="font-weight:600;font-size:.85rem;color:#111827">${nombre}</div>
+        ${cat ? `<div style="font-size:.72rem;color:#9CA3AF">${cat}</div>` : ''}
+      </div>
+      ${costoStr ? `<span style="font-size:.78rem;color:#6B7280;font-weight:600;white-space:nowrap">${costoStr}</span>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function ingAbrir(input) {
+  const wrap = input.closest('.ing-picker-wrap');
+  const dd = wrap.querySelector('.ing-dd');
+  dd.innerHTML = ingBuildOpts(input.value);
+  dd.style.display = 'block';
+}
+
+function ingFiltrar(input) {
+  const wrap = input.closest('.ing-picker-wrap');
+  const dd = wrap.querySelector('.ing-dd');
+  dd.innerHTML = ingBuildOpts(input.value);
+  dd.style.display = 'block';
+  wrap.querySelector('.ing-id-hidden').value = '';
+  calcRowCosto(input.closest('.ing-row'));
+}
+
+function ingSeleccionar(e, card) {
+  e.preventDefault();
+  const wrap = card.closest('.ing-picker-wrap');
+  const row  = wrap.closest('.ing-row');
+  wrap.querySelector('.ing-search').value    = card.dataset.nombre;
+  wrap.querySelector('.ing-id-hidden').value = card.dataset.id;
+  wrap.querySelector('.ing-dd').style.display = 'none';
+  // Populate unit options based on ingredient's unit
+  const unidSel = row.querySelector('.ing-unidad');
+  if (unidSel) {
+    const units = ingUnidades(card.dataset.unidad);
+    const main  = (card.dataset.unidad || 'g').toLowerCase();
+    unidSel.innerHTML = units.map(u =>
+      `<option value="${u}" ${u.toLowerCase() === main ? 'selected' : ''}>${u}</option>`
+    ).join('');
+  }
+  calcRowCosto(row);
+}
+
+// Close dropdowns when clicking outside
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.ing-picker-wrap')) {
+    document.querySelectorAll('.ing-dd').forEach(dd => dd.style.display = 'none');
+  }
+});
+
 // ── Costo por fila ──
 function calcRowCosto(row) {
   if (!row) return;
-  const nameInput = row.querySelector('.ing-search');
-  const ing = nameInput ? ingredientesMap[nameInput.value] : null;
-  let costoEl = row.querySelector('.ing-costo-hint');
-  if (!costoEl) {
-    costoEl = document.createElement('div');
-    costoEl.className = 'ing-costo-hint';
-    costoEl.style.cssText = 'grid-column:1/3;font-size:.72rem;color:#6B7280;padding:0 2px;margin-top:-4px';
-    const nextRow = row.nextSibling;
-    row.parentNode.insertBefore(costoEl, nextRow);
+  const wrap    = row.querySelector('.ing-picker-wrap');
+  if (!wrap) return;
+  const costoEl = wrap.querySelector('.ing-costo-hint');
+  const ingId   = wrap.querySelector('.ing-id-hidden')?.value;
+  const ing     = ingId ? ingredientesArr.find(i => i.id == ingId) : null;
+  if (!ing || !parseFloat(ing.costo_unitario)) {
+    if (costoEl) costoEl.innerHTML = '';
+    updateTotalCosto();
+    return;
   }
-  if (!ing || !ing.costo_unitario) { costoEl.textContent = ''; return; }
-  const cantEl = row.querySelector('input[name="cantidad[]"]');
-  const unidEl = row.querySelector('select[name="unidad[]"]');
-  const cant = parseFloat(cantEl?.value) || 0;
-  const unid = unidEl?.value || ing.unidad_principal;
+  const cant    = parseFloat(row.querySelector('input[name="cantidad[]"]')?.value) || 0;
+  const unid    = row.querySelector('.ing-unidad')?.value || ing.unidad_principal;
   const cantConv = convUnidadReceta(cant, unid, ing.unidad_principal);
-  const costo = cantConv * parseFloat(ing.costo_unitario);
-  if (costo > 0) {
-    const stockInfo = parseFloat(ing.stock) > 0
-      ? ` · Stock: ${parseFloat(ing.stock).toFixed(2)} ${ing.unidad_principal}` : '';
-    costoEl.innerHTML = `$<strong>${costo.toFixed(4)}</strong>${unid !== ing.unidad_principal ? ` (${cantConv.toFixed(4)} ${ing.unidad_principal})` : ''}${stockInfo}`;
-  } else {
-    costoEl.textContent = '';
+  const costo   = cantConv * parseFloat(ing.costo_unitario);
+  if (costoEl) {
+    costoEl.innerHTML = costo > 0
+      ? `Costo: <strong>$${costo.toFixed(2)}</strong>`
+        + (unid.toLowerCase() !== ing.unidad_principal.toLowerCase()
+            ? ` <span style="color:#9CA3AF">(${cantConv.toFixed(4)} ${ing.unidad_principal})</span>` : '')
+      : '';
   }
   updateTotalCosto();
 }
@@ -385,53 +462,50 @@ function calcRowCosto(row) {
 function updateTotalCosto() {
   let total = 0;
   document.querySelectorAll('#ingredientes-lista .ing-row').forEach(row => {
-    const nameInput = row.querySelector('.ing-search');
-    const ing = nameInput ? ingredientesMap[nameInput.value] : null;
-    if (!ing || !ing.costo_unitario) return;
+    const ingId = row.querySelector('.ing-id-hidden')?.value;
+    const ing   = ingId ? ingredientesArr.find(i => i.id == ingId) : null;
+    if (!ing || !parseFloat(ing.costo_unitario)) return;
     const cant = parseFloat(row.querySelector('input[name="cantidad[]"]')?.value) || 0;
-    const unid = row.querySelector('select[name="unidad[]"]')?.value || ing.unidad_principal;
-    const cantConv = convUnidadReceta(cant, unid, ing.unidad_principal);
-    total += cantConv * parseFloat(ing.costo_unitario);
+    const unid = row.querySelector('.ing-unidad')?.value || ing.unidad_principal;
+    total += convUnidadReceta(cant, unid, ing.unidad_principal) * parseFloat(ing.costo_unitario);
   });
   const banner = document.getElementById('costoTotalBanner');
-  const texto = document.getElementById('costoTotalTexto');
   if (total > 0) {
     const porciones = parseInt(document.querySelector('input[name="porciones_base"]')?.value) || 1;
-    texto.textContent = `$${total.toFixed(2)} total · $${(total/porciones).toFixed(2)}/porción`;
+    document.getElementById('costoTotalTexto').textContent =
+      `$${total.toFixed(2)} total · $${(total/porciones).toFixed(2)}/porción`;
     banner.style.display = 'flex';
   } else {
     banner.style.display = 'none';
   }
 }
 
-// ── Resumen paso 3 con costos ──
+// ── Resumen paso 3 ──
 function renderResumen() {
-  const f = document.getElementById('formPlatillo');
-  const fd = new FormData(f);
+  const fd   = new FormData(document.getElementById('formPlatillo'));
   const ings = [];
   let costoTotal = 0;
-  const ids   = [...document.querySelectorAll('#ingredientes-lista .ing-id-hidden')].map(h => h.value);
-  const names = [...document.querySelectorAll('#ingredientes-lista .ing-search')].map(i => i.value);
-  const cants = fd.getAll('cantidad[]');
-  const uns   = fd.getAll('unidad[]');
-  for (let i=0;i<ids.length;i++) {
-    if (!ids[i]) continue;
-    const ing = ingredientesMap[names[i]];
+  document.querySelectorAll('#ingredientes-lista .ing-row').forEach(row => {
+    const ingId = row.querySelector('.ing-id-hidden')?.value;
+    if (!ingId || ingId === '0' || ingId === '') return;
+    const ing   = ingredientesArr.find(x => x.id == ingId);
+    const nombre = row.querySelector('.ing-search')?.value || (ing?.nombre ?? '?');
+    const cant  = parseFloat(row.querySelector('input[name="cantidad[]"]')?.value) || 0;
+    const unid  = row.querySelector('.ing-unidad')?.value || (ing?.unidad_principal ?? 'kg');
     let costoStr = '';
-    if (ing && ing.costo_unitario) {
-      const cantConv = convUnidadReceta(parseFloat(cants[i])||0, uns[i]||'kg', ing.unidad_principal);
-      const c = cantConv * parseFloat(ing.costo_unitario);
+    if (ing && parseFloat(ing.costo_unitario)) {
+      const c = convUnidadReceta(cant, unid, ing.unidad_principal) * parseFloat(ing.costo_unitario);
       costoTotal += c;
-      costoStr = ` <span style="color:#6B7280;font-size:.75rem">→ $${c.toFixed(4)}</span>`;
+      costoStr = ` <span style="color:#6B7280;font-size:.75rem">→ $${c.toFixed(2)}</span>`;
     }
-    ings.push(`${names[i]||'?'} — ${cants[i]||0} ${uns[i]||''}${costoStr}`);
-  }
-  const porciones = parseInt(fd.get('porciones_base')||1);
-  const precio = parseFloat(fd.get('precio')||0);
-  const cat = fd.get('categoria_id');
-  const alergs = fd.getAll('alergenos[]');
-  const margen = precio - costoTotal;
-  const margenPct = precio > 0 ? (margen/precio*100).toFixed(1) : 0;
+    ings.push(`${nombre} — ${cant} ${unid}${costoStr}`);
+  });
+  const porciones = parseInt(fd.get('porciones_base') || 1);
+  const precio    = parseFloat(fd.get('precio') || 0);
+  const cat       = fd.get('categoria_id');
+  const alergs    = fd.getAll('alergenos[]');
+  const margen    = precio - costoTotal;
+  const margenPct = precio > 0 ? (margen / precio * 100).toFixed(1) : 0;
   let costoHtml = '';
   if (costoTotal > 0) {
     costoHtml = `
@@ -440,70 +514,56 @@ function renderResumen() {
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:.8rem">
         <div><div style="color:#9CA3AF">Costo ingredientes</div><strong style="color:#111827">$${costoTotal.toFixed(2)}</strong></div>
         <div><div style="color:#9CA3AF">Por porción</div><strong style="color:#111827">$${(costoTotal/porciones).toFixed(2)}</strong></div>
-        ${precio>0?`<div><div style="color:#9CA3AF">Margen estimado</div><strong style="color:${margen>=0?'#16A34A':'#EF4444'}">$${margen.toFixed(2)} (${margenPct}%)</strong></div>`:''}
+        ${precio > 0 ? `<div><div style="color:#9CA3AF">Margen estimado</div><strong style="color:${margen >= 0 ? '#16A34A' : '#EF4444'}">$${margen.toFixed(2)} (${margenPct}%)</strong></div>` : ''}
       </div>
     </div>`;
   }
-  const html = `
-    <div><strong>Nombre:</strong> ${fd.get('nombre')||'—'}</div>
-    <div><strong>Categoría:</strong> ${cat?(catNames[cat]||'—'):'Sin categoría'}</div>
-    <div><strong>Precio:</strong> $${parseFloat(fd.get('precio')||0).toFixed(2)}</div>
+  document.getElementById('resumen').innerHTML = `
+    <div><strong>Nombre:</strong> ${fd.get('nombre') || '—'}</div>
+    <div><strong>Categoría:</strong> ${cat ? (catNames[cat] || '—') : 'Sin categoría'}</div>
+    <div><strong>Precio:</strong> $${parseFloat(fd.get('precio') || 0).toFixed(2)}</div>
     <div><strong>Tiempo:</strong> ${fd.get('tiempo_preparacion_min')} min</div>
-    <div><strong>Disponible:</strong> ${fd.get('disponible')==='1'?'Sí':'No'}</div>
-    <div><strong>Descripción:</strong> ${fd.get('descripcion')||'—'}</div>
-    ${alergs.length?`<div><strong>Alérgenos:</strong> ${alergs.join(', ')}</div>`:''}
-    ${fd.get('contiene')?`<div><strong>Contiene:</strong> ${fd.get('contiene')}</div>`:''}
-    <div><strong>Ingredientes (${ings.length}):</strong><br>${ings.length?ings.map(s=>'— '+s).join('<br>'):'<span style="color:#9CA3AF">Sin receta</span>'}</div>
+    <div><strong>Disponible:</strong> ${fd.get('disponible') === '1' ? 'Sí' : 'No'}</div>
+    <div><strong>Descripción:</strong> ${fd.get('descripcion') || '—'}</div>
+    ${alergs.length ? `<div><strong>Alérgenos:</strong> ${alergs.join(', ')}</div>` : ''}
+    ${fd.get('contiene') ? `<div><strong>Contiene:</strong> ${fd.get('contiene')}</div>` : ''}
+    <div><strong>Ingredientes (${ings.length}):</strong><br>${ings.length ? ings.map(s => '— ' + s).join('<br>') : '<span style="color:#9CA3AF">Sin receta</span>'}</div>
     ${costoHtml}
   `;
-  document.getElementById('resumen').innerHTML = html;
-}
-
-// ── Typeahead para ingredientes ──
-function onIngSearch(input) {
-  const row = input.closest('.ing-row');
-  const hidden = row.querySelector('.ing-id-hidden');
-  const ing = ingredientesMap[input.value];
-  if (ing) {
-    hidden.value = ing.id;
-    const unidSel = row.querySelector('select[name="unidad[]"]');
-    if (unidSel) {
-      // Auto-select the ingredient's main unit if exists in options
-      for (let o of unidSel.options) {
-        if (o.value === ing.unidad_principal) { o.selected = true; break; }
-      }
-    }
-    calcRowCosto(row);
-  } else {
-    hidden.value = '';
-  }
 }
 
 function addIngrediente() {
-  const uOpts = ['g','kg','mg','L','ml','mL','pza','caja','bolsa'].map(u =>
-    `<option value="${u}">${u}</option>`).join('');
   const row = document.createElement('div');
   row.className = 'ing-row';
   row.innerHTML = `
-    <div style="position:relative">
-      <input type="text" class="form-input ing-search" list="dlIngredientes"
-             placeholder="Buscar ingrediente…" oninput="onIngSearch(this)" autocomplete="off">
+    <div class="ing-picker-wrap">
+      <input type="text" class="form-input ing-search"
+             placeholder="Buscar ingrediente…" autocomplete="off"
+             oninput="ingFiltrar(this)" onfocus="ingAbrir(this)">
       <input type="hidden" name="ingrediente_id[]" class="ing-id-hidden" value="">
+      <div class="ing-dd"></div>
+      <div class="ing-costo-hint"></div>
     </div>
     <input type="number" name="cantidad[]" step="0.001" min="0" placeholder="Cant." class="form-input"
            oninput="calcRowCosto(this.closest('.ing-row'))">
     <select name="unidad[]" class="form-select ing-unidad"
-            onchange="calcRowCosto(this.closest('.ing-row'))">${uOpts}</select>
-    <label style="display:flex;align-items:center;gap:4px;font-size:.75rem;color:#6B7280;cursor:pointer;white-space:nowrap" title="No descuenta stock, solo aparece en info del cliente">
+            onchange="calcRowCosto(this.closest('.ing-row'))">
+      <option value="g">g</option><option value="kg">kg</option><option value="mg">mg</option>
+      <option value="L">L</option><option value="ml">ml</option>
+      <option value="pza">pza</option><option value="caja">caja</option><option value="bolsa">bolsa</option>
+    </select>
+    <label style="display:flex;align-items:center;gap:4px;font-size:.75rem;color:#6B7280;cursor:pointer;white-space:nowrap;padding-top:8px"
+           title="No descuenta stock, solo aparece en info del cliente">
       <input type="checkbox" name="es_informativo[]" value="_new" style="cursor:pointer">
       Solo info
     </label>
     <button type="button" onclick="this.closest('.ing-row').remove();updateTotalCosto()" class="btn-icon-danger">✕</button>
   `;
   document.getElementById('ingredientes-lista').appendChild(row);
+  setTimeout(() => row.querySelector('.ing-search').focus(), 50);
 }
 
-// Calcular costos iniciales si hay ingredientes pre-cargados
+// Calcular costos de filas pre-cargadas al cargar la página
 document.querySelectorAll('#ingredientes-lista .ing-row').forEach(row => calcRowCosto(row));
 </script>
 <?php

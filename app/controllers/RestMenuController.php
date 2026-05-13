@@ -20,7 +20,8 @@ class RestMenuController extends BaseController
         $flash      = $this->getFlash();
         $pageTitle  = 'Menú';
         $activeMenu = 'rest_menu';
-        $this->render('restaurante/menu/index', compact('platillos','categorias','flash','pageTitle','activeMenu'));
+        $sucursales = (new RestauranteModel())->getByComprador($this->usuarioId());
+        $this->render('restaurante/menu/index', compact('platillos','categorias','flash','pageTitle','activeMenu','sucursales'));
     }
 
     public function form(?string $id = null): void

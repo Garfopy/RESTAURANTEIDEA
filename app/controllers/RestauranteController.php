@@ -35,7 +35,12 @@ class RestauranteController extends BaseController
             $this->redirect('restaurante/seleccionar');
         }
         $_SESSION['restaurante_activo_id'] = $restauranteId;
-        $this->redirect('restaurante/dashboard');
+        $redirect = isset($_GET['redirect']) ? trim($_GET['redirect'], '/') : null;
+        if ($redirect && preg_match('/^[a-zA-Z0-9\/_-]+$/', $redirect)) {
+            $this->redirect($redirect);
+        } else {
+            $this->redirect('restaurante/dashboard');
+        }
     }
 
     public function dashboard(?string $p = null): void

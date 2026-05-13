@@ -1,4 +1,4 @@
-# Plan & Checklist — Módulo Restaurantes CarniHub v3.9
+# Plan & Checklist — Módulo Restaurantes CarniHub v4.0
 
 **Actualizado:** 2026-05-13 | **Branch:** `sprint-restaurantes`
 
@@ -458,6 +458,7 @@ Mesero/Admin al cierre → /rest-finanzas/cortes → "Nuevo corte"
 
 | Fecha | Sprint | Cambio |
 |-------|--------|--------|
+| 2026-05-13 | v4.0 | **Receta combobox**: reemplazado `<datalist>` con dropdown personalizado con tarjetas (nombre, categoría, costo/unidad — sin stock). Costo hint dentro de cada fila (fix bug duplicación). Selección automática de unidades por grupo (g/kg/mg, L/mL, pza) al elegir ingrediente. **Mapa geocoding**: reemplazado Google Maps Geocoding API con Nominatim/OSM — funciona sin habilitar la API de geocoding. Cuando hay API Key, Google Maps sólo se usa para el renderizado visual. **Multi-sucursal en menú**: selector de sucursales (pills) en `/rest-menu/index` — visible cuando el comprador tiene >1 sucursal. `RestauranteController::activar()` ahora soporta `?redirect=` para volver a la página original después de cambiar sucursal |
 | 2026-05-13 | v3.9 | **Inventario inteligente**: cards más grandes, botón "Modificar" único con modal de 2 tabs (Movimiento con convertidor de unidades g/kg/mg/L/mL + Editar datos). Eliminado campo "Stock inicial" del formulario de creación. **Recetas + calculadora logística**: selector de unidad por ingrediente (g/kg/mg/L/mL/pza), costo en tiempo real por fila, total costo + margen en paso 3 del wizard. **Vista detalle platillo** (`/rest-menu/detalle/{id}`): tabla gramajes con Costo/Unidad + Costo Total + calculadora de margen vs precio de venta. Link "Ver costos" en cards del menú |
 | 2026-05-13 | v3.6 | **Inventario cards** — rediseño de `inventario/index.php` con grid de tarjetas (barra de stock, semáforo, valor estimado), sección movimientos recientes; **Auto-import CarniHub** — `EmpresaPedidoController::_importarStockRestaurante()` descuenta pedido entregado al inventario del restaurante; mapa Leaflet + coordenadas, selector hora AM/PM, fix login staff |
 | 2026-05-13 | v3.5 | **Links rápidos** en dashboard (portal staff + menú público); **Google Maps** usa API key de `global_settings`; `requiere_login_comensal` redirige comensal a `/acceso/{slug}`; migration 029 con 18 ingredientes de prueba; plan actualizado |

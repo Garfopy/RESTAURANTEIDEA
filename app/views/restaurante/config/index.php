@@ -61,33 +61,48 @@
       </div>
       <?php if (!empty($restaurante['direccion'])): ?>
       <?php if (!empty($mapsApiKey)): ?>
-      <!-- Google Maps geocoding -->
+      <!-- Nominatim geocoding + Google Maps display -->
       <script>
+      window._mapCoords = null;
+
       function initMap() {
-        var geocoder = new google.maps.Geocoder();
-        var dir = <?= json_encode($restaurante['direccion']) ?>;
-        geocoder.geocode({ address: dir }, function(results, status) {
-          if (status === 'OK') {
-            var loc = results[0].geometry.location;
-            var lat = loc.lat(), lng = loc.lng();
-            var el = document.getElementById('rstMap');
-            el.innerHTML = '';
-            var map = new google.maps.Map(el, { center: {lat:lat,lng:lng}, zoom: 16 });
-            new google.maps.Marker({ position: {lat:lat,lng:lng}, map: map, title: dir });
-            document.getElementById('coordLat').textContent = lat.toFixed(6);
-            document.getElementById('coordLng').textContent = lng.toFixed(6);
-            document.getElementById('inpLat').value = lat.toFixed(6);
-            document.getElementById('inpLng').value = lng.toFixed(6);
-            document.getElementById('coordsBox').style.display = 'block';
-          } else {
-            document.getElementById('rstMap').innerHTML = '<div style="padding:20px;text-align:center;color:#9CA3AF;font-size:.82rem">No se encontró la dirección.</div>';
-          }
-        });
+        // Called when Google Maps SDK loads — render if Nominatim already resolved
+        if (window._mapCoords) _renderGoogleMap(window._mapCoords.lat, window._mapCoords.lng);
       }
+
+      function _renderGoogleMap(lat, lng) {
+        var el = document.getElementById('rstMap');
+        var dir = el.dataset.direccion;
+        el.innerHTML = '';
+        var map = new google.maps.Map(el, { center:{lat:lat,lng:lng}, zoom:16 });
+        new google.maps.Marker({ position:{lat:lat,lng:lng}, map:map, title:dir });
+      }
+
+      (function(){
+        var el  = document.getElementById('rstMap');
+        var dir = el.dataset.direccion;
+        fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(dir))
+          .then(function(r){ return r.json(); })
+          .then(function(data) {
+            if (data[0]) {
+              var lat = parseFloat(data[0].lat), lng = parseFloat(data[0].lon);
+              document.getElementById('coordLat').textContent = lat.toFixed(6);
+              document.getElementById('coordLng').textContent = lng.toFixed(6);
+              document.getElementById('inpLat').value = lat.toFixed(6);
+              document.getElementById('inpLng').value = lng.toFixed(6);
+              document.getElementById('coordsBox').style.display = 'block';
+              window._mapCoords = {lat:lat, lng:lng};
+              if (window.google && window.google.maps) _renderGoogleMap(lat, lng);
+            } else {
+              el.innerHTML = '<div style="padding:20px;text-align:center;color:#9CA3AF;font-size:.82rem">No se encontró la dirección en el mapa.</div>';
+            }
+          })
+          .catch(function(){ el.innerHTML = '<div style="padding:20px;text-align:center;color:#9CA3AF;font-size:.82rem">No se pudo cargar el mapa.</div>'; });
+      })();
       </script>
       <script src="https://maps.googleapis.com/maps/api/js?key=<?= htmlspecialchars($mapsApiKey) ?>&callback=initMap" async defer></script>
       <?php else: ?>
-      <!-- Nominatim + Leaflet (fallback sin API key) -->
+      <!-- Nominatim + Leaflet (sin API key) -->
       <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
       <script>
       (function(){

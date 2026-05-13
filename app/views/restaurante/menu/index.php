@@ -33,6 +33,33 @@
   transition:background .1s; }
 </style>
 
+<?php
+$restauranteId = $_SESSION['restaurante_activo_id'] ?? 0;
+?>
+
+<?php if (!empty($sucursales) && count($sucursales) > 1): ?>
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+  <span style="font-size:.78rem;color:#6B7280;font-weight:600">Sucursal:</span>
+  <?php foreach ($sucursales as $s): ?>
+  <?php $activo = ((int)$s['id'] === (int)$restauranteId); ?>
+  <?php if ($activo): ?>
+  <span style="padding:5px 14px;border-radius:99px;font-size:.82rem;font-weight:700;
+               background:var(--cp);color:#fff;border:2px solid var(--cp)">
+    <?= htmlspecialchars($s['nombre']) ?>
+  </span>
+  <?php else: ?>
+  <a href="<?= BASE_URL ?>restaurante/activar/<?= (int)$s['id'] ?>?redirect=rest-menu/index"
+     style="padding:5px 14px;border-radius:99px;font-size:.82rem;font-weight:600;
+            background:#fff;color:#374151;border:2px solid #E5E7EB;text-decoration:none;transition:.15s"
+     onmouseover="this.style.borderColor='var(--cp)';this.style.color='var(--cp)'"
+     onmouseout="this.style.borderColor='#E5E7EB';this.style.color='#374151'">
+    <?= htmlspecialchars($s['nombre']) ?>
+  </a>
+  <?php endif; ?>
+  <?php endforeach; ?>
+</div>
+<?php endif; ?>
+
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
   <div style="display:flex;gap:10px">
     <a href="<?= BASE_URL ?>rest-menu/form" class="btn btn-primary">+ Nuevo Platillo</a>
