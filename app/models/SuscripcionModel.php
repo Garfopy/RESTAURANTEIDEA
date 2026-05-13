@@ -29,7 +29,8 @@ class SuscripcionModel extends BaseModel
             'SELECT s.*, p.slug AS plan_slug, p.nombre AS plan_nombre,
                     p.precio_mensual, p.precio_anual,
                     p.max_usuarios, p.max_productos, p.max_pedidos_mes, p.max_sucursales,
-                    p.features, p.paypal_plan_id, p.paypal_plan_id_anual
+                    p.features, p.paypal_plan_id, p.paypal_plan_id_anual,
+                    p.paypal_plan_id_live, p.paypal_plan_id_anual_live
              FROM suscripciones s
              JOIN planes_saas p ON p.id = s.plan_id
              WHERE s.empresa_id = ?',
@@ -218,6 +219,41 @@ class SuscripcionModel extends BaseModel
             'UPDATE planes_saas SET paypal_plan_id_anual = ? WHERE id = ?',
             [$paypalPlanId, $planSaasId]
         );
+    }
+
+    public function guardarPaypalPlanIdLive(int $planSaasId, string $paypalPlanId): void
+    {
+        $this->execute(
+            'UPDATE planes_saas SET paypal_plan_id_live = ? WHERE id = ?',
+            [$paypalPlanId, $planSaasId]
+        );
+    }
+
+    public function guardarPaypalPlanIdAnualLive(int $planSaasId, string $paypalPlanId): void
+    {
+        $this->execute(
+            'UPDATE planes_saas SET paypal_plan_id_anual_live = ? WHERE id = ?',
+            [$paypalPlanId, $planSaasId]
+        );
+    }
+
+    /**
+     * Limpia los IDs de PayPal del modo indicado para forzar recreación
+     * al cambiar precios del plan.
+     */
+    public function limpiarPaypalPlanIds(int $planId, string $modo): void
+    {
+        if ($modo === 'live') {
+            $this->execute(
+                'UPDATE planes_saas SET paypal_plan_id_live = NULL, paypal_plan_id_anual_live = NULL WHERE id = ?',
+                [$planId]
+            );
+        } else {
+            $this->execute(
+                'UPDATE planes_saas SET paypal_plan_id = NULL, paypal_plan_id_anual = NULL WHERE id = ?',
+                [$planId]
+            );
+        }
     }
 
     public function verificarLimite(int $empresaId, string $tipo): bool

@@ -5,15 +5,26 @@ class PayPalSuscripcionService
     private string $clientId;
     private string $secret;
 
+    private string $mode;
+
     public function __construct()
     {
-        $config      = new ConfigModel();
-        $this->clientId = $config->get('paypal_client_id', '');
-        $this->secret   = $config->get('paypal_secret', '');
-        $mode           = $config->get('paypal_mode', 'sandbox');
-        $this->baseUrl  = $mode === 'live'
+        $config         = new ConfigModel();
+        $this->mode     = $config->get('paypal_mode', 'sandbox');
+        $this->clientId = $this->mode === 'live'
+            ? $config->get('paypal_client_id_live', $config->get('paypal_client_id', ''))
+            : $config->get('paypal_client_id_sandbox', $config->get('paypal_client_id', ''));
+        $this->secret   = $this->mode === 'live'
+            ? $config->get('paypal_secret_live', $config->get('paypal_secret', ''))
+            : $config->get('paypal_secret_sandbox', $config->get('paypal_secret', ''));
+        $this->baseUrl  = $this->mode === 'live'
             ? 'https://api-m.paypal.com'
             : 'https://api-m.sandbox.paypal.com';
+    }
+
+    public function getMode(): string
+    {
+        return $this->mode;
     }
 
     // ── OAuth token ───────────────────────────────────────────────────────────
@@ -126,24 +137,33 @@ class PayPalSuscripcionService
     }
 
     // ── Sincronizar todos los planes locales con PayPal ───────────────────────
-    // Solo crea planes que aún no tienen ID; reutiliza el producto si ya existe.
+    // Crea nuevos planes en PayPal según el modo activo (sandbox o live).
+    // Si el plan ya tiene ID para el modo activo, lo omite (no recrea).
+    // Para forzar recreación (al cambiar precios), pasar forceRecreate=true.
     public function sincronizarPlanes(array $planes, string $moneda = 'MXN'): array
     {
-        $config    = new ConfigModel();
-        $productId = $config->get('paypal_product_id', '');
+        $config         = new ConfigModel();
+        $productKey     = 'paypal_product_id_' . $this->mode;
+        $productId      = $config->get($productKey, '');
 
         if (!$productId) {
             $productId = $this->crearProducto(
                 'CarniHub SaaS',
                 'Plataforma de gestión para carnicerías'
             );
+            $config->set($productKey, $productId);
+            // Compatibilidad con clave legacy
             $config->set('paypal_product_id', $productId);
         }
+
+        // Campos de BD según modo
+        $colMensual = $this->mode === 'live' ? 'paypal_plan_id_live'       : 'paypal_plan_id';
+        $colAnual   = $this->mode === 'live' ? 'paypal_plan_id_anual_live' : 'paypal_plan_id_anual';
 
         $resultado = [];
         foreach ($planes as $plan) {
             $ids = [];
-            if (empty($plan['paypal_plan_id'])) {
+            if (empty($plan[$colMensual])) {
                 $ids['mensual'] = $this->crearPlanBilling(
                     $productId,
                     $plan['nombre'] . ' — Mensual',
@@ -152,7 +172,7 @@ class PayPalSuscripcionService
                     $moneda
                 );
             }
-            if (empty($plan['paypal_plan_id_anual'])) {
+            if (empty($plan[$colAnual])) {
                 $ids['anual'] = $this->crearPlanBilling(
                     $productId,
                     $plan['nombre'] . ' — Anual',
@@ -161,7 +181,7 @@ class PayPalSuscripcionService
                     $moneda
                 );
             }
-            $resultado[$plan['id']] = $ids;
+            $resultado[$plan['id']] = $ids + ['_modo' => $this->mode];
         }
         return $resultado;
     }

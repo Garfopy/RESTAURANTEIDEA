@@ -78,6 +78,11 @@
 <script>
 // ── Firma digital ──────────────────────────────────────────────
 const canvas  = document.getElementById('firmaCanvas');
+// Sincronizar tamaño interno con el tamaño renderizado real;
+// sin esto canvas.width es 300px aunque se muestre más ancho,
+// haciendo que getImageData devuelva una franja vacía.
+canvas.width  = canvas.offsetWidth  || 300;
+canvas.height = canvas.offsetHeight || 150;
 const ctx     = canvas.getContext('2d');
 let dibujando = false;
 
@@ -100,10 +105,30 @@ function limpiarFirma() {
 }
 
 function prepararEnvio() {
-  const firmaData = canvas.toDataURL('image/png');
-  const vacio = !ctx.getImageData(0, 0, canvas.width, canvas.height).data.some(c => c !== 0);
+  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const vacio   = !imgData.data.some(c => c !== 0);
   if (vacio) { alert('Por favor dibuja la firma del receptor.'); return false; }
-  document.getElementById('firmaData').value = firmaData;
+  // Exportar negro sobre blanco para que sea legible en cualquier contexto
+  // (pestaña nueva, ZIP, PDF). El canvas visual del repartidor no cambia.
+  const tmp    = document.createElement('canvas');
+  tmp.width    = canvas.width;
+  tmp.height   = canvas.height;
+  const tmpCtx = tmp.getContext('2d');
+  tmpCtx.fillStyle = '#FFFFFF';
+  tmpCtx.fillRect(0, 0, tmp.width, tmp.height);
+  const d = imgData.data;
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i + 3] > 10) {        // píxel con trazo → invertir color
+      d[i]     = 255 - d[i];
+      d[i + 1] = 255 - d[i + 1];
+      d[i + 2] = 255 - d[i + 2];
+      d[i + 3] = 255;           // forzar opaco
+    } else {
+      d[i + 3] = 0;             // vacío → transparente (cubierto por fondo blanco)
+    }
+  }
+  tmpCtx.putImageData(imgData, 0, 0);
+  document.getElementById('firmaData').value = tmp.toDataURL('image/png');
   return true;
 }
 

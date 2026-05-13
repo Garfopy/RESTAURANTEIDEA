@@ -46,6 +46,40 @@ class ApiController extends BaseController
         $this->json(['precio' => $precio, 'escalonados' => $escalonados]);
     }
 
+    // ── Planes públicos (sin auth) ────────────────────────────────
+    /** GET /api/planes — Devuelve planes activos para polling en landing */
+    public function planes(?string $p = null): void
+    {
+        header('Cache-Control: no-store, no-cache, must-revalidate');
+
+        $model  = new SuscripcionModel();
+        $raw    = $model->getPlanesActivos();
+
+        $planes = array_map(function (array $plan): array {
+            $features = [];
+            if (!empty($plan['features'])) {
+                $features = is_array($plan['features'])
+                    ? $plan['features']
+                    : (json_decode($plan['features'], true) ?? []);
+            }
+            return [
+                'id'             => (int)$plan['id'],
+                'nombre'         => $plan['nombre'],
+                'slug'           => $plan['slug'],
+                'precio_mensual' => (float)$plan['precio_mensual'],
+                'precio_anual'   => !empty($plan['precio_anual']) ? (float)$plan['precio_anual'] : null,
+                'max_usuarios'   => (int)$plan['max_usuarios'],
+                'max_productos'  => (int)$plan['max_productos'],
+                'max_sucursales' => (int)$plan['max_sucursales'],
+                'features'       => array_slice($features, 0, 6),
+            ];
+        }, $raw);
+
+        $hash = md5(json_encode($planes));
+
+        $this->json(['planes' => $planes, 'hash' => $hash]);
+    }
+
     // ── GPS Tracking ──────────────────────────────────────────────
 
     /** GET /api/tracking/{pedido_id} — posición actual del repartidor */

@@ -220,17 +220,40 @@ $rolLabels = [
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
           <div style="grid-column:1/-1">
             <label class="perfil-label">Contraseña actual</label>
-            <input type="password" name="password_actual" class="perfil-input" required>
+            <div style="position:relative">
+              <input type="password" name="password_actual" id="pwd_actual" class="perfil-input" required style="padding-right:42px">
+              <button type="button" onclick="togglePwd('pwd_actual',this)" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#9CA3AF;padding:0;line-height:0">
+                <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+              </button>
+            </div>
           </div>
           <div>
             <label class="perfil-label">Nueva contraseña</label>
-            <input type="password" name="password_nuevo" class="perfil-input" minlength="8" required placeholder="Mínimo 8 caracteres">
+            <div style="position:relative">
+              <input type="password" name="password_nuevo" id="pwd_nuevo" class="perfil-input" minlength="8" required placeholder="Mínimo 8 caracteres" style="padding-right:42px">
+              <button type="button" onclick="togglePwd('pwd_nuevo',this)" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#9CA3AF;padding:0;line-height:0">
+                <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+              </button>
+            </div>
           </div>
           <div>
             <label class="perfil-label">Confirmar contraseña</label>
-            <input type="password" name="password_confirm" class="perfil-input" minlength="8" required placeholder="Repite la nueva contraseña">
+            <div style="position:relative">
+              <input type="password" name="password_confirm" id="pwd_confirm" class="perfil-input" minlength="8" required placeholder="Repite la nueva contraseña" style="padding-right:42px">
+              <button type="button" onclick="togglePwd('pwd_confirm',this)" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#9CA3AF;padding:0;line-height:0">
+                <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+              </button>
+            </div>
           </div>
         </div>
+        <script>
+        function togglePwd(id, btn) {
+          var inp = document.getElementById(id);
+          var showing = inp.type === 'text';
+          inp.type = showing ? 'password' : 'text';
+          btn.style.color = showing ? '#9CA3AF' : 'var(--color-primary)';
+        }
+        </script>
         <button type="submit" class="perfil-sec-btn">
           <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
           Cambiar contraseña

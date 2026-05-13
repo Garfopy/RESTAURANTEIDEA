@@ -81,17 +81,45 @@ $accion    = $esEdicion
       </div>
       <?php endif; ?>
 
-      <div style="margin-bottom:20px">
+      <div style="margin-bottom:14px">
         <label style="display:block;font-size:.8rem;font-weight:600;color:#374151;margin-bottom:5px">
           Contraseña <?= $esEdicion ? '(dejar vacío para no cambiar)' : '*' ?>
         </label>
-        <input type="password" name="password" <?= $esEdicion ? '' : 'required' ?> autocomplete="new-password"
-               minlength="6" placeholder="Mínimo 6 caracteres"
-               style="width:100%;padding:8px 12px;border:1px solid #D1D5DB;border-radius:8px;font-size:.875rem;box-sizing:border-box;outline:none">
+        <div style="position:relative">
+          <input type="password" id="inp-password" name="password" <?= $esEdicion ? '' : 'required' ?> autocomplete="new-password"
+                 minlength="6" placeholder="Mínimo 6 caracteres" oninput="onPasswordInput()"
+                 style="width:100%;padding:8px 38px 8px 12px;border:1px solid #D1D5DB;border-radius:8px;font-size:.875rem;box-sizing:border-box;outline:none">
+          <button type="button" onclick="togglePass('inp-password','eye-1')"
+                  style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#9CA3AF;padding:0;display:flex;align-items:center">
+            <svg id="eye-1" xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div id="campo-confirmar" style="margin-bottom:20px;<?= $esEdicion ? '' : '' ?>">
+        <label style="display:block;font-size:.8rem;font-weight:600;color:#374151;margin-bottom:5px">
+          Confirmar contraseña <?= $esEdicion ? '(solo si cambias la contraseña)' : '*' ?>
+        </label>
+        <div style="position:relative">
+          <input type="password" id="inp-confirm" name="password_confirm" <?= $esEdicion ? '' : 'required' ?> autocomplete="new-password"
+                 minlength="6" placeholder="Repite la contraseña" oninput="checkMatch()"
+                 style="width:100%;padding:8px 38px 8px 12px;border:1px solid #D1D5DB;border-radius:8px;font-size:.875rem;box-sizing:border-box;outline:none">
+          <button type="button" onclick="togglePass('inp-confirm','eye-2')"
+                  style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#9CA3AF;padding:0;display:flex;align-items:center">
+            <svg id="eye-2" xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+            </svg>
+          </button>
+        </div>
+        <p id="msg-mismatch" style="color:#DC2626;font-size:.75rem;margin-top:4px;display:none">Las contraseñas no coinciden</p>
       </div>
 
       <div style="display:flex;gap:10px">
-        <button type="submit"
+        <button type="submit" id="btn-submit"
                 style="padding:10px 24px;background:var(--color-primary);color:#fff;border:none;border-radius:8px;font-size:.875rem;font-weight:600;cursor:pointer">
           <?= $esEdicion ? 'Guardar cambios' : 'Crear usuario' ?>
         </button>
@@ -113,4 +141,49 @@ function toggleEmpresa(rol) {
     campo.style.opacity = (rol === 'admin_empresa') ? '1' : '0.5';
   }
 }
+
+function togglePass(inputId, eyeId) {
+  const inp = document.getElementById(inputId);
+  const eye = document.getElementById(eyeId);
+  const show = inp.type === 'password';
+  inp.type = show ? 'text' : 'password';
+  eye.innerHTML = show
+    ? '<path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>'
+    : '<path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>';
+}
+
+function checkMatch() {
+  const pass    = document.getElementById('inp-password').value;
+  const confirm = document.getElementById('inp-confirm').value;
+  const msg     = document.getElementById('msg-mismatch');
+  const btn     = document.getElementById('btn-submit');
+  const mismatch = confirm !== '' && pass !== confirm;
+  msg.style.display = mismatch ? 'block' : 'none';
+  document.getElementById('inp-confirm').style.borderColor = mismatch ? '#DC2626' : '#D1D5DB';
+  btn.disabled = mismatch;
+}
+
+function onPasswordInput() {
+  // Si el campo de contraseña está vacío en modo edición, limpiar también confirmar
+  const pass = document.getElementById('inp-password').value;
+  const confirmField = document.getElementById('inp-confirm');
+  if (pass === '') {
+    confirmField.value = '';
+    document.getElementById('msg-mismatch').style.display = 'none';
+    confirmField.style.borderColor = '#D1D5DB';
+    document.getElementById('btn-submit').disabled = false;
+  }
+  checkMatch();
+}
+
+// Bloquear submit si no coinciden
+document.querySelector('form').addEventListener('submit', function(e) {
+  const pass    = document.getElementById('inp-password').value;
+  const confirm = document.getElementById('inp-confirm').value;
+  if (pass !== '' && pass !== confirm) {
+    e.preventDefault();
+    document.getElementById('msg-mismatch').style.display = 'block';
+    document.getElementById('inp-confirm').focus();
+  }
+});
 </script>

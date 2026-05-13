@@ -1,8 +1,14 @@
 <?php
 // Vista: Listado de usuarios de la empresa
 ?>
+<?php
+$usuariosActivos   = array_filter($usuarios, fn($u) => $u['activo']);
+$usuariosInactivos = array_filter($usuarios, fn($u) => !$u['activo']);
+?>
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
-  <p style="color:#6B7280;font-size:.875rem"><?= count($usuarios) ?> usuario(s) en tu empresa</p>
+  <p style="color:#6B7280;font-size:.875rem">
+    <?= count($usuariosActivos) ?> activo(s)<?= count($usuariosInactivos) ? ', ' . count($usuariosInactivos) . ' inactivo(s)' : '' ?> en tu empresa
+  </p>
   <a href="<?= BASE_URL ?>empresa-usuario/nuevo"
      style="padding:9px 18px;background:var(--color-primary);color:#fff;border-radius:8px;text-decoration:none;font-weight:600;font-size:.875rem">
     + Agregar usuario
@@ -28,7 +34,7 @@
     </thead>
     <tbody>
       <?php foreach ($usuarios as $u): ?>
-      <tr style="border-top:1px solid #F3F4F6">
+      <tr style="border-top:1px solid #F3F4F6<?= $u['activo'] ? '' : ';opacity:.55' ?>" id="fila-usuario-<?= $u['id'] ?>">
         <td style="padding:12px 16px">
           <div style="font-weight:600;color:#111827"><?= htmlspecialchars($u['nombre'] . ' ' . $u['apellido_paterno']) ?></div>
           <div style="font-size:.8rem;color:#6B7280"><?= htmlspecialchars($u['email']) ?></div>
@@ -54,14 +60,17 @@
           <?php endif; ?>
         </td>
         <td style="padding:12px;white-space:nowrap">
+          <?php if ($u['activo']): ?>
           <a href="<?= BASE_URL ?>empresa-usuario/editar/<?= $u['id'] ?>"
              style="font-size:.8rem;color:#6B7280;text-decoration:none;margin-right:10px">Editar</a>
           <?php if ($u['rol_slug'] === 'comprador'): ?>
           <a href="<?= BASE_URL ?>empresa-usuario/precios/<?= $u['id'] ?>"
              style="font-size:.8rem;color:#7C3AED;text-decoration:none;margin-right:10px">Precios especiales</a>
           <?php endif; ?>
+          <?php endif; ?>
           <button onclick="toggleUsuario(<?= $u['id'] ?>, this)"
-                  style="font-size:.8rem;color:<?= $u['activo'] ? '#991B1B' : '#065F46' ?>;background:none;border:none;cursor:pointer;font-family:inherit">
+                  style="font-size:.8rem;color:<?= $u['activo'] ? '#991B1B' : '#065F46' ?>;background:none;border:none;cursor:pointer;font-family:inherit"
+                  data-activo="<?= $u['activo'] ? '1' : '0' ?>">
             <?= $u['activo'] ? 'Desactivar' : 'Activar' ?>
           </button>
         </td>
@@ -76,6 +85,17 @@
 function toggleUsuario(id, btn) {
   fetch('<?= BASE_URL ?>empresa-usuario/toggleActivo/' + id, { method: 'POST' })
     .then(r => r.json())
-    .then(d => { if (d.ok) location.reload(); });
+    .then(d => {
+      if (!d.ok) return;
+      const activo = d.activo;
+      const fila = document.getElementById('fila-usuario-' + id);
+      if (fila) fila.style.opacity = activo ? '' : '0.55';
+      btn.style.color = activo ? '#991B1B' : '#065F46';
+      btn.textContent  = activo ? 'Desactivar' : 'Activar';
+      btn.dataset.activo = activo ? '1' : '0';
+      // Mostrar/ocultar acciones según estado
+      const acciones = fila ? fila.querySelectorAll('a') : [];
+      acciones.forEach(a => { a.style.display = activo ? '' : 'none'; });
+    });
 }
 </script>

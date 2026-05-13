@@ -408,7 +408,7 @@ class PedidoModel extends BaseModel
     public function getSucursalesPedido(int $pedidoId): array
     {
         return $this->query(
-            'SELECT ps.id, ps.estado, ps.foto_entrega_path, ps.fecha_llegada,
+            'SELECT ps.id, ps.estado, ps.foto_entrega_path, ps.firma_path, ps.fecha_llegada,
                     s.nombre AS sucursal_nombre, s.direccion, s.lat, s.lng
                FROM pedido_sucursal ps
                JOIN sucursales s ON s.id = ps.sucursal_id
@@ -726,13 +726,13 @@ class PedidoModel extends BaseModel
 
     // ── Entrega por sucursal (flujo multi-parada directo) ─────────────────────
 
-    public function confirmarSucursalEntrega(int $pedidoSucursalId, string $fotoPath): void
+    public function confirmarSucursalEntrega(int $pedidoSucursalId, string $fotoPath, ?string $firmaPath = null): void
     {
         $this->execute(
             "UPDATE pedido_sucursal
-                SET estado = 'entregado', foto_entrega_path = ?, fecha_llegada = NOW()
+                SET estado = 'entregado', foto_entrega_path = ?, firma_path = ?, fecha_llegada = NOW()
               WHERE id = ?",
-            [$fotoPath, $pedidoSucursalId]
+            [$fotoPath, $firmaPath, $pedidoSucursalId]
         );
     }
 

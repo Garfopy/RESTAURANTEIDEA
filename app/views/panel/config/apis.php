@@ -118,35 +118,85 @@ function toggleVis(id) {
 
   <!-- PayPal -->
   <div style="background:#fff;border-radius:12px;border:1px solid #E5E7EB;padding:20px;margin-bottom:16px">
-    <h3 style="font-size:.85rem;font-weight:700;color:#111827;margin-bottom:14px;display:flex;align-items:center;gap:8px">
+    <h3 style="font-size:.85rem;font-weight:700;color:#111827;margin-bottom:6px;display:flex;align-items:center;gap:8px">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
       PayPal
     </h3>
-    <div style="display:grid;grid-template-columns:2fr 2fr 1fr;gap:14px">
-      <div>
-        <label class="form-label">Client ID</label>
-        <input type="text" name="paypal_client_id" value="<?= $s('paypal_client_id') ?>"
-               class="form-control" placeholder="AaBbCc...">
-      </div>
-      <div>
-        <label class="form-label">Secret</label>
-        <div style="display:flex">
-          <input type="password" id="paypal_secret" name="paypal_secret"
-                 value="<?= $s('paypal_secret') ?>"
-                 class="form-control" style="border-radius:6px 0 0 6px;border-right:none">
-          <button type="button" onclick="toggleVis('paypal_secret')"
-                  style="padding:0 10px;border:1px solid #E5E7EB;border-left:none;border-radius:0 6px 6px 0;background:#F9FAFB;cursor:pointer;font-size:.8rem;color:#6B7280;white-space:nowrap">Ver</button>
+    <!-- Selector de modo -->
+    <div style="margin-bottom:16px">
+      <label class="form-label">Modo activo</label>
+      <select name="paypal_mode" id="paypal_mode" class="form-control" style="max-width:220px"
+              onchange="togglePaypalCreds(this.value)">
+        <option value="sandbox" <?= ($settings['paypal_mode'] ?? 'sandbox') === 'sandbox' ? 'selected' : '' ?>>Sandbox (pruebas)</option>
+        <option value="live"    <?= ($settings['paypal_mode'] ?? '') === 'live' ? 'selected' : '' ?>>Live (producción)</option>
+      </select>
+    </div>
+    <!-- Sandbox -->
+    <div id="paypal-sandbox-creds" style="padding:14px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;margin-bottom:12px">
+      <p style="font-size:.75rem;font-weight:700;color:#166534;margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em">🧪 Sandbox (pruebas)</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div>
+          <label class="form-label">Client ID</label>
+          <input type="text" name="paypal_client_id_sandbox"
+                 value="<?= htmlspecialchars($settings['paypal_client_id_sandbox'] ?? $settings['paypal_client_id'] ?? '') ?>"
+                 class="form-control" placeholder="AaBbCc...">
+        </div>
+        <div>
+          <label class="form-label">Secret</label>
+          <div style="display:flex">
+            <input type="password" id="paypal_secret_sandbox" name="paypal_secret_sandbox"
+                   value="<?= htmlspecialchars($settings['paypal_secret_sandbox'] ?? $settings['paypal_secret'] ?? '') ?>"
+                   class="form-control" style="border-radius:6px 0 0 6px;border-right:none">
+            <button type="button" onclick="toggleVis('paypal_secret_sandbox')"
+                    style="padding:0 10px;border:1px solid #E5E7EB;border-left:none;border-radius:0 6px 6px 0;background:#F9FAFB;cursor:pointer;font-size:.8rem;color:#6B7280;white-space:nowrap">Ver</button>
+          </div>
         </div>
       </div>
-      <div>
-        <label class="form-label">Modo</label>
-        <select name="paypal_mode" class="form-control">
-          <option value="sandbox" <?= ($settings['paypal_mode'] ?? 'sandbox') === 'sandbox' ? 'selected' : '' ?>>Sandbox</option>
-          <option value="live" <?= ($settings['paypal_mode'] ?? '') === 'live' ? 'selected' : '' ?>>Live</option>
-        </select>
+    </div>
+    <!-- Live -->
+    <div id="paypal-live-creds" style="padding:14px;background:#FFF7ED;border:1px solid #FED7AA;border-radius:8px">
+      <p style="font-size:.75rem;font-weight:700;color:#9A3412;margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em">🚀 Live (producción)</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div>
+          <label class="form-label">Client ID</label>
+          <input type="text" name="paypal_client_id_live"
+                 value="<?= htmlspecialchars($settings['paypal_client_id_live'] ?? '') ?>"
+                 class="form-control" placeholder="AaBbCc...">
+        </div>
+        <div>
+          <label class="form-label">Secret</label>
+          <div style="display:flex">
+            <input type="password" id="paypal_secret_live" name="paypal_secret_live"
+                   value="<?= htmlspecialchars($settings['paypal_secret_live'] ?? '') ?>"
+                   class="form-control" style="border-radius:6px 0 0 6px;border-right:none">
+            <button type="button" onclick="toggleVis('paypal_secret_live')"
+                    style="padding:0 10px;border:1px solid #E5E7EB;border-left:none;border-radius:0 6px 6px 0;background:#F9FAFB;cursor:pointer;font-size:.8rem;color:#6B7280;white-space:nowrap">Ver</button>
+          </div>
+        </div>
       </div>
     </div>
+    <!-- Input hidden para retrocompatibilidad -->
+    <input type="hidden" name="paypal_client_id" value="">
+    <input type="hidden" name="paypal_secret"    value="">
   </div>
+  <script>
+  function togglePaypalCreds(mode) {
+    var sandbox = document.getElementById('paypal-sandbox-creds');
+    var live    = document.getElementById('paypal-live-creds');
+    if (mode === 'live') {
+      sandbox.style.opacity = '0.5';
+      live.style.opacity    = '1';
+      live.style.outline    = '2px solid #F97316';
+      sandbox.style.outline = 'none';
+    } else {
+      sandbox.style.opacity = '1';
+      live.style.opacity    = '0.5';
+      sandbox.style.outline = '2px solid #22C55E';
+      live.style.outline    = 'none';
+    }
+  }
+  togglePaypalCreds(document.getElementById('paypal_mode').value);
+  </script>
 
   <!-- Factura-lo -->
   <div style="background:#fff;border-radius:12px;border:1px solid #E5E7EB;padding:20px;margin-bottom:16px">

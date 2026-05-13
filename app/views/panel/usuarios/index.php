@@ -66,11 +66,13 @@
         <td style="padding:12px 16px;text-align:center;white-space:nowrap">
           <a href="<?= BASE_URL ?>panel-usuario/editar/<?= $u['id'] ?>"
              style="color:var(--color-primary);font-size:.8rem;font-weight:600;text-decoration:none;margin-right:10px">Editar</a>
+          <?php if ($u['rol_slug'] !== 'superadmin'): ?>
           <a href="<?= BASE_URL ?>panel-usuario/toggle/<?= $u['id'] ?>"
              onclick="return confirm('¿<?= $u['activo'] ? 'Desactivar' : 'Activar' ?> este usuario?')"
-             style="color:#6B7280;font-size:.8rem;font-weight:600;text-decoration:none">
+             style="color:<?= $u['activo'] ? '#6B7280' : '#059669' ?>;font-size:.8rem;font-weight:600;text-decoration:none">
             <?= $u['activo'] ? 'Desactivar' : 'Activar' ?>
           </a>
+          <?php endif; ?>
         </td>
       </tr>
       <?php endforeach; ?>

@@ -133,6 +133,7 @@ $publicPaths = [
     'planes/aprobarpagotest',
     'suscripcion/webhook',
     'landing/landing',
+    'api/planes',
     'taqueria/taqueria',
     'restaurantes/restaurantes',
     // Nuevas rutas SEO HUB

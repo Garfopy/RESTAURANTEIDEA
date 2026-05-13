@@ -88,6 +88,12 @@ class CompradorSucursalController extends BaseController
             $this->redirect('comprador-sucursal/nueva');
         }
 
+        $telefono = preg_replace('/\D/', '', trim($this->post('telefono', '')));
+        if ($telefono !== '' && strlen($telefono) !== 10) {
+            $this->flash('error', 'El teléfono debe tener exactamente 10 dígitos.');
+            $this->redirect('comprador-sucursal/nueva');
+        }
+
         $this->sucursalModel->crear([
             'empresa_id'  => $empresaId,
             'comprador_id'=> $compradorId,
@@ -96,7 +102,7 @@ class CompradorSucursalController extends BaseController
             'lat'         => $this->post('lat', ''),
             'lng'         => $this->post('lng', ''),
             'responsable' => trim($this->post('responsable', '')),
-            'telefono'    => trim($this->post('telefono', '')),
+            'telefono'    => $telefono,
         ]);
 
         $this->flash('success', "Sucursal '{$nombre}' agregada.");
@@ -144,13 +150,19 @@ class CompradorSucursalController extends BaseController
             $this->redirect("comprador-sucursal/editar/{$id}");
         }
 
+        $telefono = preg_replace('/\D/', '', trim($this->post('telefono', '')));
+        if ($telefono !== '' && strlen($telefono) !== 10) {
+            $this->flash('error', 'El teléfono debe tener exactamente 10 dígitos.');
+            $this->redirect("comprador-sucursal/editar/{$id}");
+        }
+
         $this->sucursalModel->actualizar($id, [
             'nombre'      => $nombre,
             'direccion'   => $direccion,
             'lat'         => $this->post('lat', ''),
             'lng'         => $this->post('lng', ''),
             'responsable' => trim($this->post('responsable', '')),
-            'telefono'    => trim($this->post('telefono', '')),
+            'telefono'    => $telefono,
         ]);
 
         $this->flash('success', 'Sucursal actualizada.');
