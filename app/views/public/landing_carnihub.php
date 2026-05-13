@@ -1127,6 +1127,139 @@
   </div>
 </section>
 
+<script>
+(function () {
+  // ── Polling: actualiza la sección de precios sin recargar la página ──
+  var BASE = '<?= BASE_URL ?>';
+  var lastHash  = '';
+  var gridEl    = null; // se asigna tras el primer render
+  var INTERVAL  = 10000; // ms
+
+  var SVG_CHECK = '<svg class="w-5 h-5 mt-0.5 flex-shrink-0 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">'
+                + '<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>';
+  var SVG_STAR  = '<svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">'
+                + '<path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>';
+
+  function formatNum(n) {
+    return n.toLocaleString('en-US', {maximumFractionDigits: 0});
+  }
+
+  function buildCard(plan, popular, delay) {
+    var pct = '';
+    if (plan.precio_anual) {
+      pct = Math.round((1 - plan.precio_anual / (plan.precio_mensual * 12)) * 100);
+    }
+
+    var badge = popular
+      ? '<div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold text-white mb-4" style="background:var(--cp)">'
+        + SVG_STAR + ' Más popular</div>'
+      : '';
+
+    var btnClass = popular
+      ? 'btn-primary btn-shimmer'
+      : 'border-2 border-gray-200 text-gray-700 hover:border-primary hover:text-primary';
+
+    var anualHtml = plan.precio_anual
+      ? '<div class="text-sm text-green-600 font-medium">o $' + formatNum(plan.precio_anual) + ' MXN/año'
+        + '<span class="text-xs text-green-500"> (ahorra ' + pct + '%)</span></div>'
+      : '';
+
+    var featuresHtml = '';
+    if (plan.features && plan.features.length) {
+      featuresHtml = '<ul class="space-y-3">';
+      plan.features.forEach(function (f) {
+        featuresHtml += '<li class="flex items-start gap-3 text-sm text-gray-600">' + SVG_CHECK
+                      + '<span>' + f.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</span></li>';
+      });
+      featuresHtml += '</ul>';
+    } else {
+      featuresHtml = '<ul class="space-y-3">';
+      if (plan.max_usuarios  > 0) featuresHtml += '<li class="flex items-center gap-3 text-sm text-gray-600">' + SVG_CHECK + 'Hasta ' + plan.max_usuarios  + ' usuarios</li>';
+      if (plan.max_productos > 0) featuresHtml += '<li class="flex items-center gap-3 text-sm text-gray-600">' + SVG_CHECK + 'Hasta ' + plan.max_productos + ' productos</li>';
+      if (plan.max_sucursales> 0) featuresHtml += '<li class="flex items-center gap-3 text-sm text-gray-600">' + SVG_CHECK + 'Hasta ' + plan.max_sucursales+ ' sucursales</li>';
+      featuresHtml += '<li class="flex items-center gap-3 text-sm text-gray-600">' + SVG_CHECK + 'GPS repartidores</li>';
+      featuresHtml += '<li class="flex items-center gap-3 text-sm text-gray-600">' + SVG_CHECK + 'Soporte incluido</li>';
+      featuresHtml += '</ul>';
+    }
+
+    return '<div class="plan-card bg-white rounded-2xl p-8 border border-gray-200 shadow-sm reveal'
+      + (popular ? ' plan-popular' : '') + '" style="transition-delay:' + delay + 'ms">'
+      + badge
+      + '<h3 class="text-xl font-extrabold text-gray-900 mb-1">' + plan.nombre + '</h3>'
+      + '<p class="text-sm text-gray-400 mb-6">Plan ' + plan.nombre.toLowerCase() + '</p>'
+      + '<div class="mb-6">'
+      +   '<div class="flex items-end gap-1 mb-1">'
+      +     '<span class="text-4xl font-black text-gray-900">$' + formatNum(plan.precio_mensual) + '</span>'
+      +     '<span class="text-gray-400 mb-1.5">MXN/mes</span>'
+      +   '</div>'
+      +   anualHtml
+      + '</div>'
+      + '<a href="' + BASE + 'planes/registro?plan=' + encodeURIComponent(plan.slug) + '&ciclo=mensual"'
+      +  ' class="block text-center font-bold py-3.5 rounded-xl mb-8 transition-all ' + btnClass + '">'
+      +  'Comenzar ahora</a>'
+      + featuresHtml
+      + '</div>';
+  }
+
+  function renderPlanes(planes) {
+    var section = document.getElementById('precios');
+    if (!section) return;
+
+    var wrapper = section.querySelector('.max-w-6xl');
+    if (!wrapper) return;
+
+    // Eliminar grid anterior si existe
+    var oldGrid = wrapper.querySelector('.grid');
+    var oldFallback = wrapper.querySelector('[data-planes-fallback]');
+    if (oldGrid)     oldGrid.remove();
+    if (oldFallback) oldFallback.remove();
+
+    if (!planes || planes.length === 0) {
+      var fb = document.createElement('div');
+      fb.setAttribute('data-planes-fallback', '1');
+      fb.className = 'text-center';
+      fb.innerHTML = '<a href="' + BASE + 'planes" class="btn-primary btn-shimmer inline-block font-bold text-base px-10 py-4 rounded-xl">Ver planes y precios →</a>';
+      wrapper.appendChild(fb);
+      return;
+    }
+
+    var midIndex = Math.floor(planes.length / 2);
+    var cols = Math.min(planes.length, 3);
+    var grid = document.createElement('div');
+    grid.className = 'grid grid-cols-1 md:grid-cols-' + cols + ' gap-6 items-start';
+
+    planes.forEach(function (plan, i) {
+      grid.insertAdjacentHTML('beforeend', buildCard(plan, i === midIndex, i * 100));
+    });
+
+    wrapper.appendChild(grid);
+  }
+
+  function fetchPlanes() {
+    fetch(BASE + 'api/planes', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+      .then(function (data) {
+        if (data.hash && data.hash !== lastHash) {
+          lastHash = data.hash;
+          renderPlanes(data.planes);
+        }
+      })
+      .catch(function () { /* fallo silencioso: la sección conserva su estado actual */ });
+  }
+
+  // Consulta inicial al cargar
+  fetchPlanes();
+
+  // Polling cada 10 segundos
+  setInterval(fetchPlanes, INTERVAL);
+
+  // Al volver a la pestaña, consultar de inmediato
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) fetchPlanes();
+  });
+})();
+</script>
+
 <!-- ══ TESTIMONIALES ══ -->
 <section class="bg-slate-50 py-24">
   <div class="max-w-6xl mx-auto px-6">
