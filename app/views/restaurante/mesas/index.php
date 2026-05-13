@@ -131,7 +131,7 @@
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script src="https://unpkg.com/qrcodejs@1.0.0/qrcode.min.js"></script>
 <script>
 // Generar QR por mesa
 <?php foreach ($mesas as $m): ?>

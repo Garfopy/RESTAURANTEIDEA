@@ -137,7 +137,7 @@ function copiar(id, btn) {
 
 (function() {
   const s = document.createElement('script');
-  s.src = 'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js';
+  s.src = 'https://unpkg.com/qrcodejs@1.0.0/qrcode.min.js';
   s.onload = function() {
     new QRCode(document.getElementById('qrStaff'), {
       text: '<?= addslashes($linkStaff) ?>',

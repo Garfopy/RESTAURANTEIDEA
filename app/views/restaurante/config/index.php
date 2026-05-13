@@ -38,16 +38,80 @@
                  value="<?= htmlspecialchars($restaurante['direccion'] ?? '') ?>"
                  placeholder="Ej: Av. Principal 123, Ciudad">
         </div>
-        <div class="form-group">
-          <label class="form-label">Horario apertura</label>
-          <input type="time" name="horario_apertura" class="form-input"
-                 value="<?= htmlspecialchars($restaurante['horario_apertura'] ?? '') ?>">
+      </div>
+
+      <!-- Horarios por día de la semana -->
+      <div style="border-top:1px solid #F3F4F6;padding-top:20px;margin-bottom:20px">
+        <div style="font-weight:700;font-size:.95rem;color:#111827;margin-bottom:6px;
+                    display:flex;align-items:center;gap:8px">
+          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          Horarios de atención
         </div>
-        <div class="form-group">
-          <label class="form-label">Horario cierre</label>
-          <input type="time" name="horario_cierre" class="form-input"
-                 value="<?= htmlspecialchars($restaurante['horario_cierre'] ?? '') ?>">
+        <div style="font-size:.8rem;color:#6B7280;margin-bottom:14px">
+          Selecciona los días que abres y define el horario. Los comensales no podrán ordenar fuera de este horario.
         </div>
+
+        <?php
+          $diasKeys = ['lun','mar','mie','jue','vie','sab','dom'];
+          $diasNom  = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+          $horariosJson = !empty($restaurante['horarios_json'])
+            ? json_decode($restaurante['horarios_json'], true)
+            : [];
+          // Default: fill from old fields or 9:00-22:00
+          $defaultAbre  = substr($restaurante['horario_apertura'] ?? '09:00', 0, 5);
+          $defaultCierra = substr($restaurante['horario_cierre']  ?? '22:00', 0, 5);
+          foreach ($diasKeys as $d) {
+            if (!isset($horariosJson[$d])) {
+              $horariosJson[$d] = ['abre' => $defaultAbre, 'cierra' => $defaultCierra, 'cerrado' => 0];
+            }
+          }
+        ?>
+
+        <!-- Day chips -->
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px" id="dayChips">
+          <?php foreach ($diasKeys as $i => $d): ?>
+          <?php $cerrado = (int)($horariosJson[$d]['cerrado'] ?? 0); ?>
+          <button type="button"
+                  data-dia="<?= $d ?>"
+                  onclick="toggleDia('<?= $d ?>', this)"
+                  style="padding:8px 16px;border-radius:99px;font-size:.85rem;font-weight:600;cursor:pointer;
+                         border:2px solid <?= !$cerrado ? 'var(--cp)' : '#D1D5DB' ?>;
+                         background:<?= !$cerrado ? 'var(--cp)' : '#fff' ?>;
+                         color:<?= !$cerrado ? '#fff' : '#6B7280' ?>;transition:.15s">
+            <?= $diasNom[$i] ?>
+          </button>
+          <?php endforeach; ?>
+        </div>
+
+        <!-- Time rows -->
+        <div id="horarioRows" style="display:grid;gap:8px">
+          <?php foreach ($diasKeys as $i => $d): ?>
+          <?php
+            $h = $horariosJson[$d];
+            $cerrado = (int)($h['cerrado'] ?? 0);
+          ?>
+          <div id="row_<?= $d ?>" style="<?= $cerrado ? 'display:none' : 'display:flex' ?>;align-items:center;gap:12px;
+               background:#F9FAFB;border-radius:10px;padding:10px 14px;flex-wrap:wrap">
+            <span style="font-weight:600;font-size:.88rem;color:#374151;width:80px"><?= $diasNom[$i] ?></span>
+            <div style="display:flex;align-items:center;gap:8px;flex:1">
+              <label style="font-size:.8rem;color:#6B7280">Abre</label>
+              <input type="time" id="abre_<?= $d ?>" value="<?= htmlspecialchars($h['abre']) ?>"
+                     class="form-input" style="max-width:130px;padding:6px 10px"
+                     onchange="actualizarHorariosJson()">
+              <label style="font-size:.8rem;color:#6B7280">Cierra</label>
+              <input type="time" id="cierra_<?= $d ?>" value="<?= htmlspecialchars($h['cierra']) ?>"
+                     class="form-input" style="max-width:130px;padding:6px 10px"
+                     onchange="actualizarHorariosJson()">
+            </div>
+          </div>
+          <?php endforeach; ?>
+        </div>
+
+        <input type="hidden" name="horarios_json" id="horariosJson"
+               value="<?= htmlspecialchars(json_encode($horariosJson)) ?>">
+        <!-- Keep legacy columns for backwards compat -->
+        <input type="hidden" name="horario_apertura" id="legacyAbre" value="<?= htmlspecialchars($defaultAbre) ?>">
+        <input type="hidden" name="horario_cierre" id="legacyCierra" value="<?= htmlspecialchars($defaultCierra) ?>">
       </div>
 
       <!-- Mapa de ubicación (Leaflet/OpenStreetMap, sin API key) -->
@@ -233,7 +297,43 @@
 </div>
 
 <script>
-// Sync color pickers con text inputs
+// ── Horarios ────────────────────────────────────────────────────────────────
+const DIAS = ['lun','mar','mie','jue','vie','sab','dom'];
+
+function toggleDia(dia, btn) {
+  const row = document.getElementById('row_' + dia);
+  const abierto = row.style.display !== 'none' && row.style.display !== '';
+  if (abierto) {
+    row.style.display = 'none';
+    btn.style.background = '#fff';
+    btn.style.color = '#6B7280';
+    btn.style.borderColor = '#D1D5DB';
+  } else {
+    row.style.display = 'flex';
+    btn.style.background = 'var(--cp)';
+    btn.style.color = '#fff';
+    btn.style.borderColor = 'var(--cp)';
+  }
+  actualizarHorariosJson();
+}
+
+function actualizarHorariosJson() {
+  const data = {};
+  DIAS.forEach(d => {
+    const row = document.getElementById('row_' + d);
+    const cerrado = !row || row.style.display === 'none' ? 1 : 0;
+    const abre   = document.getElementById('abre_'  + d)?.value || '09:00';
+    const cierra = document.getElementById('cierra_' + d)?.value || '22:00';
+    data[d] = { abre, cierra, cerrado };
+  });
+  document.getElementById('horariosJson').value = JSON.stringify(data);
+  // Update legacy fallback fields with Mon hours
+  const mon = data['lun'];
+  document.getElementById('legacyAbre').value  = mon?.cerrado ? '' : mon?.abre;
+  document.getElementById('legacyCierra').value = mon?.cerrado ? '' : mon?.cierra;
+}
+
+// ── Color pickers ────────────────────────────────────────────────────────────
 document.getElementById('cpicker').addEventListener('input', function() {
   document.getElementById('txtColorPri').value = this.value;
 });
@@ -250,7 +350,7 @@ document.getElementById('txtColorSec').addEventListener('input', function() {
 // Generar QR con qrcode.js CDN
 (function() {
   const script = document.createElement('script');
-  script.src = 'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js';
+  script.src = 'https://unpkg.com/qrcodejs@1.0.0/qrcode.min.js';
   script.onload = function() {
     new QRCode(document.getElementById('qrcanvas'), {
       text: '<?= addslashes(BASE_URL . 'menu/' . ($restaurante['slug'] ?? '')) ?>',

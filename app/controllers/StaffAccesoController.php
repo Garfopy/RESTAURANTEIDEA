@@ -40,7 +40,7 @@ class StaffAccesoController extends BaseController
         }
 
         $db   = Database::getInstance();
-        $user = $db->queryOne(
+        $stmt = $db->prepare(
             "SELECT u.*, r.slug AS rol_slug, r.nombre AS rol_nombre
              FROM usuarios u
              JOIN roles r ON r.id = u.rol_id
@@ -48,9 +48,10 @@ class StaffAccesoController extends BaseController
              WHERE u.email = ? AND u.activo = 1
                AND r.slug IN ('mesero','chef','portero')
                AND rs.activo = 1
-               AND rs.restaurante_id = ?",
-            [$email, (int)($restaurante['id'] ?? 0)]
+               AND rs.restaurante_id = ?"
         );
+        $stmt->execute([$email, (int)($restaurante['id'] ?? 0)]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
 
         if (!$user || !password_verify($password, $user['password'])) {
             $this->flash('error', 'Credenciales incorrectas o no tienes acceso a este restaurante.');
