@@ -150,19 +150,6 @@
     .navbar.scrolled ~ #mobile-menu a:not(.btn-primary) { color: #374151; }
     .navbar.scrolled ~ #mobile-menu .mobile-divider { border-color: #e5e7eb; }
 
-    /* ── Responsive hamburguesa (CSS nativo, no depende de Tailwind CDN) ── */
-    @media (max-width: 767px) {
-      #menu-toggle       { display: flex !important; }
-      .nav-login-desktop { display: none !important; }
-      .nav-links-desktop { display: none !important; }
-    }
-    @media (min-width: 768px) {
-      #menu-toggle        { display: none !important; }
-      .nav-login-desktop  { display: inline-block !important; }
-      .nav-links-desktop  { display: flex !important; }
-      #mobile-menu        { display: none !important; }
-    }
-
     /* ── Shimmer en botón CTA ── */
     .btn-shimmer { position:relative; overflow:hidden; }
     .btn-shimmer::after {
@@ -241,39 +228,58 @@
   <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
     <a href="<?= BASE_URL ?>" class="flex items-center gap-2 no-underline">
       <?php if ($appLogo): ?>
-        <img src="<?= htmlspecialchars($appLogo) ?>" alt="Logo" class="h-12 object-contain">
+        <img src="<?= htmlspecialchars($appLogo) ?>" alt="Logo" style="height:48px;width:auto;object-fit:contain">
       <?php else: ?>
-        <span class="text-2xl font-black text-white tracking-tight"><?= htmlspecialchars($appName) ?></span>
+        <span style="font-size:1.5rem;font-weight:900;color:#fff;letter-spacing:-0.025em;line-height:1"><?= htmlspecialchars($appName) ?></span>
       <?php endif; ?>
     </a>
-    <div class="nav-links-desktop hidden md:flex items-center gap-1">
-      <a href="#roles"    class="text-sm font-medium text-white/70 px-4 py-2 rounded-lg hover:text-white hover:bg-white/10 transition-all">Experiencias</a>
-      <a href="#features" class="text-sm font-medium text-white/70 px-4 py-2 rounded-lg hover:text-white hover:bg-white/10 transition-all">Funciones</a>
-      <a href="#how"      class="text-sm font-medium text-white/70 px-4 py-2 rounded-lg hover:text-white hover:bg-white/10 transition-all">¿Cómo funciona?</a>
-      <a href="#precios"  class="text-sm font-medium text-white/70 px-4 py-2 rounded-lg hover:text-white hover:bg-white/10 transition-all">Precios</a>
+    <!-- Links de navegación -->
+    <div id="nav-links" style="display:none;align-items:center;gap:4px">
+      <a href="#roles"    style="font-size:.875rem;font-weight:500;color:rgba(255,255,255,.7);padding:8px 16px;border-radius:8px;text-decoration:none;transition:color .2s,background .2s" onmouseover="this.style.color='#fff';this.style.background='rgba(255,255,255,.1)'" onmouseout="this.style.color='rgba(255,255,255,.7)';this.style.background='transparent'">Experiencias</a>
+      <a href="#features" style="font-size:.875rem;font-weight:500;color:rgba(255,255,255,.7);padding:8px 16px;border-radius:8px;text-decoration:none;transition:color .2s,background .2s" onmouseover="this.style.color='#fff';this.style.background='rgba(255,255,255,.1)'" onmouseout="this.style.color='rgba(255,255,255,.7)';this.style.background='transparent'">Funciones</a>
+      <a href="#how"      style="font-size:.875rem;font-weight:500;color:rgba(255,255,255,.7);padding:8px 16px;border-radius:8px;text-decoration:none;transition:color .2s,background .2s" onmouseover="this.style.color='#fff';this.style.background='rgba(255,255,255,.1)'" onmouseout="this.style.color='rgba(255,255,255,.7)';this.style.background='transparent'">¿Cómo funciona?</a>
+      <a href="#precios"  style="font-size:.875rem;font-weight:500;color:rgba(255,255,255,.7);padding:8px 16px;border-radius:8px;text-decoration:none;transition:color .2s,background .2s" onmouseover="this.style.color='#fff';this.style.background='rgba(255,255,255,.1)'" onmouseout="this.style.color='rgba(255,255,255,.7)';this.style.background='transparent'">Precios</a>
     </div>
-    <div class="flex items-center gap-2">
+    <div style="display:flex;align-items:center;gap:8px">
       <!-- Siempre visible: CTA principal -->
       <a href="<?= BASE_URL ?>planes"
-         class="btn-primary btn-shimmer text-sm font-bold px-5 py-2.5 rounded-xl">
+         class="btn-primary btn-shimmer"
+         style="font-size:.875rem;font-weight:700;padding:10px 20px;border-radius:12px;text-decoration:none;white-space:nowrap">
         Ver planes
       </a>
-      <!-- Iniciar sesión: solo en desktop -->
-      <a href="<?= BASE_URL ?>auth/login" class="nav-login-desktop hidden md:inline-block text-sm font-semibold text-white/80 px-4 py-2 hover:text-white transition-colors">
+      <!-- Iniciar sesión: solo desktop -->
+      <a id="nav-login" href="<?= BASE_URL ?>auth/login"
+         style="display:none;font-size:.875rem;font-weight:600;color:rgba(255,255,255,.8);padding:8px 16px;text-decoration:none;white-space:nowrap">
         Iniciar sesión
       </a>
-      <!-- Botón hamburguesa: solo en móvil -->
-      <button id="menu-toggle" class="md:hidden flex items-center justify-center w-10 h-10 rounded-lg text-white hover:bg-white/10 transition-colors" aria-label="Abrir menú" aria-expanded="false">
-        <svg id="icon-open" xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <!-- Botón hamburguesa: solo móvil -->
+      <button id="menu-toggle"
+              style="display:none;align-items:center;justify-content:center;width:40px;height:40px;border-radius:8px;background:none;border:none;color:#fff;cursor:pointer;flex-shrink:0;padding:0"
+              aria-label="Abrir menú" aria-expanded="false">
+        <svg id="icon-open" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
           <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
         </svg>
-        <svg id="icon-close" xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="hidden">
+        <svg id="icon-close" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="display:none">
           <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
         </svg>
       </button>
     </div>
   </div>
 </nav>
+<script>
+// Responsive navbar — sin depender de Tailwind CDN
+(function() {
+  function navResponsive() {
+    var isMobile = window.innerWidth < 768;
+    document.getElementById('nav-links').style.display   = isMobile ? 'none'         : 'flex';
+    document.getElementById('nav-login').style.display   = isMobile ? 'none'         : 'inline-block';
+    document.getElementById('menu-toggle').style.display = isMobile ? 'flex'         : 'none';
+    if (!isMobile && typeof closeMobileMenu === 'function') closeMobileMenu();
+  }
+  navResponsive();
+  window.addEventListener('resize', navResponsive);
+})();
+</script>
 
 <!-- ══════════════════════════════════════════════════════════ MENÚ MÓVIL -->
 <div id="mobile-menu" role="dialog" aria-label="Menú de navegación">
