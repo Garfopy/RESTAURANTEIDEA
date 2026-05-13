@@ -1,4 +1,4 @@
-# Plan & Checklist — Módulo Restaurantes CarniHub v3.4
+# Plan & Checklist — Módulo Restaurantes CarniHub v3.5
 
 **Actualizado:** 2026-05-13 | **Branch:** `sprint-restaurantes`
 
@@ -329,6 +329,10 @@ Mesero/Admin al cierre → /rest-finanzas/cortes → "Nuevo corte"
 - [x] `023_restaurantes_finanzas.sql` — gastos, retiros, cortes
 - [x] `024_restaurantes_reservaciones.sql`
 - [x] `025_roles_restaurante.sql` — roles 7/8/9, columnas restaurante_id
+- [x] `026_rest_modos.sql` — toggles de operación (mesas, reservas, portero, login comensal, propinas)
+- [x] `027_test_staff_la_comalada.sql` — usuarios de prueba mesero/chef/portero
+- [x] `028_rest_horarios_json.sql` — columna horarios_json
+- [x] `029_test_ingredientes_la_comalada.sql` — 18 ingredientes de prueba con stock inicial
 
 #### Modelos
 - [x] RestauranteModel, RestMesaModel, RestMenuModel, RestInventarioModel
@@ -351,7 +355,8 @@ Mesero/Admin al cierre → /rest-finanzas/cortes → "Nuevo corte"
 - [x] menu (index + form con receta), inventario (tabs CarniHub/Externo + movimientos)
 - [x] finanzas (dashboard, gastos, retiros, cortes), tickets (index/detalle)
 - [x] clientes (index/detalle/top), staff (index con role cards)
-- [x] config (branding + Maps), config/qr (descargable + URL staff)
+- [x] config (branding + Google Maps API key / fallback OSM), config/qr (descargable + URL staff)
+- [x] **dashboard** con panel "Links rápidos" — portal staff + menú público con botones copiar/abrir
 
 #### Portales staff
 - [x] chef/dashboard.php — KDS dark mode, AJAX 5s, Web Audio beep
@@ -374,9 +379,8 @@ Mesero/Admin al cierre → /rest-finanzas/cortes → "Nuevo corte"
 
 ### 🔴 PENDIENTE BLOQUEANTE para flujo end-to-end
 
-- [ ] **Pago público sin login** — pagar.php POSTea a `rest-ticket/confirmarPago` que requiere login → rompe el flujo. Falta endpoint público en RestPublicoController.
 - [ ] **Descuento de inventario** — `descontarPorOrden()` existe pero NUNCA se llama. Hook en chef::marcarListo cuando todo el pedido pasa a 'listo'.
-- [ ] **Migración 026** — campos `mesas_habilitadas`, `reservas_habilitadas`, `portero_habilitado`, `propinas_sugeridas`, `requiere_login_comensal`.
+- [ ] **Migración 026** — debe aplicarse en el servidor para que los toggles de modos guarden. La aplicación ya tiene try/catch defensivo; una vez aplicada, los toggles funcionarán.
 
 ### 🟡 PENDIENTE alta prioridad
 
@@ -416,8 +420,9 @@ Mesero/Admin al cierre → /rest-finanzas/cortes → "Nuevo corte"
 
 - **Onboarding de comprador**: crea restaurante → redirige a `/restaurante/bienvenida` con link `/acceso/{slug}` shareable + QR + guía.
 - **Dashboard restaurante**: KPIs reales + **banner onboarding** con checklist (info, mesas, menú, staff) y barra de progreso.
-- **Configuración**: 4 toggles de modos con badge **Activo/Apagado** visible + propinas CSV. Mapa via **Leaflet/OpenStreetMap** (sin API key).
-- **Staff**: portal `/rest-staff/index` (ya sin error 500) — crea cuentas mesero/chef/portero, código auto, login en `/acceso/{slug}`.
+- **Configuración**: 4 toggles de modos con badge **Activo/Apagado** visible + propinas CSV. Mapa via **Google Maps JS API** cuando hay API key en `global_settings` (`google_maps_key`), o **Leaflet/OSM** como fallback.
+- **Dashboard**: panel **"Links rápidos"** con botones Copiar/Abrir para el portal staff y el menú público.
+- **Staff**: portal `/rest-staff/index` — crea cuentas mesero/chef/portero, banner con link `/acceso/{slug}` shareable + copiar + abrir.
 - **Usuarios de prueba** (LA COMALADA, migration 027): `mesero1@la-comalada.test` · `chef1@la-comalada.test` · `portero1@la-comalada.test` — pass `Test1234!`.
 - **Wizard de platillo**: 3 pasos (info → receta → revisar) con validación, badge de pasos y resumen final.
 - **Menú público**: empty state bonito si aún no hay platillos.
@@ -452,6 +457,7 @@ Mesero/Admin al cierre → /rest-finanzas/cortes → "Nuevo corte"
 
 | Fecha | Sprint | Cambio |
 |-------|--------|--------|
+| 2026-05-13 | v3.5 | **Links rápidos** en dashboard (portal staff + menú público); **Google Maps** usa API key de `global_settings`; `requiere_login_comensal` redirige comensal a `/acceso/{slug}`; migration 029 con 18 ingredientes de prueba; plan actualizado |
 | 2026-05-13 | v3.4 | **Bugfix sprint**: arreglado 500 en `/rest-staff/index` (PDO methods correctos), toggles con label-based switch + badge Activo/Apagado, modales realmente centrados con animación elástica, mapa migrado a Leaflet/OSM (sin API key), banner onboarding con checklist en dashboard, wizard de 3 pasos para crear platillo, empty state en menú público |
 | 2026-05-13 | v3.3 | Plan reescrito HIPER completo: actores, modos sucursal, flujos detallados, casos extra, estado, prioridades, historial. Implementado pago público sin login + descuento inventario al marcar listo. Bienvenida post-creación + migración 026 modos + 027 staff prueba |
 | 2026-05-13 | v3.2 | Modal CSS cache-bust + fallback inline |
@@ -471,6 +477,8 @@ SOURCE migrations/024_restaurantes_reservaciones.sql;
 SOURCE migrations/025_roles_restaurante.sql;
 SOURCE migrations/026_rest_modos.sql;
 SOURCE migrations/027_test_staff_la_comalada.sql;   -- usuarios de prueba
+SOURCE migrations/028_rest_horarios_json.sql;
+SOURCE migrations/029_test_ingredientes_la_comalada.sql;  -- ingredientes de prueba
 
 UPDATE usuarios SET restaurante_activo = 1 WHERE email = 'tu@correo.com';
 ```

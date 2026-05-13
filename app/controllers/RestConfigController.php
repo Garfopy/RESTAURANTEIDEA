@@ -17,9 +17,21 @@ class RestConfigController extends BaseController
         $restauranteId = $this->restauranteId();
         $restaurante   = $this->model->find($restauranteId);
         $flash         = $this->getFlash();
-        $pageTitle     = 'Configuración del Restaurante';
-        $activeMenu    = 'rest_config';
-        $this->render('restaurante/config/index', compact('restaurante','flash','pageTitle','activeMenu'));
+
+        // Google Maps API key from global_settings (superadmin-configured)
+        $mapsApiKey = '';
+        try {
+            $db   = \Database::getInstance();
+            $stmt = $db->prepare("SELECT valor FROM global_settings WHERE clave = 'google_maps_key' LIMIT 1");
+            $stmt->execute();
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+            $mapsApiKey = $row['valor'] ?? '';
+        } catch (\Exception $e) { /* table may not exist */ }
+
+        $pageTitle  = 'Configuración del Restaurante';
+        $activeMenu = 'rest_config';
+        $this->render('restaurante/config/index',
+            compact('restaurante','flash','pageTitle','activeMenu','mapsApiKey'));
     }
 
     public function guardar(?string $p = null): void

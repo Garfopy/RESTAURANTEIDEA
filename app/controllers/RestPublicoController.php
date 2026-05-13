@@ -28,6 +28,13 @@ class RestPublicoController extends BaseController
             die('<h1>Restaurante no encontrado</h1>');
         }
 
+        // Si el restaurante exige login del comensal, redirigir al portal staff
+        // (la columna puede no existir si migration 026 aún no se aplica → default 0)
+        $requiereLogin = (int)($restaurante['requiere_login_comensal'] ?? 0);
+        if ($requiereLogin) {
+            $this->redirect('acceso/' . $restaurante['slug']);
+        }
+
         $categorias = $this->menuModel->getCategorias((int)$restaurante['id'], true);
         $platillos  = $this->menuModel->getPlatillosDisponibles((int)$restaurante['id']);
 

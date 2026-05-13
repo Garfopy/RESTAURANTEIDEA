@@ -108,35 +108,64 @@
         <input type="hidden" name="horario_cierre" id="legacyCierra" value="<?= htmlspecialchars($defaultCierra) ?>">
       </div>
 
-      <!-- Mapa de ubicación (Leaflet/OpenStreetMap, sin API key) -->
+      <!-- Mapa de ubicación -->
       <?php if (!empty($restaurante['direccion'])): ?>
       <div style="margin-bottom:20px">
         <label class="form-label">Ubicación en mapa</label>
         <div id="rstMap"
              data-direccion="<?= htmlspecialchars($restaurante['direccion'], ENT_QUOTES) ?>"
+             data-maps-key="<?= htmlspecialchars($mapsApiKey ?? '', ENT_QUOTES) ?>"
              style="border-radius:10px;overflow:hidden;border:1px solid #E5E7EB;height:240px;background:#F3F4F6"></div>
         <div style="font-size:.75rem;color:#9CA3AF;margin-top:4px">
-          Mapa abierto vía OpenStreetMap. Se actualiza al guardar la dirección.
+          Mapa actualizado con la dirección guardada.
         </div>
       </div>
-      <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-      <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
       <script>
       (function(){
         const el = document.getElementById('rstMap'); if (!el) return;
         const dir = el.dataset.direccion;
-        fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(dir))
-          .then(r => r.json())
-          .then(data => {
-            const lat = data[0] ? parseFloat(data[0].lat) : 19.4326;
-            const lng = data[0] ? parseFloat(data[0].lon) : -99.1332;
-            const map = L.map(el).setView([lat, lng], data[0] ? 16 : 12);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-              attribution: '© OpenStreetMap', maxZoom: 19
-            }).addTo(map);
-            if (data[0]) L.marker([lat, lng]).addTo(map).bindPopup(dir).openPopup();
-          })
-          .catch(() => { el.innerHTML = '<div style="padding:20px;text-align:center;color:#9CA3AF">No se pudo cargar el mapa.</div>'; });
+        const key = el.dataset.mapsKey;
+
+        if (key) {
+          // Google Maps JavaScript API
+          el.style.background = '#f0f0f0';
+          const script = document.createElement('script');
+          script.src = 'https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(key) + '&callback=initRstMap';
+          window.initRstMap = function() {
+            const geocoder = new google.maps.Geocoder();
+            geocoder.geocode({ address: dir }, function(results, status) {
+              const latlng = (status === 'OK' && results[0])
+                ? results[0].geometry.location
+                : { lat: 19.4326, lng: -99.1332 };
+              const map = new google.maps.Map(el, { zoom: 16, center: latlng });
+              if (status === 'OK' && results[0]) {
+                new google.maps.Marker({ map, position: latlng, title: dir });
+              }
+            });
+          };
+          document.head.appendChild(script);
+        } else {
+          // Fallback: Leaflet/OpenStreetMap (no API key needed)
+          const ls = document.createElement('link');
+          ls.rel = 'stylesheet'; ls.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+          document.head.appendChild(ls);
+          const sc = document.createElement('script');
+          sc.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+          sc.onload = function() {
+            fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(dir))
+              .then(r => r.json())
+              .then(data => {
+                const lat = data[0] ? parseFloat(data[0].lat) : 19.4326;
+                const lng = data[0] ? parseFloat(data[0].lon) : -99.1332;
+                const map = L.map(el).setView([lat, lng], data[0] ? 16 : 12);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  { attribution: '© OpenStreetMap', maxZoom: 19 }).addTo(map);
+                if (data[0]) L.marker([lat, lng]).addTo(map).bindPopup(dir).openPopup();
+              })
+              .catch(() => { el.innerHTML = '<div style="padding:20px;text-align:center;color:#9CA3AF">No se pudo cargar el mapa.</div>'; });
+          };
+          document.head.appendChild(sc);
+        }
       })();
       </script>
       <?php else: ?>
