@@ -90,6 +90,7 @@ class RestPublicoController extends BaseController
         $platillosIds = $this->post('platillo_id', []);
         $cantidades   = $this->post('cantidad', []);
         $exclusiones  = $this->post('exclusiones', []);  // keyed by platillo_id
+        $notasItem    = $this->post('notas_item', []);   // keyed by platillo_id
 
         $items = [];
         foreach ($platillosIds as $k => $platilloId) {
@@ -100,12 +101,13 @@ class RestPublicoController extends BaseController
             $excl = isset($exclusiones[$platilloId]) && is_array($exclusiones[$platilloId])
                 ? implode(', ', array_filter(array_map('trim', $exclusiones[$platilloId])))
                 : null;
+            $nota = isset($notasItem[$platilloId]) ? trim($notasItem[$platilloId]) : null;
             $items[] = [
                 'platillo_id' => (int)$platilloId,
                 'cantidad'    => $cant,
                 'precio_unit' => (float)$platillo['precio'],
                 'subtotal'    => (float)$platillo['precio'] * $cant,
-                'notas'       => null,
+                'notas'       => $nota ?: null,
                 'exclusiones' => $excl,
             ];
         }

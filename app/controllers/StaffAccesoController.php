@@ -28,6 +28,34 @@ class StaffAccesoController extends BaseController
     }
 
     // POST /acceso/{slug}
+    // POST /acceso/{slug}/entrarComensal
+    public function entrarComensal(?string $slug = null): void
+    {
+        if (!$this->isPost()) {
+            $this->redirect('acceso/' . $slug);
+        }
+        $restaurante = $slug ? $this->restModel->getBySlug($slug) : null;
+        if (!$restaurante) { $this->redirect('acceso/' . $slug); }
+
+        $nombre   = trim($this->post('nombre', ''));
+        $telefono = trim($this->post('telefono', '')) ?: null;
+        if (!$nombre) {
+            $this->flash('error', 'Ingresa tu nombre para continuar.');
+            $this->redirect('acceso/' . $slug);
+        }
+
+        $clienteModel = new RestClienteModel();
+        $comensalId   = $clienteModel->buscarOCrear((int)$restaurante['id'], $nombre, $telefono, null);
+
+        setcookie(
+            'comensal_' . $restaurante['id'],
+            json_encode(['id' => $comensalId, 'nombre' => $nombre]),
+            time() + 4 * 3600, '/'
+        );
+
+        $this->redirect('menu/' . $slug);
+    }
+
     public function login(?string $slug = null): void
     {
         if (!$this->isPost()) {

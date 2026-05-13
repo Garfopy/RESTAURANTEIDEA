@@ -173,6 +173,17 @@
       <div id="detalleIngsList"></div>
     </div>
 
+    <div style="margin-top:14px">
+      <div style="font-weight:600;font-size:.88rem;color:#374151;margin-bottom:6px">
+        Comentario al chef <span style="font-weight:400;color:#9CA3AF">(opcional)</span>
+      </div>
+      <textarea id="detalleNota" rows="2"
+                style="width:100%;padding:10px 12px;border:1.5px solid #E5E7EB;border-radius:10px;
+                       font-size:.875rem;resize:none;box-sizing:border-box;outline:none;font-family:inherit"
+                placeholder="Ej: bien cocido, sin picante, extra salsa…"
+                onfocus="this.style.borderColor='var(--cp)'" onblur="this.style.borderColor='#E5E7EB'"></textarea>
+    </div>
+
     <div style="display:flex;gap:10px;margin-top:20px">
       <button type="button" onclick="cerrarDetalle()"
               style="flex:1;padding:12px;border:2px solid #E5E7EB;border-radius:12px;
@@ -262,14 +273,13 @@ function abrirDetalle(id) {
 
 function cerrarDetalle() {
   document.getElementById('detalleModal').style.display = 'none';
+  document.getElementById('detalleNota').value = '';
   detalleActualId = null;
 }
 
 function confirmarDetalle() {
   if (!detalleActualId) { cerrarDetalle(); return; }
-  // Save exclusiones as hidden inputs
   const container = document.getElementById('excl-hidden-container');
-  // Remove previous for this platillo
   container.querySelectorAll(`[data-pid="${detalleActualId}"]`).forEach(e => e.remove());
   document.querySelectorAll('#detalleIngsList input[type=checkbox]:checked').forEach(chk => {
     const inp = document.createElement('input');
@@ -279,6 +289,16 @@ function confirmarDetalle() {
     inp.dataset.pid = detalleActualId;
     container.appendChild(inp);
   });
+  // Guardar nota del chef como hidden input
+  const nota = document.getElementById('detalleNota').value.trim();
+  if (nota) {
+    const ni = document.createElement('input');
+    ni.type = 'hidden';
+    ni.name = `notas_item[${detalleActualId}]`;
+    ni.value = nota;
+    ni.dataset.pid = detalleActualId;
+    container.appendChild(ni);
+  }
   cerrarDetalle();
 }
 

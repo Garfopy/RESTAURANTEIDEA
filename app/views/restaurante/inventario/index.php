@@ -204,7 +204,7 @@
     <button onclick="abrirMovimientoTipo(<?= $ing['id'] ?>, '<?= htmlspecialchars($ing['nombre'], ENT_QUOTES) ?>', 'salida')"
             class="btn-salida">－ Salida</button>
     <button onclick='editIngrediente(<?= htmlspecialchars(json_encode($ing), ENT_QUOTES) ?>)'
-            class="btn btn-outline btn-sm" style="padding:5px 9px;font-size:.78rem" title="Editar">✏</button>
+            class="btn btn-outline btn-sm" style="padding:5px 10px;font-size:.78rem;white-space:nowrap" title="Editar">Editar</button>
   </div>
 </div>
 <?php endforeach; ?>
@@ -278,18 +278,33 @@
 </div>
 <?php endif; ?>
 
+<?php
+$ingCategorias = array_values(array_unique(array_filter(array_column($ingredientes ?? [], 'categoria'))));
+sort($ingCategorias);
+?>
+<datalist id="dlCatIng">
+  <?php foreach ($ingCategorias as $c): ?>
+  <option value="<?= htmlspecialchars($c) ?>">
+  <?php endforeach; ?>
+</datalist>
+
 <!-- Modal nuevo/editar ingrediente -->
 <div id="modalIng" class="rst-modal-backdrop">
-  <div class="rst-modal">
+  <div class="rst-modal" style="max-width:520px">
     <div class="rst-modal-header">
-      <div class="rst-modal-title" id="modalIngTitle">Nuevo Ingrediente</div>
+      <div>
+        <div class="rst-modal-title" id="modalIngTitle">Nuevo Ingrediente</div>
+        <div style="font-size:.78rem;color:#9CA3AF;margin-top:2px" id="modalIngSub">Proveedor externo</div>
+      </div>
       <button class="rst-modal-close" onclick="rstModal('modalIng')">✕</button>
     </div>
 
     <!-- Tabs fuente -->
     <div class="rst-tabs" id="ingTabs">
       <button class="rst-tab active" data-tab="ext" onclick="switchTab('ext')">Proveedor externo</button>
-      <button class="rst-tab" data-tab="ch"  onclick="switchTab('ch')">Desde CarniHub</button>
+      <button class="rst-tab" data-tab="ch"  onclick="switchTab('ch')">
+        <span style="color:var(--cp);font-weight:700">⚡ Desde CarniHub</span>
+      </button>
     </div>
 
     <form method="POST" action="<?= BASE_URL ?>rest-inventario/guardar" id="formIng">
@@ -299,62 +314,103 @@
 
       <!-- Panel externo -->
       <div class="rst-tab-panel active" id="panelExt">
-        <div class="form-group">
-          <label class="form-label">Nombre del ingrediente *</label>
-          <input type="text" name="nombre" id="ingNombre" class="form-input"
-                 placeholder="Ej: Jitomate, Carne de res, Aceite" required>
-        </div>
+
+        <!-- Nombre + categoría -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="form-group" style="grid-column:span 2">
+            <label class="form-label">Nombre del ingrediente *</label>
+            <input type="text" name="nombre" id="ingNombre" class="form-input"
+                   placeholder="Ej: Jitomate, Carne de res, Aceite" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Categoría
+              <span style="color:#9CA3AF;font-weight:400;font-size:.72rem">— elige o escribe nueva</span>
+            </label>
+            <input type="text" name="categoria" id="ingCategoria" class="form-input"
+                   list="dlCatIng"
+                   placeholder="Ej: Lácteos, Carnes, Verduras">
+          </div>
           <div class="form-group">
             <label class="form-label">Unidad de medida</label>
-            <select name="unidad_principal" id="ingUnidad" class="form-select">
-              <option value="kg">kg (kilogramo)</option>
-              <option value="g">g (gramo)</option>
-              <option value="L">L (litro)</option>
-              <option value="ml">ml (mililitro)</option>
-              <option value="pza">pza (pieza)</option>
+            <select name="unidad_principal" id="ingUnidad" class="form-select" onchange="calcCostos()">
+              <option value="kg">kg — kilogramo</option>
+              <option value="g">g — gramo</option>
+              <option value="L">L — litro</option>
+              <option value="ml">ml — mililitro</option>
+              <option value="pza">pza — pieza</option>
               <option value="caja">caja</option>
               <option value="bolsa">bolsa</option>
             </select>
           </div>
-          <div class="form-group">
-            <label class="form-label">Categoría</label>
-            <input type="text" name="categoria" id="ingCategoria" class="form-input"
-                   placeholder="Ej: Lácteos, Carnes, Verduras">
+        </div>
+
+        <!-- Costo con calculadora -->
+        <div style="background:#F9FAFB;border:1.5px solid #E5E7EB;border-radius:12px;padding:14px;margin-bottom:14px">
+          <div style="font-weight:600;font-size:.85rem;color:#374151;margin-bottom:10px;display:flex;align-items:center;gap:6px">
+            <svg width="14" height="14" fill="none" stroke="#6B7280" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M4 19h16a2 2 0 002-2V7a2 2 0 00-2-2H4a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+            Costo
           </div>
-          <div class="form-group">
-            <label class="form-label">Costo por unidad</label>
-            <input type="number" name="costo_unitario" id="ingCosto" class="form-input"
-                   value="0" min="0" step="0.01" placeholder="0.00">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label">Costo por <span id="unidadLabel">kg</span></label>
+              <div style="display:flex;align-items:center;gap:6px">
+                <span style="color:#6B7280;font-weight:600">$</span>
+                <input type="number" name="costo_unitario" id="ingCosto" class="form-input"
+                       value="0" min="0" step="0.0001" placeholder="0.00"
+                       oninput="calcCostos()" style="flex:1">
+              </div>
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label">Stock mínimo (alerta)</label>
+              <div style="display:flex;align-items:center;gap:6px">
+                <input type="number" name="stock_minimo" id="ingMinimo" class="form-input"
+                       value="0" min="0" step="0.001" placeholder="0.000">
+                <span id="unidadMinLabel" style="color:#9CA3AF;font-size:.8rem;white-space:nowrap">kg</span>
+              </div>
+            </div>
           </div>
-          <div class="form-group">
-            <label class="form-label">Stock mínimo (alerta)</label>
-            <input type="number" name="stock_minimo" id="ingMinimo" class="form-input"
-                   value="0" min="0" step="0.001" placeholder="0.000">
-          </div>
-          <div class="form-group" style="grid-column:span 2">
-            <label class="form-label">Stock inicial</label>
-            <input type="number" name="stock_inicial" id="ingStockInicial" class="form-input"
-                   value="0" min="0" step="0.001" placeholder="0.000">
-          </div>
-          <div class="form-group" style="grid-column:span 2">
-            <label class="form-label">Proveedor <span style="color:#9CA3AF;font-weight:400">(nombre libre)</span></label>
-            <input type="text" name="proveedor_nombre" id="ingProveedor" class="form-input"
-                   placeholder="Ej: Mercado local, Walmart, Don José">
+          <!-- Calculadora de equivalencias -->
+          <div id="calcCostosWrap" style="display:none;margin-top:10px;padding:8px 10px;background:#EFF6FF;border-radius:8px;border:1px solid #BFDBFE">
+            <div style="font-size:.72rem;font-weight:700;color:#1E40AF;margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em">Equivalencias de costo</div>
+            <div id="calcCostos" style="font-size:.8rem;color:#1E3A5F;display:flex;gap:16px;flex-wrap:wrap"></div>
           </div>
         </div>
+
+        <!-- Stock -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Stock inicial</label>
+            <div style="display:flex;align-items:center;gap:6px">
+              <input type="number" name="stock_inicial" id="ingStockInicial" class="form-input"
+                     value="0" min="0" step="0.001" placeholder="0.000">
+              <span id="unidadStockLabel" style="color:#9CA3AF;font-size:.8rem;white-space:nowrap">kg</span>
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Proveedor <span style="color:#9CA3AF;font-weight:400">(libre)</span></label>
+            <input type="text" name="proveedor_nombre" id="ingProveedor" class="form-input"
+                   placeholder="Ej: Mercado, Walmart, Don José">
+          </div>
+        </div>
+
       </div>
 
       <!-- Panel CarniHub -->
       <div class="rst-tab-panel" id="panelCh">
-        <div style="background:var(--cp-light);border-radius:10px;padding:14px;margin-bottom:16px;font-size:.85rem;color:#374151">
-          <strong>Catálogo CarniHub</strong> — Los productos que compraste a tu distribuidor aparecen aquí.
-          Al agregarlos, el stock se mantiene sincronizado con tus pedidos CarniHub.
+        <div style="background:#FAF5FF;border:1.5px solid #DDD6FE;border-radius:10px;padding:14px;margin-bottom:14px;font-size:.85rem">
+          <div style="font-weight:700;color:#5B21B6;margin-bottom:4px">⚡ Sincronizado con CarniHub</div>
+          <div style="color:#6D28D9;line-height:1.4">Los productos que compraste a tu distribuidor aparecen aquí. El stock se actualiza automáticamente con cada pedido recibido.</div>
         </div>
         <?php if (!empty($productosCarnihub)): ?>
-        <div style="max-height:200px;overflow-y:auto;border:1px solid #E5E7EB;border-radius:8px;margin-bottom:12px">
+        <div style="border:1.5px solid #E5E7EB;border-radius:10px;overflow:hidden;margin-bottom:12px">
+          <div style="padding:8px 12px;background:#F9FAFB;font-size:.72rem;font-weight:700;color:#9CA3AF;
+                      text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid #E5E7EB">
+            Selecciona un producto
+          </div>
+          <div style="max-height:180px;overflow-y:auto">
           <?php foreach ($productosCarnihub as $pc): ?>
-          <div style="padding:10px 14px;border-bottom:1px solid #F3F4F6;display:flex;justify-content:space-between;align-items:center;cursor:pointer"
+          <div style="padding:10px 14px;border-bottom:1px solid #F3F4F6;display:flex;justify-content:space-between;align-items:center;cursor:pointer;transition:.1s"
+               onmouseover="this.style.background='#FAF5FF'" onmouseout="this.style.background=''"
                onclick="seleccionarCarniHub(<?= $pc['id'] ?>, '<?= htmlspecialchars($pc['nombre'], ENT_QUOTES) ?>')">
             <div>
               <div style="font-weight:600;font-size:.875rem"><?= htmlspecialchars($pc['nombre']) ?></div>
@@ -363,16 +419,17 @@
             <span class="badge badge-purple">CarniHub</span>
           </div>
           <?php endforeach; ?>
+          </div>
         </div>
         <?php else: ?>
         <div class="empty-state" style="padding:24px">
-          <div style="font-size:.85rem">No tienes pedidos de CarniHub aún. Cuando compres productos a tu distribuidor, aparecerán aquí para importarlos al inventario.</div>
+          <div style="font-size:.85rem">No tienes pedidos de CarniHub aún. Cuando compres productos a tu distribuidor, aparecerán aquí.</div>
         </div>
         <?php endif; ?>
         <div class="form-group" id="chNombreWrap" style="display:none">
           <label class="form-label">Producto seleccionado</label>
           <input type="text" id="ingNombreCh" class="form-input" readonly
-                 style="background:#F9FAFB" placeholder="Selecciona un producto de arriba">
+                 style="background:#FAF5FF;color:#5B21B6;font-weight:600" placeholder="Selecciona un producto de arriba">
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
           <div class="form-group">
@@ -510,6 +567,28 @@ function abrirMovimientoTipo(id, nombre, tipo) {
     lbl.style.borderColor = r.value === tipo ? 'var(--cp)' : '#E5E7EB';
   });
 }
+function calcCostos() {
+  const costo  = parseFloat(document.getElementById('ingCosto').value) || 0;
+  const unidad = document.getElementById('ingUnidad').value;
+  document.getElementById('unidadLabel').textContent = unidad;
+  document.getElementById('unidadMinLabel').textContent = unidad;
+  document.getElementById('unidadStockLabel').textContent = unidad;
+  let items = [];
+  if (costo > 0) {
+    if (unidad === 'kg') {
+      items = [`Por 100g: <strong>$${(costo/10).toFixed(2)}</strong>`,`Por g: <strong>$${(costo/1000).toFixed(4)}</strong>`];
+    } else if (unidad === 'g') {
+      items = [`Por kg: <strong>$${(costo*1000).toFixed(2)}</strong>`,`Por 100g: <strong>$${(costo*100).toFixed(3)}</strong>`];
+    } else if (unidad === 'L') {
+      items = [`Por 100ml: <strong>$${(costo/10).toFixed(2)}</strong>`,`Por ml: <strong>$${(costo/1000).toFixed(4)}</strong>`];
+    } else if (unidad === 'ml') {
+      items = [`Por L: <strong>$${(costo*1000).toFixed(2)}</strong>`,`Por 100ml: <strong>$${(costo*100).toFixed(3)}</strong>`];
+    }
+  }
+  document.getElementById('calcCostos').innerHTML = items.map(i => `<span>${i}</span>`).join('');
+  document.getElementById('calcCostosWrap').style.display = items.length ? 'block' : 'none';
+}
+
 function editIngrediente(i) {
   switchTab('ext');
   document.getElementById('ingId').value         = i.id;
@@ -523,7 +602,9 @@ function editIngrediente(i) {
   document.getElementById('ingMinimo').value     = i.stock_minimo;
   document.getElementById('ingProveedor').value  = i.proveedor_nombre || '';
   document.getElementById('modalIngTitle').textContent = 'Editar Ingrediente';
+  document.getElementById('modalIngSub').textContent   = 'Proveedor externo';
   document.getElementById('modalIng').classList.add('open');
+  calcCostos();
 }
 </script>
 

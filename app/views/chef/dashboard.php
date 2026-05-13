@@ -99,8 +99,9 @@ function renderQueue(items) {
         <div style="padding:8px 0;border-bottom:1px solid #374151;display:flex;justify-content:space-between;align-items:center">
           <div>
             <div style="font-weight:600">${it.platillo_nombre}</div>
-            <div style="font-size:.78rem;color:#9CA3AF">x${it.cantidad} · ${it.tiempo_preparacion_min}min ${it.item_notas ? '· '+it.item_notas : ''}</div>
+            <div style="font-size:.78rem;color:#9CA3AF">x${it.cantidad} · ${it.tiempo_preparacion_min}min</div>
             ${it.exclusiones ? `<div style="font-size:.75rem;background:#7F1D1D;color:#FCA5A5;border-radius:6px;padding:2px 7px;margin-top:3px;display:inline-block">🚫 Sin: ${it.exclusiones}</div>` : ''}
+            ${it.item_notas ? `<div style="font-size:.75rem;background:#1E3A5F;color:#93C5FD;border-radius:6px;padding:2px 7px;margin-top:3px;display:inline-block">💬 ${it.item_notas}</div>` : ''}
           </div>
           <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
             ${estadoBadge(it.item_estado)}

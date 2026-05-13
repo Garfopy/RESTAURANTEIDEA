@@ -60,6 +60,34 @@
         </div>
       </div>
       <?php if (!empty($restaurante['direccion'])): ?>
+      <?php if (!empty($mapsApiKey)): ?>
+      <!-- Google Maps geocoding -->
+      <script>
+      function initMap() {
+        var geocoder = new google.maps.Geocoder();
+        var dir = <?= json_encode($restaurante['direccion']) ?>;
+        geocoder.geocode({ address: dir }, function(results, status) {
+          if (status === 'OK') {
+            var loc = results[0].geometry.location;
+            var lat = loc.lat(), lng = loc.lng();
+            var el = document.getElementById('rstMap');
+            el.innerHTML = '';
+            var map = new google.maps.Map(el, { center: {lat:lat,lng:lng}, zoom: 16 });
+            new google.maps.Marker({ position: {lat:lat,lng:lng}, map: map, title: dir });
+            document.getElementById('coordLat').textContent = lat.toFixed(6);
+            document.getElementById('coordLng').textContent = lng.toFixed(6);
+            document.getElementById('inpLat').value = lat.toFixed(6);
+            document.getElementById('inpLng').value = lng.toFixed(6);
+            document.getElementById('coordsBox').style.display = 'block';
+          } else {
+            document.getElementById('rstMap').innerHTML = '<div style="padding:20px;text-align:center;color:#9CA3AF;font-size:.82rem">No se encontró la dirección.</div>';
+          }
+        });
+      }
+      </script>
+      <script src="https://maps.googleapis.com/maps/api/js?key=<?= htmlspecialchars($mapsApiKey) ?>&callback=initMap" async defer></script>
+      <?php else: ?>
+      <!-- Nominatim + Leaflet (fallback sin API key) -->
       <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
       <script>
       (function(){
@@ -78,7 +106,6 @@
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
                   { attribution: '© OpenStreetMap', maxZoom: 19 }).addTo(map);
                 L.marker([lat, lng]).addTo(map).bindPopup(dir).openPopup();
-                // Show coordinates
                 document.getElementById('coordLat').textContent = lat.toFixed(6);
                 document.getElementById('coordLng').textContent = lng.toFixed(6);
                 document.getElementById('inpLat').value = lat.toFixed(6);
@@ -93,6 +120,7 @@
         document.head.appendChild(sc);
       })();
       </script>
+      <?php endif; ?>
       <?php endif; ?>
 
       <!-- Horarios por día de la semana -->
