@@ -110,71 +110,83 @@ $gmKey = $configModel->get('google_maps_key', '');
 <script>
 (function() {
   var map, marker;
-  var latInput = document.getElementById('input-lat');
-  var lngInput = document.getElementById('input-lng');
-  var dirInput = document.getElementById('input-direccion');
+  var latInput      = document.getElementById('input-lat');
+  var lngInput      = document.getElementById('input-lng');
+  var dirInput      = document.getElementById('input-direccion');
   var mapaContainer = document.getElementById('mapa-container');
-  var mapaHint = document.getElementById('mapa-hint');
-
+  var mapaHint      = document.getElementById('mapa-hint');
   var initLat = parseFloat(latInput.value) || null;
   var initLng = parseFloat(lngInput.value) || null;
 
+  // Exponer globalmente para onerror del <script> de Maps
+  window.mostrarFallbackCoords = mostrarFallbackCoords;
+  window.gm_authFailure = function() { mostrarFallbackCoords(); };
+
+  // Callback que llama Google Maps al cargar
   window.initGoogleMaps = function() {
     try {
-    // Inicializar mapa
-    var center = (initLat && initLng)
-      ? { lat: initLat, lng: initLng }
-      : { lat: 19.4326, lng: -99.1332 }; // CDMX por defecto
+      var center = (initLat && initLng)
+        ? { lat: initLat, lng: initLng }
+        : { lat: 20.5881, lng: -100.3889 }; // Querétaro por defecto
 
-    map = new google.maps.Map(document.getElementById('mapa'), {
-      center: center,
-      zoom: (initLat && initLng) ? 15 : 12,
-      mapTypeControl: false,
-      streetViewControl: false,
-    });
+      map = new google.maps.Map(document.getElementById('mapa'), {
+        center: center,
+        zoom: (initLat && initLng) ? 15 : 12,
+        mapTypeControl: false,
+        streetViewControl: false,
+      });
 
-    // Marcador inicial si hay coordenadas
-    if (initLat && initLng) {
-      marker = new google.maps.Marker({ position: center, map: map, draggable: true, title: 'Sucursal' });
-      marker.addListener('dragend', updateCoords);
-      mapaContainer.style.display = 'block';
+      // Marcador inicial si ya hay coordenadas guardadas
+      if (initLat && initLng) {
+        marker = new google.maps.Marker({
+          position: center, map: map, draggable: true, title: 'Sucursal'
+        });
+        marker.addListener('dragend', updateCoords);
+        mapaContainer.style.display = 'block';
+      }
+
+      // Click en mapa: crea o mueve el pin
+      map.addListener('click', function(e) {
+        var pos = e.latLng;
+        if (marker) {
+          marker.setPosition(pos);
+        } else {
+          marker = new google.maps.Marker({
+            position: pos, map: map, draggable: true, title: 'Sucursal'
+          });
+          marker.addListener('dragend', updateCoords);
+        }
+        updateCoords();
+      });
+
+      // Places Autocomplete
+      var autocomplete = new google.maps.places.Autocomplete(dirInput, {
+        componentRestrictions: { country: 'mx' },
+        fields: ['geometry', 'formatted_address'],
+      });
+      autocomplete.addListener('place_changed', function() {
+        var place = autocomplete.getPlace();
+        if (!place.geometry || !place.geometry.location) return;
+        var pos = place.geometry.location;
+        map.setCenter(pos);
+        map.setZoom(16);
+        if (marker) {
+          marker.setPosition(pos);
+        } else {
+          marker = new google.maps.Marker({
+            position: pos, map: map, draggable: true, title: 'Sucursal'
+          });
+          marker.addListener('dragend', updateCoords);
+        }
+        latInput.value = pos.lat().toFixed(7);
+        lngInput.value = pos.lng().toFixed(7);
+        mapaContainer.style.display = 'block';
+        if (mapaHint) mapaHint.style.display = 'none';
+      });
+
+    } catch(e) {
+      mostrarFallbackCoords();
     }
-
-    // Click en mapa crea/mueve pin
-    map.addListener('click', function(e) {
-      var pos = e.latLng;
-      if (marker) {
-        marker.setPosition(pos);
-      } else {
-        marker = new google.maps.Marker({ position: pos, map: map, draggable: true, title: 'Sucursal' });
-        marker.addListener('dragend', updateCoords);
-      }
-      updateCoords();
-    });
-
-    // Places Autocomplete
-    var autocomplete = new google.maps.places.Autocomplete(dirInput, {
-      componentRestrictions: { country: 'mx' },
-      fields: ['geometry', 'formatted_address'],
-    });
-
-    autocomplete.addListener('place_changed', function() {
-      var place = autocomplete.getPlace();
-      if (!place.geometry || !place.geometry.location) return;
-      var pos = place.geometry.location;
-      map.setCenter(pos);
-      map.setZoom(16);
-      if (marker) {
-        marker.setPosition(pos);
-      } else {
-        marker = new google.maps.Marker({ position: pos, map: map, draggable: true, title: 'Sucursal' });
-        marker.addListener('dragend', updateCoords);
-      }
-      latInput.value = pos.lat().toFixed(7);
-      lngInput.value = pos.lng().toFixed(7);
-      mapaContainer.style.display = 'block';
-      if (mapaHint) mapaHint.style.display = 'none';
-    });
   };
 
   function updateCoords() {
@@ -184,49 +196,30 @@ $gmKey = $configModel->get('google_maps_key', '');
     lngInput.value = pos.lng().toFixed(7);
   }
 
-  } catch(e) {
-    mostrarFallbackCoords();
-  }
-
-  };
-
-  // Manejo de errores de autenticación de Google Maps
-  window.gm_authFailure = function() {
-    mostrarFallbackCoords();
-  };
-
-  // Exponer globalmente para el atributo onerror del <script> de Maps
-  window.mostrarFallbackCoords = mostrarFallbackCoords;
-
   function mostrarFallbackCoords() {
     document.getElementById('coords-fallback').style.display = 'block';
     var mapaC = document.getElementById('mapa-container');
     if (mapaC) mapaC.style.display = 'none';
     var hint = document.getElementById('mapa-hint');
     if (hint) hint.style.display = 'none';
-    // Pre-rellenar si ya hay coords
     var lat = document.getElementById('input-lat').value;
     var lng = document.getElementById('input-lng').value;
     if (lat) document.getElementById('input-lat-manual').value = lat;
     if (lng) document.getElementById('input-lng-manual').value = lng;
-    // Activar autocomplete Nominatim (OSM) como reemplazo del Places API
     activarBusquedaNominatim();
   }
-  // Agregar z-index para que el dropdown de Google Places quede visible
+
+  // z-index para que el dropdown de Places no quede oculto por otros elementos
   var pacStyle = document.createElement('style');
   pacStyle.textContent = '.pac-container { z-index: 99999 !important; }';
   document.head.appendChild(pacStyle);
 
-  // ─── Autocomplete Nominatim (OSM) ───────────────────────────────────────
-  // Se activa cuando Google Maps no está disponible o la autenticación falla.
+  // ─── Autocomplete Nominatim (fallback OSM) ───────────────────────────────
   function activarBusquedaNominatim() {
-    var dirInput = document.getElementById('input-direccion');
-    if (!dirInput) return;
-    // Evitar inicializar dos veces
-    if (dirInput.dataset.nominatimActivo) return;
-    dirInput.dataset.nominatimActivo = '1';
+    var dInput = document.getElementById('input-direccion');
+    if (!dInput || dInput.dataset.nominatimActivo) return;
+    dInput.dataset.nominatimActivo = '1';
 
-    // Crear contenedor del dropdown
     var dropdown = document.createElement('div');
     dropdown.id = 'nominatim-dropdown';
     dropdown.style.cssText = [
@@ -235,15 +228,14 @@ $gmKey = $configModel->get('google_maps_key', '');
       'border-radius:8px', 'box-shadow:0 4px 16px rgba(0,0,0,.12)',
       'z-index:99999', 'max-height:220px', 'overflow-y:auto', 'display:none',
     ].join(';');
-    dirInput.parentElement.style.position = 'relative';
-    dirInput.parentElement.appendChild(dropdown);
+    dInput.parentElement.style.position = 'relative';
+    dInput.parentElement.appendChild(dropdown);
 
     var nomTimer;
-    dirInput.addEventListener('input', function() {
+    dInput.addEventListener('input', function() {
       clearTimeout(nomTimer);
       var q = this.value.trim();
       if (q.length < 4) { dropdown.style.display = 'none'; return; }
-
       nomTimer = setTimeout(function() {
         fetch('https://nominatim.openstreetmap.org/search?format=json&countrycodes=mx&limit=6&addressdetails=1&q=' + encodeURIComponent(q), {
           headers: { 'Accept-Language': 'es', 'Accept': 'application/json' }
@@ -255,8 +247,7 @@ $gmKey = $configModel->get('google_maps_key', '');
           results.forEach(function(place, idx) {
             var item = document.createElement('div');
             item.style.cssText = [
-              'padding:10px 14px', 'cursor:pointer', 'font-size:.84rem',
-              'color:#374151', 'line-height:1.4',
+              'padding:10px 14px', 'cursor:pointer', 'font-size:.84rem', 'color:#374151', 'line-height:1.4',
               idx > 0 ? 'border-top:1px solid #F3F4F6' : '',
             ].join(';');
             item.textContent = place.display_name;
@@ -265,7 +256,7 @@ $gmKey = $configModel->get('google_maps_key', '');
             item.addEventListener('click', function() {
               var lat = parseFloat(place.lat).toFixed(7);
               var lng = parseFloat(place.lon).toFixed(7);
-              dirInput.value = place.display_name;
+              dInput.value = place.display_name;
               document.getElementById('input-lat').value = lat;
               document.getElementById('input-lng').value = lng;
               var mLat = document.getElementById('input-lat-manual');
@@ -282,9 +273,8 @@ $gmKey = $configModel->get('google_maps_key', '');
       }, 450);
     });
 
-    // Cerrar al hacer clic fuera
     document.addEventListener('click', function(e) {
-      if (!dropdown.contains(e.target) && e.target !== dirInput) {
+      if (!dropdown.contains(e.target) && e.target !== dInput) {
         dropdown.style.display = 'none';
       }
     });
