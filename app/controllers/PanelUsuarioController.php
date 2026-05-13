@@ -178,6 +178,11 @@ class PanelUsuarioController extends BaseController
                 $this->flash('error', 'La nueva contraseña debe tener al menos 6 caracteres.');
                 $this->redirect("panel-usuario/editar/$id");
             }
+            $confirmarPass = trim($this->post('password_confirm', ''));
+            if ($nuevoPass !== $confirmarPass) {
+                $this->flash('error', 'Las contraseñas no coinciden. Verifica e intenta de nuevo.');
+                $this->redirect("panel-usuario/editar/$id");
+            }
             $data['password'] = password_hash($nuevoPass, PASSWORD_BCRYPT);
         }
 

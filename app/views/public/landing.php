@@ -150,6 +150,19 @@
     .navbar.scrolled ~ #mobile-menu a:not(.btn-primary) { color: #374151; }
     .navbar.scrolled ~ #mobile-menu .mobile-divider { border-color: #e5e7eb; }
 
+    /* ── Responsive hamburguesa (CSS nativo, no depende de Tailwind CDN) ── */
+    @media (max-width: 767px) {
+      #menu-toggle       { display: flex !important; }
+      .nav-login-desktop { display: none !important; }
+      .nav-links-desktop { display: none !important; }
+    }
+    @media (min-width: 768px) {
+      #menu-toggle        { display: none !important; }
+      .nav-login-desktop  { display: inline-block !important; }
+      .nav-links-desktop  { display: flex !important; }
+      #mobile-menu        { display: none !important; }
+    }
+
     /* ── Shimmer en botón CTA ── */
     .btn-shimmer { position:relative; overflow:hidden; }
     .btn-shimmer::after {
@@ -228,12 +241,12 @@
   <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
     <a href="<?= BASE_URL ?>" class="flex items-center gap-2 no-underline">
       <?php if ($appLogo): ?>
-        <img src="<?= htmlspecialchars($appLogo) ?>" alt="Logo" class="h-9 object-contain">
+        <img src="<?= htmlspecialchars($appLogo) ?>" alt="Logo" class="h-12 object-contain">
       <?php else: ?>
-        <span class="text-xl font-black text-white tracking-tight"><?= htmlspecialchars($appName) ?></span>
+        <span class="text-2xl font-black text-white tracking-tight"><?= htmlspecialchars($appName) ?></span>
       <?php endif; ?>
     </a>
-    <div class="hidden md:flex items-center gap-1">
+    <div class="nav-links-desktop hidden md:flex items-center gap-1">
       <a href="#roles"    class="text-sm font-medium text-white/70 px-4 py-2 rounded-lg hover:text-white hover:bg-white/10 transition-all">Experiencias</a>
       <a href="#features" class="text-sm font-medium text-white/70 px-4 py-2 rounded-lg hover:text-white hover:bg-white/10 transition-all">Funciones</a>
       <a href="#how"      class="text-sm font-medium text-white/70 px-4 py-2 rounded-lg hover:text-white hover:bg-white/10 transition-all">¿Cómo funciona?</a>
@@ -246,7 +259,7 @@
         Ver planes
       </a>
       <!-- Iniciar sesión: solo en desktop -->
-      <a href="<?= BASE_URL ?>auth/login" class="hidden md:inline-block text-sm font-semibold text-white/80 px-4 py-2 hover:text-white transition-colors">
+      <a href="<?= BASE_URL ?>auth/login" class="nav-login-desktop hidden md:inline-block text-sm font-semibold text-white/80 px-4 py-2 hover:text-white transition-colors">
         Iniciar sesión
       </a>
       <!-- Botón hamburguesa: solo en móvil -->
