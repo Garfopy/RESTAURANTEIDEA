@@ -127,6 +127,7 @@ $routes = [
     'rest-mesero'         => 'RestMeseroController',
     'rest-chef'           => 'RestChefController',
     'rest-portero'        => 'RestPorteroController',
+    'rest-staff'          => 'RestStaffController',
     // Menú público (sin login)
     'menu'                => 'RestPublicoController',
     // Portal acceso staff por slug de restaurante

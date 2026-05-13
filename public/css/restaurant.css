@@ -409,6 +409,92 @@ body {
 .portero-result.ok  { background: #DCFCE7; color: #166534; }
 .portero-result.err { background: #FEE2E2; color: #991B1B; }
 
+/* ── Modales ── */
+@keyframes modalIn {
+  from { opacity: 0; transform: scale(.95) translateY(8px); }
+  to   { opacity: 1; transform: scale(1)   translateY(0); }
+}
+.rst-modal-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(17,24,39,.55);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.rst-modal-backdrop.open { display: flex; }
+.rst-modal {
+  background: #fff;
+  border-radius: 18px;
+  padding: 28px;
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0,0,0,.25);
+  animation: modalIn .2s cubic-bezier(.34,1.56,.64,1) both;
+  position: relative;
+}
+.rst-modal-sm { max-width: 380px; }
+.rst-modal-lg { max-width: 600px; }
+.rst-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+.rst-modal-title {
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: #111827;
+}
+.rst-modal-close {
+  background: #F3F4F6;
+  border: none;
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  font-size: 1rem;
+  color: #6B7280;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--transition), color var(--transition);
+  flex-shrink: 0;
+}
+.rst-modal-close:hover { background: #E5E7EB; color: #111827; }
+.rst-modal-footer {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #F3F4F6;
+}
+
+/* Tabs */
+.rst-tabs { display: flex; gap: 4px; margin-bottom: 18px; background: #F3F4F6; border-radius: 10px; padding: 4px; }
+.rst-tab {
+  flex: 1;
+  padding: 7px 12px;
+  border: none;
+  border-radius: 7px;
+  font-size: .82rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: transparent;
+  color: #6B7280;
+  transition: background var(--transition), color var(--transition);
+}
+.rst-tab.active { background: #fff; color: var(--cp); box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+.rst-tab-panel { display: none; }
+.rst-tab-panel.active { display: block; }
+
 /* ── Responsive ── */
 @media (max-width: 768px) {
   .rst-sidebar { transform: translateX(-100%); }

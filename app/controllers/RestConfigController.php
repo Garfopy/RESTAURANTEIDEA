@@ -56,4 +56,13 @@ class RestConfigController extends BaseController
         $this->flash('success', 'Configuración guardada.');
         $this->redirect('rest-config/index');
     }
+
+    public function qr(?string $p = null): void
+    {
+        $restauranteId = $this->restauranteId();
+        $restaurante   = $this->model->find($restauranteId);
+        $pageTitle     = 'QR del local';
+        $activeMenu    = 'rest_qr';
+        $this->render('restaurante/config/qr', compact('restaurante','pageTitle','activeMenu'));
+    }
 }
