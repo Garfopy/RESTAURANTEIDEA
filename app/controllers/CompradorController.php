@@ -60,4 +60,46 @@ class CompradorController extends BaseController
         $content = ob_get_clean();
         require ROOT_PATH . '/app/views/empresa/layouts/main.php';
     }
+
+    public function facturas(?string $p = null): void
+    {
+        $usuario     = $_SESSION['usuario'] ?? [];
+        $compradorId = (int)($usuario['id'] ?? 0);
+        $empresaId   = (int)($usuario['empresa_id'] ?? 0);
+
+        $page    = max(1, (int)$this->get('page', 1));
+        $perPage = 20;
+        $offset  = ($page - 1) * $perPage;
+
+        $db = Database::getInstance();
+
+        $stTotal = $db->prepare(
+            'SELECT COUNT(*) FROM facturas f
+               JOIN pedidos p ON p.id = f.pedido_id
+              WHERE p.empresa_id = ? AND p.comprador_id = ?'
+        );
+        $stTotal->execute([$empresaId, $compradorId]);
+        $total = (int)$stTotal->fetchColumn();
+
+        $stmt = $db->prepare(
+            'SELECT f.*, p.folio AS pedido_folio, p.created_at AS pedido_fecha
+               FROM facturas f
+               JOIN pedidos p ON p.id = f.pedido_id
+              WHERE p.empresa_id = ? AND p.comprador_id = ?
+              ORDER BY f.created_at DESC
+              LIMIT ? OFFSET ?'
+        );
+        $stmt->execute([$empresaId, $compradorId, $perPage, $offset]);
+        $facturas = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $totalPages = $total > 0 ? (int)ceil($total / $perPage) : 1;
+        $flash      = $this->getFlash();
+        $pageTitle  = 'Mis facturas';
+        $activeMenu = 'mis_facturas';
+
+        ob_start();
+        require ROOT_PATH . '/app/views/comprador/facturas/index.php';
+        $content = ob_get_clean();
+        require ROOT_PATH . '/app/views/empresa/layouts/main.php';
+    }
 }

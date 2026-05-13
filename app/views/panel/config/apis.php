@@ -150,14 +150,91 @@ function toggleVis(id) {
 
   <!-- Factura-lo -->
   <div style="background:#fff;border-radius:12px;border:1px solid #E5E7EB;padding:20px;margin-bottom:16px">
-    <h3 style="font-size:.85rem;font-weight:700;color:#111827;margin-bottom:14px">Factura-lo (CFDI)</h3>
-    <label class="form-label">API Key</label>
-    <div style="display:flex;max-width:400px">
-      <input type="password" id="facturalo_api_key" name="facturalo_api_key"
-             value="<?= $s('facturalo_api_key') ?>"
-             class="form-control" style="border-radius:6px 0 0 6px;border-right:none;font-family:monospace;font-size:.85rem">
-      <button type="button" onclick="toggleVis('facturalo_api_key')"
-              style="padding:0 12px;border:1px solid #E5E7EB;border-left:none;border-radius:0 6px 6px 0;background:#F9FAFB;cursor:pointer;font-size:.8rem;color:#6B7280;white-space:nowrap">Ver</button>
+    <h3 style="font-size:.85rem;font-weight:700;color:#111827;margin-bottom:4px">FacturaLO Plus (CFDI México)</h3>
+    <p style="font-size:.75rem;color:#6B7280;margin-bottom:16px">
+      Regístrate en <strong>facturaloplus.com</strong>, sube tu CSD y obtén el API Key.
+      Convierte tus archivos .key y .cer a PEM con: <code style="background:#F3F4F6;padding:1px 5px;border-radius:4px">openssl pkcs8 -inform DER -in SAT.key -out key.pem</code>
+      y <code style="background:#F3F4F6;padding:1px 5px;border-radius:4px">openssl x509 -inform DER -in SAT.cer -out cer.pem</code>
+    </p>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px">
+      <div>
+        <label class="form-label">API Key (32 chars)</label>
+        <div style="display:flex">
+          <input type="password" id="facturalo_apikey" name="facturalo_apikey"
+                 value="<?= $s('facturalo_apikey') ?>"
+                 class="form-control" style="border-radius:6px 0 0 6px;border-right:none;font-family:monospace;font-size:.82rem">
+          <button type="button" onclick="toggleVis('facturalo_apikey')"
+                  style="padding:0 10px;border:1px solid #E5E7EB;border-left:none;border-radius:0 6px 6px 0;background:#F9FAFB;cursor:pointer;font-size:.8rem;color:#6B7280;white-space:nowrap">Ver</button>
+        </div>
+      </div>
+      <div>
+        <label class="form-label">Ambiente</label>
+        <select name="facturalo_ambiente" class="form-control">
+          <option value="dev" <?= ($settings['facturalo_ambiente'] ?? 'dev') === 'dev' ? 'selected' : '' ?>>Pruebas (dev)</option>
+          <option value="app" <?= ($settings['facturalo_ambiente'] ?? '') === 'app' ? 'selected' : '' ?>>Producción (app)</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Plantilla PDF</label>
+        <input type="text" name="facturalo_plantilla" value="<?= $s('facturalo_plantilla', '1') ?>"
+               class="form-control" placeholder="1">
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:14px;margin-bottom:14px">
+      <div>
+        <label class="form-label">RFC emisor</label>
+        <input type="text" name="facturalo_rfc" value="<?= $s('facturalo_rfc') ?>"
+               class="form-control" placeholder="ABC010101XYZ" style="text-transform:uppercase">
+      </div>
+      <div style="grid-column:span 2">
+        <label class="form-label">Nombre / Razón social emisor</label>
+        <input type="text" name="facturalo_nombre" value="<?= $s('facturalo_nombre') ?>"
+               class="form-control" placeholder="MI EMPRESA SA DE CV">
+      </div>
+      <div>
+        <label class="form-label">CP de expedición</label>
+        <input type="text" name="facturalo_cp" value="<?= $s('facturalo_cp') ?>"
+               class="form-control" placeholder="76000" maxlength="5">
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+      <div>
+        <label class="form-label">Régimen fiscal emisor</label>
+        <select name="facturalo_regimen" class="form-control">
+          <?php foreach ([
+            '601'=>'601 - General de Ley Personas Morales',
+            '612'=>'612 - Personas Físicas con Actividades Empresariales',
+            '616'=>'616 - Sin obligaciones fiscales',
+            '621'=>'621 - Incorporación Fiscal',
+          ] as $clave => $label): ?>
+          <option value="<?= $clave ?>" <?= ($settings['facturalo_regimen'] ?? '601') === $clave ? 'selected' : '' ?>><?= $label ?></option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Contraseña CSD (llave privada SAT)</label>
+        <div style="display:flex">
+          <input type="password" id="facturalo_csd_pass" name="facturalo_csd_pass"
+                 value="<?= $s('facturalo_csd_pass') ?>"
+                 class="form-control" style="border-radius:6px 0 0 6px;border-right:none">
+          <button type="button" onclick="toggleVis('facturalo_csd_pass')"
+                  style="padding:0 10px;border:1px solid #E5E7EB;border-left:none;border-radius:0 6px 6px 0;background:#F9FAFB;cursor:pointer;font-size:.8rem;color:#6B7280;white-space:nowrap">Ver</button>
+        </div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div>
+        <label class="form-label">Llave privada PEM (.key convertido)</label>
+        <textarea name="facturalo_key_pem" rows="5"
+                  class="form-control" style="font-family:monospace;font-size:.72rem;resize:vertical"
+                  placeholder="-----BEGIN ENCRYPTED PRIVATE KEY-----&#10;...&#10;-----END ENCRYPTED PRIVATE KEY-----"><?= htmlspecialchars($settings['facturalo_key_pem'] ?? '') ?></textarea>
+      </div>
+      <div>
+        <label class="form-label">Certificado PEM (.cer convertido)</label>
+        <textarea name="facturalo_cer_pem" rows="5"
+                  class="form-control" style="font-family:monospace;font-size:.72rem;resize:vertical"
+                  placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"><?= htmlspecialchars($settings['facturalo_cer_pem'] ?? '') ?></textarea>
+      </div>
     </div>
   </div>
 
