@@ -75,7 +75,7 @@ class AuthController extends BaseController
 
         // Cuenta inactiva
         if (empty($usuario['activo'])) {
-            $this->flash('error', 'Tu cuenta está desactivada. Contacta al administrador.');
+            $this->flash('error', 'Tu cuenta está deshabilitada. Por favor comunícate con un administrador para volver a activarla.');
             $this->redirect('auth/login');
         }
 

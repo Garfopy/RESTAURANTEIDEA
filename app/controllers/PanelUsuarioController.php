@@ -190,9 +190,15 @@ class PanelUsuarioController extends BaseController
     public function toggle(?string $p = null): void
     {
         $id      = (int)$p;
-        $usuario = $this->usuarioModel->find($id);
+        $usuario = $this->usuarioModel->getConRol($id);
         if (!$usuario) {
             $this->flash('error', 'Usuario no encontrado.');
+            $this->redirect('panel-usuario/index');
+        }
+
+        // No se puede desactivar ninguna cuenta de superadmin
+        if ($usuario['rol_slug'] === 'superadmin') {
+            $this->flash('error', 'No es posible desactivar una cuenta de superadmin.');
             $this->redirect('panel-usuario/index');
         }
 
