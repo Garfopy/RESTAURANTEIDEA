@@ -27,12 +27,12 @@ class PedidoModel extends BaseModel
         $this->db->beginTransaction();
         try {
             $subtotal = array_sum(array_column($items, 'subtotal'));
-            // Los precios incluyen IVA 16 %. Se extrae para desglose en vistas/facturas.
-            $iva      = round($subtotal * 16 / 116, 2);
+            // IVA 16 % se suma al subtotal (precios sin IVA)
+            $iva      = round($subtotal * 0.16, 2);
             $pedidoData['folio']    = $this->generarFolio();
             $pedidoData['subtotal'] = $subtotal;
             $pedidoData['iva']      = $iva;
-            $pedidoData['total']    = $subtotal;
+            $pedidoData['total']    = $subtotal + $iva;
 
             $pedidoId = $this->insert($pedidoData);
 
@@ -138,14 +138,14 @@ class PedidoModel extends BaseModel
                 [$id]
             );
             $nuevoSubtotal = (float)($row['subtotal'] ?? 0);
-            $nuevoIva      = round($nuevoSubtotal * 16 / 116, 2);
+            $nuevoIva      = round($nuevoSubtotal * 0.16, 2);
 
             $this->execute(
                 "UPDATE pedidos
                     SET estado = 'confirmado', aprobado_por = ?, aprobado_at = NOW(),
-                        subtotal = ?, iva = ?, total = ? + costo_envio
+                        subtotal = ?, iva = ?, total = ? + ? + costo_envio
                   WHERE id = ?",
-                [$aprobadoPorId, $nuevoSubtotal, $nuevoIva, $nuevoSubtotal, $id]
+                [$aprobadoPorId, $nuevoSubtotal, $nuevoIva, $nuevoSubtotal, $nuevoIva, $id]
             );
             $this->logEstado($id, 'confirmado');
 

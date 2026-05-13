@@ -255,7 +255,7 @@ $totalItems = count($productosEnCarrito);
       <!-- Total -->
       <div style="padding:14px 16px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;font-size:.8rem;color:#6B7280">
-          <span>Subtotal s/IVA</span>
+          <span>Subtotal</span>
           <span id="ticket-neto">$0.00</span>
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:.8rem;color:#6B7280">
@@ -266,7 +266,7 @@ $totalItems = count($productosEnCarrito);
           <span style="font-weight:700;color:#111827;font-size:.88rem">TOTAL</span>
           <span id="ticket-total" style="font-weight:900;color:var(--color-primary);font-size:1.2rem">$0.00</span>
         </div>
-        <div style="font-size:.7rem;color:#9CA3AF;text-align:right;margin-top:4px">Precio incluye IVA · Sujeto a confirmación</div>
+        <div style="font-size:.7rem;color:#9CA3AF;text-align:right;margin-top:4px">Precio sin IVA · Sujeto a confirmación</div>
       </div>
     </div>
     <div id="ticket-alertas" style="margin-top:10px"></div>
@@ -436,14 +436,15 @@ function renderTicket() {
   ticketItems.innerHTML = html;
   if (ticketTotal) ticketTotal.textContent = '$' + total.toLocaleString('es-MX', {minimumFractionDigits:2, maximumFractionDigits:2});
 
-  // Desglose IVA: precios incluyen IVA 16 %
+  // Desglose IVA: precios SIN IVA — se suma 16 % encima
   const netoEl = document.getElementById('ticket-neto');
   const ivaEl  = document.getElementById('ticket-iva');
   if (netoEl && ivaEl) {
-    const neto = total / 1.16;
-    const iva  = total - neto;
-    netoEl.textContent = '$' + neto.toLocaleString('es-MX', {minimumFractionDigits:2, maximumFractionDigits:2});
-    ivaEl.textContent  = '$' + iva.toLocaleString('es-MX', {minimumFractionDigits:2, maximumFractionDigits:2});
+    const iva        = total * 0.16;
+    const totalConIva = total + iva;
+    netoEl.textContent  = '$' + total.toLocaleString('es-MX', {minimumFractionDigits:2, maximumFractionDigits:2});
+    ivaEl.textContent   = '$' + iva.toLocaleString('es-MX', {minimumFractionDigits:2, maximumFractionDigits:2});
+    if (ticketTotal) ticketTotal.textContent = '$' + totalConIva.toLocaleString('es-MX', {minimumFractionDigits:2, maximumFractionDigits:2});
   }
 
   const ahorroTotal = totalBase - total;
