@@ -429,6 +429,35 @@ $esComprador   = $rol === 'comprador';
     </a>
     <?php endif; ?>
 
+    <?php /* ── MI RESTAURANTE (comprador con restaurante_activo) ─── */ ?>
+    <?php if ($esComprador && !empty($_SESSION['usuario']['restaurante_activo'])): ?>
+    <div class="sidebar-section">Mi Restaurante</div>
+    <?php
+      $restActivo = null;
+      try {
+        $restId = $_SESSION['restaurante_activo_id'] ?? null;
+        if (!$restId) {
+          $restM  = new RestauranteModel();
+          $rests  = $restM->getByComprador((int)($_SESSION['usuario']['id'] ?? 0));
+          $restId = $rests[0]['id'] ?? null;
+          if ($restId) $_SESSION['restaurante_activo_id'] = $restId;
+        }
+        if ($restId) $restActivo = (new RestauranteModel())->find((int)$restId);
+      } catch (\Throwable $e) {}
+    ?>
+    <a href="<?= BASE_URL ?>restaurante/dashboard">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+      <?= htmlspecialchars($restActivo['nombre'] ?? 'Mi Restaurante') ?>
+    </a>
+    <a href="<?= BASE_URL ?>rest-pedido/index" style="padding-left:36px;font-size:.8rem">Pedidos activos</a>
+    <a href="<?= BASE_URL ?>rest-mesa/index" style="padding-left:36px;font-size:.8rem">Mesas</a>
+    <a href="<?= BASE_URL ?>rest-finanzas/dashboard" style="padding-left:36px;font-size:.8rem">Financiero</a>
+    <a href="<?= BASE_URL ?>rest-inventario/index" style="padding-left:36px;font-size:.8rem">Inventario</a>
+    <?php endif; ?>
+    <?php if ($esComprador && empty($_SESSION['usuario']['restaurante_activo'])): ?>
+    <?php /* Comprador sin módulo restaurante — no mostrar sección */ ?>
+    <?php endif; ?>
+
     <div class="sidebar-section">Cuenta</div>
     <a href="<?= BASE_URL ?>cuenta/perfil" class="<?= ($activeMenu??'')==='cuenta'?'active':'' ?>">
       <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5.121 17.804A8.966 8.966 0 0112 15c2.485 0 4.745.99 6.379 2.596M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>

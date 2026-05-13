@@ -112,6 +112,23 @@ $routes = [
     // Landings de audiencia
     'taqueria'            => 'PublicController',
     'restaurantes'        => 'PublicController',
+    // Módulo restaurante — portal del comprador/admin
+    'restaurante'         => 'RestauranteController',
+    'rest-config'         => 'RestConfigController',
+    'rest-mesa'           => 'RestMesaController',
+    'rest-menu'           => 'RestMenuController',
+    'rest-inventario'     => 'RestInventarioController',
+    'rest-pedido'         => 'RestPedidoController',
+    'rest-finanzas'       => 'RestFinanzasController',
+    'rest-cliente'        => 'RestClienteController',
+    'rest-reserva'        => 'RestReservaController',
+    'rest-ticket'         => 'RestTicketController',
+    // Portales staff restaurante
+    'rest-mesero'         => 'RestMeseroController',
+    'rest-chef'           => 'RestChefController',
+    'rest-portero'        => 'RestPorteroController',
+    // Menú público (sin login)
+    'menu'                => 'RestPublicoController',
 ];
 
 // ── Auth guard ────────────────────────────────────────────────────────────────
@@ -139,11 +156,16 @@ $publicPaths = [
     'landing/taqueria',
     'landing/restaurantes',
     'landing/carnihub',
+    // Menú público del restaurante
+    'menu/index',
+    'menu/ordenar',
+    'menu/pagar',
+    'menu/confirmacion',
 ];
 
 $currentPath = strtolower($ctrlSlug . '/' . $action);
 
-if (!isset($_SESSION['usuario']) && !in_array($currentPath, $publicPaths, true)) {
+if (!isset($_SESSION['usuario']) && !in_array($currentPath, $publicPaths, true) && $ctrlSlug !== 'menu') {
     header('Location: ' . BASE_URL . 'auth/login');
     exit;
 }

@@ -46,6 +46,9 @@ abstract class BaseController
             $rol === 'comprador'                                       => $this->redirect('comprador/inicio'),
             $rol === 'admin_empresa'                                   => $this->redirect('empresa/dashboard'),
             $rol === 'superadmin'                                      => $this->redirect('panel/dashboard'),
+            $rol === 'mesero'                                          => $this->redirect('rest-mesero/dashboard'),
+            $rol === 'chef'                                            => $this->redirect('rest-chef/dashboard'),
+            $rol === 'portero'                                         => $this->redirect('rest-portero/dashboard'),
             default                                                    => $this->redirect('auth/login'),
         };
     }
@@ -94,6 +97,34 @@ abstract class BaseController
         $this->requireRole(['repartidor']);
     }
 
+    /** Admin del restaurante (comprador con restaurante activo) */
+    protected function requireRestaurante(): void
+    {
+        $this->requireRole(['comprador']);
+        $restauranteId = $_SESSION['restaurante_activo_id'] ?? null;
+        if (!$restauranteId) {
+            $this->redirect('restaurante/seleccionar');
+        }
+    }
+
+    /** Staff: mesero */
+    protected function requireMesero(): void
+    {
+        $this->requireRole(['mesero', 'comprador']);
+    }
+
+    /** Staff: chef */
+    protected function requireChef(): void
+    {
+        $this->requireRole(['chef', 'comprador']);
+    }
+
+    /** Staff: portero */
+    protected function requirePortero(): void
+    {
+        $this->requireRole(['portero', 'comprador']);
+    }
+
     /** Cualquier usuario autenticado */
     protected function requireAuth(): void
     {
@@ -129,6 +160,13 @@ abstract class BaseController
     {
         return isset($_SESSION['usuario']['empresa_id'])
             ? (int)$_SESSION['usuario']['empresa_id']
+            : null;
+    }
+
+    protected function restauranteId(): ?int
+    {
+        return isset($_SESSION['restaurante_activo_id'])
+            ? (int)$_SESSION['restaurante_activo_id']
             : null;
     }
 
