@@ -25,11 +25,11 @@ $esSuperAdmin  = ($usuario['rol_slug'] ?? '') === 'superadmin';
       --color-primary: <?= htmlspecialchars($colorPrimary) ?>;
       --color-secondary: <?= htmlspecialchars($colorSecond) ?>;
     }
-    .sidebar { width:260px;min-height:100vh;background:var(--color-secondary);color:#fff;flex-shrink:0; }
+    .sidebar { width:260px;height:100vh;background:var(--color-secondary);color:#fff;flex-shrink:0;display:flex;flex-direction:column;overflow:hidden;position:fixed;top:0;left:0;z-index:100; }
     .sidebar a { display:flex;align-items:center;gap:10px;padding:10px 20px;font-size:.875rem;color:#D1D5DB;text-decoration:none;border-radius:6px;margin:2px 10px;transition:background .15s; }
     .sidebar a:hover, .sidebar a.active { background:rgba(255,255,255,.1);color:#fff; }
     .sidebar-section { font-size:.7rem;font-weight:700;letter-spacing:.08em;color:#6B7280;padding:16px 20px 4px;text-transform:uppercase; }
-    .main-content { flex:1;overflow-y:auto;background:#F9FAFB;min-height:100vh; }
+    .main-content { margin-left:260px;flex:1;overflow-y:auto;background:#F9FAFB;min-height:100vh; }
     .topbar { background:#fff;border-bottom:1px solid #E5E7EB;padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between; }
     .badge-rol { font-size:.7rem;padding:2px 8px;border-radius:999px;background:var(--color-primary);color:#fff;font-weight:600; }
   </style>
@@ -38,16 +38,15 @@ $esSuperAdmin  = ($usuario['rol_slug'] ?? '') === 'superadmin';
 
 <!-- Sidebar -->
 <aside class="sidebar">
-  <div style="padding:20px;border-bottom:1px solid rgba(255,255,255,.1);display:flex;align-items:center;gap:10px">
+  <div style="padding:18px 20px;border-bottom:1px solid rgba(255,255,255,.1);display:flex;justify-content:center;align-items:center">
     <?php if ($appLogo): ?>
-      <img src="<?= htmlspecialchars($appLogo) ?>" alt="Logo" style="height:44px;max-width:160px;object-fit:contain;filter:brightness(0) invert(1)">
+      <img src="<?= htmlspecialchars($appLogo) ?>" alt="Logo" style="height:56px;max-width:200px;object-fit:contain;filter:brightness(0) invert(1)">
     <?php else: ?>
-      <img src="<?= BASE_URL ?>public/img/logo.svg" alt="<?= htmlspecialchars($appName) ?>" style="height:44px;max-width:160px;object-fit:contain;filter:brightness(0) invert(1)">
+      <img src="<?= BASE_URL ?>public/img/logo.svg" alt="<?= htmlspecialchars($appName) ?>" style="height:56px;max-width:200px;object-fit:contain;filter:brightness(0) invert(1)">
     <?php endif; ?>
-    <span style="font-weight:800;font-size:.95rem"><?= htmlspecialchars($appName) ?></span>
   </div>
 
-  <nav style="padding:10px 0">
+  <nav style="flex:1;overflow-y:auto;min-height:0;padding:10px 0">
     <div class="sidebar-section">Principal</div>
     <a href="<?= BASE_URL ?>panel/dashboard" class="<?= ($activeMenu??'')==='dashboard'?'active':'' ?>">
       <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7h18M3 12h18M3 17h18"/></svg>
@@ -94,7 +93,7 @@ $esSuperAdmin  = ($usuario['rol_slug'] ?? '') === 'superadmin';
   </nav>
 
   <!-- Pie del sidebar -->
-  <div style="position:sticky;bottom:0;padding:12px 20px;border-top:1px solid rgba(255,255,255,.1);background:var(--color-secondary)">
+  <div style="flex-shrink:0;padding:12px 20px;border-top:1px solid rgba(255,255,255,.1);background:var(--color-secondary)">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
       <?php if (!empty($usuario['avatar'])): ?>
         <img src="<?= htmlspecialchars($usuario['avatar']) ?>" alt="Avatar"
@@ -128,7 +127,7 @@ $esSuperAdmin  = ($usuario['rol_slug'] ?? '') === 'superadmin';
   </div>
 
   <!-- Contenido de la vista inyectado aquí -->
-  <div style="padding:24px">
+  <div style="padding:28px 36px">
     <?= $content ?? '' ?>
   </div>
 </div>
