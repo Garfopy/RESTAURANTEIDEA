@@ -12,6 +12,24 @@ class RestauranteController extends BaseController
         $this->model = new RestauranteModel();
     }
 
+    public function locales(?string $p = null): void
+    {
+        $this->requireRestaurante();
+        $compradorId        = $this->usuarioId();
+        $sucursales         = $this->model->getByComprador($compradorId);
+        $restauranteActivoId = $this->restauranteId();
+        $menuModel          = new RestMenuModel();
+        $invModel           = new RestInventarioModel();
+        foreach ($sucursales as &$s) {
+            $s['num_platillos']   = count($menuModel->getByRestaurante((int)$s['id'], true));
+            $s['num_ingredientes'] = count($invModel->getByRestaurante((int)$s['id'], true));
+        }
+        unset($s);
+        $pageTitle  = 'Mis Locales';
+        $activeMenu = 'rest_locales';
+        $this->render('restaurante/locales', compact('sucursales','restauranteActivoId','pageTitle','activeMenu'));
+    }
+
     public function seleccionar(?string $p = null): void
     {
         $compradorId   = $this->usuarioId();

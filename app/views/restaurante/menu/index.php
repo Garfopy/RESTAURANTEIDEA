@@ -180,6 +180,21 @@ $restauranteId = $_SESSION['restaurante_activo_id'] ?? 0;
     <div style="background:#FEF3C7;border:1px solid #FCD34D;border-radius:8px;padding:10px 12px;margin-bottom:16px;font-size:.8rem;color:#92400E">
       <strong>Nota:</strong> Estas categorías son para el <strong>menú del cliente</strong> (Bebidas, Entradas, etc.). Las categorías de ingredientes del inventario son independientes.
     </div>
+    <?php if (!empty($categorias)): ?>
+    <div style="margin-bottom:16px">
+      <div style="font-size:.75rem;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">
+        Categorías existentes
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        <?php foreach ($categorias as $c): ?>
+        <span style="background:#F3F4F6;color:#374151;border-radius:8px;padding:4px 10px;
+                     font-size:.8rem;font-weight:600">
+          <?= htmlspecialchars($c['nombre']) ?>
+        </span>
+        <?php endforeach; ?>
+      </div>
+    </div>
+    <?php endif; ?>
     <form method="POST" action="<?= BASE_URL ?>rest-menu/guardarCategoria" onsubmit="return validarCat()">
       <input type="hidden" name="id" value="">
       <div class="form-group">

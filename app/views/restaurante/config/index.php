@@ -30,10 +30,17 @@
       <div style="display:grid;grid-template-columns:280px 1fr;gap:16px;margin-bottom:20px;align-items:start">
         <div>
           <label class="form-label">Dirección</label>
-          <input type="text" name="direccion" id="inpDireccion" class="form-input"
-                 value="<?= htmlspecialchars($restaurante['direccion'] ?? '') ?>"
-                 placeholder="Ej: Av. Principal 123, Ciudad"
-                 style="margin-bottom:10px">
+          <div style="position:relative">
+            <input type="text" name="direccion" id="inpDireccion" class="form-input"
+                   value="<?= htmlspecialchars($restaurante['direccion'] ?? '') ?>"
+                   placeholder="Ej: Av. Principal 123, Ciudad"
+                   autocomplete="off"
+                   style="margin-bottom:0">
+            <div id="addrSugg" style="display:none;position:absolute;top:calc(100% + 2px);left:0;right:0;
+                 z-index:300;background:#fff;border:1.5px solid #E5E7EB;border-radius:10px;
+                 box-shadow:0 6px 24px rgba(0,0,0,.1);max-height:220px;overflow-y:auto"></div>
+          </div>
+          <div style="margin-top:10px"></div>
           <div id="coordsBox" style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:10px 12px;<?= empty($restaurante['direccion']) ? 'display:none' : '' ?>">
             <div style="font-size:.75rem;font-weight:700;color:#065F46;margin-bottom:6px">📍 Coordenadas</div>
             <div style="font-size:.78rem;color:#374151">Lat: <span id="coordLat"><?= $restaurante['lat'] ?? '—' ?></span></div>
@@ -418,7 +425,53 @@ document.getElementById('txtColorSec').addEventListener('input', function() {
   document.getElementById('spicker').value = this.value;
 });
 
-// Generar QR con qrcode.js CDN
+// ── Address autocomplete con Nominatim ──────────────────────────────────────
+(function() {
+  const inp  = document.getElementById('inpDireccion');
+  const sugg = document.getElementById('addrSugg');
+  if (!inp || !sugg) return;
+  let timer;
+  inp.addEventListener('input', function() {
+    clearTimeout(timer);
+    const q = this.value.trim();
+    if (q.length < 4) { sugg.style.display = 'none'; return; }
+    timer = setTimeout(function() {
+      fetch('https://nominatim.openstreetmap.org/search?format=json&limit=6&addressdetails=0&q=' + encodeURIComponent(q))
+        .then(function(r){ return r.json(); })
+        .then(function(data) {
+          if (!data || !data.length) { sugg.style.display = 'none'; return; }
+          sugg.innerHTML = data.map(function(item) {
+            var name = item.display_name.replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            return '<div class="addr-opt" onmousedown="addrSelect(event,this)" data-val="' + name.replace(/"/g,'&quot;') + '"'
+              + ' style="padding:9px 13px;cursor:pointer;font-size:.82rem;color:#374151;border-bottom:1px solid #F3F4F6;display:flex;align-items:flex-start;gap:8px">'
+              + '<span style="flex-shrink:0;color:var(--cp)">📍</span>'
+              + '<span>' + name + '</span></div>';
+          }).join('');
+          sugg.style.display = 'block';
+        })
+        .catch(function(){ sugg.style.display = 'none'; });
+    }, 420);
+  });
+  inp.addEventListener('blur', function() {
+    setTimeout(function(){ sugg.style.display = 'none'; }, 200);
+  });
+  inp.addEventListener('focus', function() {
+    if (sugg.innerHTML && this.value.length >= 4) sugg.style.display = 'block';
+  });
+})();
+function addrSelect(e, el) {
+  e.preventDefault();
+  document.getElementById('inpDireccion').value = el.dataset.val;
+  document.getElementById('addrSugg').style.display = 'none';
+}
+
+// Hover effect for suggestion options
+document.addEventListener('mouseover', function(e) {
+  if (e.target.closest('.addr-opt')) e.target.closest('.addr-opt').style.background = '#F9FAFB';
+});
+document.addEventListener('mouseout', function(e) {
+  if (e.target.closest('.addr-opt')) e.target.closest('.addr-opt').style.background = '';
+});
 (function() {
   const script = document.createElement('script');
   script.src = 'https://unpkg.com/qrcodejs@1.0.0/qrcode.min.js';

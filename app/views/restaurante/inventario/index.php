@@ -188,7 +188,7 @@
   <div class="inv-card-cost">
     Costo/u: <strong>$<?= number_format((float)$ing['costo_unitario'], 2) ?></strong>
     <?php if ((float)$ing['costo_unitario'] > 0 && $stock > 0): ?>
-    &nbsp;·&nbsp; Valor: <strong>$<?= number_format($stock * (float)$ing['costo_unitario'], 2) ?></strong>
+    &nbsp;·&nbsp; Valor stock actual: <strong>$<?= number_format($stock * (float)$ing['costo_unitario'], 2) ?></strong>
     <?php endif; ?>
   </div>
 
