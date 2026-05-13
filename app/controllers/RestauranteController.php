@@ -103,7 +103,20 @@ class RestauranteController extends BaseController
 
         $_SESSION['restaurante_activo_id'] = $id;
         $this->flash('success', 'Restaurante creado correctamente.');
-        $this->redirect('restaurante/dashboard');
+        $this->redirect('restaurante/bienvenida');
+    }
+
+    public function bienvenida(?string $p = null): void
+    {
+        $this->requireRestaurante();
+        $restauranteId = $this->restauranteId();
+        $restaurante   = $this->model->find($restauranteId);
+        $linkStaff     = BASE_URL . 'acceso/' . $restaurante['slug'];
+        $linkMenu      = BASE_URL . 'menu/'   . $restaurante['slug'];
+        $pageTitle     = '¡Restaurante creado!';
+        $activeMenu    = 'rest_dashboard';
+        $this->render('restaurante/bienvenida',
+            compact('restaurante','linkStaff','linkMenu','pageTitle','activeMenu'));
     }
 
     public function editar(?string $id = null): void

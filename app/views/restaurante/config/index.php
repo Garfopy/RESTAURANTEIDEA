@@ -115,10 +115,64 @@
         </div>
       </div>
 
+      <!-- Modos de operación -->
+      <div style="border-top:1px solid #F3F4F6;padding-top:20px;margin-bottom:20px">
+        <div style="font-weight:700;font-size:.95rem;color:#111827;margin-bottom:6px;
+                    display:flex;align-items:center;gap:8px">
+          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+          Modos de operación
+        </div>
+        <div style="font-size:.8rem;color:#6B7280;margin-bottom:14px">
+          Adapta CarniHub a cómo opera tu sucursal: restaurante con mesas, taquería, take-away, etc.
+        </div>
+
+        <?php
+          $r = $restaurante ?? [];
+          $toggles = [
+            ['mesas_habilitadas',       1, '🪑 Mesas habilitadas',       'Sucursal con mesas físicas. Desactiva para take-away o banqueta sin mesas.'],
+            ['reservas_habilitadas',    1, '📅 Reservaciones',           'Permite que los comensales reserven mesa con anticipación.'],
+            ['portero_habilitado',      1, '🛡️ Portero (verifica pago)','Un portero escanea el QR del comensal al salir para confirmar el pago.'],
+            ['requiere_login_comensal', 0, '🔐 Login obligatorio',       'Exige Google login o nombre+teléfono antes de ordenar.'],
+          ];
+          foreach ($toggles as [$key, $def, $label, $desc]):
+            $val = (int)($r[$key] ?? $def);
+        ?>
+        <label style="display:flex;align-items:center;gap:14px;padding:12px 14px;border:1px solid #E5E7EB;
+                      border-radius:10px;margin-bottom:8px;cursor:pointer;background:#fff">
+          <input type="checkbox" name="<?= $key ?>" value="1" <?= $val ? 'checked' : '' ?>
+                 style="width:42px;height:24px;appearance:none;background:#D1D5DB;border-radius:12px;
+                        position:relative;cursor:pointer;transition:.2s;flex-shrink:0"
+                 onchange="this.style.background = this.checked ? 'var(--cp)' : '#D1D5DB'"
+                 class="toggle-switch">
+          <div style="flex:1">
+            <div style="font-weight:600;color:#111827;font-size:.9rem"><?= $label ?></div>
+            <div style="font-size:.78rem;color:#6B7280;margin-top:2px"><?= $desc ?></div>
+          </div>
+        </label>
+        <?php endforeach; ?>
+
+        <div class="form-group" style="margin-top:14px">
+          <label class="form-label">💰 Propinas sugeridas (CSV de %)</label>
+          <input type="text" name="propinas_sugeridas" class="form-input"
+                 value="<?= htmlspecialchars($r['propinas_sugeridas'] ?? '0,10,15,20') ?>"
+                 placeholder="0,10,15,20">
+          <div style="font-size:.75rem;color:#9CA3AF;margin-top:4px">
+            Porcentajes mostrados al comensal en la pantalla de pago, separados por comas.
+          </div>
+        </div>
+      </div>
+
       <!-- Nota footer -->
       <div style="background:#F9FAFB;border-radius:8px;padding:12px;font-size:.8rem;color:#6B7280;margin-bottom:20px">
         El footer del menú siempre mostrará: <strong>Potenciado por CarniHub</strong>
       </div>
+
+      <style>
+        .toggle-switch::after{content:'';position:absolute;top:2px;left:2px;width:20px;height:20px;
+                              border-radius:50%;background:#fff;transition:.2s;
+                              box-shadow:0 1px 3px rgba(0,0,0,.2)}
+        .toggle-switch:checked::after{transform:translateX(18px)}
+      </style>
 
       <div style="display:flex;justify-content:flex-end">
         <button type="submit" class="btn btn-primary">

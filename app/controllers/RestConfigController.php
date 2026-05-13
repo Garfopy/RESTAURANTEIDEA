@@ -36,6 +36,12 @@ class RestConfigController extends BaseController
             'color_secundario'=> $this->post('color_secundario', '#1f2937'),
             'horario_apertura'=> $this->post('horario_apertura') ?: null,
             'horario_cierre'  => $this->post('horario_cierre') ?: null,
+            // Modos de operación
+            'mesas_habilitadas'       => $this->post('mesas_habilitadas')       ? 1 : 0,
+            'reservas_habilitadas'    => $this->post('reservas_habilitadas')    ? 1 : 0,
+            'portero_habilitado'      => $this->post('portero_habilitado')      ? 1 : 0,
+            'requiere_login_comensal' => $this->post('requiere_login_comensal') ? 1 : 0,
+            'propinas_sugeridas'      => trim($this->post('propinas_sugeridas', '0,10,15,20')) ?: '0,10,15,20',
         ];
 
         // Logo upload
