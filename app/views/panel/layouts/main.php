@@ -29,6 +29,11 @@ $esSuperAdmin  = ($usuario['rol_slug'] ?? '') === 'superadmin';
     .sidebar a { display:flex;align-items:center;gap:10px;padding:10px 20px;font-size:.875rem;color:#D1D5DB;text-decoration:none;border-radius:6px;margin:2px 10px;transition:background .15s; }
     .sidebar a:hover, .sidebar a.active { background:rgba(255,255,255,.1);color:#fff; }
     .sidebar-section { font-size:.7rem;font-weight:700;letter-spacing:.08em;color:#6B7280;padding:16px 20px 4px;text-transform:uppercase; }
+    .sidebar nav::-webkit-scrollbar { width:4px; }
+    .sidebar nav::-webkit-scrollbar-track { background:transparent; }
+    .sidebar nav::-webkit-scrollbar-thumb { background:rgba(255,255,255,.15);border-radius:999px; }
+    .sidebar nav::-webkit-scrollbar-thumb:hover { background:rgba(255,255,255,.3); }
+    .sidebar nav { scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.15) transparent; }
     .main-content { margin-left:260px;flex:1;overflow-y:auto;background:#F9FAFB;min-height:100vh; }
     .topbar { background:#fff;border-bottom:1px solid #E5E7EB;padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between; }
     .badge-rol { font-size:.7rem;padding:2px 8px;border-radius:999px;background:var(--color-primary);color:#fff;font-weight:600; }

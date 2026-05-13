@@ -22,8 +22,8 @@ class UsuarioModel extends BaseModel
                     CONCAT(u.nombre, " ", u.apellido_paterno) AS nombre_completo
                FROM usuarios u
                JOIN roles r ON r.id = u.rol_id
-              WHERE u.empresa_id = ? AND u.activo = 1
-              ORDER BY r.id, u.nombre',
+              WHERE u.empresa_id = ?
+              ORDER BY u.activo DESC, r.id, u.nombre',
             [$empresaId]
         );
     }

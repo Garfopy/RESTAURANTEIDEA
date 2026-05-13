@@ -193,18 +193,36 @@ class EmpresaEvidenciaController extends BaseController
     private function urlToFsPath(string $url): ?string
     {
         if (empty($url)) return null;
-        // Intenta conversión directa URL → filesystem
+
+        // 1. Conversión directa UPLOAD_URL → UPLOAD_PATH
         $converted = str_replace(UPLOAD_URL, UPLOAD_PATH, $url);
         if ($converted !== $url && file_exists($converted)) return $converted;
 
-        // Fallback: detectar directorio por nombre en la URL
-        foreach (['entregas', 'firmas', 'evidencias'] as $dir) {
-            if (str_contains($url, "/$dir/")) {
-                $filename = basename(parse_url($url, PHP_URL_PATH));
-                $path = UPLOAD_PATH . $dir . '/' . $filename;
-                return file_exists($path) ? $path : null;
+        // 2. Extraer la parte del path y buscar /uploads/
+        $urlPath = parse_url($url, PHP_URL_PATH) ?? '';
+        if ($urlPath) {
+            $uploadsPos = strpos($urlPath, '/uploads/');
+            if ($uploadsPos !== false) {
+                $relative = substr($urlPath, $uploadsPos + 1); // "uploads/firmas/archivo.png"
+                $fsPath   = ROOT_PATH . '/public/' . $relative;
+                if (file_exists($fsPath)) return $fsPath;
+            }
+            // 2b. Fallback con DOCUMENT_ROOT
+            if (!empty($_SERVER['DOCUMENT_ROOT'])) {
+                $docPath = rtrim($_SERVER['DOCUMENT_ROOT'], '/') . $urlPath;
+                if (file_exists($docPath)) return $docPath;
             }
         }
+
+        // 3. Fallback por nombre de directorio conocido
+        foreach (['entregas', 'firmas', 'evidencias', 'comprobantes'] as $dir) {
+            if (str_contains($url, "/$dir/")) {
+                $filename = basename(parse_url($url, PHP_URL_PATH));
+                $path     = UPLOAD_PATH . $dir . '/' . $filename;
+                if (file_exists($path)) return $path;
+            }
+        }
+
         return null;
     }
 
