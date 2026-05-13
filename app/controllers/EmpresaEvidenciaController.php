@@ -97,6 +97,10 @@ class EmpresaEvidenciaController extends BaseController
         // Cargar datos del pedido
         $pedidoModel = new PedidoModel();
         $pedido      = $pedidoModel->conDetalle($pedidoId);
+        if (!$pedido) {
+            $this->flash('error', 'Pedido no encontrado.');
+            $this->redirect('empresa-evidencia/index');
+        }
         $empresa     = (new EmpresaModel())->find($empresaId);
         $configModel = new ConfigModel();
         $appLogo     = $configModel->get('app_logo', '');

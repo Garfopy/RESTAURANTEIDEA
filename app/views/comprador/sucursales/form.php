@@ -195,6 +195,9 @@ $gmKey = $configModel->get('google_maps_key', '');
     mostrarFallbackCoords();
   };
 
+  // Exponer globalmente para el atributo onerror del <script> de Maps
+  window.mostrarFallbackCoords = mostrarFallbackCoords;
+
   function mostrarFallbackCoords() {
     document.getElementById('coords-fallback').style.display = 'block';
     var mapaC = document.getElementById('mapa-container');
@@ -206,10 +209,91 @@ $gmKey = $configModel->get('google_maps_key', '');
     var lng = document.getElementById('input-lng').value;
     if (lat) document.getElementById('input-lat-manual').value = lat;
     if (lng) document.getElementById('input-lng-manual').value = lng;
+    // Activar autocomplete Nominatim (OSM) como reemplazo del Places API
+    activarBusquedaNominatim();
   }
+  // Agregar z-index para que el dropdown de Google Places quede visible
+  var pacStyle = document.createElement('style');
+  pacStyle.textContent = '.pac-container { z-index: 99999 !important; }';
+  document.head.appendChild(pacStyle);
+
+  // ─── Autocomplete Nominatim (OSM) ───────────────────────────────────────
+  // Se activa cuando Google Maps no está disponible o la autenticación falla.
+  function activarBusquedaNominatim() {
+    var dirInput = document.getElementById('input-direccion');
+    if (!dirInput) return;
+    // Evitar inicializar dos veces
+    if (dirInput.dataset.nominatimActivo) return;
+    dirInput.dataset.nominatimActivo = '1';
+
+    // Crear contenedor del dropdown
+    var dropdown = document.createElement('div');
+    dropdown.id = 'nominatim-dropdown';
+    dropdown.style.cssText = [
+      'position:absolute', 'top:100%', 'left:0', 'right:0',
+      'background:#fff', 'border:1px solid #D1D5DB',
+      'border-radius:8px', 'box-shadow:0 4px 16px rgba(0,0,0,.12)',
+      'z-index:99999', 'max-height:220px', 'overflow-y:auto', 'display:none',
+    ].join(';');
+    dirInput.parentElement.style.position = 'relative';
+    dirInput.parentElement.appendChild(dropdown);
+
+    var nomTimer;
+    dirInput.addEventListener('input', function() {
+      clearTimeout(nomTimer);
+      var q = this.value.trim();
+      if (q.length < 4) { dropdown.style.display = 'none'; return; }
+
+      nomTimer = setTimeout(function() {
+        fetch('https://nominatim.openstreetmap.org/search?format=json&countrycodes=mx&limit=6&addressdetails=1&q=' + encodeURIComponent(q), {
+          headers: { 'Accept-Language': 'es', 'Accept': 'application/json' }
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(results) {
+          dropdown.innerHTML = '';
+          if (!results || !results.length) { dropdown.style.display = 'none'; return; }
+          results.forEach(function(place, idx) {
+            var item = document.createElement('div');
+            item.style.cssText = [
+              'padding:10px 14px', 'cursor:pointer', 'font-size:.84rem',
+              'color:#374151', 'line-height:1.4',
+              idx > 0 ? 'border-top:1px solid #F3F4F6' : '',
+            ].join(';');
+            item.textContent = place.display_name;
+            item.addEventListener('mouseenter', function() { this.style.background = '#F9FAFB'; });
+            item.addEventListener('mouseleave', function() { this.style.background = ''; });
+            item.addEventListener('click', function() {
+              var lat = parseFloat(place.lat).toFixed(7);
+              var lng = parseFloat(place.lon).toFixed(7);
+              dirInput.value = place.display_name;
+              document.getElementById('input-lat').value = lat;
+              document.getElementById('input-lng').value = lng;
+              var mLat = document.getElementById('input-lat-manual');
+              var mLng = document.getElementById('input-lng-manual');
+              if (mLat) mLat.value = lat;
+              if (mLng) mLng.value = lng;
+              dropdown.style.display = 'none';
+            });
+            dropdown.appendChild(item);
+          });
+          dropdown.style.display = 'block';
+        })
+        .catch(function() { dropdown.style.display = 'none'; });
+      }, 450);
+    });
+
+    // Cerrar al hacer clic fuera
+    document.addEventListener('click', function(e) {
+      if (!dropdown.contains(e.target) && e.target !== dirInput) {
+        dropdown.style.display = 'none';
+      }
+    });
+  }
+
 })();
 </script>
 <script async defer
-  src="https://maps.googleapis.com/maps/api/js?key=<?= htmlspecialchars($gmKey) ?>&libraries=places&callback=initGoogleMaps&onerror=gm_authFailure">
+  src="https://maps.googleapis.com/maps/api/js?key=<?= htmlspecialchars($gmKey) ?>&libraries=places&callback=initGoogleMaps"
+  onerror="mostrarFallbackCoords()">
 </script>
 <?php endif; ?>

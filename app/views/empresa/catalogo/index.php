@@ -224,10 +224,20 @@ $totalCarrito = count($itemsCarrito);
       <div style="font-weight:800;font-size:1rem;color:#111827;margin-bottom:2px;line-height:1.3"><?= htmlspecialchars($prod['nombre']) ?></div>
       <div style="font-size:.8rem;color:#6B7280;margin-bottom:12px"><?= htmlspecialchars($prod['presentacion']) ?></div>
       <div style="margin-top:auto">
+        <?php $pEsp = isset($preciosEspeciales[$prod['id']]) ? $preciosEspeciales[$prod['id']] : null; ?>
+        <?php if ($pEsp !== null): ?>
+        <div style="display:flex;align-items:baseline;gap:8px">
+          <div style="font-size:1.5rem;font-weight:900;color:#059669;line-height:1">$<?= number_format($pEsp, 2) ?></div>
+          <div style="font-size:.82rem;color:#9CA3AF;text-decoration:line-through">$<?= number_format($prod['precio_base'], 2) ?></div>
+        </div>
+        <div style="display:inline-flex;align-items:center;gap:4px;background:#D1FAE5;color:#065F46;font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:999px;margin-top:4px">★ Precio especial</div>
+        <div style="font-size:.75rem;color:#9CA3AF;margin-top:4px">por <?= $prod['presentacion'] ?> · Sin IVA</div>
+        <?php else: ?>
         <div style="font-size:1.5rem;font-weight:900;color:var(--color-primary);line-height:1">
           $<?= number_format($prod['precio_base'],2) ?>
         </div>
         <div style="font-size:.75rem;color:#9CA3AF;margin-top:2px">por <?= $prod['presentacion'] ?> · Sin IVA</div>
+        <?php endif; ?>
       </div>
       <?php if (!empty($limitePorProducto[$prod['id']])): ?>
       <?php $lim = $limitePorProducto[$prod['id']]; $periodoC = ['por_pedido'=>'/pedido','semanal'=>'/semana','mensual'=>'/mes'][$lim['periodo']] ?? ''; ?>
@@ -239,14 +249,15 @@ $totalCarrito = count($itemsCarrito);
     <!-- Acciones -->
     <?php
     $prodData = json_encode([
-        'id'          => $prod['id'],
-        'nombre'      => $prod['nombre'],
-        'presentacion'=> $prod['presentacion'],
-        'precio_base' => (float)$prod['precio_base'],
-        'imagen'      => getProductImageUrl($prod),
-        'categoria'   => $prod['categoria_nombre'],
-        'escalonados' => $prod['escalonados'],
-        'limite'      => $limitePorProducto[$prod['id']] ?? null,
+        'id'            => $prod['id'],
+        'nombre'        => $prod['nombre'],
+        'presentacion'  => $prod['presentacion'],
+        'precio_base'   => (float)$prod['precio_base'],
+        'precio_especial' => isset($preciosEspeciales[$prod['id']]) ? (float)$preciosEspeciales[$prod['id']] : null,
+        'imagen'        => getProductImageUrl($prod),
+        'categoria'     => $prod['categoria_nombre'],
+        'escalonados'   => $prod['escalonados'],
+        'limite'        => $limitePorProducto[$prod['id']] ?? null,
     ]);
     ?>
     <div style="padding:12px 16px;border-top:1px solid #F3F4F6;display:flex;align-items:center;justify-content:space-between;gap:10px">
@@ -435,6 +446,10 @@ let tiersActivos = []; // tramos filtrados por el límite activo del producto
 // ═══════════════ Modal "Agregar al carrito" ═══════════════
 function abrirModalAgregar(prod) {
   modalProducto = prod;
+  // Usar precio_especial como precio de referencia cuando existe
+  modalProducto._precioRef = (prod.precio_especial !== null && prod.precio_especial !== undefined)
+    ? prod.precio_especial
+    : prod.precio_base;
   document.getElementById('modAgrNombre').textContent       = prod.nombre;
   document.getElementById('modAgrCategoria').textContent    = prod.categoria || '';
   document.getElementById('modAgrPresentacion').textContent = prod.presentacion;
@@ -443,7 +458,15 @@ function abrirModalAgregar(prod) {
   document.getElementById('modAgrFeedback').style.display   = 'none';
   document.getElementById('modAgrAlertaTramo').style.display = 'none';
   document.getElementById('modAgrSubtotalEst').textContent  = '';
-  document.getElementById('modAgrPrecioEst').textContent    = '$' + prod.precio_base.toLocaleString('es-MX',{minimumFractionDigits:2}) + ' / ' + prod.presentacion;
+
+  // Mostrar badge de precio especial si aplica
+  const precioLabel = prod.precio_especial !== null && prod.precio_especial !== undefined
+    ? '<span style="color:#059669;font-weight:900">$' + prod.precio_especial.toLocaleString('es-MX',{minimumFractionDigits:2}) + '</span>'
+      + ' <span style="font-size:.75rem;text-decoration:line-through;color:#9CA3AF">$' + prod.precio_base.toLocaleString('es-MX',{minimumFractionDigits:2}) + '</span>'
+      + ' <span style="font-size:.68rem;background:#D1FAE5;color:#065F46;padding:1px 6px;border-radius:999px;font-weight:700">★ especial</span>'
+      + ' / ' + prod.presentacion
+    : '$' + prod.precio_base.toLocaleString('es-MX',{minimumFractionDigits:2}) + ' / ' + prod.presentacion;
+  document.getElementById('modAgrPrecioEst').innerHTML = precioLabel;
   document.getElementById('btnAgregarConfirmar').style.display = 'block';
 
   const imgDiv = document.getElementById('modAgrImg');
@@ -507,7 +530,13 @@ function actualizarModalPrecio() {
   clearTimeout(debTimer);
   const qty = parseFloat(document.getElementById('modAgrCantidad').value) || 0;
   if (qty <= 0) {
-    document.getElementById('modAgrPrecioEst').textContent = '$' + modalProducto.precio_base.toLocaleString('es-MX',{minimumFractionDigits:2}) + ' / ' + modalProducto.presentacion;
+    const precioLabel = modalProducto.precio_especial !== null && modalProducto.precio_especial !== undefined
+      ? '<span style="color:#059669;font-weight:900">$' + modalProducto.precio_especial.toLocaleString('es-MX',{minimumFractionDigits:2}) + '</span>'
+        + ' <span style="font-size:.75rem;text-decoration:line-through;color:#9CA3AF">$' + modalProducto.precio_base.toLocaleString('es-MX',{minimumFractionDigits:2}) + '</span>'
+        + ' <span style="font-size:.68rem;background:#D1FAE5;color:#065F46;padding:1px 6px;border-radius:999px;font-weight:700">★ especial</span>'
+        + ' / ' + modalProducto.presentacion
+      : '$' + modalProducto.precio_base.toLocaleString('es-MX',{minimumFractionDigits:2}) + ' / ' + modalProducto.presentacion;
+    document.getElementById('modAgrPrecioEst').innerHTML = precioLabel;
     document.getElementById('modAgrSubtotalEst').textContent = '';
     document.getElementById('modAgrAlertaTramo').style.display = 'none';
     resaltarTier(null); return;
@@ -515,18 +544,29 @@ function actualizarModalPrecio() {
   debTimer = setTimeout(() => {
     fetch(BASE_URL_CAT + 'api/precios/' + modalProducto.id + '?cantidad=' + qty)
       .then(r => r.json())
-      .then(d => aplicarPrecio(qty, d.precio || modalProducto.precio_base))
-      .catch(()  => aplicarPrecio(qty, precioLocal(qty)));
+      .then(d => {
+        // Si el comprador tiene precio especial, tomar el menor entre especial y escalonado
+        let precioFinal = d.precio || modalProducto._precioRef;
+        if (modalProducto.precio_especial !== null && modalProducto.precio_especial !== undefined) {
+          precioFinal = Math.min(precioFinal, modalProducto.precio_especial);
+        }
+        aplicarPrecio(qty, precioFinal);
+      })
+      .catch(() => aplicarPrecio(qty, precioLocal(qty)));
   }, 280);
 }
 
 function precioLocal(qty) {
-  if (!modalProducto?.escalonados) return modalProducto.precio_base;
-  let p = modalProducto.precio_base;
+  if (!modalProducto?.escalonados) return modalProducto._precioRef;
+  let p = modalProducto._precioRef;
   modalProducto.escalonados.forEach(t => {
     const min = parseFloat(t.cantidad_min), max = t.cantidad_max ? parseFloat(t.cantidad_max) : Infinity;
     if (qty >= min && qty <= max) p = parseFloat(t.precio);
   });
+  // Si hay precio especial, tomar el menor
+  if (modalProducto.precio_especial !== null && modalProducto.precio_especial !== undefined) {
+    p = Math.min(p, modalProducto.precio_especial);
+  }
   return p;
 }
 
