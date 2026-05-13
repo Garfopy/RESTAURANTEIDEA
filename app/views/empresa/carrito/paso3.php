@@ -325,10 +325,17 @@ $gmKey = $configModel->get('google_maps_key', '');
       </div>
 
       <!-- Total + costo envío -->
+      <?php
+        $ivaEstimado = round($total * 0.16, 2);
+      ?>
       <div style="background:#F9FAFB;border-radius:8px;padding:14px;margin-bottom:16px">
-        <div style="display:flex;justify-content:space-between;font-size:.82rem;color:#6B7280;margin-bottom:6px">
-          <span>Subtotal productos</span>
+        <div style="display:flex;justify-content:space-between;font-size:.82rem;color:#6B7280;margin-bottom:4px">
+          <span>Subtotal</span>
           <span>$<?= number_format($total, 2) ?></span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:.82rem;color:#6B7280;margin-bottom:6px;padding-left:12px">
+          <span>IVA (16%)</span>
+          <span>$<?= number_format($ivaEstimado, 2) ?></span>
         </div>
         <div style="display:flex;justify-content:space-between;font-size:.82rem;color:#9CA3AF;margin-bottom:10px" id="fila-envio">
           <span>Costo de envío</span>
@@ -336,8 +343,8 @@ $gmKey = $configModel->get('google_maps_key', '');
         </div>
         <div style="border-top:1px solid #E5E7EB;padding-top:10px;text-align:center">
           <div style="font-size:.8rem;color:#6B7280;margin-bottom:2px">Total del pedido</div>
-          <div style="font-size:1.8rem;font-weight:800;color:var(--color-primary)">$<?= number_format($total, 2) ?></div>
-          <div style="font-size:.72rem;color:#9CA3AF;margin-top:2px">El costo de envío se confirma al aprobar</div>
+          <div style="font-size:1.8rem;font-weight:800;color:var(--color-primary)">$<?= number_format($total + $ivaEstimado, 2) ?></div>
+          <div style="font-size:.72rem;color:#9CA3AF;margin-top:2px">Envío se confirma al aprobar</div>
         </div>
       </div>
 

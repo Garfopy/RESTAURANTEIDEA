@@ -40,7 +40,8 @@ class ApiController extends BaseController
         }
 
         $model  = new ProductoModel();
-        $precio = $model->getPrecioParaCantidad($productoId, $cantidad);
+        $compradorId = $this->usuarioId();
+        $precio = $model->getPrecioFinal($compradorId, $productoId, $cantidad);
         $escalonados = $model->getEscalonados($productoId);
 
         $this->json(['precio' => $precio, 'escalonados' => $escalonados]);

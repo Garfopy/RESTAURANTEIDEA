@@ -1,5 +1,10 @@
 <?php
 $carritoItems = $carrito ?? [];
+// Mapa de precios especiales del comprador: producto_id => precio
+$peMap = [];
+foreach (($preciosEspeciales ?? []) as $pid => $p) {
+    $peMap[(int)$pid] = (float)$p;
+}
 // Solo productos que ya están en el carrito con cantidad > 0
 $productosEnCarrito = [];
 foreach (($productos ?? []) as $prod) {
@@ -113,7 +118,11 @@ $totalItems = count($productosEnCarrito);
           </thead>
           <tbody>
             <?php foreach ($productosEnCarrito as $prod): ?>
-            <?php $prev = $carritoItems[$prod['id']]['cantidad'] ?? 0; ?>
+            <?php
+              $prev           = $carritoItems[$prod['id']]['cantidad'] ?? 0;
+              $precioEfectivo = $peMap[$prod['id']] ?? $prod['precio_base'];
+              $esPrecioEsp    = isset($peMap[$prod['id']]);
+            ?>
             <tr style="border-top:1px solid #F3F4F6;background:#FFFAF9" id="row-<?= $prod['id'] ?>">
               <!-- Producto -->
               <td style="padding:14px 16px">
@@ -140,7 +149,12 @@ $totalItems = count($productosEnCarrito);
               <!-- Precio unitario -->
               <td style="padding:14px 12px;text-align:center">
                 <div id="precio-display-<?= $prod['id'] ?>" style="color:var(--color-primary);font-weight:700;font-size:.9rem">
-                  $<?= number_format($prod['precio_base'], 2) ?>
+                  <?php if ($esPrecioEsp): ?>
+                  <span style="text-decoration:line-through;color:#9CA3AF;font-size:.75rem">$<?= number_format($prod['precio_base'], 2) ?></span>
+                  <span style="color:#059669;font-weight:700">$<?= number_format($precioEfectivo, 2) ?></span>
+                  <?php else: ?>
+                  $<?= number_format($precioEfectivo, 2) ?>
+                  <?php endif; ?>
                 </div>
                 <div style="font-size:.7rem;color:#9CA3AF">por <?= $prod['presentacion'] ?></div>
               </td>
@@ -148,7 +162,7 @@ $totalItems = count($productosEnCarrito);
               <td style="padding:14px 12px;text-align:center">
                 <div style="display:flex;align-items:center;justify-content:center;gap:6px">
                   <button type="button"
-                          onclick="cambiarCantidad(<?= $prod['id'] ?>, -0.5, <?= $prod['precio_base'] ?>, '<?= htmlspecialchars($prod['nombre'], ENT_QUOTES) ?>', '<?= $prod['presentacion'] ?>')"
+                          onclick="cambiarCantidad(<?= $prod['id'] ?>, -0.5, <?= $precioEfectivo ?>, '<?= htmlspecialchars($prod['nombre'], ENT_QUOTES) ?>', '<?= $prod['presentacion'] ?>')"
                           title="−0.5"
                           style="width:38px;height:38px;border:2px solid #E5E7EB;border-radius:9px;background:#F9FAFB;cursor:pointer;font-size:1.15rem;font-weight:700;color:#374151;display:flex;align-items:center;justify-content:center;font-family:inherit;flex-shrink:0;transition:all .15s;user-select:none"
                           onmouseenter="this.style.borderColor='var(--color-primary)';this.style.color='var(--color-primary)';this.style.background='#FFF5F5'"
@@ -161,12 +175,12 @@ $totalItems = count($productosEnCarrito);
                            <?= !empty($limitePorProducto[$prod['id']]) && $limitePorProducto[$prod['id']]['limite_kg'] ? 'max="'.htmlspecialchars($limitePorProducto[$prod['id']]['limite_kg']).'"' : '' ?>
                            placeholder="0"
                            onclick="this.select()"
-                           oninput="actualizarFila(<?= $prod['id'] ?>, <?= $prod['precio_base'] ?>, '<?= htmlspecialchars($prod['nombre'], ENT_QUOTES) ?>', '<?= $prod['presentacion'] ?>')"
+                           oninput="actualizarFila(<?= $prod['id'] ?>, <?= $precioEfectivo ?>, '<?= htmlspecialchars($prod['nombre'], ENT_QUOTES) ?>', '<?= $prod['presentacion'] ?>')"
                            style="width:74px;padding:8px 6px;border:2px solid var(--color-primary);border-radius:9px;text-align:center;font-size:1.05rem;font-weight:700;color:#111827;outline:none;background:#FFFAF9;box-shadow:0 2px 6px rgba(200,16,46,.1)">
                     <span style="font-size:.62rem;color:#9CA3AF;font-weight:500"><?= $prod['presentacion'] ?></span>
                   </div>
                   <button type="button"
-                          onclick="cambiarCantidad(<?= $prod['id'] ?>, +0.5, <?= $prod['precio_base'] ?>, '<?= htmlspecialchars($prod['nombre'], ENT_QUOTES) ?>', '<?= $prod['presentacion'] ?>')"
+                          onclick="cambiarCantidad(<?= $prod['id'] ?>, +0.5, <?= $precioEfectivo ?>, '<?= htmlspecialchars($prod['nombre'], ENT_QUOTES) ?>', '<?= $prod['presentacion'] ?>')"
                           title="+0.5"
                           style="width:38px;height:38px;border:2px solid #E5E7EB;border-radius:9px;background:#F9FAFB;cursor:pointer;font-size:1.15rem;font-weight:700;color:#374151;display:flex;align-items:center;justify-content:center;font-family:inherit;flex-shrink:0;transition:all .15s;user-select:none"
                           onmouseenter="this.style.borderColor='var(--color-primary)';this.style.color='var(--color-primary)';this.style.background='#FFF5F5'"
@@ -175,7 +189,7 @@ $totalItems = count($productosEnCarrito);
               </td>
               <!-- Subtotal -->
               <td style="padding:14px 12px;text-align:right;font-weight:700;color:#111827;font-size:.95rem" id="sub-<?= $prod['id'] ?>">
-                $<?= number_format($carritoItems[$prod['id']]['subtotal'] ?? ($prev * $prod['precio_base']), 2) ?>
+                $<?= number_format($carritoItems[$prod['id']]['subtotal'] ?? ($prev * $precioEfectivo), 2) ?>
               </td>
               <!-- Quitar -->
               <td style="padding:14px 16px;text-align:center">
@@ -240,11 +254,19 @@ $totalItems = count($productosEnCarrito);
       </div>
       <!-- Total -->
       <div style="padding:14px 16px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-          <span style="font-weight:700;color:#111827;font-size:.88rem">TOTAL ESTIMADO</span>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;font-size:.8rem;color:#6B7280">
+          <span>Subtotal</span>
+          <span id="ticket-neto">$0.00</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:.8rem;color:#6B7280">
+          <span>IVA (16%)</span>
+          <span id="ticket-iva">$0.00</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-weight:700;color:#111827;font-size:.88rem">TOTAL</span>
           <span id="ticket-total" style="font-weight:900;color:var(--color-primary);font-size:1.2rem">$0.00</span>
         </div>
-        <div style="font-size:.7rem;color:#9CA3AF;text-align:right">Sin IVA · Sujeto a confirmación</div>
+        <div style="font-size:.7rem;color:#9CA3AF;text-align:right;margin-top:4px">Precio sin IVA · Sujeto a confirmación</div>
       </div>
     </div>
     <div id="ticket-alertas" style="margin-top:10px"></div>
@@ -413,6 +435,17 @@ function renderTicket() {
 
   ticketItems.innerHTML = html;
   if (ticketTotal) ticketTotal.textContent = '$' + total.toLocaleString('es-MX', {minimumFractionDigits:2, maximumFractionDigits:2});
+
+  // Desglose IVA: precios SIN IVA — se suma 16 % encima
+  const netoEl = document.getElementById('ticket-neto');
+  const ivaEl  = document.getElementById('ticket-iva');
+  if (netoEl && ivaEl) {
+    const iva        = total * 0.16;
+    const totalConIva = total + iva;
+    netoEl.textContent  = '$' + total.toLocaleString('es-MX', {minimumFractionDigits:2, maximumFractionDigits:2});
+    ivaEl.textContent   = '$' + iva.toLocaleString('es-MX', {minimumFractionDigits:2, maximumFractionDigits:2});
+    if (ticketTotal) ticketTotal.textContent = '$' + totalConIva.toLocaleString('es-MX', {minimumFractionDigits:2, maximumFractionDigits:2});
+  }
 
   const ahorroTotal = totalBase - total;
   if (ahorroTotal > 0.01) {

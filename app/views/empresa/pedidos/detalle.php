@@ -65,7 +65,7 @@ function tiempoTranscurrido(string $desde, string $hasta): string {
   </div>
   <div style="text-align:center">
     <div style="font-size:.78rem;color:#9CA3AF;margin-bottom:2px">IVA 16%</div>
-    <div style="font-size:1rem;font-weight:700;color:#374151">$<?= number_format($pedido['subtotal'] * 0.16, 2) ?></div>
+    <div style="font-size:1rem;font-weight:700;color:#374151">$<?= number_format(round($pedido['subtotal'] * 0.16, 2), 2) ?></div>
   </div>
   <?php if (($pedido['costo_envio'] ?? 0) > 0): ?>
   <div style="text-align:center">
@@ -609,7 +609,7 @@ function tiempoTranscurrido(string $desde, string $hasta): string {
           </tr>
           <tr style="background:#F9FAFB">
             <td colspan="3" style="padding:6px 16px;text-align:right;color:#6B7280;font-size:.85rem">IVA 16%</td>
-            <td style="padding:6px 16px;text-align:right;font-weight:700;color:#374151">$<?= number_format($pedido['subtotal'] * 0.16, 2) ?></td>
+            <td style="padding:6px 16px;text-align:right;font-weight:700;color:#374151">$<?= number_format(round($pedido['subtotal'] * 0.16, 2), 2) ?></td>
           </tr>
           <?php if (($pedido['costo_envio'] ?? 0) > 0): ?>
           <tr style="background:#F9FAFB">
