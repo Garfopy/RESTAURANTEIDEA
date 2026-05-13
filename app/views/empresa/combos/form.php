@@ -48,6 +48,27 @@ $comboCompradores = array_column($combo['compradores'] ?? [], 'comprador_id');
                     placeholder="Describe qué incluye este combo y cuándo usarlo."
                     style="resize:vertical"><?= htmlspecialchars($combo['descripcion'] ?? '') ?></textarea>
         </div>
+        <div>
+          <label class="campo-label">Precio del combo (opcional)</label>
+          <div style="display:flex;gap:8px;align-items:stretch;flex-wrap:wrap">
+            <div style="position:relative;flex:1;min-width:180px">
+              <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#6B7280;font-weight:600">$</span>
+              <input type="number" id="comboPrecio" name="precio" min="0" step="0.01"
+                     value="<?= isset($combo['precio']) && $combo['precio'] !== null ? htmlspecialchars((string)$combo['precio']) : '' ?>"
+                     class="input-base" placeholder="0.00" style="padding-left:24px">
+            </div>
+            <button type="button" onclick="calcularPrecioCombo()"
+                    title="Calcula la suma de los productos y aplica un 10% de descuento"
+                    style="padding:9px 14px;border:1px solid var(--color-primary);border-radius:7px;background:#fff;color:var(--color-primary);font-size:.8rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px">
+              <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.4"><path stroke-linecap="round" stroke-linejoin="round" d="M9 7h6m-6 4h6m-6 4h4M5 5a2 2 0 012-2h10a2 2 0 012 2v14a2 2 0 01-2 2H7a2 2 0 01-2-2V5z"/></svg>
+              Calcular (-10%)
+            </button>
+          </div>
+          <p style="font-size:.72rem;color:#6B7280;margin:6px 0 0">
+            Déjalo vacío para usar la suma normal de los productos. El botón suma los precios base × cantidades y aplica un 10% de descuento.
+          </p>
+          <p id="comboPrecioDetalle" style="font-size:.72rem;color:#9CA3AF;margin:4px 0 0;display:none"></p>
+        </div>
       </div>
     </div>
 
@@ -133,6 +154,44 @@ const productosOpciones = <?php
     }
     echo json_encode($opts);
 ?>;
+
+const productosPrecios = <?php
+    $precios = [];
+    foreach ($productos as $prod) {
+        $precios[(int)$prod['id']] = (float)($prod['precio_base'] ?? 0);
+    }
+    echo json_encode($precios);
+?>;
+
+function calcularPrecioCombo() {
+    const cont = document.getElementById('itemsContainer');
+    const filas = cont.querySelectorAll('.item-row');
+    let subtotal = 0;
+    let lineas = 0;
+    filas.forEach(row => {
+        const sel = row.querySelector('select[name="producto_id[]"]');
+        const cant = row.querySelector('input[name="cantidad[]"]');
+        if (!sel || !cant) return;
+        const pid = parseInt(sel.value, 10);
+        const c = parseFloat(cant.value);
+        if (!pid || !c || isNaN(c)) return;
+        const precio = productosPrecios[pid] || 0;
+        subtotal += precio * c;
+        lineas++;
+    });
+    const detalle = document.getElementById('comboPrecioDetalle');
+    if (lineas === 0) {
+        detalle.style.display = 'block';
+        detalle.style.color = '#DC2626';
+        detalle.textContent = 'Agrega al menos un producto con cantidad para calcular el precio.';
+        return;
+    }
+    const conDescuento = subtotal * 0.9;
+    document.getElementById('comboPrecio').value = conDescuento.toFixed(2);
+    detalle.style.display = 'block';
+    detalle.style.color = '#059669';
+    detalle.textContent = `Subtotal: $${subtotal.toFixed(2)} − 10% = $${conDescuento.toFixed(2)} (${lineas} producto${lineas>1?'s':''})`;
+}
 
 function agregarItem() {
     const cont = document.getElementById('itemsContainer');

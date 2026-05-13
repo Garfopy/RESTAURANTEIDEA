@@ -222,6 +222,7 @@ class PublicController extends BaseController
                 $paypalPlanId = ($ciclo === 'anual' && !empty($plan['paypal_plan_id_anual']))
                     ? $plan['paypal_plan_id_anual']
                     : $plan['paypal_plan_id'];
+                error_log('[checkout] Iniciando crearSuscripcion — plan_id=' . $paypalPlanId . ' | ciclo=' . $ciclo . ' | email=' . $email . ' | returnUrl=' . $returnUrl);
                 $resultado = $paypal->crearSuscripcion($paypalPlanId, $returnUrl, $cancelUrl);
 
                 // Guardar ID de PayPal en el registro
@@ -236,7 +237,8 @@ class PublicController extends BaseController
             }
 
         } catch (\Throwable $e) {
-            error_log('Error en registro público: ' . $e->getMessage());
+            error_log('[checkout] ERROR: ' . $e->getMessage() . ' | archivo: ' . $e->getFile() . ':' . $e->getLine());
+            error_log('[checkout] Stack trace: ' . $e->getTraceAsString());
             $this->flash('error', 'Error al procesar el pago: ' . $e->getMessage());
             $this->redirect('planes/registro?plan=' . urlencode($planSlug) . '&ciclo=' . urlencode($ciclo));
         }
@@ -317,7 +319,8 @@ class PublicController extends BaseController
             require ROOT_PATH . '/app/views/public/registro_confirmacion.php';
 
         } catch (\Throwable $e) {
-            error_log('Error en retorno de registro: ' . $e->getMessage());
+            error_log('[retorno] ERROR: ' . $e->getMessage() . ' | archivo: ' . $e->getFile() . ':' . $e->getLine());
+            error_log('[retorno] Stack trace: ' . $e->getTraceAsString());
             $this->flash('error', 'No se pudo verificar el pago: ' . $e->getMessage());
             $this->redirect('planes');
         }

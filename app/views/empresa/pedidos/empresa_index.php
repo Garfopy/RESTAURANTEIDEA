@@ -92,29 +92,37 @@ $estados = [
   border: 1px solid #E5E7EB;
   border-radius: 14px;
   overflow: hidden;
-  box-shadow: 0 1px 4px rgba(0,0,0,.03);
+  box-shadow: 0 4px 14px rgba(15,23,42,.05);
 }
-.pedidos-table { width: 100%; border-collapse: collapse; }
-.pedidos-table thead tr { background: #F9FAFB; }
+.pedidos-table { width: 100%; border-collapse: separate; border-spacing: 0; }
+.pedidos-table thead tr { background: linear-gradient(180deg,#FAFBFC 0%,#F3F4F6 100%); }
 .pedidos-table th {
-  padding: 11px 16px;
+  padding: 12px 16px;
   text-align: left;
-  font-size: .66rem;
-  color: #6B7280;
+  font-size: .68rem;
+  color: #374151;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: .08em;
   white-space: nowrap;
-  border-bottom: 1px solid #E5E7EB;
+  border-bottom: 2px solid #E5E7EB;
 }
 .pedidos-table th.right { text-align: right; }
 .pedidos-table th.center { text-align: center; }
 .pedidos-table tbody tr {
-  border-bottom: 1px solid #F3F4F6;
-  transition: background .1s;
+  transition: background .15s, box-shadow .15s;
 }
-.pedidos-table tbody tr:hover { background: #FAFAFA; }
-.pedidos-table td { padding: 8px 14px; }
+.pedidos-table tbody tr:nth-child(even) { background: #FAFBFC; }
+.pedidos-table tbody tr:hover {
+  background: #FFF5F6;
+  box-shadow: inset 4px 0 0 var(--color-primary);
+}
+.pedidos-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid #E5E7EB;
+  vertical-align: middle;
+}
+.pedidos-table tbody tr:last-child td { border-bottom: none; }
 .pedidos-table td.right { text-align: right; }
 .pedidos-table td.center { text-align: center; }
 .estado-badge {

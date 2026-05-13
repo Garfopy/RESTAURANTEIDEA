@@ -81,7 +81,7 @@ class ComboModel extends BaseModel
     public function getCombosParaComprador(int $compradorId, int $empresaId): array
     {
         return $this->query(
-            "SELECT c.id, c.nombre, c.descripcion, COUNT(ci.id) AS total_items
+            "SELECT c.id, c.nombre, c.descripcion, c.precio, COUNT(ci.id) AS total_items
                FROM combos c
                JOIN combo_compradores cc ON cc.combo_id = c.id
           LEFT JOIN combo_items ci ON ci.combo_id = c.id

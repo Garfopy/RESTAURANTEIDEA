@@ -54,6 +54,14 @@ class EmpresaDashboardController extends BaseController
             $datosGraficas = $this->obtenerDatosGraficas($empresaId);
         }
 
+        // Resumen de pedidos recurrentes (solo admin_empresa y supervisor)
+        $resumenRecurrentes  = ['total_pedidos' => 0, 'compradores_unicos' => 0, 'productos_distintos' => 0, 'monto_total' => 0];
+        $proximasRecurrentes = [];
+        if (in_array($rol, ['admin_empresa', 'supervisor'], true)) {
+            $recModel           = new RecurrenteModel();
+            $resumenRecurrentes = $recModel->getResumen($empresaId);
+        }
+
         // Cargar empresa a sesión si no está
         if (empty($_SESSION['empresa']) && $empresaId) {
             $empresaModel = new EmpresaModel();
@@ -68,6 +76,30 @@ class EmpresaDashboardController extends BaseController
         require ROOT_PATH . '/app/views/empresa/dashboard.php';
         $content = ob_get_clean();
 
+        require ROOT_PATH . '/app/views/empresa/layouts/main.php';
+    }
+
+    // Estadísticas de pedidos recurrentes
+    public function recurrentes(?string $p = null): void
+    {
+        $this->requireAdminEmpresa();
+        $empresaId = $this->empresaId();
+        $rol       = $this->rolActual();
+
+        $recModel            = new RecurrenteModel();
+        $resumen             = $recModel->getResumen($empresaId);
+        $topProductos        = $recModel->getTopProductos($empresaId, 10);
+        $diasSemana          = $recModel->getPedidosPorDiaSemana($empresaId);
+        $topCompradores      = $recModel->getTopCompradores($empresaId, 8);
+        $productosRecurrentes = $recModel->getProductosRecurrentes($empresaId, 2, 15);
+
+        $flash      = $this->getFlash();
+        $pageTitle  = 'Pedidos Recurrentes';
+        $activeMenu = 'recurrentes';
+
+        ob_start();
+        require ROOT_PATH . '/app/views/empresa/recurrentes/estadisticas.php';
+        $content = ob_get_clean();
         require ROOT_PATH . '/app/views/empresa/layouts/main.php';
     }
 

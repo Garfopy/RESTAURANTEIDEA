@@ -12,35 +12,7 @@ $puedeComprar = in_array($rol, ['admin_empresa','comprador'], true);
 $itemsCarrito = $_SESSION['carrito']['items'] ?? [];
 $totalCarrito = count($itemsCarrito);
 
-// Helper para imágenes reales
-function getProductImageUrl($prod) {
-    // Si ya tiene imagen subida, usarla
-    if (!empty($prod['imagen'])) {
-        return htmlspecialchars($prod['imagen']);
-    }
-
-    // Mapeo de categorías a imágenes reales de Unsplash
-    $baseUrl = "https://images.unsplash.com/photo-";
-    $meatImages = [
-        'res'       => '1588347818579-a62e21b490b0?w=800&h=600&fit=crop&auto=format',
-        'cerdo'     => '1603048297172-c92544798d5a?w=800&h=600&fit=crop&auto=format',
-        'pollo'     => '1587593810167-a84920ea0781?w=800&h=600&fit=crop&auto=format',
-        'pescado'   => '1559847844-5315695dadae?w=800&h=600&fit=crop&auto=format',
-        'cordero'   => '1529692236671-f1f6cf9683ba?w=800&h=600&fit=crop&auto=format',
-        'embutidos' => '1589935512933-ac5c032fa7c8?w=800&h=600&fit=crop&auto=format',
-        'mariscos'  => '1615485736162-5bf79b76e4cc?w=800&h=600&fit=crop&auto=format',
-    ];
-
-    $categoryLower = strtolower($prod['categoria_nombre']);
-    foreach ($meatImages as $key => $imgId) {
-        if (strpos($categoryLower, $key) !== false) {
-            return $baseUrl . $imgId;
-        }
-    }
-
-    // Fallback genérico
-    return "https://source.unsplash.com/800x600/?raw+meat," . urlencode($prod['categoria_nombre']);
-}
+// Helper para imágenes: getProductImageUrl() se carga desde app/helpers/ProductImageHelper.php
 ?>
 
 <style>
@@ -82,6 +54,88 @@ function getProductImageUrl($prod) {
   }
 }
 </style>
+
+<?php if (!empty($combos)): ?>
+<!-- ═══════════════════════ Sección: Combos asignados ═══════════════════════ -->
+<div style="margin-bottom:32px">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+    <div style="width:4px;height:28px;background:var(--color-primary);border-radius:2px"></div>
+    <h2 style="font-size:1.2rem;font-weight:800;color:#111827;margin:0">Combos disponibles</h2>
+    <span style="font-size:.78rem;color:#6B7280;font-weight:500"><?= count($combos) ?> combo<?= count($combos) !== 1 ? 's' : '' ?></span>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px">
+    <?php foreach ($combos as $combo): ?>
+    <div style="background:#fff;border-radius:14px;border:1px solid #E5E7EB;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06);display:flex;flex-direction:column">
+      <!-- Header del combo -->
+      <?php
+        // Precio fijo o calculado sumando items
+        $precioCombo = isset($combo['precio']) && $combo['precio'] !== null && $combo['precio'] > 0
+            ? (float)$combo['precio']
+            : array_reduce($combo['items'] ?? [], fn($carry, $item) => $carry + ((float)$item['precio_base'] * (float)$item['cantidad']), 0.0);
+        $esPrecioFijo = isset($combo['precio']) && $combo['precio'] !== null && $combo['precio'] > 0;
+      ?>
+      <div style="background:linear-gradient(135deg,#1F2937 0%,#374151 100%);padding:16px 20px">
+        <div style="font-size:.68rem;font-weight:700;color:rgba(255,255,255,.6);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Combo</div>
+        <div style="font-size:1.05rem;font-weight:800;color:#fff;line-height:1.3"><?= htmlspecialchars($combo['nombre']) ?></div>
+        <?php if (!empty($combo['descripcion'])): ?>
+        <div style="font-size:.8rem;color:rgba(255,255,255,.7);margin-top:6px"><?= htmlspecialchars($combo['descripcion']) ?></div>
+        <?php endif; ?>
+        <?php if ($precioCombo > 0): ?>
+        <div style="margin-top:10px;display:inline-flex;align-items:center;gap:6px">
+          <span style="background:var(--color-primary);color:#fff;font-size:.85rem;font-weight:800;padding:4px 12px;border-radius:999px">
+            $<?= number_format($precioCombo, 2) ?>
+          </span>
+          <?php if (!$esPrecioFijo): ?>
+          <span style="font-size:.68rem;color:rgba(255,255,255,.5)">precio estimado</span>
+          <?php endif; ?>
+        </div>
+        <?php endif; ?>
+      </div>
+
+      <!-- Items del combo -->
+      <div style="padding:14px 18px;flex:1">
+        <?php if (empty($combo['items'])): ?>
+        <p style="font-size:.82rem;color:#9CA3AF;font-style:italic;margin:0">Sin productos configurados.</p>
+        <?php else: ?>
+        <div style="font-size:.7rem;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Incluye:</div>
+        <ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px">
+          <?php foreach ($combo['items'] as $item): ?>
+          <li style="display:flex;align-items:center;gap:8px;font-size:.85rem;color:#374151">
+            <span style="width:6px;height:6px;border-radius:50%;background:var(--color-primary);flex-shrink:0"></span>
+            <span style="font-weight:600"><?= htmlspecialchars($item['producto_nombre']) ?></span>
+            <span style="margin-left:auto;font-weight:700;color:#111827;white-space:nowrap">
+              <?= number_format($item['cantidad'], 2) ?> <?= htmlspecialchars($item['presentacion']) ?>
+            </span>
+          </li>
+          <?php endforeach; ?>
+        </ul>
+        <?php endif; ?>
+      </div>
+
+      <!-- Acción -->
+      <?php if ($puedeComprar && $rol === 'comprador' && !empty($combo['items'])): ?>
+      <div style="padding:12px 18px;border-top:1px solid #F3F4F6">
+        <form method="POST" action="<?= BASE_URL ?>carrito/cargarCombo">
+          <input type="hidden" name="combo_id" value="<?= (int)$combo['id'] ?>">
+          <button type="submit"
+                  style="width:100%;padding:10px;background:var(--color-primary);color:#fff;border:none;border-radius:8px;font-size:.875rem;font-weight:700;cursor:pointer;transition:all .2s;font-family:inherit"
+                  onmouseenter="this.style.background='#A00D24'"
+                  onmouseleave="this.style.background='var(--color-primary)'">
+            🛒 Cargar combo en pedido
+          </button>
+        </form>
+      </div>
+      <?php elseif (!empty($combo['items'])): ?>
+      <div style="padding:12px 18px;border-top:1px solid #F3F4F6">
+        <div style="font-size:.78rem;color:#9CA3AF;text-align:center">Solo compradores pueden cargar combos</div>
+      </div>
+      <?php endif; ?>
+    </div>
+    <?php endforeach; ?>
+  </div>
+</div>
+<?php endif; ?>
 
 <!-- Filtros -->
 <form method="GET" action="<?= BASE_URL ?>catalogo/index" style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:flex-end">
@@ -144,6 +198,22 @@ function getProductImageUrl($prod) {
       <div style="position:absolute;bottom:10px;left:10px;background:#10B981;color:#fff;font-size:.65rem;font-weight:700;padding:3px 8px;border-radius:999px">
         ✦ Vol. desc.
       </div>
+      <?php endif; ?>
+      <?php
+        $esComprador = ($_SESSION['usuario']['rol_slug'] ?? '') === 'comprador';
+        $esFav = isset($favoritosSet) && isset($favoritosSet[$prod['id']]);
+      ?>
+      <?php if ($esComprador): ?>
+      <button type="button"
+              class="btn-fav <?= $esFav ? 'is-fav' : '' ?>"
+              data-producto-id="<?= (int)$prod['id'] ?>"
+              data-favorito="<?= $esFav ? '1' : '0' ?>"
+              onclick="toggleFavoritoCatalogo(event, this)"
+              aria-label="<?= $esFav ? 'Quitar de favoritos' : 'Agregar a favoritos' ?>"
+              title="<?= $esFav ? 'Quitar de favoritos' : 'Agregar a favoritos' ?>"
+              style="position:absolute;top:10px;<?= $estaEnCarrito ? 'left:10px' : 'right:10px' ?>;width:34px;height:34px;border-radius:50%;border:1px solid #E5E7EB;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.08);transition:transform .15s">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="<?= $esFav ? 'var(--color-primary)' : 'none' ?>" stroke="<?= $esFav ? 'var(--color-primary)' : '#9CA3AF' ?>" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.636l1.318-1.318a4.5 4.5 0 116.364 6.364L12 20.364l-7.682-7.682a4.5 4.5 0 010-6.364z"/></svg>
+      </button>
       <?php endif; ?>
     </div>
     <!-- Info -->
@@ -266,10 +336,28 @@ function getProductImageUrl($prod) {
 
 <!-- ═══════════════════════ Modal: Agregar al carrito ═══════════════════════ -->
 <div id="modalAgregar" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2001;align-items:center;justify-content:center">
-  <div style="background:#fff;border-radius:14px;width:460px;max-width:96vw;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)">
+  <div style="position:relative;width:460px;max-width:96vw">
+
+    <!-- Botón flotante: ver carrito (centrado vertical, fuera del recuadro a la derecha) -->
+    <a href="<?= BASE_URL ?>carrito/index" aria-label="Ver carrito" title="Ver carrito"
+       style="position:absolute;top:50%;right:-80px;transform:translateY(-50%);width:56px;height:56px;border-radius:50%;background:#fff;color:var(--color-primary);text-decoration:none;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 18px rgba(0,0,0,.25);border:2px solid var(--color-primary);z-index:2;transition:transform .15s, box-shadow .15s"
+       onmouseenter="this.style.transform='translateY(-50%) scale(1.08)';this.style.boxShadow='0 8px 22px rgba(0,0,0,.3)'"
+       onmouseleave="this.style.transform='translateY(-50%) scale(1)';this.style.boxShadow='0 6px 18px rgba(0,0,0,.25)'">
+      <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2 9m5-9v9m4-9v9m5-9l2 9"/></svg>
+    </a>
+
+  <div style="background:#fff;border-radius:14px;width:100%;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)">
 
     <!-- Header con gradiente -->
-    <div style="background:linear-gradient(135deg,var(--color-primary) 0%,#A00D24 100%);padding:18px 20px;border-radius:14px 14px 0 0">
+    <div style="position:relative;background:linear-gradient(135deg,var(--color-primary) 0%,#A00D24 100%);padding:18px 56px 18px 20px;border-radius:14px 14px 0 0">
+      <!-- Botón cerrar (X) en la esquina superior derecha -->
+      <button type="button" onclick="cerrarModalAgregar()" aria-label="Cerrar"
+              title="Cerrar"
+              style="position:absolute;top:10px;right:10px;width:34px;height:34px;border-radius:50%;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.15);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:1.2rem;line-height:1;font-family:inherit;transition:background .15s"
+              onmouseenter="this.style.background='rgba(255,255,255,.3)'"
+              onmouseleave="this.style.background='rgba(255,255,255,.15)'">
+        &times;
+      </button>
       <div style="font-size:.75rem;color:rgba(255,255,255,.8)" id="modAgrCategoria"></div>
       <h3 id="modAgrNombre" style="font-size:1.1rem;font-weight:800;color:#fff;margin:4px 0 0"></h3>
     </div>
@@ -334,6 +422,7 @@ function getProductImageUrl($prod) {
 
       <div id="modAgrFeedback" style="display:none;margin-top:12px;padding:10px 14px;border-radius:8px;font-size:.85rem;text-align:center;border:1px solid transparent"></div>
     </div>
+  </div>
   </div>
 </div>
 
@@ -626,4 +715,42 @@ function cerrarModalVerPrecios() {
 document.getElementById('modalVerPrecios').addEventListener('click', e => {
   if (e.target === document.getElementById('modalVerPrecios')) cerrarModalVerPrecios();
 });
+
+// ═══════════════ Favoritos (toggle AJAX) ═══════════════
+async function toggleFavoritoCatalogo(ev, btn) {
+  ev.preventDefault();
+  ev.stopPropagation();
+  const productoId = btn.dataset.productoId;
+  if (!productoId || btn.disabled) return;
+  btn.disabled = true;
+  const prevTransform = btn.style.transform;
+  btn.style.transform = 'scale(.85)';
+  try {
+    const fd = new FormData();
+    fd.append('producto_id', productoId);
+    const res = await fetch(BASE_URL_CAT + 'favorito/toggle', {
+      method: 'POST',
+      body: fd,
+      credentials: 'same-origin',
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Error');
+    const isFav = !!data.favorito;
+    btn.dataset.favorito = isFav ? '1' : '0';
+    btn.classList.toggle('is-fav', isFav);
+    btn.setAttribute('aria-label', isFav ? 'Quitar de favoritos' : 'Agregar a favoritos');
+    btn.title = isFav ? 'Quitar de favoritos' : 'Agregar a favoritos';
+    const svg = btn.querySelector('svg');
+    if (svg) {
+      svg.setAttribute('fill',  isFav ? 'var(--color-primary)' : 'none');
+      svg.setAttribute('stroke', isFav ? 'var(--color-primary)' : '#9CA3AF');
+    }
+  } catch (err) {
+    console.error('toggleFavoritoCatalogo', err);
+  } finally {
+    btn.disabled = false;
+    btn.style.transform = prevTransform || '';
+  }
+}
 </script>

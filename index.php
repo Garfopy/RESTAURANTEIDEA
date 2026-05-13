@@ -91,6 +91,7 @@ $routes = [
     // Portal comprador — solo comprador
     'comprador'           => 'CompradorController',
     'comprador-sucursal'  => 'CompradorSucursalController',
+    'favorito'            => 'FavoritoController',
     // Módulos compartidos (acceso según rol validado en cada controller)
     'catalogo'            => 'CatalogoController',
     'carrito'             => 'CarritoController',
