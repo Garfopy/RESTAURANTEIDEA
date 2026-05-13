@@ -38,7 +38,7 @@ $activeMenu = $activeMenu ?? '';
     <div style="font-weight:700;font-size:.95rem;color:#111827;line-height:1.2">
       <?= htmlspecialchars($restNombre) ?>
     </div>
-    <div style="font-size:.7rem;color:#9CA3AF;margin-top:3px">Portal Restaurante</div>
+    <div style="font-size:.7rem;color:#9CA3AF;margin-top:3px">Mi Empresa</div>
   </div>
 
   <nav>

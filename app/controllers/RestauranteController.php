@@ -15,19 +15,47 @@ class RestauranteController extends BaseController
     public function locales(?string $p = null): void
     {
         $this->requireRestaurante();
-        $compradorId        = $this->usuarioId();
-        $sucursales         = $this->model->getByComprador($compradorId);
+        $compradorId         = $this->usuarioId();
+        $sucursales          = $this->model->getByComprador($compradorId);
         $restauranteActivoId = $this->restauranteId();
-        $menuModel          = new RestMenuModel();
-        $invModel           = new RestInventarioModel();
+        $menuModel           = new RestMenuModel();
+        $invModel            = new RestInventarioModel();
         foreach ($sucursales as &$s) {
-            $s['num_platillos']   = count($menuModel->getByRestaurante((int)$s['id'], true));
+            $s['num_platillos']    = count($menuModel->getByRestaurante((int)$s['id'], true));
             $s['num_ingredientes'] = count($invModel->getByRestaurante((int)$s['id'], true));
         }
         unset($s);
+
+        // CarniHub sucursales (delivery locations) available to link
+        $sucursalesCarniHub = (new SucursalModel())->getByComprador($compradorId);
+
         $pageTitle  = 'Mis Locales';
         $activeMenu = 'rest_locales';
-        $this->render('restaurante/locales', compact('sucursales','restauranteActivoId','pageTitle','activeMenu'));
+        $flash      = $this->getFlash();
+        $this->render('restaurante/locales', compact(
+            'sucursales','restauranteActivoId','sucursalesCarniHub','pageTitle','activeMenu','flash'
+        ));
+    }
+
+    public function vincularSucursal(?string $p = null): void
+    {
+        $this->requireRestaurante();
+        if (!$this->isPost()) { $this->redirect('restaurante/locales'); return; }
+
+        $localId    = (int)($_POST['local_id'] ?? 0);
+        $sucursalId = (isset($_POST['sucursal_id']) && $_POST['sucursal_id'] !== '')
+                      ? (int)$_POST['sucursal_id'] : null;
+
+        if ($localId) {
+            $local = $this->model->find($localId);
+            if ($local && (int)$local['comprador_id'] === $this->usuarioId()) {
+                $db   = \Database::getInstance();
+                $stmt = $db->prepare("UPDATE rest_restaurantes SET sucursal_id = ? WHERE id = ?");
+                $stmt->execute([$sucursalId, $localId]);
+                $this->flash('success', 'Vinculación actualizada.');
+            }
+        }
+        $this->redirect('restaurante/locales');
     }
 
     public function seleccionar(?string $p = null): void

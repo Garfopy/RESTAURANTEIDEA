@@ -17,7 +17,18 @@
 .local-btn:hover { border-color:var(--cp);color:var(--cp);background:#fff; }
 .local-btn.primary { background:var(--cp);color:#fff;border-color:var(--cp); }
 .local-btn.primary:hover { opacity:.9; }
+.vinculo-select {
+  width:100%;padding:6px 10px;border:1.5px solid #E5E7EB;border-radius:8px;
+  font-size:.8rem;color:#374151;background:#fff;outline:none;
+}
+.vinculo-select:focus { border-color:var(--cp); }
 </style>
+
+<?php if (!empty($flash)): ?>
+<div class="flash flash-<?= $flash['type'] === 'success' ? 'success' : 'error' ?>" style="margin-bottom:16px">
+  <?= htmlspecialchars($flash['message']) ?>
+</div>
+<?php endif; ?>
 
 <!-- Info banner -->
 <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:12px;padding:14px 18px;margin-bottom:20px;
@@ -27,7 +38,7 @@
   </svg>
   <div style="font-size:.85rem;color:#1E40AF;line-height:1.5">
     <strong>Cada local es independiente.</strong> Tiene su propio menú, inventario y configuración.
-    Para administrar un local, selecciónalo — el portal cambiará al contexto de ese lugar.
+    Vincula cada local a una sucursal de CarniHub para que los pedidos actualicen el inventario automáticamente.
   </div>
 </div>
 
@@ -35,6 +46,15 @@
 <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:16px">
   <?php foreach ($sucursales as $s):
     $activo = ((int)$s['id'] === (int)$restauranteActivoId);
+    $sucursalVinculadaId = (int)($s['sucursal_id'] ?? 0);
+    // Find linked CarniHub sucursal name
+    $sucursalVinculadaNombre = null;
+    foreach ($sucursalesCarniHub as $sc) {
+      if ((int)$sc['id'] === $sucursalVinculadaId) {
+        $sucursalVinculadaNombre = $sc['nombre'];
+        break;
+      }
+    }
   ?>
   <div class="local-card <?= $activo ? 'is-active' : '' ?>">
 
@@ -70,7 +90,7 @@
     </div>
 
     <div class="local-card-body">
-      <div style="display:flex;gap:16px">
+      <div style="display:flex;gap:16px;margin-bottom:12px">
         <div style="text-align:center">
           <div style="font-size:1.1rem;font-weight:800;color:#111827"><?= $s['num_platillos'] ?></div>
           <div style="font-size:.7rem;color:#9CA3AF;font-weight:600;text-transform:uppercase;letter-spacing:.04em">Platillos</div>
@@ -82,14 +102,54 @@
         </div>
         <?php if (!empty($s['telefono'])): ?>
         <div style="width:1px;background:#F3F4F6"></div>
-        <div>
+        <div style="display:flex;align-items:center">
           <div style="font-size:.78rem;color:#374151">📞 <?= htmlspecialchars($s['telefono']) ?></div>
         </div>
         <?php endif; ?>
       </div>
 
+      <!-- Vinculación a sucursal CarniHub -->
+      <?php if (!empty($sucursalesCarniHub)): ?>
+      <div style="margin-bottom:10px">
+        <div style="font-size:.7rem;font-weight:700;color:#9CA3AF;text-transform:uppercase;
+                    letter-spacing:.04em;margin-bottom:5px">
+          Sucursal CarniHub vinculada
+        </div>
+        <?php if ($sucursalVinculadaNombre): ?>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+          <span style="padding:3px 10px;background:#F0FDF4;color:#166534;border-radius:99px;
+                       font-size:.75rem;font-weight:700">
+            ✓ <?= htmlspecialchars($sucursalVinculadaNombre) ?>
+          </span>
+        </div>
+        <?php else: ?>
+        <div style="font-size:.75rem;color:#F59E0B;font-weight:600;margin-bottom:6px">
+          ⚠ Sin vincular — los pedidos no actualizarán este inventario
+        </div>
+        <?php endif; ?>
+        <form method="POST" action="<?= BASE_URL ?>restaurante/vincularSucursal"
+              style="display:flex;gap:6px;align-items:center">
+          <input type="hidden" name="local_id" value="<?= (int)$s['id'] ?>">
+          <select name="sucursal_id" class="vinculo-select">
+            <option value="">— Sin vincular —</option>
+            <?php foreach ($sucursalesCarniHub as $sc): ?>
+            <option value="<?= (int)$sc['id'] ?>"
+              <?= $sucursalVinculadaId === (int)$sc['id'] ? 'selected' : '' ?>>
+              <?= htmlspecialchars($sc['nombre']) ?>
+            </option>
+            <?php endforeach; ?>
+          </select>
+          <button type="submit"
+            style="padding:6px 12px;background:var(--cp);color:#fff;border:none;border-radius:8px;
+                   font-size:.78rem;font-weight:700;cursor:pointer;white-space:nowrap">
+            Guardar
+          </button>
+        </form>
+      </div>
+      <?php endif; ?>
+
       <?php if ($activo): ?>
-      <div style="margin-top:12px;padding:8px 12px;background:#F0FDF4;border-radius:8px;
+      <div style="margin-top:4px;padding:8px 12px;background:#F0FDF4;border-radius:8px;
                   font-size:.78rem;color:#166534;font-weight:600;display:flex;align-items:center;gap:6px">
         <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>

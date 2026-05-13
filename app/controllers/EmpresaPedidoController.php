@@ -351,7 +351,6 @@ class EmpresaPedidoController extends BaseController
         try {
             $db = Database::getInstance();
 
-            // Get comprador_id and pedido items
             $row = $db->prepare("SELECT comprador_id FROM pedidos WHERE id = ? LIMIT 1");
             $row->execute([$pedidoId]);
             $ped = $row->fetch(\PDO::FETCH_ASSOC);
@@ -359,41 +358,80 @@ class EmpresaPedidoController extends BaseController
 
             $compradorId = (int)$ped['comprador_id'];
 
-            // Find active restaurant(s) for this comprador
-            $rStmt = $db->prepare("SELECT id FROM rest_restaurantes WHERE comprador_id = ? AND activo = 1 LIMIT 1");
+            // Get all active locales for this comprador, including their sucursal link
+            $rStmt = $db->prepare(
+                "SELECT id, sucursal_id FROM rest_restaurantes WHERE comprador_id = ? AND activo = 1"
+            );
             $rStmt->execute([$compradorId]);
-            $rest = $rStmt->fetch(\PDO::FETCH_ASSOC);
-            if (!$rest) return;
+            $restaurantes = $rStmt->fetchAll(\PDO::FETCH_ASSOC);
+            if (empty($restaurantes)) return;
 
-            $restauranteId = (int)$rest['id'];
+            $invModel = new RestInventarioModel();
+            $ref = 'carnihub_pedido:' . $pedidoId;
 
-            // Get pedido items
+            // Build map: sucursal_id => restaurante_id for linked locales
+            $sucursalMap = [];
+            foreach ($restaurantes as $r) {
+                if ($r['sucursal_id']) {
+                    $sucursalMap[(int)$r['sucursal_id']] = (int)$r['id'];
+                }
+            }
+
+            // --- Per-sucursal import via pedido_sucursal_detalle ---
+            if (!empty($sucursalMap)) {
+                $psStmt = $db->prepare(
+                    "SELECT ps.sucursal_id, psd.producto_id, psd.cantidad
+                     FROM pedido_sucursal ps
+                     JOIN pedido_sucursal_detalle psd ON psd.pedido_sucursal_id = ps.id
+                     WHERE ps.pedido_id = ?"
+                );
+                $psStmt->execute([$pedidoId]);
+                $psItems = $psStmt->fetchAll(\PDO::FETCH_ASSOC);
+
+                foreach ($psItems as $item) {
+                    $restId = $sucursalMap[(int)$item['sucursal_id']] ?? null;
+                    if (!$restId) continue;
+
+                    $ingStmt = $db->prepare(
+                        "SELECT id FROM rest_ingredientes
+                         WHERE restaurante_id = ? AND carnihub_producto_id = ? AND activo = 1 LIMIT 1"
+                    );
+                    $ingStmt->execute([$restId, (int)$item['producto_id']]);
+                    $ing = $ingStmt->fetch(\PDO::FETCH_ASSOC);
+                    if (!$ing) continue;
+
+                    $invModel->ajustarStock(
+                        (int)$ing['id'], (float)$item['cantidad'],
+                        'entrada', 'Pedido CarniHub #' . $pedidoId, $ref, $restId, null
+                    );
+                }
+                return;
+            }
+
+            // --- Fallback: no sucursal links — import to all locales via pedido_detalle ---
             $iStmt = $db->prepare(
-                "SELECT producto_id, cantidad FROM pedido_items WHERE pedido_id = ?"
+                "SELECT producto_id, cantidad FROM pedido_detalle WHERE pedido_id = ?"
             );
             $iStmt->execute([$pedidoId]);
             $items = $iStmt->fetchAll(\PDO::FETCH_ASSOC);
             if (empty($items)) return;
 
-            $invModel = new RestInventarioModel();
-            foreach ($items as $item) {
-                $ingStmt = $db->prepare(
-                    "SELECT id FROM rest_ingredientes
-                     WHERE restaurante_id = ? AND carnihub_producto_id = ? AND activo = 1 LIMIT 1"
-                );
-                $ingStmt->execute([$restauranteId, (int)$item['producto_id']]);
-                $ing = $ingStmt->fetch(\PDO::FETCH_ASSOC);
-                if (!$ing) continue;
+            foreach ($restaurantes as $r) {
+                $restId = (int)$r['id'];
+                foreach ($items as $item) {
+                    $ingStmt = $db->prepare(
+                        "SELECT id FROM rest_ingredientes
+                         WHERE restaurante_id = ? AND carnihub_producto_id = ? AND activo = 1 LIMIT 1"
+                    );
+                    $ingStmt->execute([$restId, (int)$item['producto_id']]);
+                    $ing = $ingStmt->fetch(\PDO::FETCH_ASSOC);
+                    if (!$ing) continue;
 
-                $invModel->ajustarStock(
-                    (int)$ing['id'],
-                    (float)$item['cantidad'],
-                    'entrada',
-                    'Pedido CarniHub #' . $pedidoId,
-                    'carnihub_pedido:' . $pedidoId,
-                    $restauranteId,
-                    null
-                );
+                    $invModel->ajustarStock(
+                        (int)$ing['id'], (float)$item['cantidad'],
+                        'entrada', 'Pedido CarniHub #' . $pedidoId, $ref, $restId, null
+                    );
+                }
             }
         } catch (\Throwable $e) {
             // Silent — restaurant module may not be configured
