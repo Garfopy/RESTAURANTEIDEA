@@ -235,10 +235,10 @@ $esComprador   = $rol === 'comprador';
     <a href="<?= BASE_URL ?>" style="display:flex;justify-content:center;align-items:center;text-decoration:none">
     <?php if ($appLogo): ?>
       <img src="<?= htmlspecialchars($appLogo) ?>" alt="Logo"
-           style="height:56px;max-width:200px;object-fit:contain">
+           style="height:72px;max-width:220px;object-fit:contain;filter:brightness(0) invert(1)">
     <?php else: ?>
       <img src="<?= BASE_URL ?>public/img/logo.svg" alt="<?= htmlspecialchars($appName) ?>"
-           style="height:56px;max-width:200px;object-fit:contain">
+           style="height:72px;max-width:220px;object-fit:contain;filter:brightness(0) invert(1)">
     <?php endif; ?>
     </a>
   </div>
