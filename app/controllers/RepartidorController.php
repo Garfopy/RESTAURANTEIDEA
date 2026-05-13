@@ -254,19 +254,41 @@ class RepartidorController extends BaseController
 
         $pedidoId = (int)$row['pedido_id'];
 
-        if (empty($_FILES['foto']['tmp_name'])) {
+        if (empty($_FILES['foto']['tmp_name']) && empty($_POST['foto_base64'])) {
             $this->flash('error', 'Debes tomar una foto como evidencia de entrega.');
             $this->redirect('repartidor/pedidoDirecto/' . $pedidoId);
         }
 
-        $fotoPath = $this->guardarFoto($_FILES['foto'], 'ps_' . $psId);
+        // Foto: upload de archivo o base64 desde cámara
+        $fotoPath = null;
+        if (!empty($_FILES['foto']['tmp_name'])) {
+            $fotoPath = $this->guardarFoto($_FILES['foto'], 'ps_' . $psId);
+        } elseif (!empty($_POST['foto_base64'])) {
+            $b64 = $_POST['foto_base64'];
+            if (str_starts_with($b64, 'data:image/')) {
+                $data   = explode(',', $b64)[1] ?? '';
+                $bytes  = base64_decode($data);
+                $nombre = 'foto_ps_' . $psId . '_' . time() . '.jpg';
+                $dir    = UPLOAD_PATH . 'entregas/';
+                if (!is_dir($dir)) mkdir($dir, 0755, true);
+                file_put_contents($dir . $nombre, $bytes);
+                $fotoPath = UPLOAD_URL . 'entregas/' . $nombre;
+            }
+        }
+
         if (!$fotoPath) {
             $this->flash('error', 'Formato de imagen no válido. Usa JPG, PNG o WEBP.');
             $this->redirect('repartidor/pedidoDirecto/' . $pedidoId);
         }
 
+        // Firma digital (opcional pero requerida en el front)
+        $firmaPath = null;
+        if (!empty($_POST['firma_data'])) {
+            $firmaPath = $this->guardarFirma($_POST['firma_data'], 'ps_' . $psId);
+        }
+
         $pedidoModel = new PedidoModel();
-        $pedidoModel->confirmarSucursalEntrega($psId, $fotoPath);
+        $pedidoModel->confirmarSucursalEntrega($psId, $fotoPath, $firmaPath);
 
         // Si ya se entregaron todas las sucursales, finalizar el viaje
         if ($pedidoModel->allSucursalesEntregadas($pedidoId)) {

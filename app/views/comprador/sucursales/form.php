@@ -55,9 +55,25 @@ $gmKey = $configModel->get('google_maps_key', '');
       </p>
       <?php endif; ?>
 
-      <!-- Coordenadas (ocultas) -->
+      <!-- Coordenadas (ocultas, se muestran como fallback si Maps falla) -->
       <input type="hidden" name="lat" id="input-lat" value="<?= htmlspecialchars($sucursal['lat'] ?? '') ?>">
       <input type="hidden" name="lng" id="input-lng" value="<?= htmlspecialchars($sucursal['lng'] ?? '') ?>">
+      <!-- Fallback coordenadas manuales (visible solo si Maps no carga) -->
+      <div id="coords-fallback" style="display:none;margin-bottom:16px;padding:12px;background:#FEF3C7;border:1px solid #FCD34D;border-radius:8px">
+        <p style="font-size:.78rem;color:#92400E;margin-bottom:10px">⚠ Google Maps no pudo cargar. Ingresa las coordenadas manualmente (puedes buscarlas en maps.google.com → clic derecho sobre el lugar).</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div>
+            <label style="font-size:.75rem;font-weight:600;color:#374151">Latitud</label>
+            <input type="text" id="input-lat-manual" placeholder="19.4326" class="form-control"
+                   oninput="document.getElementById('input-lat').value=this.value">
+          </div>
+          <div>
+            <label style="font-size:.75rem;font-weight:600;color:#374151">Longitud</label>
+            <input type="text" id="input-lng-manual" placeholder="-99.1332" class="form-control"
+                   oninput="document.getElementById('input-lng').value=this.value">
+          </div>
+        </div>
+      </div>
 
       <!-- Responsable y teléfono -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px">
@@ -70,7 +86,8 @@ $gmKey = $configModel->get('google_maps_key', '');
         <div>
           <label class="form-label">Teléfono</label>
           <input type="tel" name="telefono" class="form-control"
-                 placeholder="10 dígitos"
+                 placeholder="10 dígitos" maxlength="10" inputmode="numeric" pattern="[0-9]{10}"
+                 oninput="this.value=this.value.replace(/\D/g,'').slice(0,10)"
                  value="<?= htmlspecialchars($sucursal['telefono'] ?? '') ?>">
         </div>
       </div>
@@ -103,6 +120,7 @@ $gmKey = $configModel->get('google_maps_key', '');
   var initLng = parseFloat(lngInput.value) || null;
 
   window.initGoogleMaps = function() {
+    try {
     // Inicializar mapa
     var center = (initLat && initLng)
       ? { lat: initLat, lng: initLng }
@@ -165,9 +183,33 @@ $gmKey = $configModel->get('google_maps_key', '');
     latInput.value = pos.lat().toFixed(7);
     lngInput.value = pos.lng().toFixed(7);
   }
+
+  } catch(e) {
+    mostrarFallbackCoords();
+  }
+
+  };
+
+  // Manejo de errores de autenticación de Google Maps
+  window.gm_authFailure = function() {
+    mostrarFallbackCoords();
+  };
+
+  function mostrarFallbackCoords() {
+    document.getElementById('coords-fallback').style.display = 'block';
+    var mapaC = document.getElementById('mapa-container');
+    if (mapaC) mapaC.style.display = 'none';
+    var hint = document.getElementById('mapa-hint');
+    if (hint) hint.style.display = 'none';
+    // Pre-rellenar si ya hay coords
+    var lat = document.getElementById('input-lat').value;
+    var lng = document.getElementById('input-lng').value;
+    if (lat) document.getElementById('input-lat-manual').value = lat;
+    if (lng) document.getElementById('input-lng-manual').value = lng;
+  }
 })();
 </script>
 <script async defer
-  src="https://maps.googleapis.com/maps/api/js?key=<?= htmlspecialchars($gmKey) ?>&libraries=places&callback=initGoogleMaps">
+  src="https://maps.googleapis.com/maps/api/js?key=<?= htmlspecialchars($gmKey) ?>&libraries=places&callback=initGoogleMaps&onerror=gm_authFailure">
 </script>
 <?php endif; ?>

@@ -726,13 +726,13 @@ class PedidoModel extends BaseModel
 
     // ── Entrega por sucursal (flujo multi-parada directo) ─────────────────────
 
-    public function confirmarSucursalEntrega(int $pedidoSucursalId, string $fotoPath): void
+    public function confirmarSucursalEntrega(int $pedidoSucursalId, string $fotoPath, ?string $firmaPath = null): void
     {
         $this->execute(
             "UPDATE pedido_sucursal
-                SET estado = 'entregado', foto_entrega_path = ?, fecha_llegada = NOW()
+                SET estado = 'entregado', foto_entrega_path = ?, firma_path = ?, fecha_llegada = NOW()
               WHERE id = ?",
-            [$fotoPath, $pedidoSucursalId]
+            [$fotoPath, $firmaPath, $pedidoSucursalId]
         );
     }
 

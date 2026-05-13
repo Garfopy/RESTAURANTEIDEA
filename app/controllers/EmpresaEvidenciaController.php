@@ -114,9 +114,9 @@ class EmpresaEvidenciaController extends BaseController
         $stmtEv->execute([$pedidoId]);
         $evidenciasRuta = $stmtEv->fetchAll();
 
-        // Fotos de entrega directa (pedido_sucursal)
+        // Fotos y firmas de entrega directa (pedido_sucursal)
         $stmtPs = $db->prepare(
-            "SELECT ps.foto_entrega_path, ps.fecha_llegada, s.nombre AS sucursal_nombre
+            "SELECT ps.foto_entrega_path, ps.firma_path, ps.fecha_llegada, s.nombre AS sucursal_nombre
                FROM pedido_sucursal ps
                JOIN sucursales s ON s.id = ps.sucursal_id
               WHERE ps.pedido_id = ? AND ps.foto_entrega_path IS NOT NULL"
@@ -159,12 +159,19 @@ class EmpresaEvidenciaController extends BaseController
             }
         }
 
-        // Fotos directas por sucursal
+        // Fotos y firmas directas por sucursal
         foreach ($fotosDirectas as $fd) {
             $fsPath = $this->urlToFsPath($fd['foto_entrega_path']);
             if ($fsPath && file_exists($fsPath)) {
                 $nombre = basename($fsPath);
                 $zip->addFile($fsPath, 'fotos/' . $nombre);
+            }
+            if (!empty($fd['firma_path'])) {
+                $fsPath = $this->urlToFsPath($fd['firma_path']);
+                if ($fsPath && file_exists($fsPath)) {
+                    $nombre = basename($fsPath);
+                    $zip->addFile($fsPath, 'firmas/' . $nombre);
+                }
             }
         }
 

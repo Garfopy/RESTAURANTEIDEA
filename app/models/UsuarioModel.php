@@ -28,6 +28,16 @@ class UsuarioModel extends BaseModel
         );
     }
 
+    public function getComprador(int $id, int $empresaId): ?array
+    {
+        return $this->queryOne(
+            "SELECT u.id, u.nombre, u.apellido_paterno, u.email
+               FROM usuarios u JOIN roles r ON r.id = u.rol_id
+              WHERE u.id = ? AND u.empresa_id = ? AND r.slug = 'comprador'",
+            [$id, $empresaId]
+        );
+    }
+
     public function getByRolEmpresa(string $rolSlug, int $empresaId): array
     {
         return $this->query(

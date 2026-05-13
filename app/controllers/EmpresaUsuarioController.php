@@ -248,12 +248,7 @@ class EmpresaUsuarioController extends BaseController
         $empresaId = $this->empresaId();
         $cId       = (int)$compradorId;
 
-        $comprador = $this->model->queryOne(
-            "SELECT u.id, u.nombre, u.apellido_paterno, u.email
-               FROM usuarios u JOIN roles r ON r.id = u.rol_id
-              WHERE u.id = ? AND u.empresa_id = ? AND r.slug = 'comprador'",
-            [$cId, $empresaId]
-        );
+        $comprador = $this->model->getComprador($cId, $empresaId);
         if (!$comprador) {
             $this->redirect('empresa-usuario');
         }
