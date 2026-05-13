@@ -1,4 +1,58 @@
 <?php ob_start(); ?>
+
+<?php
+// Onboarding banner — checklist primera vez
+$pasos = [
+  ['ok' => !empty($restaurante['telefono']) && !empty($restaurante['direccion']),
+   'label' => 'Completa la información del restaurante', 'url' => 'rest-config/index'],
+  ['ok' => (int)($restaurante['total_mesas'] ?? 0) > 0,
+   'label' => 'Crea al menos una mesa o silla',           'url' => 'rest-mesa/index'],
+  ['ok' => (int)($restaurante['total_platillos'] ?? 0) > 0,
+   'label' => 'Agrega platillos al menú',                  'url' => 'rest-menu/index'],
+  ['ok' => (int)($restaurante['total_staff'] ?? 0) > 0,
+   'label' => 'Invita a tu staff (mesero, chef, portero)', 'url' => 'rest-staff/index'],
+];
+$completados = count(array_filter($pasos, fn($p) => $p['ok']));
+$totalPasos  = count($pasos);
+?>
+<?php if ($completados < $totalPasos): ?>
+<div style="background:linear-gradient(135deg,#FEF3C7 0%,#FFFBEB 100%);border:1px solid #FDE68A;
+            border-radius:14px;padding:20px;margin-bottom:20px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+    <div>
+      <div style="font-weight:700;color:#92400E;font-size:1rem">🚀 Configura tu restaurante</div>
+      <div style="font-size:.82rem;color:#78350F;margin-top:2px">
+        Te faltan <strong><?= $totalPasos - $completados ?> paso<?= ($totalPasos-$completados)!==1?'s':'' ?></strong> para empezar a operar.
+      </div>
+    </div>
+    <div style="font-size:.82rem;color:#92400E;font-weight:600">
+      <?= $completados ?>/<?= $totalPasos ?>
+    </div>
+  </div>
+  <div style="background:#FDE68A;height:6px;border-radius:3px;overflow:hidden;margin-bottom:14px">
+    <div style="background:#F59E0B;height:100%;width:<?= ($completados/$totalPasos)*100 ?>%;transition:.3s"></div>
+  </div>
+  <div style="display:grid;gap:6px">
+    <?php foreach ($pasos as $p): ?>
+    <a href="<?= BASE_URL . $p['url'] ?>" style="display:flex;align-items:center;gap:10px;
+            padding:8px 12px;border-radius:8px;text-decoration:none;
+            background:<?= $p['ok'] ? '#D1FAE5' : '#fff' ?>;
+            border:1px solid <?= $p['ok'] ? '#A7F3D0' : '#FDE68A' ?>;transition:.15s"
+            onmouseover="this.style.transform='translateX(2px)'"
+            onmouseout="this.style.transform=''">
+      <span style="font-size:1rem"><?= $p['ok'] ? '✅' : '⏳' ?></span>
+      <span style="flex:1;font-size:.85rem;color:<?= $p['ok'] ? '#065F46' : '#78350F' ?>;font-weight:500">
+        <?= htmlspecialchars($p['label']) ?>
+      </span>
+      <?php if (!$p['ok']): ?>
+      <span style="font-size:.78rem;color:#92400E;font-weight:600">Configurar →</span>
+      <?php endif; ?>
+    </a>
+    <?php endforeach; ?>
+  </div>
+</div>
+<?php endif; ?>
+
 <!-- KPI Cards -->
 <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px">
   <?php

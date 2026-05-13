@@ -50,21 +50,37 @@
         </div>
       </div>
 
-      <!-- Mapa de ubicación -->
+      <!-- Mapa de ubicación (Leaflet/OpenStreetMap, sin API key) -->
       <?php if (!empty($restaurante['direccion'])): ?>
       <div style="margin-bottom:20px">
         <label class="form-label">Ubicación en mapa</label>
-        <div style="border-radius:10px;overflow:hidden;border:1px solid #E5E7EB">
-          <iframe
-            src="https://maps.google.com/maps?q=<?= urlencode($restaurante['direccion']) ?>&output=embed&z=15"
-            width="100%" height="220" style="border:0;display:block" allowfullscreen loading="lazy"
-            referrerpolicy="no-referrer-when-downgrade">
-          </iframe>
-        </div>
+        <div id="rstMap"
+             data-direccion="<?= htmlspecialchars($restaurante['direccion'], ENT_QUOTES) ?>"
+             style="border-radius:10px;overflow:hidden;border:1px solid #E5E7EB;height:240px;background:#F3F4F6"></div>
         <div style="font-size:.75rem;color:#9CA3AF;margin-top:4px">
-          El mapa se actualiza al guardar la dirección.
+          Mapa abierto vía OpenStreetMap. Se actualiza al guardar la dirección.
         </div>
       </div>
+      <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+      <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+      <script>
+      (function(){
+        const el = document.getElementById('rstMap'); if (!el) return;
+        const dir = el.dataset.direccion;
+        fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(dir))
+          .then(r => r.json())
+          .then(data => {
+            const lat = data[0] ? parseFloat(data[0].lat) : 19.4326;
+            const lng = data[0] ? parseFloat(data[0].lon) : -99.1332;
+            const map = L.map(el).setView([lat, lng], data[0] ? 16 : 12);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+              attribution: '© OpenStreetMap', maxZoom: 19
+            }).addTo(map);
+            if (data[0]) L.marker([lat, lng]).addTo(map).bindPopup(dir).openPopup();
+          })
+          .catch(() => { el.innerHTML = '<div style="padding:20px;text-align:center;color:#9CA3AF">No se pudo cargar el mapa.</div>'; });
+      })();
+      </script>
       <?php else: ?>
       <div style="background:#F9FAFB;border-radius:8px;padding:14px;margin-bottom:20px;
                   font-size:.82rem;color:#6B7280;display:flex;align-items:center;gap:8px">
@@ -137,19 +153,31 @@
           foreach ($toggles as [$key, $def, $label, $desc]):
             $val = (int)($r[$key] ?? $def);
         ?>
-        <label style="display:flex;align-items:center;gap:14px;padding:12px 14px;border:1px solid #E5E7EB;
-                      border-radius:10px;margin-bottom:8px;cursor:pointer;background:#fff">
-          <input type="checkbox" name="<?= $key ?>" value="1" <?= $val ? 'checked' : '' ?>
-                 style="width:42px;height:24px;appearance:none;background:#D1D5DB;border-radius:12px;
-                        position:relative;cursor:pointer;transition:.2s;flex-shrink:0"
-                 onchange="this.style.background = this.checked ? 'var(--cp)' : '#D1D5DB'"
-                 class="toggle-switch">
+        <label class="rst-toggle-row <?= $val ? 'is-on' : '' ?>">
+          <span class="rst-toggle">
+            <input type="checkbox" name="<?= $key ?>" value="1" <?= $val ? 'checked' : '' ?>
+                   onchange="this.closest('.rst-toggle-row').classList.toggle('is-on', this.checked)">
+            <span class="rst-toggle-track"></span>
+          </span>
           <div style="flex:1">
-            <div style="font-weight:600;color:#111827;font-size:.9rem"><?= $label ?></div>
+            <div style="font-weight:600;color:#111827;font-size:.92rem"><?= $label ?></div>
             <div style="font-size:.78rem;color:#6B7280;margin-top:2px"><?= $desc ?></div>
           </div>
+          <span class="badge rst-toggle-badge <?= $val ? 'badge-green' : 'badge-gray' ?>">
+            <?= $val ? 'Activo' : 'Apagado' ?>
+          </span>
         </label>
         <?php endforeach; ?>
+
+        <script>
+        document.querySelectorAll('.rst-toggle-row input[type="checkbox"]').forEach(chk => {
+          chk.addEventListener('change', () => {
+            const badge = chk.closest('.rst-toggle-row').querySelector('.rst-toggle-badge');
+            badge.textContent = chk.checked ? 'Activo' : 'Apagado';
+            badge.className = 'badge rst-toggle-badge ' + (chk.checked ? 'badge-green' : 'badge-gray');
+          });
+        });
+        </script>
 
         <div class="form-group" style="margin-top:14px">
           <label class="form-label">💰 Propinas sugeridas (CSV de %)</label>
@@ -166,13 +194,6 @@
       <div style="background:#F9FAFB;border-radius:8px;padding:12px;font-size:.8rem;color:#6B7280;margin-bottom:20px">
         El footer del menú siempre mostrará: <strong>Potenciado por CarniHub</strong>
       </div>
-
-      <style>
-        .toggle-switch::after{content:'';position:absolute;top:2px;left:2px;width:20px;height:20px;
-                              border-radius:50%;background:#fff;transition:.2s;
-                              box-shadow:0 1px 3px rgba(0,0,0,.2)}
-        .toggle-switch:checked::after{transform:translateX(18px)}
-      </style>
 
       <div style="display:flex;justify-content:flex-end">
         <button type="submit" class="btn btn-primary">

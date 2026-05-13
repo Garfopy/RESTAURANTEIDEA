@@ -1,4 +1,4 @@
-# Plan & Checklist — Módulo Restaurantes CarniHub v3.3
+# Plan & Checklist — Módulo Restaurantes CarniHub v3.4
 
 **Actualizado:** 2026-05-13 | **Branch:** `sprint-restaurantes`
 
@@ -410,33 +410,41 @@ Mesero/Admin al cierre → /rest-finanzas/cortes → "Nuevo corte"
 
 ## 7. Por dónde empezar a corregir
 
-**Orden sugerido (de mayor impacto al flujo end-to-end):**
+> Estado **post-sprint v3.4**. Ya se completaron los bloqueantes; abajo solo lo pendiente.
 
-1. **🔴 BLOQUEANTE — Pago público sin login** ← EMPEZAR AQUÍ
-   - Endpoint `RestPublicoController::confirmarPago`
-   - Cambiar action de `pagar.php`
-   - Agregar `menu/confirmarPago` a `$publicPaths`
+### ✅ FUNCIONANDO HOY (qué probar)
 
-2. **🔴 BLOQUEANTE — Descuento inventario**
-   - Hook en `RestChefController::marcarListo`
+- **Onboarding de comprador**: crea restaurante → redirige a `/restaurante/bienvenida` con link `/acceso/{slug}` shareable + QR + guía.
+- **Dashboard restaurante**: KPIs reales + **banner onboarding** con checklist (info, mesas, menú, staff) y barra de progreso.
+- **Configuración**: 4 toggles de modos con badge **Activo/Apagado** visible + propinas CSV. Mapa via **Leaflet/OpenStreetMap** (sin API key).
+- **Staff**: portal `/rest-staff/index` (ya sin error 500) — crea cuentas mesero/chef/portero, código auto, login en `/acceso/{slug}`.
+- **Usuarios de prueba** (LA COMALADA, migration 027): `mesero1@la-comalada.test` · `chef1@la-comalada.test` · `portero1@la-comalada.test` — pass `Test1234!`.
+- **Wizard de platillo**: 3 pasos (info → receta → revisar) con validación, badge de pasos y resumen final.
+- **Menú público**: empty state bonito si aún no hay platillos.
+- **Modales**: centrados de verdad (flex centrado + scroll interno) con animación elástica `cubic-bezier`.
+- **KDS chef → inventario**: cuando el chef marca el último ítem como listo, ejecuta `descontarPorOrden()`.
+- **Pago público sin login**: `/menu/{slug}/pagar/{visita}` permite confirmar pago como invitado.
 
-3. **🟡 Migración 026 + toggles**
-   - SQL + UI en `restaurante/config/index.php`
+### 🟡 EN PROGRESO / PARCIAL
 
-4. **🟡 KPIs dashboard restaurante**
-   - `RestauranteController::dashboard` con queries reales
+- **Categorías de menú**: el modal funciona pero no hay UX para reordenar drag&drop.
+- **Inventario CarniHub**: tabla y CRUD listos; falta el hook automático cuando un pedido al distribuidor pasa a `entregado`.
+- **PayPal real**: `confirmarPago` marca pagado pero aún no llama a `PayPalPagoService` — modos efectivo/tarjeta/transferencia funcionan localmente.
 
-5. **🟢 Selector de sucursal**
-   - Vista `restaurante/index.php` + action `seleccionar/{id}`
+### 🔴 PENDIENTE (orden sugerido)
 
-6. **🟢 Auto-import compras CarniHub**
-   - Hook en `EmpresaPedidoController::cambiarEstado`
-
-7. **🟢 PayPal real**
-   - Integrar `PayPalPagoService` en endpoint público
-
-8. **🟢 Notificaciones + guías**
-   - Tabla notificaciones + helper tooltip
+1. **Hook auto-import compras CarniHub → inventario del restaurante**
+   - En `EmpresaPedidoController::cambiarEstado` cuando pasa a `entregado` y comprador tiene `restaurante_activo`, proponer entrada de inventario.
+2. **PayPal real en pago público**
+   - Reemplazar la confirmación inmediata por `PayPalPagoService::crearOrden` y handler de retorno/webhook.
+3. **Layout drag & drop de mesas**
+   - Canvas con posiciones X/Y persistidas en `rest_mesas`.
+4. **Selector multi-sucursal en topbar**
+   - Dropdown con `getByComprador()` para cambiar `$_SESSION['restaurante_activo_id']`.
+5. **Reservaciones — formulario completo + recordatorio email**
+6. **Notificaciones in-app** (tabla + helper + badge en topbar)
+7. **Reportes CSV/PDF** finanzas, inventario, mejores comensales
+8. **Google Auth para comensales** (módulo público de menú)
 
 ---
 
@@ -444,7 +452,8 @@ Mesero/Admin al cierre → /rest-finanzas/cortes → "Nuevo corte"
 
 | Fecha | Sprint | Cambio |
 |-------|--------|--------|
-| 2026-05-13 | v3.3 | Plan reescrito HIPER completo: actores, modos sucursal, flujos detallados, casos extra, estado, prioridades, historial. Implementado pago público sin login + descuento inventario al marcar listo |
+| 2026-05-13 | v3.4 | **Bugfix sprint**: arreglado 500 en `/rest-staff/index` (PDO methods correctos), toggles con label-based switch + badge Activo/Apagado, modales realmente centrados con animación elástica, mapa migrado a Leaflet/OSM (sin API key), banner onboarding con checklist en dashboard, wizard de 3 pasos para crear platillo, empty state en menú público |
+| 2026-05-13 | v3.3 | Plan reescrito HIPER completo: actores, modos sucursal, flujos detallados, casos extra, estado, prioridades, historial. Implementado pago público sin login + descuento inventario al marcar listo. Bienvenida post-creación + migración 026 modos + 027 staff prueba |
 | 2026-05-13 | v3.2 | Modal CSS cache-bust + fallback inline |
 | 2026-05-13 | v3.2 | UX: modales animados, staff CRUD, inventario tabs CarniHub/Externo, QR del local descargable |
 | 2026-05-13 | v3.2 | CSS separado, flujo QR, portal staff /acceso/{slug}, checklist |
@@ -460,10 +469,20 @@ SOURCE migrations/022_restaurantes_core.sql;
 SOURCE migrations/023_restaurantes_finanzas.sql;
 SOURCE migrations/024_restaurantes_reservaciones.sql;
 SOURCE migrations/025_roles_restaurante.sql;
--- pendiente:
--- SOURCE migrations/026_rest_modos.sql;
+SOURCE migrations/026_rest_modos.sql;
+SOURCE migrations/027_test_staff_la_comalada.sql;   -- usuarios de prueba
 
 UPDATE usuarios SET restaurante_activo = 1 WHERE email = 'tu@correo.com';
 ```
 
 Luego: cerrar sesión → "Ver mis locales" → crear restaurante.
+
+**Logins de prueba (LA COMALADA, slug `la-comalada`)**
+
+| Rol     | Email                          | Pass        |
+|---------|--------------------------------|-------------|
+| Mesero  | mesero1@la-comalada.test       | Test1234!   |
+| Chef    | chef1@la-comalada.test         | Test1234!   |
+| Portero | portero1@la-comalada.test      | Test1234!   |
+
+URL del staff: `BASE_URL/acceso/la-comalada`

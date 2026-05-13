@@ -56,6 +56,17 @@
   <input type="hidden" name="visita_id" id="inpVisitaId" value="<?= (int)($visitaId ?? 0) ?>">
 
   <div class="pub-grid" id="grid">
+    <?php if (empty($platillos)): ?>
+    <div style="grid-column:1/-1;padding:60px 20px;text-align:center;color:#6B7280">
+      <div style="font-size:3.5rem;margin-bottom:8px">🍽️</div>
+      <div style="font-size:1.05rem;font-weight:700;color:#374151;margin-bottom:6px">
+        Estamos preparando el menú
+      </div>
+      <div style="font-size:.88rem;max-width:340px;margin:0 auto;line-height:1.5">
+        Aún no hay platillos disponibles. Vuelve en un momento o pide ayuda al personal.
+      </div>
+    </div>
+    <?php else: ?>
     <?php foreach ($platillos as $p): ?>
     <div class="pub-card" data-cat="<?= (int)$p['categoria_id'] ?>">
       <?php if ($p['imagen']): ?>
@@ -87,6 +98,7 @@
       </div>
     </div>
     <?php endforeach; ?>
+    <?php endif; ?>
   </div>
 </form>
 

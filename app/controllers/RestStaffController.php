@@ -17,23 +17,26 @@ class RestStaffController extends BaseController
         $restauranteId = $this->restauranteId();
         $db            = Database::getInstance();
 
-        $staff = $db->query(
+        $stmt = $db->prepare(
             "SELECT u.id, u.nombre, u.email, u.activo,
                     r.nombre AS rol_nombre, r.slug AS rol_slug,
                     rs.codigo, rs.fecha_ingreso, rs.activo AS staff_activo
              FROM rest_staff rs
              JOIN usuarios u ON u.id = rs.usuario_id
-             JOIN roles r ON r.id = u.rol_id
+             JOIN roles r    ON r.id = u.rol_id
              WHERE rs.restaurante_id = ?
-             ORDER BY r.slug, u.nombre",
-            [$restauranteId]
+             ORDER BY r.slug, u.nombre"
         );
+        $stmt->execute([$restauranteId]);
+        $staff = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         $restaurante = $this->restModel->find($restauranteId);
+        $linkAcceso  = BASE_URL . 'acceso/' . $restaurante['slug'];
         $flash       = $this->getFlash();
         $pageTitle   = 'Gestión de Staff';
         $activeMenu  = 'rest_staff';
-        $this->render('restaurante/staff/index', compact('staff','restaurante','flash','pageTitle','activeMenu'));
+        $this->render('restaurante/staff/index',
+            compact('staff','restaurante','linkAcceso','flash','pageTitle','activeMenu'));
     }
 
     public function crear(?string $p = null): void
@@ -53,16 +56,14 @@ class RestStaffController extends BaseController
             $this->flash('error', 'Nombre, email y contraseña son requeridos.');
             $this->redirect('rest-staff/index');
         }
-
-        // Verificar que el rol sea válido
         if (!in_array($rolSlug, ['mesero','chef','portero'], true)) {
             $this->flash('error', 'Rol inválido.');
             $this->redirect('rest-staff/index');
         }
 
-        // Verificar que el email no exista
-        $existe = $db->queryOne("SELECT id FROM usuarios WHERE email = ?", [$email]);
-        if ($existe) {
+        $st = $db->prepare("SELECT id FROM usuarios WHERE email = ? LIMIT 1");
+        $st->execute([$email]);
+        if ($st->fetch()) {
             $this->flash('error', 'Ya existe un usuario con ese correo.');
             $this->redirect('rest-staff/index');
         }
@@ -70,42 +71,50 @@ class RestStaffController extends BaseController
         $restaurante = $this->restModel->find($restauranteId);
         $empresaId   = $restaurante['empresa_id'] ?? null;
 
-        // Obtener rol_id
-        $rol = $db->queryOne("SELECT id FROM roles WHERE slug = ?", [$rolSlug]);
+        $st = $db->prepare("SELECT id FROM roles WHERE slug = ? LIMIT 1");
+        $st->execute([$rolSlug]);
+        $rol = $st->fetch(PDO::FETCH_ASSOC);
         if (!$rol) {
             $this->flash('error', 'Rol no encontrado. Asegúrate de correr migration 025.');
             $this->redirect('rest-staff/index');
         }
 
-        // Crear usuario
-        $hash   = password_hash($password, PASSWORD_DEFAULT);
-        $db->execute(
-            "INSERT INTO usuarios (nombre, email, password, rol_id, empresa_id, restaurante_id, activo, created_at)
-             VALUES (?,?,?,?,?,?,1,NOW())",
-            [$nombre, $email, $hash, $rol['id'], $empresaId, $restauranteId]
+        $hash = password_hash($password, PASSWORD_DEFAULT);
+        $partes = preg_split('/\s+/', $nombre, 3);
+        $primerNombre = $partes[0] ?? $nombre;
+        $apPat = $partes[1] ?? 'Staff';
+        $apMat = $partes[2] ?? null;
+
+        $ins = $db->prepare(
+            "INSERT INTO usuarios
+               (nombre, apellido_paterno, apellido_materno, email, email_verificado,
+                primer_login_completado, password, rol_id, empresa_id, restaurante_id, activo, created_at)
+             VALUES (?,?,?,?,1,1,?,?,?,?,1,NOW())"
         );
+        $ins->execute([$primerNombre, $apPat, $apMat, $email, $hash, $rol['id'], $empresaId, $restauranteId]);
         $usuarioId = (int)$db->lastInsertId();
 
-        // Crear entrada en rest_staff
         if (!$codigo) {
             $prefix = ['mesero'=>'ME','chef'=>'CH','portero'=>'PT'][$rolSlug] ?? 'ST';
-            $codigo = $prefix . str_pad($usuarioId, 3, '0', STR_PAD_LEFT);
+            $codigo = $prefix . str_pad((string)$usuarioId, 3, '0', STR_PAD_LEFT);
         }
-        $db->execute(
-            "INSERT INTO rest_staff (restaurante_id, usuario_id, codigo, rol_slug, activo, fecha_ingreso, created_at)
-             VALUES (?,?,?,?,1,CURDATE(),NOW())",
-            [$restauranteId, $usuarioId, $codigo, $rolSlug]
+        $ins2 = $db->prepare(
+            "INSERT INTO rest_staff
+               (restaurante_id, usuario_id, codigo, rol_slug, activo, fecha_ingreso, created_at)
+             VALUES (?,?,?,?,1,CURDATE(),NOW())"
         );
+        $ins2->execute([$restauranteId, $usuarioId, $codigo, $rolSlug]);
 
-        $this->flash('success', "Staff creado: $nombre ($rolSlug). Código: $codigo");
+        $this->flash('success', "Staff creado: $primerNombre ($rolSlug). Código: $codigo · Email: $email");
         $this->redirect('rest-staff/index');
     }
 
     public function desactivar(?string $id = null): void
     {
-        $db = Database::getInstance();
-        $db->execute("UPDATE rest_staff SET activo = 0 WHERE usuario_id = ?", [(int)$id]);
-        $db->execute("UPDATE usuarios SET activo = 0 WHERE id = ?", [(int)$id]);
+        $db  = Database::getInstance();
+        $uid = (int)$id;
+        $db->prepare("UPDATE rest_staff SET activo = 0 WHERE usuario_id = ?")->execute([$uid]);
+        $db->prepare("UPDATE usuarios   SET activo = 0 WHERE id         = ?")->execute([$uid]);
         $this->flash('success', 'Staff desactivado.');
         $this->redirect('rest-staff/index');
     }

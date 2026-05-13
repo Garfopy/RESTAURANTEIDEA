@@ -35,6 +35,7 @@ class RestauranteModel extends BaseModel
                     (SELECT COUNT(*) FROM rest_mesas WHERE restaurante_id = r.id AND activo = 1) AS total_mesas,
                     (SELECT COUNT(*) FROM rest_mesas WHERE restaurante_id = r.id AND estado = 'ocupada') AS mesas_ocupadas,
                     (SELECT COUNT(*) FROM rest_pedidos WHERE restaurante_id = r.id AND estado IN ('pendiente','en_preparacion')) AS pedidos_activos,
+                    (SELECT COUNT(*) FROM rest_platillos WHERE restaurante_id = r.id AND activo = 1) AS total_platillos,
                     (SELECT COUNT(*) FROM rest_staff WHERE restaurante_id = r.id AND activo = 1) AS total_staff
              FROM rest_restaurantes r WHERE r.id = ?",
             [$restauranteId]
