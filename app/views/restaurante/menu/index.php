@@ -96,10 +96,6 @@
                placeholder="Ej: Entradas, Bebidas, Postres">
         <div id="catError" style="font-size:.78rem;color:#EF4444;margin-top:4px;display:none">El nombre es obligatorio.</div>
       </div>
-      <div class="form-group">
-        <label class="form-label">Orden <span style="color:#9CA3AF;font-weight:400">(número, menor = primero)</span></label>
-        <input type="number" name="orden" value="0" class="form-input" style="max-width:120px">
-      </div>
       <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid #F3F4F6">
         <button type="button" onclick="cerrarModalCat()" class="btn btn-outline">Cancelar</button>
         <button type="submit" class="btn btn-primary">Guardar categoría</button>

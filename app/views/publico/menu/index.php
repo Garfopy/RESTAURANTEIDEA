@@ -67,7 +67,11 @@
       </div>
     </div>
     <?php else: ?>
+    <?php
+    $alergenoBadge = ['Gluten'=>'#FEF3C7:#92400E','Lactosa'=>'#DBEAFE:#1E40AF','Mariscos'=>'#CCFBF1:#065F46','Frutos secos'=>'#FEE2E2:#991B1B','Huevo'=>'#FEF9C3:#713F12','Soya'=>'#F3E8FF:#6B21A8','Cacahuate'=>'#FFEDD5:#9A3412','Mostaza'=>'#D1FAE5:#064E3B'];
+    ?>
     <?php foreach ($platillos as $p): ?>
+    <?php $pId = $p['id']; $ings = $recetaIngredientes[$pId] ?? []; $ingsStock = array_values(array_filter($ings, fn($i) => !$i['es_informativo'])); ?>
     <div class="pub-card" data-cat="<?= (int)$p['categoria_id'] ?>">
       <?php if ($p['imagen']): ?>
       <img src="<?= BASE_URL . htmlspecialchars($p['imagen']) ?>" alt=""
@@ -85,10 +89,39 @@
           <?= mb_strlen($p['descripcion']) > 65 ? '…' : '' ?>
         </div>
         <?php endif; ?>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:auto">
-          <span class="pub-card-price">$<?= number_format((float)$p['precio'], 2) ?></span>
+
+        <?php if ($p['contiene']): ?>
+        <div style="font-size:.7rem;color:#6B7280;margin-top:4px">
+          <em>Contiene:</em> <?= htmlspecialchars($p['contiene']) ?>
+        </div>
+        <?php endif; ?>
+
+        <?php if ($p['alergenos']): ?>
+        <div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:5px">
+          <?php foreach (array_filter(array_map('trim', explode(',', $p['alergenos']))) as $al): ?>
+          <?php $parts = explode(':', $alergenoBadge[$al] ?? '#F3F4F6:#374151'); ?>
+          <span style="font-size:.62rem;font-weight:700;padding:2px 6px;border-radius:5px;
+                       background:<?= $parts[0] ?>;color:<?= $parts[1] ?>">
+            ⚠️ <?= htmlspecialchars($al) ?>
+          </span>
+          <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:auto;padding-top:8px">
+          <div>
+            <span class="pub-card-price">$<?= number_format((float)$p['precio'], 2) ?></span>
+            <?php if (!empty($ingsStock)): ?>
+            <button type="button"
+                    onclick="abrirDetalle(<?= $pId ?>)"
+                    style="display:block;font-size:.68rem;color:var(--cp);background:none;border:none;
+                           cursor:pointer;padding:0;margin-top:2px;text-decoration:underline">
+              Personalizar →
+            </button>
+            <?php endif; ?>
+          </div>
           <div class="pub-counter">
-            <input type="hidden" name="platillo_id[]" value="<?= $p['id'] ?>">
+            <input type="hidden" name="platillo_id[]" value="<?= $pId ?>">
             <button type="button" class="pub-counter-btn minus" onclick="cambiarCant(this,-1)">−</button>
             <span class="cant pub-counter-val">0</span>
             <input type="hidden" name="cantidad[]" value="0" class="cant-input">
@@ -100,6 +133,9 @@
     <?php endforeach; ?>
     <?php endif; ?>
   </div>
+
+  <!-- Exclusiones como hidden inputs (populated by JS modal) -->
+  <div id="excl-hidden-container"></div>
 </form>
 
 <!-- Carrito flotante -->
@@ -121,10 +157,134 @@
   Potenciado por <strong>CarniHub</strong>
 </footer>
 
+<!-- Modal de detalle/personalización -->
+<div id="detalleModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:999;align-items:flex-end;justify-content:center">
+  <div style="background:#fff;border-radius:20px 20px 0 0;padding:24px;width:100%;max-width:480px;
+              max-height:80vh;overflow-y:auto;animation:slideUp .25s ease">
+    <div style="font-weight:700;font-size:1rem;margin-bottom:4px" id="detalleNombre"></div>
+    <div style="font-size:.82rem;color:#6B7280;margin-bottom:16px" id="detalleDesc"></div>
+    <div id="detalleAlergenos" style="margin-bottom:10px"></div>
+    <div id="detalleContiene" style="margin-bottom:14px;font-size:.8rem;color:#6B7280"></div>
+
+    <div id="detalleIngsSection" style="display:none">
+      <div style="font-weight:600;font-size:.88rem;color:#374151;margin-bottom:8px">
+        ¿Qué no quieres que incluya?
+      </div>
+      <div id="detalleIngsList"></div>
+    </div>
+
+    <div style="display:flex;gap:10px;margin-top:20px">
+      <button type="button" onclick="cerrarDetalle()"
+              style="flex:1;padding:12px;border:2px solid #E5E7EB;border-radius:12px;
+                     background:#fff;font-size:.9rem;cursor:pointer;font-weight:600;color:#374151">
+        Cancelar
+      </button>
+      <button type="button" onclick="confirmarDetalle()"
+              style="flex:1;padding:12px;background:var(--cp);color:#fff;border:none;
+                     border-radius:12px;font-size:.9rem;cursor:pointer;font-weight:700">
+        Listo ✓
+      </button>
+    </div>
+  </div>
+</div>
+<style>
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+</style>
+
 <script>
 const precios = {
   <?php foreach ($platillos as $p): ?>'<?= $p['id'] ?>': <?= (float)$p['precio'] ?>,<?php endforeach; ?>
 };
+
+// Datos de platillos (allergens, contiene, ingredientes no-informativos)
+const platillosData = <?= json_encode(array_combine(
+  array_column($platillos, 'id'),
+  array_map(fn($p) => [
+    'nombre'    => $p['nombre'],
+    'descripcion' => $p['descripcion'] ?? '',
+    'alergenos' => $p['alergenos'] ?? '',
+    'contiene'  => $p['contiene'] ?? '',
+    'ings'      => array_values(array_filter($recetaIngredientes[$p['id']] ?? [], fn($i) => !$i['es_informativo']))
+  ], $platillos)
+)) ?>;
+
+const alergenoColors = <?= json_encode(array_map(fn($v) => array_combine(['bg','fg'], explode(':', $v)), [
+  'Gluten'=>'#FEF3C7:#92400E','Lactosa'=>'#DBEAFE:#1E40AF','Mariscos'=>'#CCFBF1:#065F46',
+  'Frutos secos'=>'#FEE2E2:#991B1B','Huevo'=>'#FEF9C3:#713F12','Soya'=>'#F3E8FF:#6B21A8',
+  'Cacahuate'=>'#FFEDD5:#9A3412','Mostaza'=>'#D1FAE5:#064E3B'
+])) ?>;
+
+let detalleActualId = null;
+
+function abrirDetalle(id) {
+  const d = platillosData[id];
+  if (!d) return;
+  detalleActualId = id;
+  document.getElementById('detalleNombre').textContent = d.nombre;
+  document.getElementById('detalleDesc').textContent   = d.descripcion;
+
+  // Alérgenos
+  const alerDiv = document.getElementById('detalleAlergenos');
+  if (d.alergenos) {
+    alerDiv.innerHTML = d.alergenos.split(',').map(a => {
+      a = a.trim(); const c = alergenoColors[a] || {bg:'#F3F4F6',fg:'#374151'};
+      return `<span style="font-size:.72rem;font-weight:700;padding:3px 8px;border-radius:6px;margin-right:4px;background:${c.bg};color:${c.fg}">⚠️ ${a}</span>`;
+    }).join('');
+  } else { alerDiv.innerHTML = ''; }
+
+  // Contiene
+  const conDiv = document.getElementById('detalleContiene');
+  conDiv.textContent = d.contiene ? 'También contiene: ' + d.contiene : '';
+
+  // Ingredientes (para exclusiones)
+  const ingsSec = document.getElementById('detalleIngsSection');
+  const ingsList = document.getElementById('detalleIngsList');
+  if (d.ings && d.ings.length) {
+    ingsSec.style.display = 'block';
+    // Restore previously selected exclusions
+    const prevExcl = Array.from(document.querySelectorAll(`input[name="exclusiones[${id}][]"]`)).map(i => i.value);
+    ingsList.innerHTML = d.ings.map(i => `
+      <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;
+                    border:1.5px solid #E5E7EB;margin-bottom:6px;cursor:pointer;font-size:.88rem">
+        <input type="checkbox" value="${i.ingrediente_nombre}"
+               ${prevExcl.includes(i.ingrediente_nombre)?'checked':''}
+               style="width:18px;height:18px;cursor:pointer">
+        <span style="flex:1">${i.ingrediente_nombre}</span>
+        <span style="font-size:.75rem;color:#9CA3AF">${i.cantidad} ${i.unidad}</span>
+      </label>`).join('');
+  } else {
+    ingsSec.style.display = 'none';
+  }
+
+  const modal = document.getElementById('detalleModal');
+  modal.style.display = 'flex';
+}
+
+function cerrarDetalle() {
+  document.getElementById('detalleModal').style.display = 'none';
+  detalleActualId = null;
+}
+
+function confirmarDetalle() {
+  if (!detalleActualId) { cerrarDetalle(); return; }
+  // Save exclusiones as hidden inputs
+  const container = document.getElementById('excl-hidden-container');
+  // Remove previous for this platillo
+  container.querySelectorAll(`[data-pid="${detalleActualId}"]`).forEach(e => e.remove());
+  document.querySelectorAll('#detalleIngsList input[type=checkbox]:checked').forEach(chk => {
+    const inp = document.createElement('input');
+    inp.type = 'hidden';
+    inp.name = `exclusiones[${detalleActualId}][]`;
+    inp.value = chk.value;
+    inp.dataset.pid = detalleActualId;
+    container.appendChild(inp);
+  });
+  cerrarDetalle();
+}
+
+document.getElementById('detalleModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) cerrarDetalle();
+});
 
 // Recuperar visita de cookie si existe
 const cookieVisita = document.cookie.split('; ').find(r => r.startsWith('visita_<?= $restaurante['id'] ?>='));

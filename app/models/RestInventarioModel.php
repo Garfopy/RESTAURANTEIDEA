@@ -68,21 +68,38 @@ class RestInventarioModel extends BaseModel
         ]);
     }
 
+    private static function convertirUnidad(float $cantidad, string $desde, string $hasta): float
+    {
+        $d = strtolower(trim($desde));
+        $h = strtolower(trim($hasta));
+        if ($d === $h) return $cantidad;
+        if ($d === 'g'  && $h === 'kg') return $cantidad / 1000;
+        if ($d === 'kg' && $h === 'g')  return $cantidad * 1000;
+        if ($d === 'mg' && $h === 'kg') return $cantidad / 1_000_000;
+        if ($d === 'mg' && $h === 'g')  return $cantidad / 1000;
+        if ($d === 'ml' && $h === 'l')  return $cantidad / 1000;
+        if ($d === 'l'  && $h === 'ml') return $cantidad * 1000;
+        // Same family but unknown direction → 1:1 (chef's responsibility)
+        return $cantidad;
+    }
+
     public function descontarPorOrden(int $pedidoId, int $restauranteId, ?int $usuarioId = null): void
     {
         $items = $this->query(
             "SELECT pi.cantidad AS cantidad_pedida, ri.ingrediente_id, ri.cantidad AS cant_receta, ri.unidad,
-                    rec.porciones_base
+                    rec.porciones_base, i.unidad_principal
              FROM rest_pedido_items pi
              JOIN rest_platillos pl ON pl.id = pi.platillo_id
              JOIN rest_recetas rec ON rec.platillo_id = pl.id
              JOIN rest_receta_ingredientes ri ON ri.receta_id = rec.id
-             WHERE pi.pedido_id = ?",
+             JOIN rest_ingredientes i ON i.id = ri.ingrediente_id
+             WHERE pi.pedido_id = ? AND ri.es_informativo = 0",
             [$pedidoId]
         );
 
         foreach ($items as $item) {
-            $descuento = ($item['cant_receta'] / max(1, $item['porciones_base'])) * $item['cantidad_pedida'];
+            $cantidadEnUnidadReceta = ($item['cant_receta'] / max(1, $item['porciones_base'])) * $item['cantidad_pedida'];
+            $descuento = self::convertirUnidad($cantidadEnUnidadReceta, $item['unidad'], $item['unidad_principal']);
             $this->ajustarStock(
                 (int) $item['ingrediente_id'],
                 -$descuento,

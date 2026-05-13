@@ -41,6 +41,11 @@ class RestMenuController extends BaseController
         $restauranteId = $this->restauranteId();
 
         $id = (int)$this->post('id');
+
+        // Alérgenos: array of checkbox values → comma-separated string
+        $alergenosArr = $this->post('alergenos', []);
+        $alergenosStr = is_array($alergenosArr) ? implode(',', array_filter(array_map('trim', $alergenosArr))) : '';
+
         $data = [
             'restaurante_id'         => $restauranteId,
             'categoria_id'           => $this->post('categoria_id') ?: null,
@@ -49,6 +54,8 @@ class RestMenuController extends BaseController
             'precio'                 => (float)$this->post('precio', 0),
             'tiempo_preparacion_min' => (int)$this->post('tiempo_preparacion_min', 15),
             'disponible'             => $this->post('disponible', 1),
+            'alergenos'              => $alergenosStr ?: null,
+            'contiene'               => $this->post('contiene') ?: null,
         ];
 
         if ($id) {
@@ -62,6 +69,7 @@ class RestMenuController extends BaseController
         $ingredientesIds  = $this->post('ingrediente_id', []);
         $cantidades       = $this->post('cantidad', []);
         $unidades         = $this->post('unidad', []);
+        $informativos     = $this->post('es_informativo', []);  // array of ingrediente_id values that are checked
 
         if (!empty($ingredientesIds)) {
             $recetaId = $this->model->upsertReceta(
@@ -76,6 +84,7 @@ class RestMenuController extends BaseController
                     'ingrediente_id' => (int)$ingId,
                     'cantidad'       => (float)($cantidades[$k] ?? 0),
                     'unidad'         => $unidades[$k] ?? 'kg',
+                    'es_informativo' => in_array((string)$ingId, (array)$informativos) ? 1 : 0,
                 ];
             }
             $this->model->syncIngredientesReceta($recetaId, $ings);

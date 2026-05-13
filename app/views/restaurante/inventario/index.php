@@ -66,6 +66,12 @@
   display:flex;gap:6px;
 }
 .inv-card-actions .btn { flex:1;justify-content:center;font-size:.78rem;padding:5px 8px; }
+.btn-entrada { background:#DCFCE7;color:#166534;border:1.5px solid #86EFAC;border-radius:8px;
+               padding:5px 8px;font-size:.78rem;font-weight:600;cursor:pointer;transition:.15s;flex:1;text-align:center; }
+.btn-salida  { background:#FEE2E2;color:#991B1B;border:1.5px solid #FCA5A5;border-radius:8px;
+               padding:5px 8px;font-size:.78rem;font-weight:600;cursor:pointer;transition:.15s;flex:1;text-align:center; }
+.btn-entrada:hover { background:#BBF7D0; }
+.btn-salida:hover  { background:#FCA5A5; }
 
 /* Movements table */
 .mov-row { display:grid;grid-template-columns:90px 1fr 80px 90px 80px;gap:8px;
@@ -88,13 +94,49 @@
 </div>
 <?php endif; ?>
 
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
-  <div style="display:flex;gap:10px;align-items:center">
-    <a href="<?= BASE_URL ?>rest-inventario/movimientos" class="btn btn-outline btn-sm">
-      Ver historial completo
-    </a>
+<!-- Guía colapsable -->
+<div id="guia-inv" style="display:none;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:12px;padding:16px;margin-bottom:16px;font-size:.84rem;color:#1E3A5F">
+  <div style="font-weight:700;margin-bottom:10px;font-size:.92rem">📋 Cómo operar el inventario</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+    <div><span style="background:#DCFCE7;color:#166534;border-radius:6px;padding:2px 8px;font-weight:600;font-size:.75rem">＋ Entrada</span>
+      — Cuando recibes mercancía, compras ingredientes o devuelven producto. <strong>Suma</strong> al stock.</div>
+    <div><span style="background:#FEE2E2;color:#991B1B;border-radius:6px;padding:2px 8px;font-weight:600;font-size:.75rem">－ Salida</span>
+      — Uso directo sin pasar por pedido (ej: consumo del personal). <strong>Resta</strong> del stock.</div>
+    <div><span style="background:#FEF3C7;color:#92400E;border-radius:6px;padding:2px 8px;font-weight:600;font-size:.75rem">Merma</span>
+      — Producto caducado, dañado o derramado. Registra la pérdida.</div>
+    <div><span style="background:#DBEAFE;color:#1E40AF;border-radius:6px;padding:2px 8px;font-weight:600;font-size:.75rem">Ajuste</span>
+      — Corrección manual tras conteo físico del almacén.</div>
   </div>
-  <button onclick="rstModal('modalIng')" class="btn btn-primary btn-sm">
+  <div style="margin-top:10px;padding-top:10px;border-top:1px solid #BFDBFE">
+    <strong>Alerta stock bajo:</strong> cuando el stock llega al mínimo que configures, aparece un aviso rojo. <br>
+    <strong>Descuento automático:</strong> cuando el chef marca un pedido como "listo", los ingredientes de la receta se descuentan solos. <br>
+    <strong>Stock mínimo:</strong> edita el ingrediente y ajusta el campo "Stock mínimo" para configurar desde qué cantidad te alertamos.
+  </div>
+</div>
+
+<!-- Barra de herramientas -->
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;gap:12px">
+  <div style="display:flex;gap:8px;align-items:center;flex:1">
+    <div style="position:relative;flex:1;max-width:320px">
+      <svg width="16" height="16" fill="none" stroke="#9CA3AF" viewBox="0 0 24 24"
+           style="position:absolute;left:10px;top:50%;transform:translateY(-50%);pointer-events:none">
+        <circle cx="11" cy="11" r="8"/><path stroke-linecap="round" d="m21 21-4.35-4.35"/>
+      </svg>
+      <input type="text" id="invBuscar" oninput="filtrarIngredientes()"
+             placeholder="Buscar ingrediente o categoría…"
+             style="width:100%;padding:8px 12px 8px 34px;border:1.5px solid #E5E7EB;border-radius:10px;
+                    font-size:.85rem;box-sizing:border-box;outline:none"
+             onfocus="this.style.borderColor='var(--cp)'" onblur="this.style.borderColor='#E5E7EB'">
+    </div>
+    <a href="<?= BASE_URL ?>rest-inventario/movimientos" class="btn btn-outline btn-sm" style="white-space:nowrap">Ver historial</a>
+    <button onclick="toggleGuia()" title="Ayuda"
+            style="padding:7px 11px;border:1.5px solid #E5E7EB;border-radius:10px;background:#fff;
+                   cursor:pointer;font-size:.85rem;color:#6B7280;transition:.15s"
+            onmouseover="this.style.borderColor='#93C5FD'" onmouseout="this.style.borderColor='#E5E7EB'">
+      ❓ Guía
+    </button>
+  </div>
+  <button onclick="rstModal('modalIng')" class="btn btn-primary btn-sm" style="white-space:nowrap">
     + Ingrediente
   </button>
 </div>
@@ -109,7 +151,8 @@
   $pct   = $min > 0 ? min(100, round($stock / ($min * 2) * 100)) : ($stock > 0 ? 100 : 0);
   $fillCls = $bajo ? 'low' : ($pct < 60 ? 'warn' : '');
 ?>
-<div class="inv-card <?= $bajo ? 'bajo' : 'ok' ?>">
+<div class="inv-card <?= $bajo ? 'bajo' : 'ok' ?>"
+     data-search="<?= strtolower(htmlspecialchars($ing['nombre'] . ' ' . ($ing['categoria'] ?? ''), ENT_QUOTES)) ?>">
   <div class="inv-card-head">
     <div class="inv-card-name">
       <?= htmlspecialchars($ing['nombre']) ?>
@@ -156,22 +199,21 @@
   </div>
 
   <div class="inv-card-actions">
-    <button onclick="abrirMovimiento(<?= $ing['id'] ?>, '<?= htmlspecialchars($ing['nombre'], ENT_QUOTES) ?>')"
-            class="btn btn-primary btn-sm">
-      <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="margin-right:3px"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg>
-      Mover
-    </button>
+    <button onclick="abrirMovimientoTipo(<?= $ing['id'] ?>, '<?= htmlspecialchars($ing['nombre'], ENT_QUOTES) ?>', 'entrada')"
+            class="btn-entrada">＋ Entrada</button>
+    <button onclick="abrirMovimientoTipo(<?= $ing['id'] ?>, '<?= htmlspecialchars($ing['nombre'], ENT_QUOTES) ?>', 'salida')"
+            class="btn-salida">－ Salida</button>
     <button onclick='editIngrediente(<?= htmlspecialchars(json_encode($ing), ENT_QUOTES) ?>)'
-            class="btn btn-outline btn-sm">
-      <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="margin-right:3px"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-      Editar
-    </button>
+            class="btn btn-outline btn-sm" style="padding:5px 9px;font-size:.78rem" title="Editar">✏</button>
   </div>
 </div>
 <?php endforeach; ?>
 </div>
 
 <?php else: ?>
+<div id="noMatch" style="display:none;text-align:center;padding:32px;color:#9CA3AF;font-size:.9rem">
+  Sin resultados para tu búsqueda.
+</div>
 <div class="empty-state" style="margin-bottom:32px">
   <svg width="40" height="40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
   <div style="font-size:.95rem;font-weight:600;color:#374151;margin-bottom:4px">Sin ingredientes</div>
@@ -411,6 +453,21 @@ document.querySelectorAll('.rst-modal-backdrop').forEach(bd => {
   bd.addEventListener('click', e => { if (e.target === bd) bd.classList.remove('open'); });
 });
 
+function toggleGuia() {
+  const g = document.getElementById('guia-inv');
+  g.style.display = g.style.display === 'none' ? 'block' : 'none';
+}
+
+function filtrarIngredientes() {
+  const q = document.getElementById('invBuscar').value.toLowerCase().trim();
+  document.querySelectorAll('.inv-card[data-search]').forEach(card => {
+    card.style.display = !q || card.dataset.search.includes(q) ? '' : 'none';
+  });
+  const vis = [...document.querySelectorAll('.inv-card[data-search]')].filter(c => c.style.display !== 'none').length;
+  const nm = document.getElementById('noMatch');
+  if (nm) nm.style.display = (vis === 0 && q) ? 'block' : 'none';
+}
+
 let tabActual = 'ext';
 function switchTab(tab) {
   tabActual = tab;
@@ -443,6 +500,15 @@ function abrirMovimiento(id, nombre) {
   document.getElementById('movIngId').value = id;
   document.getElementById('movIngNombre').textContent = nombre;
   document.getElementById('modalMov').classList.add('open');
+}
+function abrirMovimientoTipo(id, nombre, tipo) {
+  abrirMovimiento(id, nombre);
+  // Pre-select the movement type
+  document.querySelectorAll('.tipo-radio').forEach(r => r.checked = r.value === tipo);
+  document.querySelectorAll('.tipo-lbl').forEach(lbl => {
+    const r = lbl.querySelector('.tipo-radio');
+    lbl.style.borderColor = r.value === tipo ? 'var(--cp)' : '#E5E7EB';
+  });
 }
 function editIngrediente(i) {
   switchTab('ext');

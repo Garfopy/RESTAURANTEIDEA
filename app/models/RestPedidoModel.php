@@ -37,9 +37,9 @@ class RestPedidoModel extends BaseModel
 
             foreach ($items as $item) {
                 $this->execute(
-                    "INSERT INTO rest_pedido_items (pedido_id, platillo_id, cantidad, precio_unit, subtotal, notas)
-                     VALUES (?,?,?,?,?,?)",
-                    [$pedidoId, $item['platillo_id'], $item['cantidad'], $item['precio_unit'], $item['subtotal'], $item['notas'] ?? null]
+                    "INSERT INTO rest_pedido_items (pedido_id, platillo_id, cantidad, precio_unit, subtotal, notas, exclusiones)
+                     VALUES (?,?,?,?,?,?,?)",
+                    [$pedidoId, $item['platillo_id'], $item['cantidad'], $item['precio_unit'], $item['subtotal'], $item['notas'] ?? null, $item['exclusiones'] ?? null]
                 );
             }
 
@@ -90,6 +90,7 @@ class RestPedidoModel extends BaseModel
             "SELECT p.id, p.folio, p.created_at, p.notas AS pedido_notas,
                     m.nombre AS mesa_nombre,
                     pi.id AS item_id, pi.cantidad, pi.notas AS item_notas, pi.estado AS item_estado,
+                    pi.exclusiones,
                     pl.nombre AS platillo_nombre, pl.tiempo_preparacion_min
              FROM rest_pedidos p
              JOIN rest_pedido_items pi ON pi.pedido_id = p.id

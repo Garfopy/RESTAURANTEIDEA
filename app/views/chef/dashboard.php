@@ -100,6 +100,7 @@ function renderQueue(items) {
           <div>
             <div style="font-weight:600">${it.platillo_nombre}</div>
             <div style="font-size:.78rem;color:#9CA3AF">x${it.cantidad} · ${it.tiempo_preparacion_min}min ${it.item_notas ? '· '+it.item_notas : ''}</div>
+            ${it.exclusiones ? `<div style="font-size:.75rem;background:#7F1D1D;color:#FCA5A5;border-radius:6px;padding:2px 7px;margin-top:3px;display:inline-block">🚫 Sin: ${it.exclusiones}</div>` : ''}
           </div>
           <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
             ${estadoBadge(it.item_estado)}

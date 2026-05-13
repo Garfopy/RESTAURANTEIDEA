@@ -37,6 +37,10 @@ class RestPublicoController extends BaseController
 
         $categorias = $this->menuModel->getCategorias((int)$restaurante['id'], true);
         $platillos  = $this->menuModel->getPlatillosDisponibles((int)$restaurante['id']);
+        $recetaIngredientes = [];
+        try {
+            $recetaIngredientes = $this->menuModel->getIngredientesPorRestaurante((int)$restaurante['id']);
+        } catch (\Throwable $e) {}
 
         $mesa = null;
         $mesaQr = $this->get('mesa');
@@ -57,7 +61,7 @@ class RestPublicoController extends BaseController
         }
 
         $pageTitle = $restaurante['nombre'];
-        $this->render('publico/menu/index', compact('restaurante','categorias','platillos','mesa','visitaId','pageTitle'));
+        $this->render('publico/menu/index', compact('restaurante','categorias','platillos','recetaIngredientes','mesa','visitaId','pageTitle'));
     }
 
     public function ordenar(?string $slug = null): void
@@ -85,19 +89,24 @@ class RestPublicoController extends BaseController
 
         $platillosIds = $this->post('platillo_id', []);
         $cantidades   = $this->post('cantidad', []);
+        $exclusiones  = $this->post('exclusiones', []);  // keyed by platillo_id
 
         $items = [];
         foreach ($platillosIds as $k => $platilloId) {
             if (!$platilloId || empty($cantidades[$k])) continue;
             $platillo = $this->menuModel->find((int)$platilloId);
             if (!$platillo || !$platillo['disponible']) continue;
-            $cant    = max(1, (int)$cantidades[$k]);
+            $cant = max(1, (int)$cantidades[$k]);
+            $excl = isset($exclusiones[$platilloId]) && is_array($exclusiones[$platilloId])
+                ? implode(', ', array_filter(array_map('trim', $exclusiones[$platilloId])))
+                : null;
             $items[] = [
                 'platillo_id' => (int)$platilloId,
                 'cantidad'    => $cant,
                 'precio_unit' => (float)$platillo['precio'],
                 'subtotal'    => (float)$platillo['precio'] * $cant,
                 'notas'       => null,
+                'exclusiones' => $excl,
             ];
         }
 
