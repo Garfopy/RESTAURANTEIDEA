@@ -194,6 +194,9 @@ document.addEventListener('click', e => {
     sb.classList.remove('open');
   }
 });
+// Teleport modal backdrops to <body> so position:fixed works correctly
+// (page-content animation creates a containing block that clips fixed children)
+document.querySelectorAll('.rst-modal-backdrop').forEach(m => document.body.appendChild(m));
 </script>
 </body>
 </html>

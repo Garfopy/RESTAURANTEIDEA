@@ -1,5 +1,5 @@
 <?php ob_start(); ?>
-<div style="max-width:820px;margin:0 auto">
+<div>
   <a href="<?= BASE_URL ?>rest-menu/index"
      style="font-size:.85rem;color:#6B7280;text-decoration:none;display:inline-flex;align-items:center;gap:4px;margin-bottom:18px">
     ← Volver al menú

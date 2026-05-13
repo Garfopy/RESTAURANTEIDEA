@@ -1,9 +1,28 @@
 <?php ob_start(); ?>
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
-  <div style="font-size:.85rem;color:#6B7280">
-    Staff de tu restaurante — pueden iniciar sesión en
-    <strong style="color:var(--cp)"><?= BASE_URL ?>acceso/<?= htmlspecialchars($restaurante['slug'] ?? '') ?></strong>
+
+<!-- Login link para compartir con staff -->
+<div style="background:linear-gradient(135deg,var(--cp-light) 0%,#fff 100%);border:1px solid var(--cp);
+            border-radius:12px;padding:16px 20px;margin-bottom:20px;display:flex;align-items:center;
+            justify-content:space-between;gap:16px;flex-wrap:wrap">
+  <div>
+    <div style="font-weight:700;color:var(--cp);font-size:.92rem;margin-bottom:3px">
+      🔗 Link de acceso del staff
+    </div>
+    <div style="font-family:monospace;font-size:.8rem;color:#374151;word-break:break-all">
+      <?= htmlspecialchars($linkAcceso) ?>
+    </div>
   </div>
+  <div style="display:flex;gap:8px;flex-shrink:0">
+    <button onclick="navigator.clipboard.writeText('<?= htmlspecialchars($linkAcceso, ENT_QUOTES) ?>');this.textContent='¡Copiado!';setTimeout(()=>this.textContent='Copiar',2000)"
+            class="btn btn-outline btn-sm">Copiar</button>
+    <a href="<?= htmlspecialchars($linkAcceso) ?>" target="_blank" class="btn btn-primary btn-sm">
+      Abrir ↗
+    </a>
+  </div>
+</div>
+
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+  <div></div>
   <button onclick="rstModal('modalStaff')" class="btn btn-primary btn-sm">+ Nuevo staff</button>
 </div>
 

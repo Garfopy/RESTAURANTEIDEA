@@ -43,6 +43,11 @@
     <?php endif; ?>
 
     <!-- Form -->
+    <?php if (!$restaurante): ?>
+    <div class="flash flash-error">
+      Restaurante no encontrado. Verifica la URL de acceso con tu administrador.
+    </div>
+    <?php else: ?>
     <form method="POST" action="<?= BASE_URL ?>acceso/<?= htmlspecialchars($slug ?? '') ?>/login" autocomplete="on">
       <div class="form-group">
         <label class="form-label">Correo electrónico</label>
@@ -73,6 +78,7 @@
         <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
       </button>
     </form>
+    <?php endif; ?>
 
     <div style="text-align:center;margin-top:20px;font-size:.75rem;color:#9CA3AF">
       Potenciado por <strong>CarniHub</strong>

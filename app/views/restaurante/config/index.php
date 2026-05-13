@@ -1,11 +1,5 @@
 <?php ob_start(); ?>
-<div style="max-width:760px">
-  <?php if (!empty($flash)): ?>
-  <div class="flash flash-<?= $flash['type'] === 'success' ? 'success' : 'error' ?>">
-    <?= htmlspecialchars($flash['message']) ?>
-  </div>
-  <?php endif; ?>
-
+<div>
   <div class="rst-card">
     <form method="POST" action="<?= BASE_URL ?>rest-config/guardar" enctype="multipart/form-data">
 

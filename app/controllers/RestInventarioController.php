@@ -27,17 +27,18 @@ class RestInventarioController extends BaseController
             $restaurante = (new RestauranteModel())->find($restauranteId);
             $empresaId   = $restaurante['empresa_id'] ?? 0;
             if ($empresaId) {
-                $db = Database::getInstance();
-                $productosCarnihub = $db->query(
+                $db   = Database::getInstance();
+                $stmt = $db->prepare(
                     "SELECT DISTINCT p.id, p.nombre, p.unidad
                      FROM productos p
                      JOIN pedido_items pi ON pi.producto_id = p.id
                      JOIN pedidos ped ON ped.id = pi.pedido_id
                      WHERE ped.empresa_id = ? AND p.activo = 1
                      ORDER BY p.nombre
-                     LIMIT 100",
-                    [$empresaId]
+                     LIMIT 100"
                 );
+                $stmt->execute([$empresaId]);
+                $productosCarnihub = $stmt->fetchAll(PDO::FETCH_ASSOC);
             }
         } catch (\Throwable $e) {}
 
@@ -55,10 +56,12 @@ class RestInventarioController extends BaseController
 
         // Si viene de CarniHub, usar datos del producto
         if ($esCarnihub && $carnihubProdId) {
-            $db      = Database::getInstance();
-            $prod    = $db->queryOne("SELECT * FROM productos WHERE id = ?", [$carnihubProdId]);
-            $nombre  = $prod['nombre'] ?? $this->post('nombre', '');
-            $unidad  = $prod['unidad'] ?? 'kg';
+            $db   = Database::getInstance();
+            $stmt = $db->prepare("SELECT * FROM productos WHERE id = ?");
+            $stmt->execute([$carnihubProdId]);
+            $prod   = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+            $nombre = $prod['nombre'] ?? $this->post('nombre', '');
+            $unidad = $prod['unidad'] ?? 'kg';
         } else {
             $nombre = trim($this->post('nombre', ''));
             $unidad = $this->post('unidad_principal', 'kg');
