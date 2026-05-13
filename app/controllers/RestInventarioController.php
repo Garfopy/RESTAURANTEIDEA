@@ -18,6 +18,14 @@ class RestInventarioController extends BaseController
         $ingredientes     = $this->model->getByRestaurante($restauranteId);
         $alertas          = $this->model->alertasStockBajo($restauranteId);
         $flash            = $this->getFlash();
+
+        // Recent movements (last 10)
+        $movRecientes = [];
+        try {
+            $resultado = $this->model->getMovimientos($restauranteId, 1);
+            $movRecientes = array_slice($resultado['movimientos'] ?? [], 0, 10);
+        } catch (\Throwable $e) {}
+
         $pageTitle        = 'Inventario';
         $activeMenu       = 'rest_inventario';
 
@@ -42,7 +50,9 @@ class RestInventarioController extends BaseController
             }
         } catch (\Throwable $e) {}
 
-        $this->render('restaurante/inventario/index', compact('ingredientes','alertas','productosCarnihub','flash','pageTitle','activeMenu'));
+        $this->render('restaurante/inventario/index', compact(
+            'ingredientes','alertas','productosCarnihub','movRecientes','flash','pageTitle','activeMenu'
+        ));
     }
 
     public function guardar(?string $p = null): void

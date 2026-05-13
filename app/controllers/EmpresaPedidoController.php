@@ -96,6 +96,10 @@ class EmpresaPedidoController extends BaseController
             $this->pedidoModel->cambiarEstado($pedidoId, $estado);
         }
 
+        if ($estado === 'entregado') {
+            $this->_importarStockRestaurante($pedidoId);
+        }
+
         $this->log('Cambiar estado pedido', 'pedidos', "Pedido $pedidoId → $estado. $nota");
         $this->flash('success', 'Estado del pedido actualizado.');
         $this->redirect('pedido/detalle/' . $pedidoId);
@@ -208,6 +212,7 @@ class EmpresaPedidoController extends BaseController
         }
 
         $this->_procesarFotoEntrega($pedidoId);
+        $this->_importarStockRestaurante($pedidoId);
         $this->flash('success', 'Foto de entrega registrada. Pedido marcado como entregado.');
         $this->redirect('empresa-pedido');
     }
@@ -339,5 +344,59 @@ class EmpresaPedidoController extends BaseController
         }
         $path = '/public/uploads/evidencias/' . $filename;
         $this->pedidoModel->subirFotoEntrega($pedidoId, $path);
+    }
+
+    private function _importarStockRestaurante(int $pedidoId): void
+    {
+        try {
+            $db = Database::getInstance();
+
+            // Get comprador_id and pedido items
+            $row = $db->prepare("SELECT comprador_id FROM pedidos WHERE id = ? LIMIT 1");
+            $row->execute([$pedidoId]);
+            $ped = $row->fetch(\PDO::FETCH_ASSOC);
+            if (!$ped || !$ped['comprador_id']) return;
+
+            $compradorId = (int)$ped['comprador_id'];
+
+            // Find active restaurant(s) for this comprador
+            $rStmt = $db->prepare("SELECT id FROM rest_restaurantes WHERE comprador_id = ? AND activo = 1 LIMIT 1");
+            $rStmt->execute([$compradorId]);
+            $rest = $rStmt->fetch(\PDO::FETCH_ASSOC);
+            if (!$rest) return;
+
+            $restauranteId = (int)$rest['id'];
+
+            // Get pedido items
+            $iStmt = $db->prepare(
+                "SELECT producto_id, cantidad FROM pedido_items WHERE pedido_id = ?"
+            );
+            $iStmt->execute([$pedidoId]);
+            $items = $iStmt->fetchAll(\PDO::FETCH_ASSOC);
+            if (empty($items)) return;
+
+            $invModel = new RestInventarioModel();
+            foreach ($items as $item) {
+                $ingStmt = $db->prepare(
+                    "SELECT id FROM rest_ingredientes
+                     WHERE restaurante_id = ? AND carnihub_producto_id = ? AND activo = 1 LIMIT 1"
+                );
+                $ingStmt->execute([$restauranteId, (int)$item['producto_id']]);
+                $ing = $ingStmt->fetch(\PDO::FETCH_ASSOC);
+                if (!$ing) continue;
+
+                $invModel->ajustarStock(
+                    (int)$ing['id'],
+                    (float)$item['cantidad'],
+                    'entrada',
+                    'Pedido CarniHub #' . $pedidoId,
+                    'carnihub_pedido:' . $pedidoId,
+                    $restauranteId,
+                    null
+                );
+            }
+        } catch (\Throwable $e) {
+            // Silent — restaurant module may not be configured
+        }
     }
 }

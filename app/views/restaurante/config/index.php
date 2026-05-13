@@ -20,19 +20,80 @@
         <textarea name="descripcion" class="form-textarea" rows="3"><?= htmlspecialchars($restaurante['descripcion'] ?? '') ?></textarea>
       </div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
-        <div class="form-group">
-          <label class="form-label">Teléfono</label>
-          <input type="text" name="telefono" class="form-input"
-                 value="<?= htmlspecialchars($restaurante['telefono'] ?? '') ?>">
-        </div>
-        <div class="form-group">
+      <div class="form-group">
+        <label class="form-label">Teléfono</label>
+        <input type="text" name="telefono" class="form-input"
+               value="<?= htmlspecialchars($restaurante['telefono'] ?? '') ?>">
+      </div>
+
+      <!-- Dirección + Mapa lado a lado -->
+      <div style="display:grid;grid-template-columns:280px 1fr;gap:16px;margin-bottom:20px;align-items:start">
+        <div>
           <label class="form-label">Dirección</label>
           <input type="text" name="direccion" id="inpDireccion" class="form-input"
                  value="<?= htmlspecialchars($restaurante['direccion'] ?? '') ?>"
-                 placeholder="Ej: Av. Principal 123, Ciudad">
+                 placeholder="Ej: Av. Principal 123, Ciudad"
+                 style="margin-bottom:10px">
+          <div id="coordsBox" style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:10px 12px;<?= empty($restaurante['direccion']) ? 'display:none' : '' ?>">
+            <div style="font-size:.75rem;font-weight:700;color:#065F46;margin-bottom:6px">📍 Coordenadas</div>
+            <div style="font-size:.78rem;color:#374151">Lat: <span id="coordLat"><?= $restaurante['lat'] ?? '—' ?></span></div>
+            <div style="font-size:.78rem;color:#374151">Lng: <span id="coordLng"><?= $restaurante['lng'] ?? '—' ?></span></div>
+            <input type="hidden" name="lat" id="inpLat" value="<?= htmlspecialchars($restaurante['lat'] ?? '') ?>">
+            <input type="hidden" name="lng" id="inpLng" value="<?= htmlspecialchars($restaurante['lng'] ?? '') ?>">
+          </div>
+          <div id="mapNote" style="font-size:.72rem;color:#9CA3AF;margin-top:6px">
+            Guarda para actualizar el mapa.
+          </div>
+        </div>
+        <div>
+          <label class="form-label">Ubicación en mapa</label>
+          <div id="rstMap"
+               data-direccion="<?= htmlspecialchars($restaurante['direccion'] ?? '', ENT_QUOTES) ?>"
+               style="border-radius:10px;overflow:hidden;border:1px solid #E5E7EB;height:200px;background:#F3F4F6;display:flex;align-items:center;justify-content:center">
+            <?php if (empty($restaurante['direccion'])): ?>
+            <div style="text-align:center;color:#9CA3AF;font-size:.82rem">
+              <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="margin:0 auto 6px;display:block"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+              Agrega una dirección para ver el mapa
+            </div>
+            <?php endif; ?>
+          </div>
         </div>
       </div>
+      <?php if (!empty($restaurante['direccion'])): ?>
+      <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+      <script>
+      (function(){
+        var sc = document.createElement('script');
+        sc.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+        sc.onload = function() {
+          var el  = document.getElementById('rstMap');
+          var dir = el.dataset.direccion;
+          el.innerHTML = '';
+          fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(dir))
+            .then(function(r){ return r.json(); })
+            .then(function(data) {
+              if (data[0]) {
+                var lat = parseFloat(data[0].lat), lng = parseFloat(data[0].lon);
+                var map = L.map(el).setView([lat, lng], 16);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  { attribution: '© OpenStreetMap', maxZoom: 19 }).addTo(map);
+                L.marker([lat, lng]).addTo(map).bindPopup(dir).openPopup();
+                // Show coordinates
+                document.getElementById('coordLat').textContent = lat.toFixed(6);
+                document.getElementById('coordLng').textContent = lng.toFixed(6);
+                document.getElementById('inpLat').value = lat.toFixed(6);
+                document.getElementById('inpLng').value = lng.toFixed(6);
+                document.getElementById('coordsBox').style.display = 'block';
+              } else {
+                el.innerHTML = '<div style="padding:20px;text-align:center;color:#9CA3AF;font-size:.82rem">No se encontró la dirección en el mapa.</div>';
+              }
+            })
+            .catch(function(){ el.innerHTML = '<div style="padding:20px;text-align:center;color:#9CA3AF;font-size:.82rem">No se pudo cargar el mapa.</div>'; });
+        };
+        document.head.appendChild(sc);
+      })();
+      </script>
+      <?php endif; ?>
 
       <!-- Horarios por día de la semana -->
       <div style="border-top:1px solid #F3F4F6;padding-top:20px;margin-bottom:20px">
@@ -79,23 +140,35 @@
 
         <!-- Time rows -->
         <div id="horarioRows" style="display:grid;gap:8px">
-          <?php foreach ($diasKeys as $i => $d): ?>
           <?php
-            $h = $horariosJson[$d];
-            $cerrado = (int)($h['cerrado'] ?? 0);
+          function horaSelect(string $id, string $val): string {
+            $h = "<select id=\"$id\" onchange=\"actualizarHorariosJson()\"
+                style=\"padding:7px 10px;border:1.5px solid #D1D5DB;border-radius:8px;
+                        background:#fff;color:#374151;font-size:.85rem;cursor:pointer;
+                        appearance:none;-webkit-appearance:none;min-width:110px\">";
+            for ($hh = 0; $hh < 24; $hh++) {
+              foreach ([0, 30] as $mm) {
+                $v    = sprintf('%02d:%02d', $hh, $mm);
+                $ampm = $hh < 12 ? 'AM' : 'PM';
+                $h12  = $hh % 12 ?: 12;
+                $lbl  = sprintf('%d:%02d %s', $h12, $mm, $ampm);
+                $sel  = $v === $val ? ' selected' : '';
+                $h   .= "<option value=\"$v\"$sel>$lbl</option>";
+              }
+            }
+            return $h . '</select>';
+          }
           ?>
+          <?php foreach ($diasKeys as $i => $d): ?>
+          <?php $h = $horariosJson[$d]; $cerrado = (int)($h['cerrado'] ?? 0); ?>
           <div id="row_<?= $d ?>" style="<?= $cerrado ? 'display:none' : 'display:flex' ?>;align-items:center;gap:12px;
                background:#F9FAFB;border-radius:10px;padding:10px 14px;flex-wrap:wrap">
             <span style="font-weight:600;font-size:.88rem;color:#374151;width:80px"><?= $diasNom[$i] ?></span>
-            <div style="display:flex;align-items:center;gap:8px;flex:1">
-              <label style="font-size:.8rem;color:#6B7280">Abre</label>
-              <input type="time" id="abre_<?= $d ?>" value="<?= htmlspecialchars($h['abre']) ?>"
-                     class="form-input" style="max-width:130px;padding:6px 10px"
-                     onchange="actualizarHorariosJson()">
-              <label style="font-size:.8rem;color:#6B7280">Cierra</label>
-              <input type="time" id="cierra_<?= $d ?>" value="<?= htmlspecialchars($h['cierra']) ?>"
-                     class="form-input" style="max-width:130px;padding:6px 10px"
-                     onchange="actualizarHorariosJson()">
+            <div style="display:flex;align-items:center;gap:10px;flex:1;flex-wrap:wrap">
+              <label style="font-size:.78rem;color:#6B7280;font-weight:500">Abre</label>
+              <?= horaSelect('abre_' . $d, $h['abre'] ?? '09:00') ?>
+              <label style="font-size:.78rem;color:#6B7280;font-weight:500">Cierra</label>
+              <?= horaSelect('cierra_' . $d, $h['cierra'] ?? '22:00') ?>
             </div>
           </div>
           <?php endforeach; ?>
@@ -107,74 +180,6 @@
         <input type="hidden" name="horario_apertura" id="legacyAbre" value="<?= htmlspecialchars($defaultAbre) ?>">
         <input type="hidden" name="horario_cierre" id="legacyCierra" value="<?= htmlspecialchars($defaultCierra) ?>">
       </div>
-
-      <!-- Mapa de ubicación -->
-      <?php if (!empty($restaurante['direccion'])): ?>
-      <div style="margin-bottom:20px">
-        <label class="form-label">Ubicación en mapa</label>
-        <div id="rstMap"
-             data-direccion="<?= htmlspecialchars($restaurante['direccion'], ENT_QUOTES) ?>"
-             data-maps-key="<?= htmlspecialchars($mapsApiKey ?? '', ENT_QUOTES) ?>"
-             style="border-radius:10px;overflow:hidden;border:1px solid #E5E7EB;height:240px;background:#F3F4F6"></div>
-        <div style="font-size:.75rem;color:#9CA3AF;margin-top:4px">
-          Mapa actualizado con la dirección guardada.
-        </div>
-      </div>
-      <script>
-      (function(){
-        const el = document.getElementById('rstMap'); if (!el) return;
-        const dir = el.dataset.direccion;
-        const key = el.dataset.mapsKey;
-
-        if (key) {
-          // Google Maps JavaScript API
-          el.style.background = '#f0f0f0';
-          const script = document.createElement('script');
-          script.src = 'https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(key) + '&callback=initRstMap';
-          window.initRstMap = function() {
-            const geocoder = new google.maps.Geocoder();
-            geocoder.geocode({ address: dir }, function(results, status) {
-              const latlng = (status === 'OK' && results[0])
-                ? results[0].geometry.location
-                : { lat: 19.4326, lng: -99.1332 };
-              const map = new google.maps.Map(el, { zoom: 16, center: latlng });
-              if (status === 'OK' && results[0]) {
-                new google.maps.Marker({ map, position: latlng, title: dir });
-              }
-            });
-          };
-          document.head.appendChild(script);
-        } else {
-          // Fallback: Leaflet/OpenStreetMap (no API key needed)
-          const ls = document.createElement('link');
-          ls.rel = 'stylesheet'; ls.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-          document.head.appendChild(ls);
-          const sc = document.createElement('script');
-          sc.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-          sc.onload = function() {
-            fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(dir))
-              .then(r => r.json())
-              .then(data => {
-                const lat = data[0] ? parseFloat(data[0].lat) : 19.4326;
-                const lng = data[0] ? parseFloat(data[0].lon) : -99.1332;
-                const map = L.map(el).setView([lat, lng], data[0] ? 16 : 12);
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  { attribution: '© OpenStreetMap', maxZoom: 19 }).addTo(map);
-                if (data[0]) L.marker([lat, lng]).addTo(map).bindPopup(dir).openPopup();
-              })
-              .catch(() => { el.innerHTML = '<div style="padding:20px;text-align:center;color:#9CA3AF">No se pudo cargar el mapa.</div>'; });
-          };
-          document.head.appendChild(sc);
-        }
-      })();
-      </script>
-      <?php else: ?>
-      <div style="background:#F9FAFB;border-radius:8px;padding:14px;margin-bottom:20px;
-                  font-size:.82rem;color:#6B7280;display:flex;align-items:center;gap:8px">
-        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-        Agrega una dirección para mostrar el mapa de ubicación.
-      </div>
-      <?php endif; ?>
 
       <!-- Branding -->
       <div style="border-top:1px solid #F3F4F6;padding-top:20px;margin-top:4px;margin-bottom:20px">

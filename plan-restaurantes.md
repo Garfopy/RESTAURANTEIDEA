@@ -1,4 +1,4 @@
-# Plan & Checklist — Módulo Restaurantes CarniHub v3.5
+# Plan & Checklist — Módulo Restaurantes CarniHub v3.6
 
 **Actualizado:** 2026-05-13 | **Branch:** `sprint-restaurantes`
 
@@ -196,10 +196,9 @@ Diferencias: mesa_id NULL, 1 orden = 1 ticket, mesero/portero no participan.
     Admin restaurante → CarniHub como comprador → Carrito → Pedido
       ├─ Pedido se procesa normal
       └─ Al marcar 'entregado':
-            ⚠️ PENDIENTE: hook → propone entrada automática al inventario
-                  ├─ Por cada item: busca rest_ingredientes WHERE carnihub_producto_id = X
-                  │     ├─ Si existe: pre-rellena form (admin confirma)
-                  │     └─ Si no: prompt "¿Crear ingrediente nuevo?"
+            ✅ IMPLEMENTADO: `EmpresaPedidoController::_importarStockRestaurante()` — auto-import silencioso:
+                  ├─ Por cada item del pedido: busca rest_ingredientes WHERE carnihub_producto_id = X
+                  └─ Si existe: ajustarStock(cantidad, 'entrada', 'Pedido CarniHub #ID')
                   └─ Al confirmar: ajustarStock(+cantidad, 'entrada')
 
 [B] Compra externa
@@ -387,7 +386,7 @@ Mesero/Admin al cierre → /rest-finanzas/cortes → "Nuevo corte"
 - [ ] Toggle modos §2 en `restaurante/config/index.php`
 - [ ] Vista `/restaurante/dashboard` con KPIs reales (actualmente básica)
 - [ ] Vista `/restaurante/index` (lista sucursales) y `/seleccionar` (cambiar activa)
-- [ ] Auto-import compras CarniHub al inventario (hook en pedido entregado)
+- [x] ~~Auto-import compras CarniHub al inventario (hook en pedido entregado)~~ ✅ v3.6
 - [ ] Integración real PayPal en confirmarPago
 
 ### 🟢 PENDIENTE media
@@ -438,8 +437,7 @@ Mesero/Admin al cierre → /rest-finanzas/cortes → "Nuevo corte"
 
 ### 🔴 PENDIENTE (orden sugerido)
 
-1. **Hook auto-import compras CarniHub → inventario del restaurante**
-   - En `EmpresaPedidoController::cambiarEstado` cuando pasa a `entregado` y comprador tiene `restaurante_activo`, proponer entrada de inventario.
+1. ~~**Hook auto-import compras CarniHub → inventario del restaurante**~~ ✅ Implementado en v3.6
 2. **PayPal real en pago público**
    - Reemplazar la confirmación inmediata por `PayPalPagoService::crearOrden` y handler de retorno/webhook.
 3. **Layout drag & drop de mesas**
@@ -457,6 +455,7 @@ Mesero/Admin al cierre → /rest-finanzas/cortes → "Nuevo corte"
 
 | Fecha | Sprint | Cambio |
 |-------|--------|--------|
+| 2026-05-13 | v3.6 | **Inventario cards** — rediseño de `inventario/index.php` con grid de tarjetas (barra de stock, semáforo, valor estimado), sección movimientos recientes; **Auto-import CarniHub** — `EmpresaPedidoController::_importarStockRestaurante()` descuenta pedido entregado al inventario del restaurante; mapa Leaflet + coordenadas, selector hora AM/PM, fix login staff |
 | 2026-05-13 | v3.5 | **Links rápidos** en dashboard (portal staff + menú público); **Google Maps** usa API key de `global_settings`; `requiere_login_comensal` redirige comensal a `/acceso/{slug}`; migration 029 con 18 ingredientes de prueba; plan actualizado |
 | 2026-05-13 | v3.4 | **Bugfix sprint**: arreglado 500 en `/rest-staff/index` (PDO methods correctos), toggles con label-based switch + badge Activo/Apagado, modales realmente centrados con animación elástica, mapa migrado a Leaflet/OSM (sin API key), banner onboarding con checklist en dashboard, wizard de 3 pasos para crear platillo, empty state en menú público |
 | 2026-05-13 | v3.3 | Plan reescrito HIPER completo: actores, modos sucursal, flujos detallados, casos extra, estado, prioridades, historial. Implementado pago público sin login + descuento inventario al marcar listo. Bienvenida post-creación + migración 026 modos + 027 staff prueba |

@@ -15,7 +15,11 @@ class StaffAccesoController extends BaseController
     public function index(?string $slug = null): void
     {
         if (isset($_SESSION['usuario'])) {
-            $this->redirectSegunRol($_SESSION['usuario']['rol_slug'] ?? '');
+            $rol = $_SESSION['usuario']['rol_slug'] ?? '';
+            // Solo redirigir automáticamente a staff — comprador/admin puede ver la página para compartirla
+            if (in_array($rol, ['mesero', 'chef', 'portero'])) {
+                $this->redirectSegunRol($rol);
+            }
         }
         $restaurante = $slug ? $this->restModel->getBySlug($slug) : null;
         $flash       = $this->getFlash();

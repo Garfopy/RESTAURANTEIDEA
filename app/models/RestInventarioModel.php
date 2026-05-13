@@ -97,7 +97,7 @@ class RestInventarioModel extends BaseModel
 
     public function getMovimientos(int $restauranteId, int $page = 1): array
     {
-        $sql = "SELECT mv.*, i.nombre AS ingrediente_nombre, u.nombre AS usuario_nombre
+        $sql = "SELECT mv.*, i.nombre AS ingrediente_nombre, i.unidad_principal, u.nombre AS usuario_nombre
                 FROM rest_movimientos_inventario mv
                 JOIN rest_ingredientes i ON i.id = mv.ingrediente_id
                 LEFT JOIN usuarios u ON u.id = mv.usuario_id
