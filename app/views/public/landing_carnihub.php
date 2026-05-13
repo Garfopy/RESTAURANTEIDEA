@@ -1131,7 +1131,17 @@
 (function () {
   // ── Polling: actualiza la sección de precios sin recargar la página ──
   var BASE = '<?= BASE_URL ?>';
-  var lastHash  = '';
+  <?php
+  $planesNorm = array_map(function($p){
+    $f = !empty($p['features']) ? (is_array($p['features']) ? $p['features'] : (json_decode($p['features'],true)??[])) : [];
+    return ['id'=>(int)$p['id'],'nombre'=>$p['nombre'],'slug'=>$p['slug'],
+            'precio_mensual'=>(float)$p['precio_mensual'],
+            'precio_anual'=>!empty($p['precio_anual'])?(float)$p['precio_anual']:null,
+            'max_usuarios'=>(int)$p['max_usuarios'],'max_productos'=>(int)$p['max_productos'],
+            'max_sucursales'=>(int)$p['max_sucursales'],'features'=>array_slice($f,0,6)];
+  }, $planes ?? []);
+  ?>
+  var lastHash  = '<?= md5(json_encode($planesNorm)) ?>';
   var gridEl    = null; // se asigna tras el primer render
   var INTERVAL  = 10000; // ms
 
@@ -1233,6 +1243,8 @@
     });
 
     wrapper.appendChild(grid);
+    // Mostrar inmediatamente (el IntersectionObserver no observa elementos nuevos)
+    grid.querySelectorAll('.reveal').forEach(function(el) { el.classList.add('visible'); });
   }
 
   function fetchPlanes() {
