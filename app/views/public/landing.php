@@ -901,15 +901,15 @@ const iconClose   = document.getElementById('icon-close');
 
 function closeMobileMenu() {
   mobileMenu.classList.remove('open');
-  iconOpen.classList.remove('hidden');
-  iconClose.classList.add('hidden');
+  iconOpen.style.display  = '';
+  iconClose.style.display = 'none';
   menuToggle.setAttribute('aria-expanded', 'false');
 }
 
 menuToggle.addEventListener('click', () => {
   const isOpen = mobileMenu.classList.toggle('open');
-  iconOpen.classList.toggle('hidden', isOpen);
-  iconClose.classList.toggle('hidden', !isOpen);
+  iconOpen.style.display  = isOpen ? 'none'  : '';
+  iconClose.style.display = isOpen ? 'block' : 'none';
   menuToggle.setAttribute('aria-expanded', String(isOpen));
 });
 

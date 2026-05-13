@@ -43,6 +43,13 @@ $paginacion    = $resultado          ?? [];
       <?php endforeach; ?>
     </select>
     <button type="submit" style="padding:8px 16px;background:#374151;color:#fff;border:none;border-radius:8px;font-size:.875rem;cursor:pointer">Filtrar</button>
+    <?php $hayFiltros = !empty($filtros['buscar']) || !empty($filtros['plan_id']) || !empty($filtros['estado']); ?>
+    <?php if ($hayFiltros): ?>
+    <a href="<?= BASE_URL ?>suscripcion/index"
+       style="padding:8px 14px;background:#FEE2E2;color:#991B1B;border-radius:8px;font-size:.875rem;font-weight:600;text-decoration:none;white-space:nowrap">
+      ✕ Limpiar filtros
+    </a>
+    <?php endif; ?>
   </form>
   <a href="<?= BASE_URL ?>suscripcion/configurar"
      style="padding:9px 16px;background:var(--color-primary);color:#fff;border-radius:8px;text-decoration:none;font-weight:600;font-size:.875rem">
