@@ -525,6 +525,11 @@ function previewGaleriaDir(input) {
 (function() {
   var canvas = document.getElementById('firmaDirectaCanvas');
   if (!canvas) return;
+  // Sincronizar tamaño interno con el tamaño real renderizado
+  // (sin esto el canvas.width por defecto es 300px aunque se muestre más ancho,
+  //  lo que hace que el check de "vacío" falle y la firma no se envíe)
+  canvas.width  = canvas.offsetWidth  || 300;
+  canvas.height = canvas.offsetHeight || 130;
   var ctx    = canvas.getContext('2d');
   var dibujando = false;
 
