@@ -34,9 +34,10 @@ if (isset($ticket)) {
     if ($ticketMetodo) $waTexto .= "💳 Pago: {$ticketMetodo}\n";
 }
 $waTexto .= "━━━━━━━━━━━━━━━━━━━\n¡Gracias por tu visita! 🙏";
-$visitaQr = $visita['qr_code'] ?? '';
-$qrImgUrl = $visitaQr
-    ? 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' . urlencode($visitaQr)
+$visitaQr  = $visita['qr_code'] ?? '';
+$scanUrl   = $visitaQr ? BASE_URL . 'menu/scanPortero?qr=' . urlencode($visitaQr) : '';
+$qrImgUrl  = $scanUrl
+    ? 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' . urlencode($scanUrl)
     : '';
 ?>
 <!DOCTYPE html>
@@ -240,23 +241,6 @@ $qrImgUrl = $visitaQr
   <div id="ticket-ajax-result"></div>
   <?php endif; ?>
 
-  <!-- ── QR para portero ───────────────────────────────── -->
-  <?php if ($ticketPagado && $qrImgUrl): ?>
-  <div style="text-align:center;background:#F0FDF4;border:1.5px solid #86EFAC;border-radius:14px;
-              padding:20px;margin-bottom:10px">
-    <div style="font-size:.75rem;font-weight:700;color:#166534;text-transform:uppercase;
-                letter-spacing:.05em;margin-bottom:10px">🔍 Muestra este QR al portero</div>
-    <img src="<?= htmlspecialchars($qrImgUrl) ?>" alt="QR Portero"
-         style="width:180px;height:180px;display:block;margin:0 auto;border-radius:8px">
-    <div style="font-size:.72rem;color:#9CA3AF;margin-top:8px;margin-bottom:12px">Escaneo válido para verificar salida</div>
-    <a href="<?= htmlspecialchars($qrImgUrl) ?>" target="_blank" rel="noopener"
-       style="display:inline-block;padding:8px 18px;background:#DCFCE7;color:#166534;
-              border-radius:8px;font-size:.78rem;font-weight:700;text-decoration:none">
-      ⬇️ Guardar QR
-    </a>
-  </div>
-  <?php endif; ?>
-
   <!-- ── WhatsApp ─────────────────────────────────────── -->
   <?php if (isset($ticket)): ?>
   <a id="btn-whatsapp"
@@ -367,7 +351,8 @@ function actualizarBtnPagar(ticketEstado, qrCode) {
     }
     // Inyectar QR dinámicamente si no existe aún
     if (qrCode && !document.getElementById('qr-portero-section')) {
-      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(qrCode)}`;
+      const scanUrl = `${BASE_URL}menu/scanPortero?qr=${encodeURIComponent(qrCode)}`;
+      const qrUrl   = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(scanUrl)}`;
       const qrDiv = document.createElement('div');
       qrDiv.id = 'qr-portero-section';
       qrDiv.style.cssText = 'text-align:center;background:#F0FDF4;border:1.5px solid #86EFAC;border-radius:14px;padding:20px;margin-bottom:10px';

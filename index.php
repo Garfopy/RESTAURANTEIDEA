@@ -199,6 +199,9 @@ $publicPaths = [
     'menu/paypalCrear',
     'menu/paypalRetorno',
     'menu/paypalCancelar',
+    // Verificación pública de salida (QR del portero)
+    'menu/scanPortero',
+    'menu/registrarSalidaPublica',
     // Acceso staff (login por slug de restaurante)
     'acceso/index',
     'acceso/login',

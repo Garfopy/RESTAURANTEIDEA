@@ -506,4 +506,55 @@ class RestPublicoController extends BaseController
         ]);
         exit;
     }
+
+    // GET /menu/scanPortero?qr={token}  — página pública de verificación de salida
+    public function scanPortero(?string $p = null): void
+    {
+        $qr     = trim($this->get('qr', ''));
+        $visita = $qr ? $this->visitaModel->getByQr($qr) : null;
+
+        if (!$visita) {
+            http_response_code(404);
+            $this->render('publico/portero/scan_error');
+            exit;
+        }
+
+        $restaurante = $this->restModel->find((int)$visita['restaurante_id']);
+        $pageTitle   = 'Verificar salida';
+        $this->render('publico/portero/scan', compact('visita', 'restaurante', 'qr', 'pageTitle'));
+    }
+
+    // POST /menu/registrarSalidaPublica  — AJAX; seguro por token de alta entropía
+    public function registrarSalidaPublica(?string $p = null): void
+    {
+        header('Content-Type: application/json');
+        $qr     = trim($this->post('qr', ''));
+        $visita = $qr ? $this->visitaModel->getByQr($qr) : null;
+
+        if (!$visita) {
+            http_response_code(404);
+            echo json_encode(['ok' => false, 'mensaje' => 'QR no válido.']);
+            exit;
+        }
+
+        if ($visita['estado'] !== 'pagada') {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'mensaje' => 'La cuenta no está pagada.']);
+            exit;
+        }
+
+        if (!empty($visita['salida_at'])) {
+            echo json_encode(['ok' => false, 'ya_salio' => true, 'mensaje' => 'Salida ya registrada.']);
+            exit;
+        }
+
+        $this->visitaModel->marcarSalida((int)$visita['id']);
+
+        if (!empty($visita['mesa_id'])) {
+            $this->mesaModel->cambiarEstado((int)$visita['mesa_id'], 'disponible');
+        }
+
+        echo json_encode(['ok' => true, 'mensaje' => '¡Salida registrada! Mesa liberada.']);
+        exit;
+    }
 }
