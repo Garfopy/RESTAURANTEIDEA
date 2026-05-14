@@ -15,11 +15,27 @@ class RestMeseroController extends BaseController
     public function dashboard(?string $p = null): void
     {
         $restauranteId = $this->restauranteId();
-        $restaurante   = (new RestauranteModel())->find($restauranteId);
-        $mesas         = (new RestMesaModel())->getByRestaurante($restauranteId, true);
-        $listos        = $this->model->listar($restauranteId, 1, 'listo')['data'] ?? [];
-        $flash         = $this->getFlash();
-        $pageTitle     = 'Mesero';
+        if (!$restauranteId) {
+            $this->redirect('acceso/login');
+            return;
+        }
+
+        $restaurante = (new RestauranteModel())->find($restauranteId);
+
+        // Query directa sin JOIN rest_zonas (puede no existir en producción)
+        $db   = Database::getInstance();
+        $stmt = $db->prepare(
+            "SELECT id, nombre, capacidad, estado
+             FROM rest_mesas
+             WHERE restaurante_id = ? AND activo = 1
+             ORDER BY nombre ASC"
+        );
+        $stmt->execute([$restauranteId]);
+        $mesas = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $listos    = $this->model->listar($restauranteId, 1, 'listo')['data'] ?? [];
+        $flash     = $this->getFlash();
+        $pageTitle = 'Mesero';
         $this->render('mesero/dashboard', compact('restaurante','mesas','listos','flash','pageTitle'));
     }
 

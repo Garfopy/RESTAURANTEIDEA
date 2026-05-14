@@ -363,12 +363,20 @@ function actualizarBtnPagar(ticketEstado, qrCode) {
 function actualizarUI(data) {
   if (!data.ok) return;
 
-  // Estado global (el más atrasado de todos los pedidos activos)
+  // Estado global: el ítem activo más atrasado entre todos los pedidos activos
   let estadoGlobal = 'entregado';
   data.pedidos.forEach(p => {
     if (p.estado === 'cancelado') return;
-    const pi = PASOS.indexOf(p.estado), gi = PASOS.indexOf(estadoGlobal);
-    if (pi < gi) estadoGlobal = p.estado;
+    const itemsActivos = (p.items || []).filter(it => it.estado !== 'cancelado');
+    if (itemsActivos.length) {
+      itemsActivos.forEach(it => {
+        const ii = PASOS.indexOf(it.estado), gi = PASOS.indexOf(estadoGlobal);
+        if (ii >= 0 && ii < gi) estadoGlobal = it.estado;
+      });
+    } else {
+      const pi = PASOS.indexOf(p.estado), gi = PASOS.indexOf(estadoGlobal);
+      if (pi >= 0 && pi < gi) estadoGlobal = p.estado;
+    }
   });
 
   actualizarBarra(estadoGlobal);

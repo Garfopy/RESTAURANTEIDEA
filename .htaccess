@@ -29,7 +29,8 @@ RewriteBase /carnihub/
       *.gstatic.com \
       maps.gstatic.com \
       *.openstreetmap.org \
-      *.tile.openstreetmap.org; \
+      *.tile.openstreetmap.org \
+      api.qrserver.com; \
     connect-src 'self' \
       *.googleapis.com \
       *.gstatic.com \
