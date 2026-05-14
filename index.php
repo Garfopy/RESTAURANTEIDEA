@@ -37,7 +37,7 @@ $param    = $segments[2] ?? null;
 // Convención esperada por los controllers: param = "slug" o "slug/visitaId" (concat de segmentos restantes)
 if (in_array($ctrlSlug, ['menu', 'acceso'], true)) {
     $knownActions = ['index','ordenar','pagar','confirmarPago','confirmacion','login',
-                     'llamarMesero','cancelarPedido','estadoPedido','actualizarPropina',
+                     'llamarMesero','cancelarPedido','estadoPedido','actualizarPropina','generarTicket',
                      'paypalCrear','paypalRetorno','paypalCancelar','entrarComensal'];
     if ($action !== '' && in_array($action, $knownActions, true)) {
         // Forma /menu/{accion}/{slug}/{...} — concatenar segmentos a partir del 2

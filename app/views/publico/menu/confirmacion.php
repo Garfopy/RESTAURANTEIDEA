@@ -34,6 +34,10 @@ if (isset($ticket)) {
     if ($ticketMetodo) $waTexto .= "💳 Pago: {$ticketMetodo}\n";
 }
 $waTexto .= "━━━━━━━━━━━━━━━━━━━\n¡Gracias por tu visita! 🙏";
+$visitaQr = $visita['qr_code'] ?? '';
+$qrImgUrl = $visitaQr
+    ? 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' . urlencode($visitaQr)
+    : '';
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -154,12 +158,10 @@ $waTexto .= "━━━━━━━━━━━━━━━━━━━\n¡Gracia
     <?php endforeach; ?>
   </div>
 
-  <!-- Acciones -->
+  <!-- ── Acciones ──────────────────────────────────────── -->
   <div id="accion-pagar" style="margin-bottom:10px">
     <?php if ($ticketPagado): ?>
-    <div class="link-btn" style="background:#D1FAE5;color:#065F46;cursor:default">
-      ✅ Cuenta pagada
-    </div>
+    <div class="link-btn" style="background:#D1FAE5;color:#065F46;cursor:default">✅ Cuenta pagada</div>
     <?php else: ?>
     <a href="<?= BASE_URL ?>menu/<?= htmlspecialchars($slug) ?>/pagar/<?= $visitaId ?>"
        id="btn-pagar" class="link-btn pulse-green" style="background:var(--cp);color:#fff">
@@ -168,7 +170,69 @@ $waTexto .= "━━━━━━━━━━━━━━━━━━━\n¡Gracia
     <?php endif; ?>
   </div>
 
-  <!-- Botón WhatsApp -->
+  <!-- ── Resumen del ticket ────────────────────────────── -->
+  <?php if (isset($ticket)): ?>
+  <?php
+    $cardBg     = $ticketPagado ? '#DCFCE7' : '#FFFBEB';
+    $cardBorder = $ticketPagado ? '#86EFAC' : '#FCD34D';
+    $totalColor = $ticketPagado ? '#166534' : '#92400E';
+  ?>
+  <div id="ticket-summary"
+       style="background:<?= $cardBg ?>;border:1.5px solid <?= $cardBorder ?>;border-radius:14px;padding:16px;margin-bottom:10px">
+    <div style="font-size:.72rem;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;display:flex;align-items:center;gap:8px">
+      🧾 Ticket <?= htmlspecialchars($ticketFolio) ?>
+      <?php if ($ticketMetodo): ?>
+      <span style="background:#E5E7EB;padding:2px 8px;border-radius:10px;font-size:.68rem;font-weight:600"><?= htmlspecialchars(ucfirst($ticketMetodo)) ?></span>
+      <?php endif; ?>
+    </div>
+    <div style="font-size:.85rem">
+      <?php foreach ($pedidos as $p): foreach ($p['items'] ?? [] as $it): if (($it['estado'] ?? '') === 'cancelado') continue; ?>
+      <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(0,0,0,.06)">
+        <span><?= (int)$it['cantidad'] ?>× <?= htmlspecialchars($it['platillo_nombre'] ?? $it['nombre'] ?? '') ?></span>
+        <?php if (!empty($it['subtotal'])): ?><span>$<?= number_format((float)$it['subtotal'],2) ?></span><?php endif; ?>
+      </div>
+      <?php endforeach; endforeach; ?>
+    </div>
+    <div style="margin-top:10px;padding-top:8px;border-top:2px solid rgba(0,0,0,.08)">
+      <div style="display:flex;justify-content:space-between;font-size:.85rem;color:#6B7280;margin-bottom:4px">
+        <span>Subtotal</span><span>$<?= $ticketSubt ?></span>
+      </div>
+      <?php if ((float)($ticket['propina'] ?? 0) > 0): ?>
+      <div style="display:flex;justify-content:space-between;font-size:.85rem;color:#10B981;margin-bottom:4px">
+        <span>Propina</span><span>$<?= $ticketProp ?></span>
+      </div>
+      <?php endif; ?>
+      <div style="display:flex;justify-content:space-between;font-size:1.05rem;font-weight:800;color:<?= $totalColor ?>">
+        <span>Total</span><span>$<?= $ticketTotal ?></span>
+      </div>
+    </div>
+  </div>
+
+  <?php else: ?>
+  <!-- Sin ticket: botón generar + placeholder AJAX -->
+  <button id="btn-generar-ticket" onclick="generarTicket()"
+      style="display:flex;align-items:center;justify-content:center;gap:8px;padding:14px;
+             border-radius:12px;font-weight:700;font-size:.9rem;cursor:pointer;width:100%;
+             background:#F9FAFB;color:#374151;border:1.5px dashed #D1D5DB;margin-bottom:10px">
+    📋 Ver resumen y generar ticket
+  </button>
+  <div id="ticket-ajax-result"></div>
+  <?php endif; ?>
+
+  <!-- ── QR para portero ───────────────────────────────── -->
+  <?php if ($ticketPagado && $qrImgUrl): ?>
+  <div style="text-align:center;background:#F0FDF4;border:1.5px solid #86EFAC;border-radius:14px;
+              padding:20px;margin-bottom:10px">
+    <div style="font-size:.75rem;font-weight:700;color:#166534;text-transform:uppercase;
+                letter-spacing:.05em;margin-bottom:10px">🔍 Muestra este QR al portero</div>
+    <img src="<?= htmlspecialchars($qrImgUrl) ?>" alt="QR Portero"
+         style="width:180px;height:180px;display:block;margin:0 auto;border-radius:8px">
+    <div style="font-size:.72rem;color:#9CA3AF;margin-top:8px">Escaneo válido para verificar salida</div>
+  </div>
+  <?php endif; ?>
+
+  <!-- ── WhatsApp ─────────────────────────────────────── -->
+  <?php if (isset($ticket)): ?>
   <a id="btn-whatsapp"
      href="https://wa.me/?text=<?= rawurlencode($waTexto) ?>"
      target="_blank" rel="noopener"
@@ -176,13 +240,18 @@ $waTexto .= "━━━━━━━━━━━━━━━━━━━\n¡Gracia
     <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20.52 3.48A11.95 11.95 0 0012.02 0C5.4 0 .02 5.37.02 12a11.94 11.94 0 001.63 6.06L0 24l6.13-1.61A12.04 12.04 0 0012.02 24c6.62 0 11.98-5.37 11.98-12 0-3.2-1.25-6.21-3.48-8.52zM12.02 22a9.96 9.96 0 01-5.08-1.39l-.36-.22-3.74.98 1-3.65-.24-.38A9.96 9.96 0 012.02 12c0-5.52 4.49-10 10-10a9.98 9.98 0 017.07 2.93A9.93 9.93 0 0122.02 12c0 5.52-4.49 10-10 10zm5.48-7.54c-.3-.15-1.76-.87-2.03-.97-.28-.1-.48-.15-.68.15s-.78.97-.96 1.17c-.18.2-.35.22-.65.07-.3-.15-1.26-.47-2.4-1.49-.89-.8-1.49-1.78-1.66-2.08-.17-.3-.02-.46.13-.6.13-.13.3-.34.45-.51.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.07-.15-.67-1.62-.92-2.22-.24-.58-.49-.5-.68-.51h-.58c-.2 0-.52.07-.79.37s-1.04 1.02-1.04 2.48 1.06 2.88 1.21 3.08c.15.2 2.1 3.2 5.08 4.49.71.31 1.26.49 1.69.63.71.22 1.36.19 1.87.12.57-.08 1.76-.72 2.01-1.42.25-.7.25-1.3.17-1.42-.07-.12-.27-.19-.57-.34z"/></svg>
     Compartir ticket por WhatsApp
   </a>
+  <?php else: ?>
+  <div id="wa-placeholder"></div>
+  <?php endif; ?>
 
+  <?php if (!$ticketPagado): ?>
   <a href="<?= BASE_URL ?>menu/<?= htmlspecialchars($slug) ?>"
-     class="link-btn" style="background:#F3F4F6;color:#374151">
+     class="link-btn" style="background:#F3F4F6;color:#374151;margin-bottom:10px">
     ← Agregar más items
   </a>
+  <?php endif; ?>
 
-  <div style="margin-top:24px;font-size:.7rem;color:#9CA3AF;text-align:center">
+  <div style="margin-top:16px;font-size:.7rem;color:#9CA3AF;text-align:center">
     Potenciado por <strong>CarniHub</strong>
   </div>
 </div>
@@ -374,6 +443,121 @@ function cancelarPedido(pedidoId) {
       }
     })
     .catch(() => { if (btn) btn.disabled = false; });
+}
+
+// ── Generar ticket vía AJAX ────────────────────────────
+const REST_NOMBRE = '<?= addslashes($restaurante['nombre'] ?? '') ?>';
+const MESA_NOMBRE = '<?= addslashes($mesaNombre) ?>';
+const QR_CODE     = '<?= addslashes($visitaQr) ?>';
+const WA_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20.52 3.48A11.95 11.95 0 0012.02 0C5.4 0 .02 5.37.02 12a11.94 11.94 0 001.63 6.06L0 24l6.13-1.61A12.04 12.04 0 0012.02 24c6.62 0 11.98-5.37 11.98-12 0-3.2-1.25-6.21-3.48-8.52zM12.02 22a9.96 9.96 0 01-5.08-1.39l-.36-.22-3.74.98 1-3.65-.24-.38A9.96 9.96 0 012.02 12c0-5.52 4.49-10 10-10a9.98 9.98 0 017.07 2.93A9.93 9.93 0 0122.02 12c0 5.52-4.49 10-10 10zm5.48-7.54c-.3-.15-1.76-.87-2.03-.97-.28-.1-.48-.15-.68.15s-.78.97-.96 1.17c-.18.2-.35.22-.65.07-.3-.15-1.26-.47-2.4-1.49-.89-.8-1.49-1.78-1.66-2.08-.17-.3-.02-.46.13-.6.13-.13.3-.34.45-.51.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.07-.15-.67-1.62-.92-2.22-.24-.58-.49-.5-.68-.51h-.58c-.2 0-.52.07-.79.37s-1.04 1.02-1.04 2.48 1.06 2.88 1.21 3.08c.15.2 2.1 3.2 5.08 4.49.71.31 1.26.49 1.69.63.71.22 1.36.19 1.87.12.57-.08 1.76-.72 2.01-1.42.25-.7.25-1.3.17-1.42-.07-.12-.27-.19-.57-.34z"/></svg>`;
+
+function generarTicket() {
+  const btn = document.getElementById('btn-generar-ticket');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Generando...'; }
+
+  fetch(`<?= BASE_URL ?>menu/${SLUG}/generarTicket/${VISITA}`, { method: 'POST' })
+    .then(r => r.json())
+    .then(d => {
+      if (!d.ok) {
+        if (btn) { btn.disabled = false; btn.textContent = '📋 Ver resumen y generar ticket'; }
+        showToast('⚠️ ' + (d.error || 'No se pudo generar el ticket'));
+        return;
+      }
+
+      const fmt = v => '$' + parseFloat(v).toFixed(2);
+
+      // Items HTML
+      const itemsHtml = (d.items || []).map(it =>
+        `<div style="display:flex;justify-content:space-between;padding:4px 0;
+                     border-bottom:1px solid rgba(0,0,0,.06);font-size:.85rem">
+          <span>${it.cantidad}× ${it.nombre}</span>
+          <span>${fmt(it.subtotal)}</span>
+        </div>`
+      ).join('');
+
+      // WhatsApp text
+      const lineas = (d.items || []).map(it => `  • ${it.cantidad}x ${it.nombre} ${fmt(it.subtotal)}`);
+      const waLines = [
+        `🍽️ *${REST_NOMBRE}*`,
+        d.folio     ? `📋 Folio: ${d.folio}`   : '',
+        MESA_NOMBRE ? `🪑 Mesa: ${MESA_NOMBRE}` : '',
+        '━━━━━━━━━━━━━━━━━━━',
+        lineas.join('\n'),
+        '━━━━━━━━━━━━━━━━━━━',
+        `Subtotal: ${fmt(d.subtotal)}`,
+        parseFloat(d.propina) > 0 ? `Propina:  ${fmt(d.propina)}` : '',
+        `*Total: ${fmt(d.total)}*`,
+        '━━━━━━━━━━━━━━━━━━━',
+        '¡Gracias por tu visita! 🙏',
+      ].filter(Boolean).join('\n');
+      const waUrl = 'https://wa.me/?text=' + encodeURIComponent(waLines);
+
+      // QR section
+      const qrCode = d.qr_code || QR_CODE;
+      const qrHtml = qrCode
+        ? `<div style="text-align:center;background:#F9FAFB;border:1.5px solid #E5E7EB;
+                        border-radius:14px;padding:20px;margin-bottom:10px">
+             <div style="font-size:.75rem;font-weight:700;color:#374151;text-transform:uppercase;
+                         letter-spacing:.05em;margin-bottom:10px">QR de visita</div>
+             <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(qrCode)}"
+                  style="width:180px;height:180px;display:block;margin:0 auto;border-radius:8px"
+                  alt="QR Portero">
+             <div style="font-size:.72rem;color:#9CA3AF;margin-top:8px">
+               El portero verificará el estado al escanear
+             </div>
+           </div>`
+        : '';
+
+      // WhatsApp button
+      const waHtml = `<a href="${waUrl}" target="_blank" rel="noopener"
+          class="link-btn" style="background:#25D366;color:#fff;margin-bottom:10px;
+                 display:flex;align-items:center;justify-content:center;gap:8px">
+          ${WA_SVG} Compartir ticket por WhatsApp
+        </a>`;
+
+      // Propina row
+      const propHtml = parseFloat(d.propina) > 0
+        ? `<div style="display:flex;justify-content:space-between;font-size:.85rem;color:#10B981;margin-bottom:4px">
+             <span>Propina</span><span>${fmt(d.propina)}</span></div>` : '';
+
+      const result = document.getElementById('ticket-ajax-result');
+      if (result) {
+        result.innerHTML = `
+          <div style="background:#FFFBEB;border:1.5px solid #FCD34D;border-radius:14px;
+                      padding:16px;margin-bottom:10px">
+            <div style="font-size:.72rem;font-weight:700;color:#9CA3AF;text-transform:uppercase;
+                        letter-spacing:.06em;margin-bottom:10px">🧾 Ticket ${d.folio}</div>
+            <div>${itemsHtml}</div>
+            <div style="margin-top:10px;padding-top:8px;border-top:2px solid rgba(0,0,0,.08)">
+              <div style="display:flex;justify-content:space-between;font-size:.85rem;
+                          color:#6B7280;margin-bottom:4px">
+                <span>Subtotal</span><span>${fmt(d.subtotal)}</span>
+              </div>
+              ${propHtml}
+              <div style="display:flex;justify-content:space-between;
+                          font-size:1.05rem;font-weight:800;color:#92400E">
+                <span>Total</span><span>${fmt(d.total)}</span>
+              </div>
+            </div>
+          </div>
+          ${qrHtml}
+          ${waHtml}`;
+      }
+
+      // Reemplazar placeholder WhatsApp si existe
+      const waPlaceholder = document.getElementById('wa-placeholder');
+      if (waPlaceholder) {
+        const tmp = document.createElement('div');
+        tmp.innerHTML = waHtml;
+        waPlaceholder.replaceWith(tmp.firstElementChild);
+      }
+
+      if (btn) btn.style.display = 'none';
+      showToast('✅ Ticket generado');
+    })
+    .catch(() => {
+      if (btn) { btn.disabled = false; btn.textContent = '📋 Ver resumen y generar ticket'; }
+    });
 }
 </script>
 </body>

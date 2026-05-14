@@ -155,6 +155,59 @@ class RestPublicoController extends BaseController
         $this->render('publico/menu/confirmacion', compact('restaurante','visita','pedidos','ticket','pageTitle'));
     }
 
+    // POST /menu/{slug}/generarTicket/{visitaId} — consolida ticket sin pagar, devuelve JSON
+    public function generarTicket(?string $slug = null): void
+    {
+        $parts       = explode('/', $slug ?? '');
+        $realSlug    = $parts[0] ?? '';
+        $visitaId    = (int)($parts[1] ?? 0);
+        $restaurante = $this->restModel->getBySlug($realSlug);
+        $visita      = $this->visitaModel->find($visitaId);
+
+        if (!$restaurante || !$visita
+            || (int)$visita['restaurante_id'] !== (int)$restaurante['id']) {
+            $this->json(['ok' => false, 'error' => 'Visita no válida']);
+            return;
+        }
+
+        $ticket = $this->ticketModel->getByVisita($visitaId);
+        if (!$ticket) {
+            $ticketId = $this->ticketModel->consolidar($visitaId, 0);
+            $ticket   = $this->ticketModel->find($ticketId);
+        }
+
+        if (!$ticket) {
+            $this->json(['ok' => false, 'error' => 'No hay pedidos para generar ticket']);
+            return;
+        }
+
+        $pedidos = $this->pedidoModel->getByVisita($visitaId);
+        $items   = [];
+        foreach ($pedidos as $p) {
+            $det = $this->pedidoModel->getConItems((int)$p['id']);
+            foreach ($det['items'] ?? [] as $it) {
+                if ($it['estado'] !== 'cancelado') {
+                    $items[] = [
+                        'nombre'   => $it['platillo_nombre'] ?? $it['nombre'] ?? '',
+                        'cantidad' => (int)$it['cantidad'],
+                        'subtotal' => (float)($it['subtotal'] ?? 0),
+                    ];
+                }
+            }
+        }
+
+        $this->json([
+            'ok'       => true,
+            'folio'    => $ticket['folio']    ?? '',
+            'subtotal' => (float)($ticket['subtotal'] ?? 0),
+            'propina'  => (float)($ticket['propina']  ?? 0),
+            'total'    => (float)($ticket['total']    ?? 0),
+            'estado'   => $ticket['estado']   ?? '',
+            'items'    => $items,
+            'qr_code'  => $visita['qr_code']  ?? '',
+        ]);
+    }
+
     public function pagar(?string $slug = null): void
     {
         $parts       = explode('/', $slug ?? '');
