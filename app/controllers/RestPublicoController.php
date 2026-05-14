@@ -467,6 +467,7 @@ class RestPublicoController extends BaseController
 
         $ticketRow     = $this->ticketModel->getByVisita($visitaId);
         $ticketEstado  = $ticketRow['estado'] ?? null;
+        $visitaRow     = $this->visitaModel->find($visitaId);
 
         echo json_encode([
             'ok'            => true,
@@ -475,6 +476,7 @@ class RestPublicoController extends BaseController
             'ticket_estado' => $ticketEstado,
             'ticket_total'  => $ticketRow ? (float)$ticketRow['total']   : 0,
             'ticket_propina'=> $ticketRow ? (float)$ticketRow['propina'] : 0,
+            'qr_code'       => $visitaRow['qr_code'] ?? '',
         ]);
         exit;
     }

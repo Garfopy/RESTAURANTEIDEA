@@ -210,11 +210,11 @@ $qrImgUrl = $visitaQr
 
   <?php else: ?>
   <!-- Sin ticket: botón generar + placeholder AJAX -->
-  <button id="btn-generar-ticket" onclick="generarTicket()"
+  <button id="btn-generar-ticket" class="link-btn-cerrar" onclick="generarTicket()"
       style="display:flex;align-items:center;justify-content:center;gap:8px;padding:14px;
              border-radius:12px;font-weight:700;font-size:.9rem;cursor:pointer;width:100%;
-             background:#F9FAFB;color:#374151;border:1.5px dashed #D1D5DB;margin-bottom:10px">
-    📋 Ver resumen y generar ticket
+             background:#1F2937;color:#fff;border:none;margin-bottom:10px">
+    🧾 Cerrar cuenta
   </button>
   <div id="ticket-ajax-result"></div>
   <?php endif; ?>
@@ -227,7 +227,12 @@ $qrImgUrl = $visitaQr
                 letter-spacing:.05em;margin-bottom:10px">🔍 Muestra este QR al portero</div>
     <img src="<?= htmlspecialchars($qrImgUrl) ?>" alt="QR Portero"
          style="width:180px;height:180px;display:block;margin:0 auto;border-radius:8px">
-    <div style="font-size:.72rem;color:#9CA3AF;margin-top:8px">Escaneo válido para verificar salida</div>
+    <div style="font-size:.72rem;color:#9CA3AF;margin-top:8px;margin-bottom:12px">Escaneo válido para verificar salida</div>
+    <a href="<?= htmlspecialchars($qrImgUrl) ?>" target="_blank" rel="noopener"
+       style="display:inline-block;padding:8px 18px;background:#DCFCE7;color:#166534;
+              border-radius:8px;font-size:.78rem;font-weight:700;text-decoration:none">
+      ⬇️ Guardar QR
+    </a>
   </div>
   <?php endif; ?>
 
@@ -246,7 +251,7 @@ $qrImgUrl = $visitaQr
 
   <?php if (!$ticketPagado): ?>
   <a href="<?= BASE_URL ?>menu/<?= htmlspecialchars($slug) ?>"
-     class="link-btn" style="background:#F3F4F6;color:#374151;margin-bottom:10px">
+     class="link-btn link-btn-mas" style="background:#F3F4F6;color:#374151;margin-bottom:10px">
     ← Agregar más items
   </a>
   <?php endif; ?>
@@ -323,13 +328,15 @@ function actualizarBarra(estadoGlobal) {
 }
 
 // ── Actualizar botón pagar ─────────────────────────
-function actualizarBtnPagar(ticketEstado) {
+function actualizarBtnPagar(ticketEstado, qrCode) {
   const wrap = document.getElementById('accion-pagar');
   if (!wrap) return;
   if (ticketEstado === 'pagado' && !cuentaPagada) {
     cuentaPagada = true;
     wrap.innerHTML = '<div class="link-btn" style="background:#D1FAE5;color:#065F46;cursor:default">✅ Cuenta pagada</div>';
-    // Mostrar banner si no está visible
+    // Ocultar botones de flujo
+    document.querySelectorAll('.link-btn-cerrar,.link-btn-mas').forEach(el => el.style.display = 'none');
+    // Banner si no está visible
     if (!document.getElementById('banner-pagado')) {
       const banner = document.createElement('div');
       banner.id = 'banner-pagado';
@@ -337,20 +344,18 @@ function actualizarBtnPagar(ticketEstado) {
       banner.style.cssText = 'background:#DCFCE7;border:1.5px solid #86EFAC;border-radius:14px;padding:20px;text-align:center;margin-bottom:20px';
       document.querySelector('.card').prepend(banner);
     }
-  }
-}
-
-// ── Actualizar WhatsApp link con total ─────────────
-function actualizarWhatsApp(data) {
-  if (!data.ticket_total || data.ticket_total <= 0) return;
-  const btn = document.getElementById('btn-whatsapp');
-  if (!btn) return;
-  // Reconstruir solo totales si hay ticket
-  const url = btn.href;
-  const decoded = decodeURIComponent(url.replace('https://wa.me/?text=', ''));
-  // Reemplazar totales si línea de total cambia
-  if (data.ticket_estado === 'pagado') {
-    // ya tiene datos del servidor
+    // Inyectar QR dinámicamente si no existe aún
+    if (qrCode && !document.getElementById('qr-portero-section')) {
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(qrCode)}`;
+      const qrDiv = document.createElement('div');
+      qrDiv.id = 'qr-portero-section';
+      qrDiv.style.cssText = 'text-align:center;background:#F0FDF4;border:1.5px solid #86EFAC;border-radius:14px;padding:20px;margin-bottom:10px';
+      qrDiv.innerHTML = `<div style="font-size:.75rem;font-weight:700;color:#166534;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">🔍 Muestra este QR al portero</div>
+        <img src="${qrUrl}" style="width:200px;height:200px;display:block;margin:0 auto;border-radius:8px" alt="QR Portero">
+        <div style="font-size:.72rem;color:#9CA3AF;margin-top:8px;margin-bottom:12px">Escaneo válido para verificar salida</div>
+        <a href="${qrUrl}" target="_blank" rel="noopener" style="display:inline-block;padding:8px 18px;background:#DCFCE7;color:#166534;border-radius:8px;font-size:.78rem;font-weight:700;text-decoration:none">⬇️ Guardar QR</a>`;
+      wrap.after(qrDiv);
+    }
   }
 }
 
@@ -377,7 +382,7 @@ function actualizarUI(data) {
   }
 
   // Botón pagar
-  actualizarBtnPagar(data.ticket_estado);
+  actualizarBtnPagar(data.ticket_estado, data.qr_code || '');
 
   // Detectar cambios de estado en ítems
   let hayListos = false;
@@ -494,17 +499,23 @@ function generarTicket() {
 
       // QR section
       const qrCode = d.qr_code || QR_CODE;
+      const qrUrl  = qrCode ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(qrCode)}` : '';
       const qrHtml = qrCode
-        ? `<div style="text-align:center;background:#F9FAFB;border:1.5px solid #E5E7EB;
+        ? `<div style="text-align:center;background:#F0FDF4;border:1.5px solid #86EFAC;
                         border-radius:14px;padding:20px;margin-bottom:10px">
-             <div style="font-size:.75rem;font-weight:700;color:#374151;text-transform:uppercase;
-                         letter-spacing:.05em;margin-bottom:10px">QR de visita</div>
-             <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(qrCode)}"
-                  style="width:180px;height:180px;display:block;margin:0 auto;border-radius:8px"
+             <div style="font-size:.75rem;font-weight:700;color:#166534;text-transform:uppercase;
+                         letter-spacing:.05em;margin-bottom:10px">🔍 Muestra este QR al portero</div>
+             <img src="${qrUrl}"
+                  style="width:200px;height:200px;display:block;margin:0 auto;border-radius:8px"
                   alt="QR Portero">
-             <div style="font-size:.72rem;color:#9CA3AF;margin-top:8px">
+             <div style="font-size:.72rem;color:#9CA3AF;margin-top:8px;margin-bottom:12px">
                El portero verificará el estado al escanear
              </div>
+             <a href="${qrUrl}" target="_blank" rel="noopener"
+                style="display:inline-block;padding:8px 18px;background:#DCFCE7;color:#166534;
+                       border-radius:8px;font-size:.78rem;font-weight:700;text-decoration:none">
+               ⬇️ Guardar QR
+             </a>
            </div>`
         : '';
 
@@ -544,19 +555,12 @@ function generarTicket() {
           ${waHtml}`;
       }
 
-      // Reemplazar placeholder WhatsApp si existe
-      const waPlaceholder = document.getElementById('wa-placeholder');
-      if (waPlaceholder) {
-        const tmp = document.createElement('div');
-        tmp.innerHTML = waHtml;
-        waPlaceholder.replaceWith(tmp.firstElementChild);
-      }
-
       if (btn) btn.style.display = 'none';
-      showToast('✅ Ticket generado');
+      document.querySelectorAll('.link-btn-mas').forEach(el => el.style.display = 'none');
+      showToast('✅ ¡Cuenta cerrada — listo para pagar!');
     })
     .catch(() => {
-      if (btn) { btn.disabled = false; btn.textContent = '📋 Ver resumen y generar ticket'; }
+      if (btn) { btn.disabled = false; btn.textContent = '🧾 Cerrar cuenta'; }
     });
 }
 </script>
