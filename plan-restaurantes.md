@@ -1,6 +1,6 @@
-# Plan & Checklist — Módulo Restaurantes CarniHub v4.0
+# Plan & Checklist — Módulo Restaurantes CarniHub v4.3
 
-**Actualizado:** 2026-05-13 | **Branch:** `sprint-restaurantes`
+**Actualizado:** 2026-05-14 | **Branch:** `sprint-restaurantes`
 
 > Manual operativo + checklist + historial del módulo. Cualquier funcionalidad nueva se diseña primero aquí.
 
@@ -23,13 +23,35 @@
 
 | Actor | Rol DB | Portal | Cómo entra |
 |-------|--------|--------|-----------|
-| **Admin Restaurante** | `comprador` con `restaurante_activo=1` | `/restaurante/*` `/rest-*/` | Login normal CarniHub → "Ver mis locales" |
+| **Comprador CarniHub** | `comprador` con `restaurante_activo=1` | `/comprador/*` + sidebar "Mi Empresa" → `/restaurante/locales` | Login normal CarniHub |
+| **Admin Local** | `admin_local` (rol id 10) — `usuarios.restaurante_id = X` | `/restaurante/*` `/rest-*/` | Login `/acceso/{slug}` o login principal → restaurante/dashboard |
 | **Mesero** | `mesero` (rol id 7) | `/rest-mesero/*` | Login en portal staff branded `/acceso/{slug}` |
 | **Chef** | `chef` (rol id 8) | `/rest-chef/*` | Login en portal staff branded `/acceso/{slug}` |
 | **Portero** | `portero` (rol id 9) | `/rest-portero/*` | Login en portal staff branded `/acceso/{slug}` |
 | **Comensal** | NO USUARIO | `/menu/{slug}` | Escanea QR físico — sin login |
 
-**Regla de oro**: el comprador (admin) NO se mete en el flujo operativo diario; sólo configura, ve KPIs y crea staff. Mesero/Chef/Portero mueven mesas/platillos día a día.
+### Jerarquía de roles (v4.3)
+
+```
+COMPRADOR CARNIHUB
+  └── crea y posee los locales (rest_restaurantes)
+  └── puede acceder a todos los locales de su empresa
+  └── designa un Admin Local por local (en "Mi Empresa")
+
+ADMIN LOCAL (nuevo rol 10)
+  └── asignado a UN local específico (usuarios.restaurante_id = local.id)
+  └── accede al dashboard del restaurante con todos los permisos de operación
+  └── gestiona: inventario, menú, pedidos, mesas, finanzas, reservas, tickets
+  └── crea y gestiona su propio staff (mesero/chef/portero)
+  └── NO puede crear nuevos locales (eso es exclusivo del comprador)
+
+MESERO / CHEF / PORTERO
+  └── asignados a UN local (usuarios.restaurante_id)
+  └── acceden por /acceso/{slug}
+  └── solo su dashboard específico (KDS, mesas, portero)
+```
+
+**Regla de oro**: el comprador configura la empresa y designa admins. El Admin Local opera el día a día de su local. Staff (mesero/chef/portero) maneja la operación en piso.
 
 ---
 
@@ -92,7 +114,6 @@ Staff abre URL branded: /acceso/{slug-restaurante}
 
 ### 3.4 Operación COMPLETA del comensal (con mesa)
 
-```
 [1] Llegada
     Comensal entra → portero (opcional según toggle):
       A. portero_habilitado=1:
@@ -100,10 +121,13 @@ Staff abre URL branded: /acceso/{slug-restaurante}
          ├─ Click "Registrar entrada" → opcional nombre+teléfono
          ├─ POST /rest-portero/registrarEntrada
          │     ├─ Crea rest_visitas con qr_code = bin2hex(random_bytes(16))
+         │     ├─ estado='activa'
          │     └─ Devuelve qr_code
          └─ Portero imprime/muestra QR al comensal
+
       B. portero_habilitado=0:
          └─ Comensal va directo a su mesa, no se crea visita aún
+
 
 [2] Sentarse y ordenar
     Comensal escanea QR de mesa pegado en la mesa
@@ -111,69 +135,195 @@ Staff abre URL branded: /acceso/{slug-restaurante}
       ├─ RestPublicoController::index
       │     ├─ Busca rest_restaurantes WHERE slug=...
       │     ├─ Busca rest_mesas WHERE qr_codigo=... (si hay ?mesa=)
-      │     ├─ Lee cookie 'visita_{restId}' (4h TTL)
-      │     │     ├─ Si existe y visita 'activa': se reutiliza (más órdenes)
+      │     ├─ Lee cookie 'visita_{restId}' (TTL 4h)
+      │     │     ├─ Si existe y visita 'activa': reutiliza visita (más órdenes)
       │     │     └─ Si no: visitaId=0 (se creará al ordenar)
       │     └─ Render publico/menu/index.php con catálogo
-      ├─ Comensal arma carrito en su celular
-      ├─ POST /menu/{slug}/ordenar con platillo_id[], cantidad[], mesa_qr, visita_id
-      │     ├─ Si visita_id NULL → RestVisitaModel::crear() + cookie 4h
-      │     ├─ Crea rest_pedidos (estado='pendiente', mesa_id, visita_id)
-      │     ├─ Crea rest_pedido_items por cada platillo
-      │     └─ RestVisitaModel::actualizarTotales()
-      └─ Redirect a /menu/{slug}/confirmacion/{visitaId}
-            └─ "✅ Pedido recibido", lista items, link "Pedir más" o "Pagar"
+      │
+      ├─ Vista pública muestra:
+      │     ├─ Menú y carrito
+      │     ├─ Botón "🔔 Llamar mesero"
+      │     ├─ Botón "🔁 Pedir lo mismo" (si ya hubo pedidos)
+      │     ├─ Estado de pedido en tiempo real:
+      │     │     pendiente → en_preparacion → listo → entregado
+      │     └─ Tiempo estimado:
+      │           "⏱️ Tiempo estimado: 12 min"
+      │
+      ├─ Click "Llamar mesero"
+      │     └─ POST /menu/{slug}/llamarMesero
+      │           └─ Crea rest_alertas(tipo='mesero', mesa_id, visita_id)
+      │
+      ├─ Comensal arma carrito en celular
+      │
+      ├─ POST /menu/{slug}/ordenar
+      │     payload:
+      │       platillo_id[], cantidad[], mesa_qr, visita_id
+      │
+      │     ├─ Si visita_id NULL:
+      │     │     ├─ RestVisitaModel::crear()
+      │     │     └─ Guarda cookie visita_{restId}
+      │     │
+      │     ├─ Crea rest_pedidos
+      │     │     estado='pendiente'
+      │     │     mesa_id
+      │     │     visita_id
+      │     │
+      │     ├─ Crea rest_pedido_items
+      │     ├─ RestVisitaModel::actualizarTotales()
+      │     └─ Emit WebSocket:
+      │           event='nuevo_pedido'
+      │
+      ├─ Cancelación limitada:
+      │     └─ POST /menu/{slug}/cancelarPedido/{pedidoId}
+      │           └─ Solo permitido si estado='pendiente'
+      │
+      └─ Redirect:
+            /menu/{slug}/confirmacion/{visitaId}
+              └─ "✅ Pedido recibido"
+                 lista items
+                 link "Pedir más"
+                 link "Pagar"
+
 
 [3] Cocina
     Chef entra a /rest-chef/dashboard (KDS dark mode)
-      ├─ JS hace fetch a /rest-chef/queue cada 5s
-      │     └─ JSON con pedidos+items WHERE estado IN (pendiente, en_preparacion)
-      ├─ Si hay items NUEVOS (set diff) → Web Audio API beep
-      ├─ Click "Prep ▶" → POST /rest-chef/marcarPreparacion/{itemId}
-      │     └─ rest_pedido_items.estado = 'en_preparacion'
-      └─ Click "Listo ✓" → POST /rest-chef/marcarListo/{itemId}
-            ├─ rest_pedido_items.estado = 'listo'
-            ├─ Si TODOS los items del pedido están 'listo':
-            │     ├─ rest_pedidos.estado = 'listo'
-            │     └─ ⚠️ NUEVO: descuenta inventario por receta
-            │           └─ RestInventarioModel::descontarPorOrden(pedidoId)
-            └─ JSON ok=true
+
+      ├─ WebSocket conectado:
+      │     ws://.../rest-chef/socket
+      │
+      ├─ Evento recibido:
+      │     "nuevo_pedido"
+      │     ├─ Inserta pedido en pantalla inmediatamente
+      │     └─ Web Audio API beep
+      │
+      ├─ Dashboard muestra:
+      │     ├─ pedidos pendientes
+      │     ├─ en preparación
+      │     └─ tiempos de espera
+      │
+      ├─ Click "Prep ▶"
+      │     └─ POST /rest-chef/marcarPreparacion/{itemId}
+      │           ├─ rest_pedido_items.estado='en_preparacion'
+      │           └─ Emit WebSocket:
+      │                 event='pedido_actualizado'
+      │
+      ├─ Click "Listo ✓"
+      │     └─ POST /rest-chef/marcarListo/{itemId}
+      │           ├─ rest_pedido_items.estado='listo'
+      │           │
+      │           ├─ Si TODOS items están listos:
+      │           │     ├─ rest_pedidos.estado='listo'
+      │           │     ├─ RestInventarioModel::descontarPorOrden(pedidoId)
+      │           │     └─ Emit WebSocket:
+      │           │           event='pedido_listo'
+      │           │
+      │           └─ JSON ok=true
+      │
+      └─ Cliente recibe actualización en vivo:
+            "👨‍🍳 Tu pedido ya está listo"
+
 
 [4] Entrega
     Mesero entra a /rest-mesero/dashboard
-      ├─ Banner "✅ Órdenes listas para entregar"
-      ├─ Grid de mesas con estado (verde=disponible, amber=ocupada, rojo=pagando)
-      ├─ Click "Entregado ✓" → POST /rest-mesero/marcarEntregado/{pedidoId}
-      │     ├─ rest_pedidos.estado = 'entregado'
-      │     └─ rest_pedido_items.estado = 'entregado'
-      └─ Página recarga
+
+      ├─ WebSocket conectado
+      │
+      ├─ Banner:
+      │     "✅ Órdenes listas para entregar"
+      │
+      ├─ Alertas:
+      │     "🔔 Mesa 4 solicita ayuda"
+      │
+      ├─ Grid de mesas:
+      │     verde = disponible
+      │     amarillo = ocupada
+      │     rojo = pagando
+      │
+      ├─ Click "Entregado ✓"
+      │     └─ POST /rest-mesero/marcarEntregado/{pedidoId}
+      │           ├─ rest_pedidos.estado='entregado'
+      │           ├─ rest_pedido_items.estado='entregado'
+      │           └─ Emit WebSocket:
+      │                 event='pedido_entregado'
+      │
+      └─ Cliente ve:
+            "✅ Pedido entregado"
+
 
 [5] Pago
-    Comensal en su celular abre /menu/{slug}/pagar/{visitaId}
+    Comensal abre:
+      /menu/{slug}/pagar/{visitaId}
+
       ├─ RestPublicoController::pagar
-      │     ├─ Si NO existe ticket pendiente: RestTicketModel::consolidar(visitaId, propina=0)
-      │     │     ├─ Suma rest_pedidos.subtotal de la visita
-      │     │     ├─ Crea rest_tickets (estado=pendiente)
-      │     │     └─ rest_visitas.estado = 'pagando'
+      │
+      │     ├─ Si NO existe ticket pendiente:
+      │     │     └─ RestTicketModel::consolidar(visitaId, propina=0)
+      │     │           ├─ Suma rest_pedidos.subtotal
+      │     │           ├─ Crea rest_tickets
+      │     │           │     estado='pendiente'
+      │     │           └─ rest_visitas.estado='pagando'
+      │
       │     └─ Render publico/menu/pagar.php
-      ├─ Vista: subtotal, selector propina, método pago
-      ├─ POST /menu/{slug}/confirmarPago/{ticketId} (PÚBLICO sin login)
-      │     ├─ Valida ticket pertenece al slug
-      │     ├─ ticket.estado = 'pagado', metodo_pago, propina, total
-      │     ├─ visita.estado = 'pagada', pagada_at = NOW()
-      │     └─ Si paypal: redirect a PayPal Checkout
-      └─ Pantalla "✅ ¡Cuenta pagada!" con QR para mostrar al portero
+      │
+      ├─ Vista muestra:
+      │     ├─ subtotal
+      │     ├─ selector propina
+      │     ├─ método de pago
+      │     ├─ "Dividir cuenta"
+      │     │     └─ seleccionar items por persona
+      │     └─ total final
+      │
+      ├─ POST /menu/{slug}/confirmarPago/{ticketId}
+      │
+      │     Seguridad:
+      │     ├─ valida ticket pertenece al slug
+      │     ├─ valida ticket pertenece a visita
+      │     ├─ token_firma temporal
+      │     ├─ CSRF token
+      │     ├─ verifica ticket no pagado
+      │     └─ anti replay
+      │
+      │     Procesamiento:
+      │     ├─ ticket.estado='pagado'
+      │     ├─ metodo_pago
+      │     ├─ propina
+      │     ├─ total
+      │     ├─ visita.estado='pagada'
+      │     ├─ visita.pagada_at=NOW()
+      │     ├─ mesa.estado='disponible'   ← liberación automática
+      │     └─ Si PayPal:
+      │           redirect a PayPal Checkout
+      │
+      └─ Pantalla:
+            "✅ ¡Cuenta pagada!"
+            QR para mostrar al portero
+
 
 [6] Salida
     portero_habilitado=1:
-      Comensal va a la salida → portero escanea QR con cámara o teclado
-      ├─ POST /rest-portero/verificar con qr_code
-      ├─ JSON: { pagado: bool, mensaje: '✅ PUEDE SALIR' | '❌ PAGO PENDIENTE $X' }
-      └─ Si pagado: opcional registrar salida → /rest-portero/registrarSalida
-            └─ visita.salida_at = NOW()
+      Comensal va a la salida
+      Portero escanea QR con cámara o teclado
+
+      ├─ POST /rest-portero/verificar
+      │     payload: qr_code
+      │
+      ├─ JSON:
+      │     {
+      │       pagado: true/false,
+      │       mensaje:
+      │       '✅ PUEDE SALIR'
+      │       '❌ PAGO PENDIENTE $X'
+      │     }
+      │
+      └─ Si pagado:
+            ├─ POST /rest-portero/registrarSalida
+            │     ├─ visita.salida_at = NOW()
+            │     └─ visita.estado='cerrada'
+            └─ Fin del flujo
+
     portero_habilitado=0:
-      Comensal sale solo, no hay verificación.
-```
+      └─ Comensal sale automáticamente
+            visita puede cerrarse vía cron job o al pagar
 
 ### 3.5 Flujo TAQUERÍA (sin mesas)
 
@@ -353,6 +503,9 @@ Mesero/Admin al cierre → /rest-finanzas/cortes → "Nuevo corte"
 - [x] **Vista detalle platillo** (`/rest-menu/detalle/{id}`) — tabla gramajes + costo logístico vs precio venta
 
 - [x] layouts/main.php con CSS separado y modal-display fallback inline
+- [x] **Sidebar "Mi Empresa"** — sección renombrada, link a `/restaurante/locales`
+- [x] **Rol `admin_local`** — migration 032, BaseController, RestauranteController, RestStaffController
+- [x] **Fix stock sync** — `cambiarEstado` y `subirFotoEntrega` ahora siempre guardan estado 'entregado' en DB
 - [x] dashboard, mesas (modal), pedidos (index/detalle/nuevo), reservas
 - [x] menu (index + form con receta), inventario (tabs CarniHub/Externo + movimientos)
 - [x] finanzas (dashboard, gastos, retiros, cortes), tickets (index/detalle)
@@ -458,6 +611,7 @@ Mesero/Admin al cierre → /rest-finanzas/cortes → "Nuevo corte"
 
 | Fecha | Sprint | Cambio |
 |-------|--------|--------|
+| 2026-05-14 | v4.3 | **Arquitectura Mi Empresa v2**: Sidebar "Mi Empresa" (reemplaza "Mi Restaurante"/"Ver mis locales"), link a `/restaurante/locales`. **Nuevo rol `admin_local`** (id 10, migration 032): cada local puede tener un Admin Local designado que gestiona inventario/menú/staff exclusivamente para su local. Vista `locales.php` muestra el admin asignado por tarjeta con link "Designar" → staff/index. `BaseController::requireRestaurante()` acepta `admin_local` y setea `restaurante_activo_id` desde `usuarios.restaurante_id`. Guards en `RestauranteController::crear/guardar` (solo comprador puede crear locales). `RestStaffController::crear()` acepta rol `admin_local` con prefijo `AL`. **Fix stock sync**: bug en `EmpresaPedidoController::cambiarEstado` donde `pedidoModel->cambiarEstado` no se llamaba cuando había foto+entregado; también fijo en `subirFotoEntrega` — ahora siempre se guarda estado 'entregado' en DB antes del import de stock |
 | 2026-05-13 | v4.1 | **Mis Locales** (nueva página en portal restaurante): vista de todas las sucursales del comprador con tarjetas (nombre, dirección, # platillos, # ingredientes). Botones "Menú / Inventario / Config" por local + "Seleccionar este local". Link "Mis Locales" agregado al sidebar. **Dirección autocomplete**: campo de dirección en Configuración sugiere direcciones reales con Nominatim mientras escribes. **Valor stock actual**: renombrado de "Valor:" a "Valor stock actual:" en tarjetas de inventario para mayor claridad. **Categorías existentes en modal**: el modal de Nueva Categoría ahora muestra las categorías ya creadas para evitar duplicados |
 | 2026-05-13 | v4.0 | **Receta combobox**: reemplazado `<datalist>` con dropdown personalizado con tarjetas (nombre, categoría, costo/unidad — sin stock). Costo hint dentro de cada fila (fix bug duplicación). Selección automática de unidades por grupo (g/kg/mg, L/mL, pza) al elegir ingrediente. **Mapa geocoding**: reemplazado Google Maps Geocoding API con Nominatim/OSM — funciona sin habilitar la API de geocoding. Cuando hay API Key, Google Maps sólo se usa para el renderizado visual. **Multi-sucursal en menú**: selector de sucursales (pills) en `/rest-menu/index` — visible cuando el comprador tiene >1 sucursal. `RestauranteController::activar()` ahora soporta `?redirect=` para volver a la página original después de cambiar sucursal |
 | 2026-05-13 | v3.9 | **Inventario inteligente**: cards más grandes, botón "Modificar" único con modal de 2 tabs (Movimiento con convertidor de unidades g/kg/mg/L/mL + Editar datos). Eliminado campo "Stock inicial" del formulario de creación. **Recetas + calculadora logística**: selector de unidad por ingrediente (g/kg/mg/L/mL/pza), costo en tiempo real por fila, total costo + margen en paso 3 del wizard. **Vista detalle platillo** (`/rest-menu/detalle/{id}`): tabla gramajes con Costo/Unidad + Costo Total + calculadora de margen vs precio de venta. Link "Ver costos" en cards del menú |

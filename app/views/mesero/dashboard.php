@@ -24,6 +24,13 @@
 </div>
 
 <div style="padding:20px">
+  <!-- Banner de alertas del comensal (llamar mesero / pedir cuenta) -->
+  <div id="alertasBanner" style="display:none;background:#FEF3C7;border:1px solid #FCD34D;
+        border-radius:12px;padding:14px;margin-bottom:16px">
+    <div style="font-weight:700;color:#92400E;margin-bottom:8px">🔔 Solicitudes de comensales</div>
+    <div id="alertasList"></div>
+  </div>
+
   <!-- Órdenes listas para entregar -->
   <?php if (!empty($listos)): ?>
   <div style="background:#DCFCE7;border:1px solid #86EFAC;border-radius:12px;padding:16px;margin-bottom:20px">
@@ -56,5 +63,52 @@
     <?php endforeach; ?>
   </div>
 </div>
+
+<script>
+// ── Polling alertas del comensal ──────────────────────────────────────────────
+const TIPOS_LABEL = { mesero: '🙋 Llama al mesero', cuenta: '💳 Pide la cuenta' };
+
+function pollAlertas() {
+  fetch('<?= BASE_URL ?>rest-mesero/alertas')
+    .then(r => r.json())
+    .then(d => {
+      const banner = document.getElementById('alertasBanner');
+      const list   = document.getElementById('alertasList');
+      if (!d.ok || !d.alertas.length) { banner.style.display = 'none'; return; }
+
+      let html = '';
+      d.alertas.forEach(a => {
+        const label = TIPOS_LABEL[a.tipo] ?? a.tipo;
+        html += `<div style="display:flex;justify-content:space-between;align-items:center;
+                              padding:7px 0;border-bottom:1px solid rgba(252,211,77,.4)">
+          <span style="font-size:.88rem;color:#78350F">
+            <strong>${label}</strong>
+            ${a.mesa_nombre ? '· Mesa <strong>' + a.mesa_nombre + '</strong>' : ''}
+          </span>
+          <button onclick="atenderAlerta(${a.id}, this)"
+                  style="padding:4px 12px;background:#F59E0B;color:#fff;border:none;
+                         border-radius:7px;font-size:.78rem;font-weight:700;cursor:pointer">
+            Atendido ✓
+          </button>
+        </div>`;
+      });
+      list.innerHTML = html;
+      banner.style.display = 'block';
+    })
+    .catch(() => {});
+}
+
+function atenderAlerta(id, btn) {
+  btn.disabled = true;
+  fetch(`<?= BASE_URL ?>rest-mesero/atenderAlerta/${id}`, { method: 'POST' })
+    .then(r => r.json())
+    .then(d => { if (d.ok) pollAlertas(); else btn.disabled = false; })
+    .catch(() => { btn.disabled = false; });
+}
+
+// Iniciar polling
+pollAlertas();
+setInterval(pollAlertas, 5000);
+</script>
 </body>
 </html>

@@ -26,6 +26,16 @@
   </div>
 
   <!-- Ticket card -->
+  <?php
+    $flashErr = $_SESSION['flash_error'] ?? null;
+    if ($flashErr) unset($_SESSION['flash_error']);
+  ?>
+  <?php if ($flashErr): ?>
+  <div style="background:#FEE2E2;color:#991B1B;border:1.5px solid #FECACA;border-radius:10px;
+               padding:12px 16px;margin-bottom:14px;font-size:.87rem;font-weight:500">
+    ⚠️ <?= htmlspecialchars($flashErr) ?>
+  </div>
+  <?php endif; ?>
   <div class="rst-card" style="border-radius:20px;padding:28px;margin-bottom:0">
     <div style="text-align:center;margin-bottom:20px;padding-bottom:16px;border-bottom:1px dashed #E5E7EB">
       <div style="font-size:.75rem;color:#9CA3AF;font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px">
@@ -120,7 +130,50 @@
     <form method="POST" action="<?= BASE_URL ?>menu/confirmarPago/<?= htmlspecialchars($restaurante['slug'] ?? '') ?>/<?= (int)($ticket['id'] ?? 0) ?>" id="formPago">
       <input type="hidden" name="metodo_pago" id="inpMetodo" value="efectivo">
       <input type="hidden" name="propina" id="inpPropina" value="0">
-      <button type="submit" class="btn btn-primary btn-lg" style="width:100%;justify-content:center;border-radius:12px">
+
+      <!-- Dividir cuenta (acordeón) -->
+      <?php if (!empty($todoItems)): ?>
+      <div style="margin-bottom:16px">
+        <button type="button" id="btnDividir"
+                onclick="toggleDividir()"
+                style="width:100%;padding:10px;border:1.5px dashed #D1D5DB;border-radius:10px;
+                       background:#F9FAFB;font-size:.85rem;font-weight:600;color:#374151;cursor:pointer;
+                       display:flex;align-items:center;justify-content:center;gap:6px">
+          👥 Dividir cuenta por ítems
+        </button>
+        <div id="dividirPanel" style="display:none;margin-top:10px;border:1.5px solid #E5E7EB;
+                                       border-radius:12px;padding:14px">
+          <div style="font-size:.8rem;color:#6B7280;margin-bottom:10px">
+            Selecciona los ítems que vas a pagar tú:
+          </div>
+          <?php foreach ($todoItems as $it): ?>
+          <label style="display:flex;align-items:center;gap:10px;padding:8px;border-radius:8px;
+                         cursor:pointer;font-size:.87rem;border:1.5px solid #E5E7EB;margin-bottom:6px">
+            <input type="checkbox" class="split-chk"
+                   data-subtotal="<?= number_format((float)$it['subtotal'], 2, '.', '') ?>"
+                   checked
+                   style="width:16px;height:16px;cursor:pointer;accent-color:var(--cp)">
+            <span style="flex:1"><?= htmlspecialchars($it['platillo_nombre'] ?? $it['nombre'] ?? '?') ?>
+              <span style="color:#9CA3AF;font-size:.78rem">×<?= (int)$it['cantidad'] ?></span>
+            </span>
+            <span style="font-weight:700;color:#111827">$<?= number_format((float)$it['subtotal'], 2) ?></span>
+          </label>
+          <?php endforeach; ?>
+          <div style="display:flex;justify-content:space-between;padding:10px 0 0;
+                       border-top:1.5px solid #F3F4F6;margin-top:4px;font-weight:700">
+            <span>Mi parte:</span>
+            <span id="splitTotal" style="color:var(--cp)">$<?= number_format((float)($ticket['subtotal']??0), 2) ?></span>
+          </div>
+          <input type="hidden" name="split_subtotal" id="inpSplitSubtotal" value="">
+          <p style="font-size:.72rem;color:#9CA3AF;margin-top:6px">
+            Desmarca los ítems de los demás. Cada persona confirma su pago por separado.
+          </p>
+        </div>
+      </div>
+      <?php endif; ?>
+
+      <button type="submit" id="btnPagar"
+              class="btn btn-primary btn-lg" style="width:100%;justify-content:center;border-radius:12px">
         Confirmar pago $<span id="totalFinal"><?= number_format((float)($ticket['total'] ?? 0), 2) ?></span> →
       </button>
     </form>
@@ -141,18 +194,45 @@
 <script>
 const subtotal = <?= (float)($ticket['subtotal'] ?? 0) ?>;
 const baseTotal = <?= (float)($ticket['total'] ?? 0) ?>;
+const TICKET_ID = <?= (int)($ticket['id'] ?? 0) ?>;
+const SLUG_PAGO = '<?= htmlspecialchars($restaurante['slug'] ?? '') ?>';
 let propinaMonto = 0;
 let metodoActual = 'efectivo';
+let splitSubtotal = null;     // null = paga todo; number = paga sólo su parte
 
-// Seleccionar primer método
+// Inicializar
 seleccionarMetodo('efectivo');
+actualizarTotalDisplay();
 
+// ── Propina (AJAX para exactitud) ─────────────────────────────────────────────
 function seleccionarPropina(pct, monto) {
   propinaMonto = monto;
-  document.getElementById('inpPropina').value = monto.toFixed(2);
-  document.getElementById('totalFinal').textContent = (subtotal + monto).toFixed(2);
   document.querySelectorAll('.propina-btn').forEach(b => b.classList.remove('selected'));
   document.querySelector(`.propina-btn[data-pct="${pct}"]`).classList.add('selected');
+
+  fetch(`<?= BASE_URL ?>menu/${SLUG_PAGO}/actualizarPropina/${TICKET_ID}`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+    body: `propina=${encodeURIComponent(monto.toFixed(2))}`
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.ok) {
+      propinaMonto = parseFloat(d.propina);
+      document.getElementById('inpPropina').value = propinaMonto.toFixed(2);
+    }
+    actualizarTotalDisplay();
+  })
+  .catch(() => {
+    document.getElementById('inpPropina').value = monto.toFixed(2);
+    actualizarTotalDisplay();
+  });
+}
+
+function actualizarTotalDisplay() {
+  const base = (splitSubtotal !== null) ? splitSubtotal : subtotal;
+  const total = base + propinaMonto;
+  document.getElementById('totalFinal').textContent = total.toFixed(2);
 }
 
 function seleccionarMetodo(metodo) {
@@ -162,6 +242,34 @@ function seleccionarMetodo(metodo) {
   const btn = document.querySelector(`.metodo-btn[data-metodo="${metodo}"]`);
   if (btn) btn.classList.add('selected');
 }
+
+// ── Dividir cuenta ────────────────────────────────────────────────────────────
+function toggleDividir() {
+  const panel = document.getElementById('dividirPanel');
+  if (!panel) return;
+  const visible = panel.style.display !== 'none';
+  panel.style.display = visible ? 'none' : 'block';
+  if (visible) {
+    // Al cerrar, volver a pagar todo
+    splitSubtotal = null;
+    document.getElementById('inpSplitSubtotal').value = '';
+    document.querySelectorAll('.split-chk').forEach(c => c.checked = true);
+    document.getElementById('splitTotal').textContent = '$' + subtotal.toFixed(2);
+    actualizarTotalDisplay();
+  }
+}
+
+document.addEventListener('change', e => {
+  if (!e.target.classList.contains('split-chk')) return;
+  let suma = 0;
+  document.querySelectorAll('.split-chk:checked').forEach(c => {
+    suma += parseFloat(c.dataset.subtotal) || 0;
+  });
+  splitSubtotal = suma;
+  document.getElementById('inpSplitSubtotal').value = suma.toFixed(2);
+  document.getElementById('splitTotal').textContent = '$' + suma.toFixed(2);
+  actualizarTotalDisplay();
+});
 </script>
 </body>
 </html>

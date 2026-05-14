@@ -36,6 +36,33 @@
     <svg width="14" height="14" fill="currentColor" viewBox="0 0 20 20"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/></svg>
     Mesa: <strong><?= htmlspecialchars($mesa['nombre']) ?></strong>
   </div>
+
+  <!-- Botón llamar mesero -->
+  <div style="margin-top:10px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+    <button id="btnLlamarMesero"
+            onclick="llamarMesero()"
+            style="padding:7px 16px;background:rgba(255,255,255,.2);border:1.5px solid rgba(255,255,255,.5);
+                   color:#fff;border-radius:20px;font-size:.82rem;font-weight:600;cursor:pointer;transition:.15s"
+            onmouseover="this.style.background='rgba(255,255,255,.3)'"
+            onmouseout="this.style.background='rgba(255,255,255,.2)'">
+      🔔 Llamar mesero
+    </button>
+    <?php if ($visitaId): ?>
+    <a href="<?= BASE_URL ?>menu/<?= htmlspecialchars($restaurante['slug']) ?>/pagar/<?= $visitaId ?>"
+       style="padding:7px 16px;background:rgba(255,255,255,.2);border:1.5px solid rgba(255,255,255,.5);
+              color:#fff;border-radius:20px;font-size:.82rem;font-weight:600;text-decoration:none;transition:.15s">
+      🧾 Ver mi cuenta
+    </a>
+    <?php endif; ?>
+  </div>
+  <?php endif; ?>
+
+  <!-- Status tracker (visible cuando hay visita activa) -->
+  <?php if ($visitaId): ?>
+  <div id="statusTracker" style="margin-top:12px;background:rgba(255,255,255,.12);border-radius:10px;
+                                  padding:10px 14px;font-size:.82rem;display:none">
+    <div id="statusContent">Verificando estado del pedido…</div>
+  </div>
   <?php endif; ?>
 </div>
 
@@ -144,13 +171,22 @@
     <div style="font-size:.78rem;opacity:.75" id="carritoItems">0 items</div>
     <div style="font-weight:800;font-size:1.05rem" id="carritoTotal">$0.00</div>
   </div>
-  <button onclick="document.getElementById('formPedido').submit()"
-          style="padding:10px 24px;background:#fff;color:var(--cs);border:none;
-                 border-radius:10px;font-weight:700;font-size:.9rem;cursor:pointer;
-                 transition:.15s" onmouseover="this.style.filter='brightness(.9)'"
-                 onmouseout="this.style.filter=''">
-    Ordenar →
-  </button>
+  <div style="display:flex;gap:8px;align-items:center">
+    <?php if ($visitaId): ?>
+    <button id="btnPedirMismo" onclick="pedirLoMismo()"
+            style="padding:8px 14px;background:rgba(255,255,255,.2);color:#fff;border:1.5px solid rgba(255,255,255,.5);
+                   border-radius:10px;font-size:.78rem;font-weight:600;cursor:pointer;display:none">
+      🔁 Lo mismo
+    </button>
+    <?php endif; ?>
+    <button onclick="document.getElementById('formPedido').submit()"
+            style="padding:10px 24px;background:#fff;color:var(--cs);border:none;
+                   border-radius:10px;font-weight:700;font-size:.9rem;cursor:pointer;
+                   transition:.15s" onmouseover="this.style.filter='brightness(.9)'"
+                   onmouseout="this.style.filter=''">
+      Ordenar →
+    </button>
+  </div>
 </div>
 
 <footer style="padding:24px;text-align:center;font-size:.75rem;color:#9CA3AF;padding-bottom:90px">
@@ -347,6 +383,114 @@ document.querySelectorAll('.pub-cat-btn').forEach(btn => {
     });
   });
 });
+
+// ── Llamar mesero ─────────────────────────────────────────────────────────────
+<?php if ($mesa): ?>
+const SLUG      = '<?= htmlspecialchars($restaurante['slug']) ?>';
+const MESA_QR   = '<?= htmlspecialchars($mesa['qr_codigo'] ?? '') ?>';
+const VISITA_ID = <?= (int)($visitaId ?? 0) ?>;
+
+function llamarMesero() {
+  const btn = document.getElementById('btnLlamarMesero');
+  btn.disabled = true;
+  btn.textContent = '🔔 Avisando…';
+  fetch(`<?= BASE_URL ?>menu/${SLUG}/llamarMesero`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+    body: `mesa_qr=${encodeURIComponent(MESA_QR)}&visita_id=${VISITA_ID}`
+  })
+  .then(r => r.json())
+  .then(d => {
+    btn.textContent = d.ok ? '✅ Mesero avisado' : '❌ Error';
+    setTimeout(() => { btn.textContent = '🔔 Llamar mesero'; btn.disabled = false; }, 4000);
+  })
+  .catch(() => { btn.textContent = '🔔 Llamar mesero'; btn.disabled = false; });
+}
+<?php endif; ?>
+
+// ── Polling estado del pedido ─────────────────────────────────────────────────
+<?php if ($visitaId): ?>
+const ESTADO_LABELS = {
+  pendiente:       '⏳ Esperando que la cocina tome tu pedido',
+  en_preparacion:  '👨‍🍳 Tu pedido está en preparación',
+  listo:           '✅ ¡Tu pedido está listo! El mesero lo llevará pronto',
+  entregado:       '🍽️ Pedido entregado. ¡Buen provecho!',
+};
+const ESTADO_COLORS = {
+  pendiente:'#F59E0B', en_preparacion:'#3B82F6', listo:'#10B981', entregado:'#6B7280'
+};
+let ultimosEstados = {};
+
+function actualizarEstadoPedido() {
+  fetch(`<?= BASE_URL ?>menu/<?= htmlspecialchars($restaurante['slug']) ?>/estadoPedido/<?= (int)$visitaId ?>`)
+    .then(r => r.json())
+    .then(d => {
+      if (!d.ok || !d.pedidos.length) return;
+
+      // Detectar si hubo cambios de estado
+      let cambio = false;
+      d.pedidos.forEach(p => {
+        if (ultimosEstados[p.id] !== p.estado) { cambio = true; ultimosEstados[p.id] = p.estado; }
+      });
+
+      // Consolidar estado global (el peor estado = el más atrasado)
+      const prioridad = ['pendiente','en_preparacion','listo','entregado'];
+      let estadoGlobal = 'entregado';
+      d.pedidos.forEach(p => {
+        if (p.estado !== 'cancelado') {
+          const pi = prioridad.indexOf(p.estado);
+          const gi = prioridad.indexOf(estadoGlobal);
+          if (pi < gi) estadoGlobal = p.estado;
+        }
+      });
+
+      const tracker  = document.getElementById('statusTracker');
+      const content  = document.getElementById('statusContent');
+      const label    = ESTADO_LABELS[estadoGlobal] ?? estadoGlobal;
+      const color    = ESTADO_COLORS[estadoGlobal] ?? '#374151';
+      let html = `<span style="color:${color};font-weight:600">${label}</span>`;
+      if (d.tiempo_min > 0 && estadoGlobal === 'en_preparacion') {
+        html += ` <span style="color:rgba(255,255,255,.7);margin-left:6px">⏱️ ~${d.tiempo_min} min</span>`;
+      }
+      content.innerHTML = html;
+      tracker.style.display = 'block';
+
+      // Mostrar botón "Pedir lo mismo" cuando hay pedidos entregados
+      const btnMismo = document.getElementById('btnPedirMismo');
+      if (btnMismo && d.pedidos.some(p => p.estado === 'entregado')) {
+        btnMismo._ultimosPedidos = d.pedidos;
+        btnMismo.style.display = 'block';
+      }
+    })
+    .catch(() => {});
+}
+
+// Iniciar polling cada 5 s
+actualizarEstadoPedido();
+setInterval(actualizarEstadoPedido, 5000);
+
+// ── Pedir lo mismo ────────────────────────────────────────────────────────────
+function pedirLoMismo() {
+  const btn = document.getElementById('btnPedirMismo');
+  const pedidos = btn?._ultimosPedidos ?? [];
+  // Tomar los ítems del último pedido entregado y pre-llenar el carrito
+  const ultimo = pedidos.filter(p => p.estado === 'entregado').pop();
+  if (!ultimo) return;
+  ultimo.items.forEach(it => {
+    const card = [...document.querySelectorAll('.pub-card')]
+      .find(c => c.querySelector('input[name="platillo_id[]"]')?.value == it.platillo_id);
+    if (!card) return;
+    const span  = card.querySelector('.cant');
+    const input = card.querySelector('.cant-input');
+    if (span && input) {
+      span.textContent = it.cantidad;
+      input.value      = it.cantidad;
+    }
+  });
+  actualizarCarrito();
+  window.scrollTo({top: 0, behavior: 'smooth'});
+}
+<?php endif; ?>
 </script>
 </body>
 </html>

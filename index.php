@@ -36,7 +36,9 @@ $param    = $segments[2] ?? null;
 // Rutas públicas con slug en URL: /menu/{slug}, /menu/{slug}/ordenar, /menu/{slug}/pagar/{visitaId}, /acceso/{slug}
 // Convención esperada por los controllers: param = "slug" o "slug/visitaId" (concat de segmentos restantes)
 if (in_array($ctrlSlug, ['menu', 'acceso'], true)) {
-    $knownActions = ['index','ordenar','pagar','confirmarPago','confirmacion','login'];
+    $knownActions = ['index','ordenar','pagar','confirmarPago','confirmacion','login',
+                     'llamarMesero','cancelarPedido','estadoPedido','actualizarPropina',
+                     'paypalCrear','paypalRetorno','paypalCancelar','entrarComensal'];
     if ($action !== '' && in_array($action, $knownActions, true)) {
         // Forma /menu/{accion}/{slug}/{...} — concatenar segmentos a partir del 2
         $rest  = array_slice($segments, 2);
@@ -189,9 +191,17 @@ $publicPaths = [
     'menu/pagar',
     'menu/confirmarPago',
     'menu/confirmacion',
+    'menu/llamarMesero',
+    'menu/cancelarPedido',
+    'menu/estadoPedido',
+    'menu/actualizarPropina',
+    'menu/paypalCrear',
+    'menu/paypalRetorno',
+    'menu/paypalCancelar',
     // Acceso staff (login por slug de restaurante)
     'acceso/index',
     'acceso/login',
+    'acceso/entrarComensal',
 ];
 
 $currentPath = strtolower($ctrlSlug . '/' . $action);
