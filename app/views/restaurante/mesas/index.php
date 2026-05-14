@@ -148,22 +148,44 @@
 </div>
 
 <!-- Modal QR grande -->
-<div id="modalQR" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);
-     z-index:9999;align-items:center;justify-content:center">
-  <div style="background:#fff;border-radius:20px;padding:28px 24px;text-align:center;
-              max-width:340px;width:92%;position:relative;box-shadow:0 20px 60px rgba(0,0,0,.3)">
-    <button onclick="cerrarModalQR()"
-            style="position:absolute;top:12px;right:14px;border:none;background:none;
-                   font-size:1.4rem;cursor:pointer;color:#9CA3AF;line-height:1">✕</button>
-    <div id="qrModalNombre" style="font-weight:700;font-size:1rem;color:#111827;margin-bottom:16px"></div>
-    <div id="qrGrande" style="display:flex;justify-content:center;margin-bottom:14px"></div>
-    <div id="qrModalUrl"
-         style="font-size:.68rem;color:#9CA3AF;word-break:break-all;margin-bottom:18px;padding:0 4px"></div>
-    <button onclick="descargarQR()"
-            style="padding:10px 22px;background:#111827;color:#fff;border:none;
-                   border-radius:10px;font-size:.88rem;font-weight:600;cursor:pointer">
-      ⬇️ Descargar PNG
-    </button>
+<div id="modalQR" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);
+     z-index:9999;align-items:center;justify-content:center;padding:16px">
+  <div style="background:#fff;border-radius:20px;text-align:center;
+              max-width:340px;width:100%;box-shadow:0 24px 64px rgba(0,0,0,.3);overflow:hidden">
+    <!-- Header -->
+    <div style="padding:14px 18px;border-bottom:1px solid #F3F4F6;
+                display:flex;align-items:center;justify-content:space-between">
+      <span id="qrModalNombre" style="font-weight:700;font-size:.95rem;color:#111827"></span>
+      <button onclick="cerrarModalQR()"
+              style="border:none;background:#F3F4F6;width:28px;height:28px;border-radius:50%;
+                     font-size:.85rem;cursor:pointer;color:#6B7280;line-height:28px">✕</button>
+    </div>
+    <!-- QR -->
+    <div style="padding:20px;background:#F9FAFB">
+      <div id="qrGrande" style="display:inline-flex;justify-content:center;align-items:center;
+                                 background:#fff;border-radius:12px;padding:12px;
+                                 box-shadow:0 2px 10px rgba(0,0,0,.1)"></div>
+    </div>
+    <!-- URL -->
+    <div style="padding:0 18px 14px">
+      <div id="qrModalUrl"
+           style="font-size:.68rem;color:#6B7280;word-break:break-all;
+                  background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px;
+                  padding:8px 10px;text-align:left;font-family:monospace;line-height:1.5"></div>
+    </div>
+    <!-- Botones -->
+    <div style="padding:0 18px 18px;display:flex;gap:8px">
+      <button onclick="copiarUrl()" id="btnCopiarQR"
+              style="flex:1;padding:10px;background:#F3F4F6;color:#374151;border:none;
+                     border-radius:10px;font-size:.8rem;font-weight:600;cursor:pointer">
+        📋 Copiar URL
+      </button>
+      <button onclick="descargarQR()"
+              style="flex:1;padding:10px;background:#111827;color:#fff;border:none;
+                     border-radius:10px;font-size:.8rem;font-weight:600;cursor:pointer">
+        ⬇️ Descargar PNG
+      </button>
+    </div>
   </div>
 </div>
 
@@ -203,6 +225,14 @@ function descargarQR() {
   a.href = canvas.toDataURL('image/png');
   a.download = (document.getElementById('qrModalNombre').textContent || 'qr-mesa') + '.png';
   a.click();
+}
+function copiarUrl() {
+  const url = document.getElementById('qrModalUrl').textContent;
+  const btn = document.getElementById('btnCopiarQR');
+  navigator.clipboard.writeText(url).then(() => {
+    btn.textContent = '✅ Copiado';
+    setTimeout(() => { btn.textContent = '📋 Copiar URL'; }, 2000);
+  });
 }
 document.getElementById('modalQR').addEventListener('click', e => {
   if (e.target.id === 'modalQR') cerrarModalQR();

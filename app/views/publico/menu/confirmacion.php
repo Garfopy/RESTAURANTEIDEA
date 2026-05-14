@@ -170,6 +170,27 @@ $qrImgUrl = $visitaQr
     <?php endif; ?>
   </div>
 
+  <?php if ($ticketPagado && $qrImgUrl): ?>
+  <div id="qr-portero-section"
+       style="text-align:center;background:#F0FDF4;border:1.5px solid #86EFAC;
+              border-radius:14px;padding:20px;margin-bottom:10px">
+    <div style="font-size:1.5rem;margin-bottom:6px">📱</div>
+    <div style="font-size:.82rem;font-weight:700;color:#166534;margin-bottom:12px">
+      Muestra este QR al salir, por favor
+    </div>
+    <img src="<?= $qrImgUrl ?>" alt="QR de salida"
+         style="width:200px;height:200px;display:block;margin:0 auto 12px;border-radius:8px">
+    <div style="font-size:.72rem;color:#9CA3AF;margin-bottom:12px">
+      El portero o mesero verificará tu pago al escanearlo
+    </div>
+    <a href="<?= $qrImgUrl ?>" target="_blank" rel="noopener"
+       style="display:inline-block;padding:8px 18px;background:#DCFCE7;color:#166534;
+              border-radius:8px;font-size:.78rem;font-weight:700;text-decoration:none">
+      ⬇️ Guardar QR
+    </a>
+  </div>
+  <?php endif; ?>
+
   <!-- ── Resumen del ticket ────────────────────────────── -->
   <?php if (isset($ticket)): ?>
   <?php
@@ -350,9 +371,10 @@ function actualizarBtnPagar(ticketEstado, qrCode) {
       const qrDiv = document.createElement('div');
       qrDiv.id = 'qr-portero-section';
       qrDiv.style.cssText = 'text-align:center;background:#F0FDF4;border:1.5px solid #86EFAC;border-radius:14px;padding:20px;margin-bottom:10px';
-      qrDiv.innerHTML = `<div style="font-size:.75rem;font-weight:700;color:#166534;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">🔍 Muestra este QR al portero</div>
-        <img src="${qrUrl}" style="width:200px;height:200px;display:block;margin:0 auto;border-radius:8px" alt="QR Portero">
-        <div style="font-size:.72rem;color:#9CA3AF;margin-top:8px;margin-bottom:12px">Escaneo válido para verificar salida</div>
+      qrDiv.innerHTML = `<div style="font-size:1.5rem;margin-bottom:6px">📱</div>
+        <div style="font-size:.82rem;font-weight:700;color:#166534;margin-bottom:12px">Muestra este QR al salir, por favor</div>
+        <img src="${qrUrl}" style="width:200px;height:200px;display:block;margin:0 auto 12px;border-radius:8px" alt="QR de salida">
+        <div style="font-size:.72rem;color:#9CA3AF;margin-bottom:12px">El portero o mesero verificará tu pago al escanearlo</div>
         <a href="${qrUrl}" target="_blank" rel="noopener" style="display:inline-block;padding:8px 18px;background:#DCFCE7;color:#166534;border-radius:8px;font-size:.78rem;font-weight:700;text-decoration:none">⬇️ Guardar QR</a>`;
       wrap.after(qrDiv);
     }
@@ -511,13 +533,15 @@ function generarTicket() {
       const qrHtml = qrCode
         ? `<div style="text-align:center;background:#F0FDF4;border:1.5px solid #86EFAC;
                         border-radius:14px;padding:20px;margin-bottom:10px">
-             <div style="font-size:.75rem;font-weight:700;color:#166534;text-transform:uppercase;
-                         letter-spacing:.05em;margin-bottom:10px">🔍 Muestra este QR al portero</div>
+             <div style="font-size:1.5rem;margin-bottom:6px">📱</div>
+             <div style="font-size:.82rem;font-weight:700;color:#166534;margin-bottom:12px">
+               Muestra este QR al salir, por favor
+             </div>
              <img src="${qrUrl}"
-                  style="width:200px;height:200px;display:block;margin:0 auto;border-radius:8px"
-                  alt="QR Portero">
-             <div style="font-size:.72rem;color:#9CA3AF;margin-top:8px;margin-bottom:12px">
-               El portero verificará el estado al escanear
+                  style="width:200px;height:200px;display:block;margin:0 auto 12px;border-radius:8px"
+                  alt="QR de salida">
+             <div style="font-size:.72rem;color:#9CA3AF;margin-bottom:12px">
+               El portero o mesero verificará tu pago al escanearlo
              </div>
              <a href="${qrUrl}" target="_blank" rel="noopener"
                 style="display:inline-block;padding:8px 18px;background:#DCFCE7;color:#166534;

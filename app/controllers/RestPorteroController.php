@@ -81,6 +81,12 @@ class RestPorteroController extends BaseController
         }
 
         $this->visitas->marcarSalida((int)$visita['id']);
+
+        // Liberar la mesa
+        if (!empty($visita['mesa_id'])) {
+            (new RestMesaModel())->cambiarEstado((int)$visita['mesa_id'], 'disponible');
+        }
+
         $this->json(['ok' => true, 'mensaje' => 'Salida registrada.']);
     }
 }
