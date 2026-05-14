@@ -13,9 +13,13 @@ class PayPalOrdenService
     public function __construct()
     {
         $config         = new ConfigModel();
-        $this->clientId = $config->get('paypal_client_id', '');
-        $this->secret   = $config->get('paypal_secret', '');
         $mode           = $config->get('paypal_mode', 'sandbox');
+        $this->clientId = $mode === 'live'
+            ? $config->get('paypal_client_id_live',    $config->get('paypal_client_id', ''))
+            : $config->get('paypal_client_id_sandbox', $config->get('paypal_client_id', ''));
+        $this->secret   = $mode === 'live'
+            ? $config->get('paypal_secret_live',    $config->get('paypal_secret', ''))
+            : $config->get('paypal_secret_sandbox', $config->get('paypal_secret', ''));
         $this->baseUrl  = $mode === 'live'
             ? 'https://api-m.paypal.com'
             : 'https://api-m.sandbox.paypal.com';

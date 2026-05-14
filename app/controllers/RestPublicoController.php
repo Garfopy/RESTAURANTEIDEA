@@ -333,7 +333,7 @@ class RestPublicoController extends BaseController
         $visitaId = (int)$this->post('visita_id', 0);
         $mesa     = $mesaQr ? $this->mesaModel->getByQr($mesaQr) : null;
 
-        $db = Database::getInstance()->getConnection();
+        $db = Database::getInstance();
         $db->prepare(
             'INSERT INTO rest_alertas (restaurante_id, tipo, mesa_id, visita_id) VALUES (?,?,?,?)'
         )->execute([
