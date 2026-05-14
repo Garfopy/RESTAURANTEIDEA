@@ -46,8 +46,17 @@
         <td><span class="badge <?= $badgeCls ?>"><?= $badgeTxt ?></span></td>
         <td>
           <div id="qr-<?= $m['id'] ?>" style="line-height:0"></div>
-          <div style="font-size:.65rem;color:#9CA3AF;margin-top:2px;font-family:monospace">
-            <?= htmlspecialchars(substr($m['qr_codigo'], 0, 18)) ?>…
+          <div style="margin-top:4px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+            <button type="button" onclick="verQR(<?= $m['id'] ?>, '<?= htmlspecialchars($m['nombre'], ENT_QUOTES) ?>')"
+                    style="font-size:.7rem;color:#6B7280;background:#F3F4F6;border:none;
+                           padding:3px 8px;border-radius:5px;cursor:pointer">
+              🔍 Ver QR
+            </button>
+            <a href="<?= BASE_URL ?>menu/<?= htmlspecialchars($rest['slug'] ?? '') ?>?mesa=<?= urlencode($m['qr_codigo']) ?>"
+               target="_blank"
+               style="font-size:.7rem;color:#3B82F6;text-decoration:none">
+              🔗 Abrir
+            </a>
           </div>
         </td>
         <td>
@@ -131,15 +140,66 @@
   </div>
 </div>
 
+<!-- Modal QR grande -->
+<div id="modalQR" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);
+     z-index:9999;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:20px;padding:28px 24px;text-align:center;
+              max-width:340px;width:92%;position:relative;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+    <button onclick="cerrarModalQR()"
+            style="position:absolute;top:12px;right:14px;border:none;background:none;
+                   font-size:1.4rem;cursor:pointer;color:#9CA3AF;line-height:1">✕</button>
+    <div id="qrModalNombre" style="font-weight:700;font-size:1rem;color:#111827;margin-bottom:16px"></div>
+    <div id="qrGrande" style="display:flex;justify-content:center;margin-bottom:14px"></div>
+    <div id="qrModalUrl"
+         style="font-size:.68rem;color:#9CA3AF;word-break:break-all;margin-bottom:18px;padding:0 4px"></div>
+    <button onclick="descargarQR()"
+            style="padding:10px 22px;background:#111827;color:#fff;border:none;
+                   border-radius:10px;font-size:.88rem;font-weight:600;cursor:pointer">
+      ⬇️ Descargar PNG
+    </button>
+  </div>
+</div>
+
 <script src="https://unpkg.com/qrcodejs@1.0.0/qrcode.min.js"></script>
 <script>
-// Generar QR por mesa
+// URLs por mesa
+const qrUrls = {};
+<?php foreach ($mesas as $m): ?>
+qrUrls[<?= $m['id'] ?>] = '<?= addslashes(BASE_URL . 'menu/' . ($rest['slug'] ?? '') . '?mesa=' . $m['qr_codigo']) ?>';
+<?php endforeach; ?>
+
+// Thumbnails 80×80 en la tabla
 <?php foreach ($mesas as $m): ?>
 new QRCode(document.getElementById('qr-<?= $m['id'] ?>'), {
-  text: '<?= addslashes(BASE_URL . 'menu/' . ($rest['slug'] ?? '') . '?mesa=' . $m['qr_codigo']) ?>',
-  width: 52, height: 52, colorDark: '#111827'
+  text: qrUrls[<?= $m['id'] ?>],
+  width: 80, height: 80, colorDark: '#111827'
 });
 <?php endforeach; ?>
+
+// ── Modal QR grande ──────────────────────────────────────────────────────────
+function verQR(mesaId, nombre) {
+  document.getElementById('qrModalNombre').textContent = nombre;
+  document.getElementById('qrModalUrl').textContent    = qrUrls[mesaId] ?? '';
+  const c = document.getElementById('qrGrande');
+  c.innerHTML = '';
+  new QRCode(c, { text: qrUrls[mesaId], width: 256, height: 256, colorDark: '#111827' });
+  document.getElementById('modalQR').style.display = 'flex';
+}
+function cerrarModalQR() {
+  document.getElementById('modalQR').style.display = 'none';
+  document.getElementById('qrGrande').innerHTML = '';
+}
+function descargarQR() {
+  const canvas = document.querySelector('#qrGrande canvas');
+  if (!canvas) return;
+  const a = document.createElement('a');
+  a.href = canvas.toDataURL('image/png');
+  a.download = (document.getElementById('qrModalNombre').textContent || 'qr-mesa') + '.png';
+  a.click();
+}
+document.getElementById('modalQR').addEventListener('click', e => {
+  if (e.target.id === 'modalQR') cerrarModalQR();
+});
 
 function rstModal(id) {
   const el = document.getElementById(id);

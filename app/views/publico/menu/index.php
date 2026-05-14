@@ -87,10 +87,11 @@
     <div style="grid-column:1/-1;padding:60px 20px;text-align:center;color:#6B7280">
       <div style="font-size:3.5rem;margin-bottom:8px">🍽️</div>
       <div style="font-size:1.05rem;font-weight:700;color:#374151;margin-bottom:6px">
-        Estamos preparando el menú
+        Menú en preparación
       </div>
-      <div style="font-size:.88rem;max-width:340px;margin:0 auto;line-height:1.5">
-        Aún no hay platillos disponibles. Vuelve en un momento o pide ayuda al personal.
+      <div style="font-size:.88rem;max-width:340px;margin:0 auto;line-height:1.6">
+        Aún no hay platillos disponibles.<br>
+        Vuelve pronto o pide ayuda al personal.
       </div>
     </div>
     <?php else: ?>
