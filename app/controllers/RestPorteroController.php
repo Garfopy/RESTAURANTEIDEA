@@ -31,15 +31,18 @@ class RestPorteroController extends BaseController
             $this->json(['ok' => false, 'mensaje' => 'QR no reconocido.'], 404);
         }
 
-        $pagado = $visita['estado'] === 'pagada';
+        $pagado  = $visita['estado'] === 'pagada';
+        $yaSalio = !empty($visita['salida_at']);
         $this->json([
-            'ok'          => true,
-            'pagado'      => $pagado,
-            'estado'      => $visita['estado'],
-            'comensal'    => $visita['comensal_nombre'] ?? 'Visitante',
-            'mesa'        => $visita['mesa_nombre'] ?? '—',
-            'total'       => $visita['total'],
-            'mensaje'     => $pagado ? '✅ PUEDE SALIR' : '❌ PAGO PENDIENTE $' . number_format((float)$visita['total'], 2),
+            'ok'       => true,
+            'pagado'   => $pagado,
+            'ya_salio' => $yaSalio,
+            'estado'   => $visita['estado'],
+            'comensal' => $visita['comensal_nombre'] ?? 'Visitante',
+            'mesa'     => $visita['mesa_nombre'] ?? '—',
+            'total'    => (float)$visita['total'],
+            'propina'  => (float)($visita['propina'] ?? 0),
+            'mensaje'  => $pagado ? '✅ PUEDE SALIR' : '❌ PAGO PENDIENTE $' . number_format((float)$visita['total'], 2),
         ]);
     }
 

@@ -82,16 +82,89 @@ document.getElementById('formVerificar').addEventListener('submit', async e => {
   await verificar(qr);
 });
 
+let lastQr = '';
+
 async function verificar(qr) {
   const fd = new FormData();
   fd.append('qr_code', qr);
   const res  = await fetch(baseUrl + 'rest-portero/verificar', { method: 'POST', body: fd });
   const data = await res.json();
   const box  = document.getElementById('resultBox');
-  box.textContent = data.mensaje || (data.ok ? 'OK' : 'Error');
-  box.className   = 'result-box ' + (data.pagado ? 'result-ok' : 'result-err');
-  box.style.display = 'block';
   document.getElementById('qrInput').value = '';
+
+  if (!data.ok) {
+    box.className = 'result-box result-err';
+    box.innerHTML = '<div style="font-size:2rem;margin-bottom:8px">⚠️</div><div>' + (data.mensaje || 'QR no reconocido') + '</div>';
+    box.style.display = 'block';
+    return;
+  }
+
+  lastQr = qr;
+
+  if (data.pagado && data.ya_salio) {
+    box.className = 'result-box';
+    box.style.cssText = box.style.cssText;
+    box.style.background = '#1F2937';
+    box.style.border = '2px solid #6B7280';
+    box.style.color = '#9CA3AF';
+    box.style.display = 'block';
+    box.innerHTML =
+      '<div style="font-size:2rem;margin-bottom:8px">🚪</div>' +
+      '<div style="font-size:1.15rem;font-weight:700;margin-bottom:8px">SALIDA YA REGISTRADA</div>' +
+      '<div style="font-size:.85rem">Mesa: ' + data.mesa + '</div>';
+    return;
+  }
+
+  if (data.pagado) {
+    const propText = data.propina > 0
+      ? '<div style="font-size:.85rem;color:#A7F3D0;margin-bottom:20px">Propina incluida: $' + data.propina.toFixed(2) + '</div>'
+      : '<div style="margin-bottom:20px"></div>';
+    box.className = 'result-box result-ok';
+    box.style.background = '';
+    box.style.border = '';
+    box.style.color = '';
+    box.style.display = 'block';
+    box.innerHTML =
+      '<div style="font-size:2.5rem;margin-bottom:8px">✅</div>' +
+      '<div style="font-size:1.3rem;margin-bottom:6px">CUENTA PAGADA</div>' +
+      '<div style="font-size:.88rem;font-weight:400;color:#A7F3D0;margin-bottom:14px">Mesa: ' + data.mesa + ' &nbsp;·&nbsp; ' + data.comensal + '</div>' +
+      '<div style="font-size:1.15rem;font-weight:700;margin-bottom:4px">Total: $' + data.total.toFixed(2) + '</div>' +
+      propText +
+      '<button onclick="registrarSalida()" style="width:100%;padding:12px;background:#10B981;color:#fff;border:none;border-radius:10px;font-size:1rem;font-weight:700;cursor:pointer">🚪 Registrar salida</button>';
+    return;
+  }
+
+  // No pagado
+  box.className = 'result-box result-err';
+  box.style.background = '';
+  box.style.border = '';
+  box.style.color = '';
+  box.style.display = 'block';
+  box.innerHTML =
+    '<div style="font-size:2.5rem;margin-bottom:8px">❌</div>' +
+    '<div style="font-size:1.3rem;margin-bottom:10px">PAGO PENDIENTE</div>' +
+    '<div style="font-size:1.1rem;font-weight:700">$' + data.total.toFixed(2) + '</div>' +
+    '<div style="font-size:.85rem;color:#FCA5A5;margin-top:6px">El comensal debe pagar antes de salir.</div>';
+}
+
+async function registrarSalida() {
+  if (!lastQr) return;
+  const btn = document.querySelector('#resultBox button');
+  if (btn) { btn.disabled = true; btn.textContent = 'Registrando...'; }
+  const fd = new FormData();
+  fd.append('qr_code', lastQr);
+  const res  = await fetch(baseUrl + 'rest-portero/registrarSalida', { method: 'POST', body: fd });
+  const data = await res.json();
+  const box  = document.getElementById('resultBox');
+  if (data.ok) {
+    box.innerHTML =
+      '<div style="font-size:2.5rem;margin-bottom:8px">🚪</div>' +
+      '<div style="font-size:1.3rem">SALIDA REGISTRADA</div>' +
+      '<div style="font-size:.85rem;color:#A7F3D0;margin-top:8px">¡Hasta pronto!</div>';
+    lastQr = '';
+  } else {
+    if (btn) { btn.disabled = false; btn.textContent = '🚪 Registrar salida'; }
+  }
 }
 
 document.getElementById('formEntrada').addEventListener('submit', async e => {
