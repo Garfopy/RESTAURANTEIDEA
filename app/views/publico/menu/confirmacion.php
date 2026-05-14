@@ -38,6 +38,16 @@
 <body>
 <div class="card">
 
+  <?php if (!empty($_GET['pagado'])): ?>
+  <!-- Banner pago exitoso -->
+  <div style="background:#DCFCE7;border:1.5px solid #86EFAC;border-radius:14px;
+               padding:20px;text-align:center;margin-bottom:20px">
+    <div style="font-size:2.2rem;margin-bottom:6px">🎉</div>
+    <div style="font-weight:700;color:#166534;font-size:1.05rem">¡Pago confirmado!</div>
+    <div style="font-size:.85rem;color:#16A34A;margin-top:4px">Gracias por tu visita. Tu pedido sigue en preparación.</div>
+  </div>
+  <?php endif; ?>
+
   <!-- Header -->
   <div style="text-align:center;margin-bottom:20px">
     <?php if (!empty($restaurante['logo'])): ?>

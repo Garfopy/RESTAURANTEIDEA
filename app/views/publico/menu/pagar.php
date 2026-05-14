@@ -76,30 +76,6 @@
     </div>
 
     <?php else: ?>
-    <!-- Propina selector -->
-    <div style="margin:16px 0">
-      <div style="font-size:.85rem;font-weight:600;color:#374151;margin-bottom:8px">¿Deseas dejar propina?</div>
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px" id="propinaGrid">
-        <?php
-        $subtotal = (float)($ticket['subtotal'] ?? 0);
-        $tips = [0, 10, 15, 20];
-        foreach ($tips as $pct):
-          $monto = $subtotal * $pct / 100;
-        ?>
-        <button type="button" onclick="seleccionarPropina(<?= $pct ?>, <?= $monto ?>)"
-                class="propina-btn <?= $pct === 0 ? 'selected' : '' ?>"
-                data-pct="<?= $pct ?>"
-                style="padding:8px 4px;border-radius:8px;border:2px solid #E5E7EB;background:#fff;
-                       font-size:.8rem;font-weight:600;cursor:pointer;transition:.15s;text-align:center">
-          <?= $pct === 0 ? 'Sin propina' : $pct . '%' ?>
-          <?php if ($pct > 0): ?>
-          <div style="font-size:.7rem;color:#6B7280;font-weight:400">$<?= number_format($monto, 2) ?></div>
-          <?php endif; ?>
-        </button>
-        <?php endforeach; ?>
-      </div>
-    </div>
-
     <!-- Selector método de pago -->
     <div style="margin-bottom:16px">
       <div style="font-size:.85rem;font-weight:600;color:#374151;margin-bottom:8px">Método de pago</div>
@@ -130,6 +106,30 @@
     <form method="POST" action="<?= BASE_URL ?>menu/confirmarPago/<?= htmlspecialchars($restaurante['slug'] ?? '') ?>/<?= (int)($ticket['id'] ?? 0) ?>" id="formPago">
       <input type="hidden" name="metodo_pago" id="inpMetodo" value="efectivo">
       <input type="hidden" name="propina" id="inpPropina" value="0">
+
+      <!-- Propina selector -->
+      <div style="margin-bottom:16px">
+        <div style="font-size:.85rem;font-weight:600;color:#374151;margin-bottom:8px">¿Deseas dejar propina?</div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px" id="propinaGrid">
+          <?php
+          $subtotal = (float)($ticket['subtotal'] ?? 0);
+          $tips = [0, 10, 15, 20];
+          foreach ($tips as $pct):
+            $monto = $subtotal * $pct / 100;
+          ?>
+          <button type="button" onclick="seleccionarPropina(<?= $pct ?>, <?= $monto ?>)"
+                  class="propina-btn <?= $pct === 0 ? 'selected' : '' ?>"
+                  data-pct="<?= $pct ?>"
+                  style="padding:8px 4px;border-radius:8px;border:2px solid #E5E7EB;background:#fff;
+                         font-size:.8rem;font-weight:600;cursor:pointer;transition:.15s;text-align:center">
+            <?= $pct === 0 ? 'Sin propina' : $pct . '%' ?>
+            <?php if ($pct > 0): ?>
+            <div style="font-size:.7rem;color:#6B7280;font-weight:400">$<?= number_format($monto, 2) ?></div>
+            <?php endif; ?>
+          </button>
+          <?php endforeach; ?>
+        </div>
+      </div>
 
       <!-- Dividir cuenta (acordeón) -->
       <?php if (!empty($todoItems)): ?>

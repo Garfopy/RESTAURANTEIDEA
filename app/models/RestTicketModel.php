@@ -37,10 +37,17 @@ class RestTicketModel extends BaseModel
         $folio = $this->generarFolio((int)$visita['rest_id']);
         $total = $subtotal + $propina;
 
+        // Obtener el mesero del primer pedido de la visita (para asignar propina)
+        $meseroRow = $this->queryOne(
+            "SELECT mesero_id FROM rest_pedidos WHERE visita_id = ? AND mesero_id IS NOT NULL ORDER BY created_at ASC LIMIT 1",
+            [$visitaId]
+        );
+        $meseroId = $meseroRow ? (int)$meseroRow['mesero_id'] : null;
+
         $this->execute(
-            "INSERT INTO rest_tickets (restaurante_id, visita_id, mesa_id, folio, subtotal, propina, total)
-             VALUES (?,?,?,?,?,?,?)",
-            [$visita['rest_id'], $visitaId, $visita['mesa_id'], $folio, $subtotal, $propina, $total]
+            "INSERT INTO rest_tickets (restaurante_id, visita_id, mesa_id, folio, subtotal, propina, total, mesero_id)
+             VALUES (?,?,?,?,?,?,?,?)",
+            [$visita['rest_id'], $visitaId, $visita['mesa_id'], $folio, $subtotal, $propina, $total, $meseroId]
         );
         $ticketId = (int) $this->db->lastInsertId();
 

@@ -1,4 +1,11 @@
 <?php ob_start(); ?>
+<style>
+/* ── QR thumbnail en tabla ─────────────────────────────────────────── */
+.qr-cell { vertical-align: top; width: 130px; }
+[id^="qr-"] { width: 80px; height: 80px; overflow: hidden; }
+[id^="qr-"] canvas,
+[id^="qr-"] img { display: block !important; width: 80px !important; height: 80px !important; }
+</style>
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
   <div style="font-size:.85rem;color:#6B7280">
     <?= count($mesas) ?> mesa<?= count($mesas) !== 1 ? 's' : '' ?> registrada<?= count($mesas) !== 1 ? 's' : '' ?>
@@ -44,9 +51,9 @@
         <td style="color:#6B7280"><?= htmlspecialchars($m['zona_nombre'] ?? '—') ?></td>
         <td style="text-align:center"><?= (int)$m['capacidad'] ?></td>
         <td><span class="badge <?= $badgeCls ?>"><?= $badgeTxt ?></span></td>
-        <td>
-          <div id="qr-<?= $m['id'] ?>" style="line-height:0"></div>
-          <div style="margin-top:4px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        <td class="qr-cell">
+          <div id="qr-<?= $m['id'] ?>"></div>
+          <div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
             <button type="button" onclick="verQR(<?= $m['id'] ?>, '<?= htmlspecialchars($m['nombre'], ENT_QUOTES) ?>')"
                     style="font-size:.7rem;color:#6B7280;background:#F3F4F6;border:none;
                            padding:3px 8px;border-radius:5px;cursor:pointer">

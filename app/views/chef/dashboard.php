@@ -118,17 +118,34 @@ function renderQueue(items) {
 }
 
 async function marcar(url, btn) {
+  const originalText = btn.textContent;
   btn.disabled = true;
-  await fetch(url, { method: 'POST' });
-  await loadQueue();
+  btn.textContent = '...';
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      credentials: 'same-origin',
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    await loadQueue();
+  } catch (e) {
+    console.error('Error al marcar item:', e);
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
 }
 
 async function loadQueue() {
   try {
-    const res = await fetch('<?= BASE_URL ?>rest-chef/queue');
+    const res = await fetch('<?= BASE_URL ?>rest-chef/queue?t=' + Date.now(), {
+      credentials: 'same-origin',
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     renderQueue(data);
-  } catch (e) {}
+  } catch (e) {
+    console.error('Error al cargar queue:', e);
+  }
 }
 
 // Reloj

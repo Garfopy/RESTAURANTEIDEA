@@ -250,7 +250,7 @@ class RestPublicoController extends BaseController
         // Limpia cookie de visita para que el comensal no quede pegado
         setcookie('visita_' . $restaurante['id'], '', time() - 1, '/');
 
-        $this->redirect('menu/' . $realSlug . '/pagar/' . $ticket['visita_id']);
+        $this->redirect('menu/' . $realSlug . '/confirmacion/' . $ticket['visita_id'] . '?pagado=1');
     }
 
     // GET /menu/{slug}/paypalRetorno/{ticketId}/{propina}
@@ -303,7 +303,7 @@ class RestPublicoController extends BaseController
             $_SESSION['flash_error'] = 'No se pudo confirmar el pago con PayPal. Contacta al staff.';
         }
 
-        $this->redirect('menu/' . $realSlug . '/pagar/' . $ticket['visita_id']);
+        $this->redirect('menu/' . $realSlug . '/confirmacion/' . $ticket['visita_id'] . '?pagado=1');
     }
 
     // GET /menu/{slug}/paypalCancelar/{ticketId}
