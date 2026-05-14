@@ -31,9 +31,9 @@ $nombre   = htmlspecialchars($restaurante['nombre'] ?? '');
       background: #111827;
       min-height: 100vh;
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       justify-content: center;
-      padding: 24px 16px;
+      padding: max(24px, env(safe-area-inset-top)) 16px max(40px, env(safe-area-inset-bottom));
     }
     .card {
       background: #1F2937;
