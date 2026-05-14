@@ -57,4 +57,63 @@ class RestMeseroController extends BaseController
         $stmt->execute([$this->restauranteId()]);
         $this->json(['ok' => true, 'alertas' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
     }
+
+    // GET /rest-mesero/pedidosMesa/{mesaId}  — pedidos activos de una mesa (para modal)
+    public function pedidosMesa(?string $mesaId = null): void
+    {
+        $db   = Database::getInstance();
+        $stmt = $db->prepare(
+            "SELECT p.id, p.folio, p.estado, p.created_at
+             FROM rest_pedidos p
+             WHERE p.mesa_id = ? AND p.restaurante_id = ?
+               AND p.estado NOT IN ('entregado','cancelado')
+             ORDER BY p.created_at DESC"
+        );
+        $stmt->execute([(int)$mesaId, $this->restauranteId()]);
+        $pedidos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($pedidos as &$ped) {
+            $stmt2 = $db->prepare(
+                "SELECT pi.id, pl.nombre AS nombre, pi.cantidad, pi.estado
+                 FROM rest_pedido_items pi
+                 JOIN rest_platillos pl ON pl.id = pi.platillo_id
+                 WHERE pi.pedido_id = ? AND pi.estado != 'cancelado'"
+            );
+            $stmt2->execute([(int)$ped['id']]);
+            $ped['items'] = $stmt2->fetchAll(PDO::FETCH_ASSOC);
+        }
+        unset($ped);
+
+        $this->json(['ok' => true, 'pedidos' => $pedidos]);
+    }
+
+    // GET /rest-mesero/listos  — pedidos en estado 'listo' para entregar
+    public function listos(?string $p = null): void
+    {
+        $db   = Database::getInstance();
+        $stmt = $db->prepare(
+            "SELECT p.id, p.folio, p.estado, p.created_at, m.nombre AS mesa_nombre
+             FROM rest_pedidos p
+             LEFT JOIN rest_mesas m ON m.id = p.mesa_id
+             WHERE p.restaurante_id = ? AND p.estado = 'listo'
+             ORDER BY p.created_at ASC
+             LIMIT 50"
+        );
+        $stmt->execute([$this->restauranteId()]);
+        $pedidos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($pedidos as &$ped) {
+            $stmt2 = $db->prepare(
+                "SELECT pi.id, pl.nombre AS nombre, pi.cantidad
+                 FROM rest_pedido_items pi
+                 JOIN rest_platillos pl ON pl.id = pi.platillo_id
+                 WHERE pi.pedido_id = ? AND pi.estado != 'cancelado'"
+            );
+            $stmt2->execute([(int)$ped['id']]);
+            $ped['items'] = $stmt2->fetchAll(PDO::FETCH_ASSOC);
+        }
+        unset($ped);
+
+        $this->json(['ok' => true, 'listos' => $pedidos]);
+    }
 }

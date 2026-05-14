@@ -150,8 +150,9 @@ class RestPublicoController extends BaseController
             $detalle = $this->pedidoModel->getConItems((int)$ped['id']);
             $pedidos[] = array_merge($ped, ['items' => $detalle['items'] ?? []]);
         }
+        $ticket      = $this->ticketModel->getByVisita($visitaId);
         $pageTitle   = '¡Pedido recibido!';
-        $this->render('publico/menu/confirmacion', compact('restaurante','visita','pedidos','pageTitle'));
+        $this->render('publico/menu/confirmacion', compact('restaurante','visita','pedidos','ticket','pageTitle'));
     }
 
     public function pagar(?string $slug = null): void
@@ -411,10 +412,16 @@ class RestPublicoController extends BaseController
             ];
         }
 
+        $ticketRow     = $this->ticketModel->getByVisita($visitaId);
+        $ticketEstado  = $ticketRow['estado'] ?? null;
+
         echo json_encode([
-            'ok'          => true,
-            'pedidos'     => $result,
-            'tiempo_min'  => $tiempoMax,
+            'ok'            => true,
+            'pedidos'       => $result,
+            'tiempo_min'    => $tiempoMax,
+            'ticket_estado' => $ticketEstado,
+            'ticket_total'  => $ticketRow ? (float)$ticketRow['total']   : 0,
+            'ticket_propina'=> $ticketRow ? (float)$ticketRow['propina'] : 0,
         ]);
         exit;
     }
