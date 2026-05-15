@@ -39,6 +39,33 @@ class RestPublicoController extends BaseController
 
         $categorias = $this->menuModel->getCategorias((int)$restaurante['id'], true);
         $platillos  = $this->menuModel->getPlatillosDisponibles((int)$restaurante['id']);
+
+        // ── Deduplicar categorías por nombre y normalizar IDs de platillos ──
+        // Si hay dos filas con el mismo nombre (ej. dos "Bebidas"), conservar la
+        // primera como canónica y reasignar los platillos que apunten a las duplicadas.
+        $canonicalByName = [];   // nombre_lower → id canónico
+        $idMap           = [];   // id_duplicado  → id canónico
+        $categoriasUnicas = [];
+        foreach ($categorias as $cat) {
+            $key = mb_strtolower(trim($cat['nombre']));
+            if (!isset($canonicalByName[$key])) {
+                $canonicalByName[$key] = (int)$cat['id'];
+                $categoriasUnicas[]    = $cat;
+            } else {
+                $idMap[(int)$cat['id']] = $canonicalByName[$key];
+            }
+        }
+        $categorias = $categoriasUnicas;
+        if (!empty($idMap)) {
+            foreach ($platillos as &$p) {
+                $cid = (int)($p['categoria_id'] ?? 0);
+                if (isset($idMap[$cid])) {
+                    $p['categoria_id'] = $idMap[$cid];
+                }
+            }
+            unset($p);
+        }
+        // ────────────────────────────────────────────────────────────────────
         $recetaIngredientes = [];
         try {
             $recetaIngredientes = $this->menuModel->getIngredientesPorRestaurante((int)$restaurante['id']);
