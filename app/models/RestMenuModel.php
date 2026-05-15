@@ -77,7 +77,8 @@ class RestMenuModel extends BaseModel
     {
         return $this->query(
             "SELECT ri.*, i.nombre AS ingrediente_nombre, i.unidad_principal, i.costo_unitario,
-                    COALESCE(ri.precio_extra, 0) AS precio_extra
+                    COALESCE(ri.precio_extra, 0) AS precio_extra,
+                    ri.tipo_componente, ri.codigo_display
              FROM rest_receta_ingredientes ri
              JOIN rest_ingredientes i ON i.id = ri.ingrediente_id
              WHERE ri.receta_id = ?",
@@ -128,8 +129,8 @@ class RestMenuModel extends BaseModel
         $this->execute("DELETE FROM rest_receta_ingredientes WHERE receta_id = ?", [$recetaId]);
         foreach ($ingredientes as $ing) {
             $this->execute(
-                "INSERT INTO rest_receta_ingredientes (receta_id, ingrediente_id, cantidad, unidad, notas, es_informativo, precio_extra) VALUES (?,?,?,?,?,?,?)",
-                [$recetaId, $ing['ingrediente_id'], $ing['cantidad'], $ing['unidad'], $ing['notas'] ?? null, $ing['es_informativo'] ?? 0, (float)($ing['precio_extra'] ?? 0)]
+                "INSERT INTO rest_receta_ingredientes (receta_id, ingrediente_id, cantidad, unidad, notas, es_informativo, precio_extra, tipo_componente, codigo_display) VALUES (?,?,?,?,?,?,?,?,?)",
+                [$recetaId, $ing['ingrediente_id'], $ing['cantidad'], $ing['unidad'], $ing['notas'] ?? null, $ing['es_informativo'] ?? 0, (float)($ing['precio_extra'] ?? 0), $ing['tipo_componente'] ?? 'materia_prima', $ing['codigo_display'] ?? null]
             );
         }
     }

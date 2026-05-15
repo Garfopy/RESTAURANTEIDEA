@@ -74,7 +74,6 @@ class RestChefController extends BaseController
              JOIN rest_ingredientes        i  ON i.id  = ri.ingrediente_id
              WHERE re.platillo_id   = ?
                AND i.restaurante_id = ?
-               AND ri.es_informativo = 0
              ORDER BY ri.tipo_componente, ri.codigo_display, i.nombre"
         );
         $stmtIng->execute([$platilloId, $restauranteId]);

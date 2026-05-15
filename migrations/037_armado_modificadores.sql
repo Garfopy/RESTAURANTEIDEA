@@ -14,7 +14,7 @@
 -- ────────────────────────────────────────────────────────────
 ALTER TABLE `rest_receta_ingredientes`
   ADD COLUMN `tipo_componente`
-      ENUM('materia_prima','guarnicion','salsa','extra','accion')
+      ENUM('materia_prima','guarnicion')
       NOT NULL DEFAULT 'materia_prima'
       COMMENT 'Categoría visual para el KDS'
       AFTER `notas`,

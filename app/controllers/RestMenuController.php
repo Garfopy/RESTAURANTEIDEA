@@ -71,6 +71,8 @@ class RestMenuController extends BaseController
         $cantidades       = $this->post('cantidad', []);
         $unidades         = $this->post('unidad', []);
         $informativos     = $this->post('es_informativo', []);  // array of ingrediente_id values that are checked
+        $tiposComponente  = $this->post('tipo_componente', []);
+        $codigosDisplay   = $this->post('codigo_display', []);
 
         if (!empty($ingredientesIds)) {
             $recetaId = $this->model->upsertReceta(
@@ -82,10 +84,12 @@ class RestMenuController extends BaseController
             foreach ($ingredientesIds as $k => $ingId) {
                 if (!$ingId) continue;
                 $ings[] = [
-                    'ingrediente_id' => (int)$ingId,
-                    'cantidad'       => (float)($cantidades[$k] ?? 0),
-                    'unidad'         => $unidades[$k] ?? 'kg',
-                    'es_informativo' => in_array((string)$ingId, (array)$informativos) ? 1 : 0,
+                    'ingrediente_id'  => (int)$ingId,
+                    'cantidad'        => (float)($cantidades[$k] ?? 0),
+                    'unidad'          => $unidades[$k] ?? 'kg',
+                    'es_informativo'  => in_array((string)$ingId, (array)$informativos) ? 1 : 0,
+                    'tipo_componente' => $tiposComponente[$k] ?? 'materia_prima',
+                    'codigo_display'  => trim($codigosDisplay[$k] ?? '') ?: null,
                 ];
             }
             $this->model->syncIngredientesReceta($recetaId, $ings);

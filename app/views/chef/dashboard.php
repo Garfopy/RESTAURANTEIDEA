@@ -122,9 +122,6 @@
     }
     .armado-materia_prima { background: #7F1D1D30; color: #FCA5A5; border: 1px solid #7F1D1D60; }
     .armado-guarnicion    { background: #14532D30; color: #86EFAC; border: 1px solid #14532D60; }
-    .armado-salsa         { background: #78350F30; color: #FCD34D; border: 1px solid #78350F60; }
-    .armado-extra         { background: #1E3A5F30; color: #93C5FD; border: 1px solid #1E3A5F60; }
-    .armado-accion        { background: #1F2937;   color: #9CA3AF; border: 1px solid #374151;   }
     .armado-badge strong  { font-size: .68rem; opacity: .8; }
     .armado-badge em      { font-size: .68rem; opacity: .65; font-style: normal; }
     .armado-loading       { font-size: .7rem; color: #484F58; padding: 4px 0; }
@@ -189,7 +186,7 @@ async function fetchArmado(platilloId) {
   armadoLoading.delete(platilloId);
 }
 
-const TIPO_LABEL = { materia_prima: 'MP', guarnicion: 'G', salsa: 'SA', extra: 'EX', accion: '→' };
+const TIPO_LABEL = { materia_prima: 'MP', guarnicion: 'G' };
 
 function renderArmadoHtml(data) {
   if (!data) return '';
