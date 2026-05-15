@@ -91,7 +91,22 @@ class RestPedidoModel extends BaseModel
                     m.nombre AS mesa_nombre,
                     pi.id AS item_id, pi.cantidad, pi.notas AS item_notas, pi.estado AS item_estado,
                     pi.exclusiones,
-                    pl.nombre AS platillo_nombre, pl.tiempo_preparacion_min
+                    pl.nombre AS platillo_nombre, pl.tiempo_preparacion_min,
+                    (SELECT GROUP_CONCAT(
+                                CONCAT_WS('|',
+                                    ri.ingrediente_id,
+                                    ing.nombre,
+                                    COALESCE(ing.categoria,''),
+                                    ri.cantidad,
+                                    ri.unidad
+                                )
+                                ORDER BY ing.categoria, ing.nombre
+                                SEPARATOR '||'
+                            )
+                     FROM rest_recetas r
+                     JOIN rest_receta_ingredientes ri ON ri.receta_id = r.id
+                     JOIN rest_ingredientes ing ON ing.id = ri.ingrediente_id
+                     WHERE r.platillo_id = pi.platillo_id) AS ingredientes_raw
              FROM rest_pedidos p
              JOIN rest_pedido_items pi ON pi.pedido_id = p.id
              JOIN rest_platillos pl ON pl.id = pi.platillo_id

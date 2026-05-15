@@ -86,6 +86,33 @@
     .pill-exclu { background: #7F1D1D; color: #FCA5A5; }
     .pill-nota  { background: #1E3A5F; color: #93C5FD; }
 
+    /* ── Ingredientes (receta) ── */
+    .receta-block {
+      margin-top: 8px; padding: 8px 10px;
+      background: #0D1117; border: 1px solid #21262D; border-radius: 8px;
+    }
+    .receta-title {
+      font-size: .68rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .08em; color: #8B949E; margin-bottom: 6px;
+    }
+    .receta-group { margin-bottom: 6px; }
+    .receta-group:last-child { margin-bottom: 0; }
+    .receta-group-label {
+      font-size: .65rem; font-weight: 600; color: #6E7681;
+      text-transform: uppercase; letter-spacing: .05em; margin-bottom: 3px;
+    }
+    .ing-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 7px; margin: 2px 3px 2px 0;
+      background: #161B22; border: 1px solid #30363D; border-radius: 6px;
+      font-size: .72rem; color: #E6EDF3;
+    }
+    .ing-code {
+      font-family: ui-monospace, "Cascadia Code", monospace;
+      font-weight: 700; color: #FBBF24;
+    }
+    .ing-qty { color: #8B949E; font-size: .68rem; }
+
     /* ── Botones ── */
     .btn-action {
       min-height: 44px; min-width: 90px;
@@ -191,6 +218,55 @@ function urgencyClass(createdAt) {
   return 'normal';
 }
 
+// ── Escape HTML ─────────────────────────────────
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+
+// ── Receta: códigos de materia prima y guarniciones ──
+function renderReceta(raw, cantidadPlatillo) {
+  if (!raw) return '';
+  const cant = Number(cantidadPlatillo) || 1;
+  const items = raw.split('||').map(s => {
+    const [id, nombre, categoria, qty, unidad] = s.split('|');
+    return {
+      id: id || '',
+      nombre: nombre || '',
+      categoria: (categoria || '').trim(),
+      qty: (Number(qty) || 0) * cant,
+      unidad: unidad || ''
+    };
+  }).filter(i => i.id);
+
+  if (!items.length) return '';
+
+  const esGuarnicion = c => /guarn/i.test(c);
+  const guarniciones = items.filter(i => esGuarnicion(i.categoria));
+  const materiaPrima = items.filter(i => !esGuarnicion(i.categoria));
+
+  const chip = i => `
+    <span class="ing-chip" title="${esc(i.categoria)}">
+      <span class="ing-code">#${esc(i.id)}</span>
+      <span>${esc(i.nombre)}</span>
+      ${i.qty ? `<span class="ing-qty">${i.qty.toFixed(2)} ${esc(i.unidad)}</span>` : ''}
+    </span>`;
+
+  const grupo = (label, arr) => arr.length
+    ? `<div class="receta-group">
+         <div class="receta-group-label">${label}</div>
+         ${arr.map(chip).join('')}
+       </div>` : '';
+
+  return `
+    <div class="receta-block">
+      <div class="receta-title">🧾 Receta · preparar con</div>
+      ${grupo('Materia prima', materiaPrima)}
+      ${grupo('Guarniciones', guarniciones)}
+    </div>`;
+}
+
 // ── Renderizar columna ───────────────────────────
 function renderColumna(pedidos, colId) {
   const col = document.getElementById(colId);
@@ -210,6 +286,7 @@ function renderColumna(pedidos, colId) {
           <div class="item-sub">×${it.cantidad}${it.tiempo_preparacion_min ? ' · ' + it.tiempo_preparacion_min + ' min' : ''}</div>
           ${it.exclusiones ? `<span class="pill pill-exclu">🚫 Sin: ${it.exclusiones}</span>` : ''}
           ${it.item_notas   ? `<span class="pill pill-nota">💬 ${it.item_notas}</span>`       : ''}
+          ${renderReceta(it.ingredientes_raw, it.cantidad)}
         </div>
         <div>
           ${!esPrepCol && it.item_estado === 'pendiente'
