@@ -357,15 +357,7 @@ class RestPublicoController extends BaseController
 
         $this->ticketModel->marcarPagado($ticketId, $metodo, null);
         $this->visitaModel->marcarPagada((int)$ticket['visita_id']);
-
-        // Liberar mesa
-        $visita = $this->visitaModel->find((int)$ticket['visita_id']);
-        if ($visita && !empty($visita['mesa_id'])) {
-            $this->mesaModel->cambiarEstado((int)$visita['mesa_id'], 'disponible');
-        }
-
-        // Limpia cookie de visita para que el comensal no quede pegado
-        setcookie('visita_' . $restaurante['id'], '', time() - 1, '/');
+        // La mesa se libera cuando el portero escanea el QR de salida, no aquí.
 
         $this->redirect('menu/' . $realSlug . '/confirmacion/' . $ticket['visita_id'] . '?pagado=1');
     }
@@ -409,13 +401,7 @@ class RestPublicoController extends BaseController
             }
             $this->ticketModel->marcarPagado($ticketId, 'paypal', $orderId);
             $this->visitaModel->marcarPagada((int)$ticket['visita_id']);
-
-            $visita = $this->visitaModel->find((int)$ticket['visita_id']);
-            if ($visita && !empty($visita['mesa_id'])) {
-                $this->mesaModel->cambiarEstado((int)$visita['mesa_id'], 'disponible');
-            }
-
-            setcookie('visita_' . $restaurante['id'], '', time() - 1, '/');
+            // La mesa se libera cuando el portero escanea el QR de salida, no aquí.
         } catch (\Throwable $e) {
             $_SESSION['flash_error'] = 'No se pudo confirmar el pago con PayPal. Contacta al staff.';
         }
@@ -617,7 +603,40 @@ class RestPublicoController extends BaseController
             $this->mesaModel->cambiarEstado((int)$visita['mesa_id'], 'disponible');
         }
 
-        echo json_encode(['ok' => true, 'mensaje' => '¡Salida registrada! Mesa liberada.']);
+        // Borrar cookie del comensal
+        $restaurante = $this->restModel->find((int)$visita['restaurante_id']);
+        if ($restaurante) {
+            setcookie('visita_' . $restaurante['id'], '', time() - 1, '/');
+        }
+
+        echo json_encode([
+            'ok'       => true,
+            'mensaje'  => '¡Salida registrada! Mesa liberada.',
+            'redirect' => BASE_URL . 'menu/gracias?qr=' . urlencode($visita['qr_code'] ?? ''),
+        ]);
         exit;
+    }
+
+    // GET /menu/gracias?qr={token}
+    public function gracias(?string $p = null): void
+    {
+        $qr     = trim($this->get('qr', ''));
+        $visita = $qr ? $this->visitaModel->getByQr($qr) : null;
+
+        $restaurante = null;
+        if ($visita && !empty($visita['restaurante_id'])) {
+            $restaurante = $this->restModel->find((int)$visita['restaurante_id']);
+        }
+
+        if (!$restaurante) {
+            // QR inválido o expirado — mostrar página genérica
+            $restaurante = ['nombre' => 'el restaurante', 'color_primario' => '#C8102E', 'logo' => ''];
+        }
+
+        // Limpiar cookie de visita
+        setcookie('visita_' . ($restaurante['id'] ?? 0), '', time() - 1, '/');
+
+        $pageTitle = '¡Gracias por tu visita!';
+        $this->render('publico/menu/gracias', compact('restaurante', 'visita', 'pageTitle'));
     }
 }

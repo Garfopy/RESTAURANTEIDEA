@@ -89,7 +89,7 @@ class RestPedidoModel extends BaseModel
         return $this->query(
             "SELECT p.id, p.folio, p.created_at, p.notas AS pedido_notas,
                     m.nombre AS mesa_nombre,
-                    pi.id AS item_id, pi.cantidad, pi.notas AS item_notas, pi.estado AS item_estado,
+                    pi.id AS item_id, pi.platillo_id, pi.cantidad, pi.notas AS item_notas, pi.estado AS item_estado,
                     pi.exclusiones,
                     pl.nombre AS platillo_nombre, pl.tiempo_preparacion_min
              FROM rest_pedidos p

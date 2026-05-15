@@ -39,7 +39,7 @@ if (in_array($ctrlSlug, ['menu', 'acceso'], true)) {
     $knownActions = ['index','ordenar','pagar','confirmarPago','confirmacion','login',
                      'llamarMesero','cancelarPedido','estadoPedido','actualizarPropina','generarTicket',
                      'paypalCrear','paypalRetorno','paypalCancelar','entrarComensal',
-                     'scanPortero','registrarSalidaPublica'];
+                     'scanPortero','registrarSalidaPublica','gracias'];
     if ($action !== '' && in_array($action, $knownActions, true)) {
         // Forma /menu/{accion}/{slug}/{...} — concatenar segmentos a partir del 2
         $rest  = array_slice($segments, 2);
@@ -203,6 +203,7 @@ $publicPaths = [
     // Verificación pública de salida (QR del portero)
     'menu/scanPortero',
     'menu/registrarSalidaPublica',
+    'menu/gracias',
     // Acceso staff (login por slug de restaurante)
     'acceso/index',
     'acceso/login',

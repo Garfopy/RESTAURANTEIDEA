@@ -200,6 +200,9 @@ async function registrarSalida() {
       msg.className   = 'result-msg result-ok';
       msg.textContent = data.mensaje || '¡Salida registrada! Mesa liberada.';
       msg.style.display = 'block';
+      if (data.redirect) {
+        setTimeout(() => window.location.href = data.redirect, 1000);
+      }
     } else {
       btn.disabled    = false;
       btn.textContent = '🚪 Registrar salida y liberar mesa';

@@ -28,7 +28,7 @@
     /* ── Layout columnas ── */
     .kds-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1fr 1px 1fr;
       gap: 0;
       padding: 0;
     }
@@ -108,6 +108,29 @@
       opacity: 0; transition: transform .35s cubic-bezier(.34,1.56,.64,1), opacity .35s; z-index: 99;
     }
     #kds-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ── Armado de platillo (KDS en preparación) ── */
+    .armado-wrap {
+      margin-top: 8px; padding-top: 8px;
+      border-top: 1px dashed #30363D;
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .armado-badges { display: flex; flex-wrap: wrap; gap: 5px; }
+    .armado-badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 8px; border-radius: 6px; font-size: .72rem; font-weight: 700;
+    }
+    .armado-materia_prima { background: #7F1D1D30; color: #FCA5A5; border: 1px solid #7F1D1D60; }
+    .armado-guarnicion    { background: #14532D30; color: #86EFAC; border: 1px solid #14532D60; }
+    .armado-salsa         { background: #78350F30; color: #FCD34D; border: 1px solid #78350F60; }
+    .armado-extra         { background: #1E3A5F30; color: #93C5FD; border: 1px solid #1E3A5F60; }
+    .armado-accion        { background: #1F2937;   color: #9CA3AF; border: 1px solid #374151;   }
+    .armado-badge strong  { font-size: .68rem; opacity: .8; }
+    .armado-badge em      { font-size: .68rem; opacity: .65; font-style: normal; }
+    .armado-loading       { font-size: .7rem; color: #484F58; padding: 4px 0; }
+    .prep-pasos { margin-top: 6px; }
+    .prep-paso  { font-size: .72rem; color: #8B949E; padding: 2px 0; }
+    .prep-paso:before { content: '▸ '; color: #F59E0B; }
   </style>
 </head>
 <body>
@@ -144,6 +167,48 @@
 <script>
 let prevIds  = new Set();
 const BASE   = '<?= BASE_URL ?>';
+
+// ── Caché de armado por platillo_id ──────────────
+const armadoCache   = {};
+const armadoLoading = new Set();
+
+async function fetchArmado(platilloId) {
+  if (armadoLoading.has(platilloId)) return;
+  armadoLoading.add(platilloId);
+  try {
+    const res = await fetch(`${BASE}rest-chef/armado/${platilloId}`, { credentials: 'same-origin' });
+    if (!res.ok) return;
+    armadoCache[platilloId] = await res.json();
+    // Actualizar placeholders ya renderizados en el DOM
+    document.querySelectorAll(`.armado-placeholder[data-pid="${platilloId}"]`).forEach(el => {
+      const div = document.createElement('div');
+      div.innerHTML = renderArmadoHtml(armadoCache[platilloId]);
+      el.replaceWith(...div.childNodes);
+    });
+  } catch {}
+  armadoLoading.delete(platilloId);
+}
+
+const TIPO_LABEL = { materia_prima: 'MP', guarnicion: 'G', salsa: 'SA', extra: 'EX', accion: '→' };
+
+function renderArmadoHtml(data) {
+  if (!data) return '';
+  const badges = (data.ingredientes || []).map(i => {
+    const tipo  = i.tipo_componente || 'materia_prima';
+    const label = TIPO_LABEL[tipo] || '·';
+    const cod   = i.codigo_display ? `<strong>${i.codigo_display}</strong> ` : `<strong>${label}</strong> `;
+    const cant  = i.cantidad ? ` <em>${i.cantidad} ${i.unidad}</em>` : '';
+    return `<span class="armado-badge armado-${tipo}">${cod}${i.nombre}${cant}</span>`;
+  }).join('');
+  const pasos = (data.pasos || []).map(p =>
+    `<div class="prep-paso">${p.orden_paso}. ${p.descripcion}</div>`
+  ).join('');
+  if (!badges && !pasos) return '';
+  return `<div class="armado-wrap">
+    ${badges ? `<div class="armado-badges">${badges}</div>` : ''}
+    ${pasos  ? `<div class="prep-pasos">${pasos}</div>`      : ''}
+  </div>`;
+}
 
 // ── Sonido ────────────────────────────────────────
 const alertSound = () => {
@@ -203,13 +268,21 @@ function renderColumna(pedidos, colId) {
     const urg = urgencyClass(ped.created_at);
     const esPrepCol = colId === 'col-preparacion';
 
-    const itemsHtml = ped.items.map(it => `
+    const itemsHtml = ped.items.map(it => {
+      const cachedArmado = armadoCache[it.platillo_id];
+      const armadoHtml   = esPrepCol
+        ? (cachedArmado
+            ? renderArmadoHtml(cachedArmado)
+            : `<div class="armado-loading armado-placeholder" data-pid="${it.platillo_id}">⏳ Cargando armado…</div>`)
+        : '';
+      return `
       <div class="item-row">
         <div style="flex:1">
           <div class="item-nombre">${it.platillo_nombre}</div>
           <div class="item-sub">×${it.cantidad}${it.tiempo_preparacion_min ? ' · ' + it.tiempo_preparacion_min + ' min' : ''}</div>
           ${it.exclusiones ? `<span class="pill pill-exclu">🚫 Sin: ${it.exclusiones}</span>` : ''}
           ${it.item_notas   ? `<span class="pill pill-nota">💬 ${it.item_notas}</span>`       : ''}
+          ${armadoHtml}
         </div>
         <div>
           ${!esPrepCol && it.item_estado === 'pendiente'
@@ -220,7 +293,8 @@ function renderColumna(pedidos, colId) {
             : ''}
         </div>
       </div>
-    `).join('');
+      `;
+    }).join('');
 
     return `
       <div class="kds-card ${urg}${esPrepCol ? ' preparacion' : ''}">
@@ -261,6 +335,10 @@ function renderQueue(items) {
 
   renderColumna(pendientes,  'col-pendiente');
   renderColumna(preparacion, 'col-preparacion');
+
+  // Disparar fetch de armado para platillos aún no cacheados
+  const pidsPrep = [...new Set(preparacion.flatMap(p => p.items.map(i => i.platillo_id)))];
+  pidsPrep.filter(id => id && !armadoCache[id]).forEach(fetchArmado);
 
   document.getElementById('cnt-pendiente').textContent   = pendientes.length  + ' pendientes';
   document.getElementById('cnt-preparacion').textContent = preparacion.length + ' en prep.';
