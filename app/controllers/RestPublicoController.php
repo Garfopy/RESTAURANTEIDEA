@@ -3,22 +3,24 @@ require_once ROOT_PATH . '/app/controllers/BaseController.php';
 
 class RestPublicoController extends BaseController
 {
-    private RestauranteModel $restModel;
-    private RestMenuModel    $menuModel;
-    private RestPedidoModel  $pedidoModel;
-    private RestVisitaModel  $visitaModel;
-    private RestTicketModel  $ticketModel;
-    private RestMesaModel    $mesaModel;
+    private RestauranteModel    $restModel;
+    private RestMenuModel        $menuModel;
+    private RestPedidoModel      $pedidoModel;
+    private RestVisitaModel      $visitaModel;
+    private RestTicketModel      $ticketModel;
+    private RestMesaModel        $mesaModel;
+    private RestInventarioModel  $inventarioModel;
 
     public function __construct()
     {
         parent::__construct();
-        $this->restModel   = new RestauranteModel();
-        $this->menuModel   = new RestMenuModel();
-        $this->pedidoModel = new RestPedidoModel();
-        $this->visitaModel = new RestVisitaModel();
-        $this->ticketModel = new RestTicketModel();
-        $this->mesaModel   = new RestMesaModel();
+        $this->restModel       = new RestauranteModel();
+        $this->menuModel       = new RestMenuModel();
+        $this->pedidoModel     = new RestPedidoModel();
+        $this->visitaModel     = new RestVisitaModel();
+        $this->ticketModel     = new RestTicketModel();
+        $this->mesaModel       = new RestMesaModel();
+        $this->inventarioModel = new RestInventarioModel();
     }
 
     // /menu/{slug}  o  /menu/{slug}?mesa={qr_codigo}
@@ -176,6 +178,15 @@ class RestPublicoController extends BaseController
             'visita_id'      => $visitaId,
             'mesero_id'      => null,
         ], $items);
+
+        // Descontar stock automáticamente al confirmar el pedido.
+        // Se ejecuta fuera de la transacción del pedido: un fallo de inventario
+        // no revierte el pedido ya guardado.
+        try {
+            $this->inventarioModel->descontarPorOrden($pedidoId, $restauranteId);
+        } catch (\Throwable $e) {
+            error_log('[RestauranteStock] pedido=' . $pedidoId . ' ' . $e->getMessage());
+        }
 
         $this->visitaModel->actualizarTotales((int)$visitaId);
 

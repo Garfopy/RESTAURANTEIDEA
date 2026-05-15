@@ -86,8 +86,9 @@ class RestInventarioModel extends BaseModel
     public function descontarPorOrden(int $pedidoId, int $restauranteId, ?int $usuarioId = null): void
     {
         $items = $this->query(
-            "SELECT pi.cantidad AS cantidad_pedida, ri.ingrediente_id, ri.cantidad AS cant_receta, ri.unidad,
-                    rec.porciones_base, i.unidad_principal
+            "SELECT pi.cantidad AS cantidad_pedida, pi.exclusiones,
+                    ri.ingrediente_id, ri.cantidad AS cant_receta, ri.unidad,
+                    rec.porciones_base, i.unidad_principal, i.nombre AS ingrediente_nombre
              FROM rest_pedido_items pi
              JOIN rest_platillos pl ON pl.id = pi.platillo_id
              JOIN rest_recetas rec ON rec.platillo_id = pl.id
@@ -98,6 +99,14 @@ class RestInventarioModel extends BaseModel
         );
 
         foreach ($items as $item) {
+            // Si el comensal excluyó este ingrediente, no se abrió el paquete → no descontar
+            if (!empty($item['exclusiones'])) {
+                $excluidos = array_map('trim', explode(',', $item['exclusiones']));
+                if (in_array($item['ingrediente_nombre'], $excluidos, true)) {
+                    continue;
+                }
+            }
+
             $cantidadEnUnidadReceta = ($item['cant_receta'] / max(1, $item['porciones_base'])) * $item['cantidad_pedida'];
             $descuento = self::convertirUnidad($cantidadEnUnidadReceta, $item['unidad'], $item['unidad_principal']);
             $this->ajustarStock(
