@@ -153,4 +153,16 @@ class RestInventarioController extends BaseController
         $this->flash('success', 'Ingrediente desactivado.');
         $this->redirect('rest-inventario/index');
     }
+
+    /** Endpoint JSON — devuelve stocks actuales para polling en tiempo real */
+    public function stocks(?string $p = null): void
+    {
+        $rows = $this->model->getByRestaurante($this->restauranteId());
+        $this->json(array_map(fn($r) => [
+            'id'               => (int)$r['id'],
+            'stock'            => (float)$r['stock'],
+            'stock_minimo'     => (float)$r['stock_minimo'],
+            'unidad_principal' => $r['unidad_principal'],
+        ], $rows));
+    }
 }

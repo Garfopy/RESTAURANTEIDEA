@@ -146,6 +146,8 @@
   $fillCls = $bajo ? 'low' : ($pct < 60 ? 'warn' : '');
 ?>
 <div class="inv-card <?= $bajo ? 'bajo' : 'ok' ?>"
+     id="inv-card-<?= $ing['id'] ?>"
+     data-min="<?= $min ?>" data-unidad="<?= htmlspecialchars($ing['unidad_principal'], ENT_QUOTES) ?>"
      data-search="<?= strtolower(htmlspecialchars($ing['nombre'] . ' ' . ($ing['categoria'] ?? ''), ENT_QUOTES)) ?>">
   <div class="inv-card-head">
     <div class="inv-card-name">
@@ -164,10 +166,10 @@
   <div class="inv-stock-bar-wrap">
     <div class="inv-stock-label">
       <span>Stock actual</span>
-      <strong style="color:<?= $bajo ? '#EF4444' : '#111827' ?>"><?= number_format($stock, 2) ?> <?= htmlspecialchars($ing['unidad_principal']) ?></strong>
+      <strong id="inv-sv-<?= $ing['id'] ?>" style="color:<?= $bajo ? '#EF4444' : '#111827' ?>"><?= number_format($stock, 2) ?> <?= htmlspecialchars($ing['unidad_principal']) ?></strong>
     </div>
     <div class="inv-bar">
-      <div class="inv-bar-fill <?= $fillCls ?>" style="width:<?= $pct ?>%"></div>
+      <div class="inv-bar-fill <?= $fillCls ?>" id="inv-bar-<?= $ing['id'] ?>" style="width:<?= $pct ?>%"></div>
     </div>
     <?php if ($min > 0): ?>
     <div style="font-size:.7rem;color:#9CA3AF;margin-top:3px">Mínimo: <?= number_format($min, 2) ?> <?= htmlspecialchars($ing['unidad_principal']) ?></div>
@@ -180,7 +182,7 @@
     <?php elseif ($ing['proveedor_nombre']): ?>
     <span class="badge badge-gray" style="font-size:.68rem"><?= htmlspecialchars($ing['proveedor_nombre']) ?></span>
     <?php endif; ?>
-    <span class="badge <?= $bajo ? 'badge-red' : 'badge-green' ?>" style="font-size:.7rem">
+    <span id="inv-badge-<?= $ing['id'] ?>" class="badge <?= $bajo ? 'badge-red' : 'badge-green' ?>" style="font-size:.7rem">
       <?= $bajo ? 'Stock bajo' : 'OK' ?>
     </span>
   </div>
@@ -760,6 +762,76 @@ function prepararMovimiento() {
   }
   return true;
 }
+
+// —— Polling de stock en tiempo real ——
+(function startStockPolling() {
+  const BASE = '<?= BASE_URL ?>';
+
+  async function refreshStocks() {
+    try {
+      const res = await fetch(BASE + 'rest-inventario/stocks?t=' + Date.now(), { credentials: 'same-origin' });
+      if (!res.ok) return;
+      const items = await res.json();
+      items.forEach(function(i) {
+        const card = document.getElementById('inv-card-' + i.id);
+        if (!card) return;
+
+        const min     = parseFloat(card.dataset.min) || 0;
+        const bajo    = i.stock <= min;
+        const pct     = min > 0
+          ? Math.min(100, Math.round(i.stock / (min * 2) * 100))
+          : (i.stock > 0 ? 100 : 0);
+        const fillCls = bajo ? 'low' : (pct < 60 ? 'warn' : '');
+        const unidad  = card.dataset.unidad || '';
+
+        // Clase del card
+        card.classList.toggle('bajo',  bajo);
+        card.classList.toggle('ok',   !bajo);
+
+        // Valor de stock
+        const sv = document.getElementById('inv-sv-' + i.id);
+        if (sv) {
+          sv.textContent = i.stock.toLocaleString('es-MX', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' ' + unidad;
+          sv.style.color = bajo ? '#EF4444' : '#111827';
+        }
+
+        // Barra de progreso
+        const bar = document.getElementById('inv-bar-' + i.id);
+        if (bar) {
+          bar.style.width = pct + '%';
+          bar.className = 'inv-bar-fill' + (fillCls ? ' ' + fillCls : '');
+        }
+
+        // Badge de estado
+        const badge = document.getElementById('inv-badge-' + i.id);
+        if (badge) {
+          badge.textContent = bajo ? 'Stock bajo' : 'OK';
+          badge.className = 'badge ' + (bajo ? 'badge-red' : 'badge-green');
+          badge.style.fontSize = '.7rem';
+        }
+
+        // Icono de alerta (reaparece/desaparece según nivel)
+        const head = card.querySelector('.inv-card-head');
+        if (head) {
+          const existing = head.querySelector('.inv-alert-icon');
+          if (bajo && !existing) {
+            const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.setAttribute('width', '16'); svg.setAttribute('height', '16');
+            svg.setAttribute('fill', 'none'); svg.setAttribute('stroke', '#EF4444');
+            svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('class', 'inv-alert-icon');
+            svg.style.cssText = 'flex-shrink:0;margin-top:2px';
+            svg.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>';
+            head.appendChild(svg);
+          } else if (!bajo && existing) {
+            existing.remove();
+          }
+        }
+      });
+    } catch(e) { /* silenciar errores de red */ }
+  }
+
+  setInterval(refreshStocks, 8000);
+}());
 </script>
 
 <?php
