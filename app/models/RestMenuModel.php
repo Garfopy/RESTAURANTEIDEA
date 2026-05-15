@@ -76,7 +76,8 @@ class RestMenuModel extends BaseModel
     public function getIngredientesReceta(int $recetaId): array
     {
         return $this->query(
-            "SELECT ri.*, i.nombre AS ingrediente_nombre, i.unidad_principal, i.costo_unitario
+            "SELECT ri.*, i.nombre AS ingrediente_nombre, i.unidad_principal, i.costo_unitario,
+                    COALESCE(ri.precio_extra, 0) AS precio_extra
              FROM rest_receta_ingredientes ri
              JOIN rest_ingredientes i ON i.id = ri.ingrediente_id
              WHERE ri.receta_id = ?",
@@ -84,12 +85,13 @@ class RestMenuModel extends BaseModel
         );
     }
 
-    /** Returns [platillo_id => [ingredients]] for all platillos of a restaurant (excludes informativo). */
+    /** Returns [platillo_id => [ingredients]] for all platillos of a restaurant. */
     public function getIngredientesPorRestaurante(int $restauranteId): array
     {
         $rows = $this->query(
             "SELECT rec.platillo_id, ri.ingrediente_id, i.nombre AS ingrediente_nombre,
-                    ri.cantidad, ri.unidad, ri.es_informativo
+                    ri.cantidad, ri.unidad, ri.es_informativo,
+                    COALESCE(ri.precio_extra, 0) AS precio_extra
              FROM rest_recetas rec
              JOIN rest_receta_ingredientes ri ON ri.receta_id = rec.id
              JOIN rest_ingredientes i ON i.id = ri.ingrediente_id
@@ -126,8 +128,8 @@ class RestMenuModel extends BaseModel
         $this->execute("DELETE FROM rest_receta_ingredientes WHERE receta_id = ?", [$recetaId]);
         foreach ($ingredientes as $ing) {
             $this->execute(
-                "INSERT INTO rest_receta_ingredientes (receta_id, ingrediente_id, cantidad, unidad, notas, es_informativo) VALUES (?,?,?,?,?,?)",
-                [$recetaId, $ing['ingrediente_id'], $ing['cantidad'], $ing['unidad'], $ing['notas'] ?? null, $ing['es_informativo'] ?? 0]
+                "INSERT INTO rest_receta_ingredientes (receta_id, ingrediente_id, cantidad, unidad, notas, es_informativo, precio_extra) VALUES (?,?,?,?,?,?,?)",
+                [$recetaId, $ing['ingrediente_id'], $ing['cantidad'], $ing['unidad'], $ing['notas'] ?? null, $ing['es_informativo'] ?? 0, (float)($ing['precio_extra'] ?? 0)]
             );
         }
     }

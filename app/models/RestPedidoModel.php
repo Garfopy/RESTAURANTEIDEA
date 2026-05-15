@@ -37,9 +37,9 @@ class RestPedidoModel extends BaseModel
 
             foreach ($items as $item) {
                 $this->execute(
-                    "INSERT INTO rest_pedido_items (pedido_id, platillo_id, cantidad, precio_unit, subtotal, notas, exclusiones)
-                     VALUES (?,?,?,?,?,?,?)",
-                    [$pedidoId, $item['platillo_id'], $item['cantidad'], $item['precio_unit'], $item['subtotal'], $item['notas'] ?? null, $item['exclusiones'] ?? null]
+                    "INSERT INTO rest_pedido_items (pedido_id, platillo_id, cantidad, precio_unit, subtotal, notas, exclusiones, extras)
+                     VALUES (?,?,?,?,?,?,?,?)",
+                    [$pedidoId, $item['platillo_id'], $item['cantidad'], $item['precio_unit'], $item['subtotal'], $item['notas'] ?? null, $item['exclusiones'] ?? null, $item['extras'] ?? null]
                 );
             }
 

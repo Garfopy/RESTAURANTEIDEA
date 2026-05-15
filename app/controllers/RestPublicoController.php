@@ -93,6 +93,7 @@ class RestPublicoController extends BaseController
         $cantidades   = $this->post('cantidad', []);
         $exclusiones  = $this->post('exclusiones', []);  // keyed by platillo_id
         $notasItem    = $this->post('notas_item', []);   // keyed by platillo_id
+        $extrasPost   = $this->post('extras', []);        // keyed by platillo_id → JSON string
 
         $items = [];
         foreach ($platillosIds as $k => $platilloId) {
@@ -104,13 +105,37 @@ class RestPublicoController extends BaseController
                 ? implode(', ', array_filter(array_map('trim', $exclusiones[$platilloId])))
                 : null;
             $nota = isset($notasItem[$platilloId]) ? trim($notasItem[$platilloId]) : null;
+
+            // Extras: porción adicional de guarniciones (con costo)
+            $extrasJson = null;
+            $extrasCoste = 0.0;
+            if (!empty($extrasPost[$platilloId])) {
+                $extrasDecoded = json_decode($extrasPost[$platilloId], true);
+                if (is_array($extrasDecoded)) {
+                    $extrasValidos = array_filter($extrasDecoded, fn($e) =>
+                        isset($e['ingrediente_id'], $e['nombre'], $e['precio_extra'], $e['cantidad'])
+                        && (int)$e['cantidad'] > 0
+                        && (float)$e['precio_extra'] >= 0
+                    );
+                    if ($extrasValidos) {
+                        $extrasJson  = json_encode(array_values($extrasValidos));
+                        $extrasCoste = array_sum(array_map(
+                            fn($e) => (float)$e['precio_extra'] * (int)$e['cantidad'],
+                            $extrasValidos
+                        ));
+                    }
+                }
+            }
+
+            $precioUnit = (float)$platillo['precio'] + $extrasCoste;
             $items[] = [
                 'platillo_id' => (int)$platilloId,
                 'cantidad'    => $cant,
-                'precio_unit' => (float)$platillo['precio'],
-                'subtotal'    => (float)$platillo['precio'] * $cant,
+                'precio_unit' => $precioUnit,
+                'subtotal'    => $precioUnit * $cant,
                 'notas'       => $nota ?: null,
                 'exclusiones' => $excl,
+                'extras'      => $extrasJson,
             ];
         }
 
