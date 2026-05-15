@@ -72,8 +72,8 @@ class RestChefController extends BaseController
              FROM rest_receta_ingredientes ri
              JOIN rest_recetas            re ON re.id = ri.receta_id
              JOIN rest_ingredientes        i  ON i.id  = ri.ingrediente_id
-             WHERE re.platillo_id    = ?
-               AND re.restaurante_id = ?
+             WHERE re.platillo_id   = ?
+               AND i.restaurante_id = ?
                AND ri.es_informativo = 0
              ORDER BY ri.tipo_componente, ri.codigo_display, i.nombre"
         );

@@ -13,12 +13,12 @@
 --    (es_informativo y precio_extra ya existen desde migrations 030 y 036)
 -- ────────────────────────────────────────────────────────────
 ALTER TABLE `rest_receta_ingredientes`
-  ADD COLUMN IF NOT EXISTS `tipo_componente`
+  ADD COLUMN `tipo_componente`
       ENUM('materia_prima','guarnicion','salsa','extra','accion')
       NOT NULL DEFAULT 'materia_prima'
       COMMENT 'Categoría visual para el KDS'
       AFTER `notas`,
-  ADD COLUMN IF NOT EXISTS `codigo_display`
+  ADD COLUMN `codigo_display`
       VARCHAR(10) NULL
       COMMENT 'Identificador manual asignado por el admin: MP1, G1, SA2…'
       AFTER `tipo_componente`;
