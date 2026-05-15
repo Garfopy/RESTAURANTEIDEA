@@ -242,11 +242,20 @@ body {
    MENÚ PÚBLICO — estilos para /menu/{slug}
    ============================================================ */
 .pub-hero {
-  background: linear-gradient(160deg, color-mix(in srgb, var(--cp) 8%, #FFFFFF) 0%, #FAFAF7 55%);
-  border-bottom: 1px solid rgba(0,0,0,.06);
-  color: #1C1C2E;
-  padding: 32px 20px 24px;
+  background: linear-gradient(150deg, var(--cs) 0%, color-mix(in srgb, var(--cs) 78%, var(--cp)) 60%, color-mix(in srgb, var(--cp) 55%, #0d0d18) 100%);
+  border-bottom: 1px solid rgba(255,255,255,.06);
+  color: #fff;
+  padding: 44px 20px 32px;
   text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.pub-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(201,164,48,.18) 0%, transparent 70%);
+  pointer-events: none;
 }
 .pub-cat-bar {
   display: flex;

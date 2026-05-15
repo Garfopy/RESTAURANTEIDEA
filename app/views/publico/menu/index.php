@@ -26,30 +26,31 @@
     a { color:inherit; text-decoration:none; }
 
     /* ── Barra de tabs ──────────────────────────── */
-    .mn-tab-bar { display:flex; gap:6px; padding:12px 16px 10px; overflow-x:auto; scrollbar-width:none; position:sticky; top:0; background:rgba(250,250,247,.97); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); z-index:20; border-bottom:1px solid #E5E7EB; }
+    .mn-tab-bar { display:flex; gap:6px; padding:12px 16px 10px; overflow-x:auto; scrollbar-width:none; position:sticky; top:0; background:rgba(250,250,247,.97); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); z-index:20; border-bottom:1px solid #E5E7EB; box-shadow:0 2px 8px rgba(0,0,0,.04); }
     .mn-tab-bar::-webkit-scrollbar { display:none; }
-    .mn-tab { padding:7px 18px; border-radius:99px; font-size:.82rem; font-weight:600; border:1.5px solid #D1D5DB; background:transparent; color:var(--text-muted); cursor:pointer; white-space:nowrap; transition:all .18s; flex-shrink:0; }
-    .mn-tab:hover { border-color:var(--gold); color:var(--gold); }
-    .mn-tab.active { background:var(--gold); border-color:var(--gold); color:#fff; }
+    .mn-tab { padding:8px 18px; border-radius:99px; font-size:.82rem; font-weight:600; border:1.5px solid #D1D5DB; background:transparent; color:var(--text-muted); cursor:pointer; white-space:nowrap; transition:all .18s; flex-shrink:0; }
+    .mn-tab:hover { border-color:var(--gold); color:var(--gold); background:var(--gold-dim); }
+    .mn-tab.active { background:var(--gold); border-color:var(--gold); color:#fff; box-shadow:0 3px 10px rgba(201,164,48,.35); }
 
     /* ── Secciones y grid ───────────────────────── */
-    .mn-section-title { padding:20px 16px 8px; font-family:'Playfair Display',Georgia,serif; font-size:1.15rem; color:var(--gold); letter-spacing:.02em; border-bottom:1px solid #E5E7EB; margin:0 16px 14px; }
-    .mn-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(164px,1fr)); gap:14px; padding:0 16px 14px; }
+    .mn-section-title { padding:22px 16px 10px; font-family:'Playfair Display',Georgia,serif; font-size:1.2rem; color:var(--gold); letter-spacing:.02em; border-bottom:2px solid rgba(201,164,48,.18); margin:0 16px 16px; display:flex; align-items:center; gap:8px; }
+    .mn-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(172px,1fr)); gap:16px; padding:0 16px 16px; }
 
     /* ── Tarjeta ────────────────────────────────── */
-    .mn-card { background:var(--card); border:1px solid rgba(0,0,0,.06); border-radius:16px; overflow:hidden; display:flex; flex-direction:column; cursor:pointer; box-shadow:0 2px 10px rgba(0,0,0,.06); transition:box-shadow .2s,transform .18s; }
-    .mn-card:hover { box-shadow:0 6px 28px rgba(201,164,48,.22); transform:translateY(-2px); border-color:rgba(201,164,48,.35); }
-    .mn-card-img { height:110px; position:relative; overflow:hidden; }
-    .mn-card-img img { width:100%; height:100%; object-fit:cover; }
-    .mn-placeholder { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:2.6rem; background:linear-gradient(135deg,#F5F3EE 0%,#EDEAE3 100%); }
-    .mn-price-badge { position:absolute; top:8px; right:8px; background:var(--gold); color:#fff; font-size:.75rem; font-weight:800; padding:3px 9px; border-radius:99px; }
-    .mn-card-body { padding:11px 13px 13px; display:flex; flex-direction:column; flex:1; gap:6px; }
-    .mn-card-name { font-family:'Playfair Display',Georgia,serif; font-size:.92rem; font-weight:700; line-height:1.25; color:var(--text-main); }
+    .mn-card { background:var(--card); border:1px solid rgba(0,0,0,.06); border-radius:18px; overflow:hidden; display:flex; flex-direction:column; cursor:pointer; box-shadow:0 2px 12px rgba(0,0,0,.07); transition:box-shadow .22s,transform .2s,border-color .2s; }
+    .mn-card:hover { box-shadow:0 8px 32px rgba(201,164,48,.26); transform:translateY(-3px); border-color:rgba(201,164,48,.4); }
+    .mn-card-img { height:124px; position:relative; overflow:hidden; }
+    .mn-card-img img { width:100%; height:100%; object-fit:cover; transition:transform .3s; }
+    .mn-card:hover .mn-card-img img { transform:scale(1.05); }
+    .mn-placeholder { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:2.8rem; background:linear-gradient(135deg,#F5F3EE 0%,#EDE8DC 100%); }
+    .mn-price-badge { position:absolute; bottom:8px; right:8px; background:var(--gold); color:#fff; font-size:.76rem; font-weight:800; padding:4px 10px; border-radius:99px; box-shadow:0 2px 8px rgba(0,0,0,.2); letter-spacing:.01em; }
+    .mn-card-body { padding:12px 14px 14px; display:flex; flex-direction:column; flex:1; gap:6px; }
+    .mn-card-name { font-family:'Playfair Display',Georgia,serif; font-size:.95rem; font-weight:700; line-height:1.25; color:var(--text-main); }
     .mn-chips { display:flex; flex-wrap:wrap; gap:4px; margin-top:2px; }
-    .mn-chip { font-size:.6rem; font-weight:600; padding:2px 7px; border-radius:99px; border:1px solid rgba(201,164,48,.3); color:rgba(160,120,20,.85); background:rgba(201,164,48,.07); white-space:nowrap; }
+    .mn-chip { font-size:.6rem; font-weight:600; padding:2px 7px; border-radius:99px; border:1px solid rgba(201,164,48,.3); color:rgba(150,112,12,.9); background:rgba(201,164,48,.09); white-space:nowrap; }
     .mn-chip-more { font-size:.6rem; color:var(--text-muted); align-self:center; }
-    .mn-card-btn { margin-top:auto; padding:9px 0; background:var(--gold-dim); border:1px solid rgba(201,164,48,.3); border-radius:10px; color:#8a6800; font-size:.82rem; font-weight:700; cursor:pointer; width:100%; transition:background .15s; letter-spacing:.02em; }
-    .mn-card-btn:hover { background:rgba(201,164,48,.22); }
+    .mn-card-btn { margin-top:auto; padding:10px 0; background:var(--gold); border:none; border-radius:12px; color:#fff; font-size:.83rem; font-weight:700; cursor:pointer; width:100%; transition:filter .15s,transform .12s; letter-spacing:.03em; box-shadow:0 2px 8px rgba(201,164,48,.3); }
+    .mn-card-btn:hover { filter:brightness(1.1); transform:translateY(-1px); }
 
     /* ── Carrito flotante ───────────────────────── */
     .pub-cart-bar { position:fixed; bottom:0; left:0; right:0; background:#fff; border-top:1px solid var(--gold); color:var(--text-main); padding:14px 20px; display:flex; justify-content:space-between; align-items:center; z-index:99; transform:translateY(100%); transition:transform .3s cubic-bezier(.4,0,.2,1); box-shadow:0 -4px 32px rgba(201,164,48,.15); }
@@ -102,20 +103,20 @@
 <div class="pub-hero">
   <?php if ($restaurante['logo']): ?>
   <img src="<?= BASE_URL . htmlspecialchars($restaurante['logo']) ?>" alt=""
-       style="height:52px;object-fit:contain;margin-bottom:12px;display:block;margin-inline:auto;filter:drop-shadow(0 2px 6px rgba(0,0,0,.1))">
+       style="height:60px;object-fit:contain;margin-bottom:14px;display:block;margin-inline:auto;filter:drop-shadow(0 3px 10px rgba(0,0,0,.3)) brightness(1.05)">
   <?php endif; ?>
-  <h1 style="font-family:'Playfair Display',Georgia,serif;font-size:1.6rem;font-weight:800;margin:0 0 4px;color:var(--text-main)">
+  <h1 style="font-family:'Playfair Display',Georgia,serif;font-size:1.85rem;font-weight:800;margin:0 0 6px;color:#fff;text-shadow:0 2px 12px rgba(0,0,0,.25);letter-spacing:-.01em">
     <?= htmlspecialchars($restaurante['nombre']) ?>
   </h1>
   <?php if ($restaurante['descripcion']): ?>
-  <p style="font-size:.85rem;color:var(--text-muted);margin:0;line-height:1.5">
+  <p style="font-size:.875rem;color:rgba(255,255,255,.75);margin:0;line-height:1.6;max-width:340px;margin-inline:auto">
     <?= htmlspecialchars($restaurante['descripcion']) ?>
   </p>
   <?php endif; ?>
 
   <?php if ($mesa): ?>
-  <div style="display:inline-flex;align-items:center;gap:6px;margin-top:12px;
-              background:#F3F4F6;border-radius:8px;padding:6px 12px;font-size:.85rem;color:var(--text-main)">
+  <div style="display:inline-flex;align-items:center;gap:6px;margin-top:14px;
+              background:rgba(255,255,255,.15);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.25);border-radius:10px;padding:7px 14px;font-size:.85rem;color:#fff">
     <svg width="14" height="14" fill="currentColor" viewBox="0 0 20 20" style="opacity:.6">
       <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/>
     </svg>
@@ -123,22 +124,22 @@
   </div>
   <div style="margin-top:10px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
     <button id="btnLlamarMesero" onclick="llamarMesero()"
-            style="padding:7px 16px;background:#fff;border:1.5px solid #D1D5DB;
-                   color:var(--text-main);border-radius:20px;font-size:.82rem;font-weight:600;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.08)">
+            style="padding:8px 18px;background:rgba(255,255,255,.18);border:1.5px solid rgba(255,255,255,.35);
+                   color:#fff;border-radius:20px;font-size:.82rem;font-weight:600;cursor:pointer;backdrop-filter:blur(8px);box-shadow:0 2px 8px rgba(0,0,0,.15)">
       🔔 Llamar mesero
     </button>
     <?php if ($visitaId): ?>
     <a href="<?= BASE_URL ?>menu/<?= htmlspecialchars($restaurante['slug']) ?>/pagar/<?= $visitaId ?>"
-       style="padding:7px 16px;background:#fff;border:1.5px solid #D1D5DB;
-              color:var(--text-main);border-radius:20px;font-size:.82rem;font-weight:600;box-shadow:0 1px 4px rgba(0,0,0,.08)">
+       style="padding:8px 18px;background:rgba(255,255,255,.18);border:1.5px solid rgba(255,255,255,.35);
+              color:#fff;border-radius:20px;font-size:.82rem;font-weight:600;backdrop-filter:blur(8px);box-shadow:0 2px 8px rgba(0,0,0,.15)">
       🧾 Ver mi cuenta
     </a>
     <?php endif; ?>
   </div>
   <?php endif; ?>
   <?php if ($visitaId): ?>
-  <div id="statusTracker" style="margin-top:12px;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:10px;
-                                  padding:10px 14px;font-size:.82rem;display:none;color:var(--text-main)">
+  <div id="statusTracker" style="margin-top:14px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:12px;
+                                  padding:10px 16px;font-size:.82rem;display:none;color:#fff;backdrop-filter:blur(8px)">
     <div id="statusContent">Verificando estado del pedido…</div>
   </div>
   <?php endif; ?>
