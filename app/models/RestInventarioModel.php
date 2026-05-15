@@ -94,7 +94,7 @@ class RestInventarioModel extends BaseModel
              JOIN rest_recetas rec ON rec.platillo_id = pl.id
              JOIN rest_receta_ingredientes ri ON ri.receta_id = rec.id
              JOIN rest_ingredientes i ON i.id = ri.ingrediente_id
-             WHERE pi.pedido_id = ? AND ri.es_informativo = 0",
+             WHERE pi.pedido_id = ?",
             [$pedidoId]
         );
 

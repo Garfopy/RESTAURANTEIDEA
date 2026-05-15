@@ -325,11 +325,9 @@ sort($ingCategorias);
           <div class="form-group">
             <label class="form-label">Unidad de medida</label>
             <select name="unidad_principal" id="ingUnidad" class="form-select" onchange="calcCostos()">
-              <option value="kg">kg — kilogramo</option>
-              <option value="g">g — gramo</option>
-              <option value="L">L — litro</option>
-              <option value="ml">ml — mililitro</option>
+              <option value="paquete" selected>paquete</option>
               <option value="pza">pza — pieza</option>
+              <option value="porción">porción</option>
               <option value="caja">caja</option>
               <option value="bolsa">bolsa</option>
             </select>
@@ -344,7 +342,7 @@ sort($ingCategorias);
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
             <div class="form-group" style="margin-bottom:0">
-              <label class="form-label">Costo por <span id="unidadLabel">kg</span></label>
+              <label class="form-label">Costo por <span id="unidadLabel">paquete</span></label>
               <div style="display:flex;align-items:center;gap:6px">
                 <span style="color:#6B7280;font-weight:600">$</span>
                 <input type="number" name="costo_unitario" id="ingCosto" class="form-input"
@@ -357,7 +355,7 @@ sort($ingCategorias);
               <div style="display:flex;align-items:center;gap:6px">
                 <input type="number" name="stock_minimo" id="ingMinimo" class="form-input"
                        value="0" min="0" step="0.001" placeholder="0.000">
-                <span id="unidadMinLabel" style="color:#9CA3AF;font-size:.8rem;white-space:nowrap">kg</span>
+                <span id="unidadMinLabel" style="color:#9CA3AF;font-size:.8rem;white-space:nowrap">paquete</span>
               </div>
             </div>
           </div>
@@ -525,11 +523,9 @@ sort($ingCategorias);
             <select name="unidad_principal" id="modifEditUnidad" class="form-select"
                     onchange="document.getElementById('modifEditUnidadLabel').textContent=this.value;
                               document.getElementById('modifEditUnidadWarn').style.display='block'">
-              <option value="kg">kg — kilogramo</option>
-              <option value="g">g — gramo</option>
-              <option value="L">L — litro</option>
-              <option value="ml">ml — mililitro</option>
+              <option value="paquete">paquete</option>
               <option value="pza">pza — pieza</option>
+              <option value="porción">porción</option>
               <option value="caja">caja</option>
               <option value="bolsa">bolsa</option>
             </select>
@@ -628,15 +624,7 @@ function calcCostos() {
   document.getElementById('unidadMinLabel').textContent = unidad;
   let items = [];
   if (costo > 0) {
-    if (unidad === 'kg') {
-      items = [`Por 100g: <strong>$${(costo/10).toFixed(2)}</strong>`,`Por g: <strong>$${(costo/1000).toFixed(4)}</strong>`];
-    } else if (unidad === 'g') {
-      items = [`Por kg: <strong>$${(costo*1000).toFixed(2)}</strong>`,`Por 100g: <strong>$${(costo*100).toFixed(3)}</strong>`];
-    } else if (unidad === 'L') {
-      items = [`Por 100ml: <strong>$${(costo/10).toFixed(2)}</strong>`,`Por ml: <strong>$${(costo/1000).toFixed(4)}</strong>`];
-    } else if (unidad === 'ml') {
-      items = [`Por L: <strong>$${(costo*1000).toFixed(2)}</strong>`,`Por 100ml: <strong>$${(costo*100).toFixed(3)}</strong>`];
-    }
+    items = [`Por ${unidad}: <strong>$${costo.toFixed(2)}</strong>`];
   }
   document.getElementById('calcCostos').innerHTML = items.map(i => `<span>${i}</span>`).join('');
   document.getElementById('calcCostosWrap').style.display = items.length ? 'block' : 'none';
@@ -710,6 +698,7 @@ function setupModifUnidades(mainUnit) {
     'kg':['g','kg'],'g':['g','kg','mg'],'mg':['mg','g','kg'],
     'L':['ml','L'],'l':['ml','L'],'ml':['ml','L'],'mL':['ml','L'],
     'pza':['pza'],'caja':['caja'],'bolsa':['bolsa'],
+    'paquete':['paquete'],'porción':['porción'],'porcion':['porción'],
   };
   const units = grupos[mainUnit] || [mainUnit];
   units.forEach(u => {

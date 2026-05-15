@@ -52,17 +52,6 @@ class RestChefController extends BaseController
             $stmt2->execute([$pedidoId]);
             if ((int)$stmt2->fetchColumn() === 0) {
                 $this->model->cambiarEstadoPedido($pedidoId, 'listo');
-
-                // Descuento automático de inventario por receta
-                try {
-                    (new RestInventarioModel())->descontarPorOrden(
-                        $pedidoId,
-                        $this->restauranteId(),
-                        $this->usuarioId()
-                    );
-                } catch (\Throwable $e) {
-                    error_log('descontarPorOrden falló pedido ' . $pedidoId . ': ' . $e->getMessage());
-                }
             }
         }
 
