@@ -63,6 +63,10 @@ function tiempoTranscurrido(string $desde, string $hasta): string {
     <div style="font-size:.78rem;color:#9CA3AF;margin-bottom:2px">Subtotal</div>
     <div style="font-size:1rem;font-weight:700;color:#374151">$<?= number_format($pedido['subtotal'], 2) ?></div>
   </div>
+  <div style="text-align:center">
+    <div style="font-size:.78rem;color:#9CA3AF;margin-bottom:2px">IVA 16%</div>
+    <div style="font-size:1rem;font-weight:700;color:#374151">$<?= number_format(round($pedido['subtotal'] * 0.16, 2), 2) ?></div>
+  </div>
   <?php if (($pedido['costo_envio'] ?? 0) > 0): ?>
   <div style="text-align:center">
     <div style="font-size:.78rem;color:#9CA3AF;margin-bottom:2px">Envío</div>
@@ -70,8 +74,8 @@ function tiempoTranscurrido(string $desde, string $hasta): string {
   </div>
   <?php endif; ?>
   <div style="text-align:center">
-    <div style="font-size:.78rem;color:#9CA3AF;margin-bottom:2px">Total</div>
-    <div style="font-size:1.3rem;font-weight:800;color:var(--color-primary)">$<?= number_format($pedido['total'], 2) ?></div>
+    <div style="font-size:.78rem;color:#9CA3AF;margin-bottom:2px">Total (con IVA)</div>
+    <div style="font-size:1.3rem;font-weight:800;color:var(--color-primary)">$<?= number_format($pedido['subtotal'] * 1.16 + ($pedido['costo_envio'] ?? 0), 2) ?></div>
   </div>
   <div style="display:flex;gap:8px;flex-wrap:wrap">
     <a href="<?= BASE_URL ?>pedido/pdf/<?= $pedido['id'] ?>" target="_blank"
@@ -187,6 +191,15 @@ function tiempoTranscurrido(string $desde, string $hasta): string {
           </a>
           <?php else: ?>
           <span style="font-size:.65rem;color:#D1D5DB;background:#F9FAFB;border:1px dashed #E5E7EB;border-radius:6px;padding:4px 8px;white-space:nowrap">Sin foto aún</span>
+          <?php endif; ?>
+          <?php if (!empty($ps['firma_path'])): ?>
+          <a href="<?= htmlspecialchars($ps['firma_path']) ?>" target="_blank"
+             title="Ver firma completa"
+             style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:2px;text-decoration:none">
+            <img src="<?= htmlspecialchars($ps['firma_path']) ?>" alt="Firma del receptor"
+                 style="width:100px;height:52px;object-fit:contain;border-radius:8px;border:2px solid #BFDBFE;background:#fff;display:block;box-shadow:0 1px 4px rgba(0,0,0,.1)">
+            <span style="font-size:.6rem;color:#3B82F6;font-weight:700">✍ Ver firma</span>
+          </a>
           <?php endif; ?>
         </div>
       </div>
@@ -591,8 +604,12 @@ function tiempoTranscurrido(string $desde, string $hasta): string {
         </tbody>
         <tfoot>
           <tr style="border-top:1px solid #E5E7EB;background:#F9FAFB">
-            <td colspan="3" style="padding:10px 16px;text-align:right;color:#6B7280;font-size:.85rem">Subtotal productos</td>
+            <td colspan="3" style="padding:10px 16px;text-align:right;color:#6B7280;font-size:.85rem">Subtotal (sin IVA)</td>
             <td style="padding:10px 16px;text-align:right;font-weight:700;color:#374151">$<?= number_format($pedido['subtotal'], 2) ?></td>
+          </tr>
+          <tr style="background:#F9FAFB">
+            <td colspan="3" style="padding:6px 16px;text-align:right;color:#6B7280;font-size:.85rem">IVA 16%</td>
+            <td style="padding:6px 16px;text-align:right;font-weight:700;color:#374151">$<?= number_format(round($pedido['subtotal'] * 0.16, 2), 2) ?></td>
           </tr>
           <?php if (($pedido['costo_envio'] ?? 0) > 0): ?>
           <tr style="background:#F9FAFB">
@@ -601,9 +618,9 @@ function tiempoTranscurrido(string $desde, string $hasta): string {
           </tr>
           <?php endif; ?>
           <tr style="border-top:2px solid #E5E7EB;background:#F9FAFB">
-            <td colspan="3" style="padding:12px 16px;text-align:right;font-weight:700;color:#374151">TOTAL</td>
+            <td colspan="3" style="padding:12px 16px;text-align:right;font-weight:700;color:#374151">TOTAL (con IVA)</td>
             <td style="padding:12px 16px;text-align:right;font-weight:800;color:var(--color-primary);font-size:1.05rem">
-              $<?= number_format($pedido['total'], 2) ?>
+              $<?= number_format($pedido['subtotal'] * 1.16 + ($pedido['costo_envio'] ?? 0), 2) ?>
             </td>
           </tr>
         </tfoot>

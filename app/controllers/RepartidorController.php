@@ -254,19 +254,41 @@ class RepartidorController extends BaseController
 
         $pedidoId = (int)$row['pedido_id'];
 
-        if (empty($_FILES['foto']['tmp_name'])) {
+        if (empty($_FILES['foto']['tmp_name']) && empty($_POST['foto_base64'])) {
             $this->flash('error', 'Debes tomar una foto como evidencia de entrega.');
             $this->redirect('repartidor/pedidoDirecto/' . $pedidoId);
         }
 
-        $fotoPath = $this->guardarFoto($_FILES['foto'], 'ps_' . $psId);
+        // Foto: upload de archivo o base64 desde cámara
+        $fotoPath = null;
+        if (!empty($_FILES['foto']['tmp_name'])) {
+            $fotoPath = $this->guardarFoto($_FILES['foto'], 'ps_' . $psId);
+        } elseif (!empty($_POST['foto_base64'])) {
+            $b64 = $_POST['foto_base64'];
+            if (str_starts_with($b64, 'data:image/')) {
+                $data   = explode(',', $b64)[1] ?? '';
+                $bytes  = base64_decode($data);
+                $nombre = 'foto_ps_' . $psId . '_' . time() . '.jpg';
+                $dir    = UPLOAD_PATH . 'entregas/';
+                if (!is_dir($dir)) mkdir($dir, 0755, true);
+                file_put_contents($dir . $nombre, $bytes);
+                $fotoPath = UPLOAD_URL . 'entregas/' . $nombre;
+            }
+        }
+
         if (!$fotoPath) {
             $this->flash('error', 'Formato de imagen no válido. Usa JPG, PNG o WEBP.');
             $this->redirect('repartidor/pedidoDirecto/' . $pedidoId);
         }
 
+        // Firma digital (opcional pero requerida en el front)
+        $firmaPath = null;
+        if (!empty($_POST['firma_data'])) {
+            $firmaPath = $this->guardarFirma($_POST['firma_data'], 'ps_' . $psId);
+        }
+
         $pedidoModel = new PedidoModel();
-        $pedidoModel->confirmarSucursalEntrega($psId, $fotoPath);
+        $pedidoModel->confirmarSucursalEntrega($psId, $fotoPath, $firmaPath);
 
         // Si ya se entregaron todas las sucursales, finalizar el viaje
         if ($pedidoModel->allSucursalesEntregadas($pedidoId)) {
@@ -329,16 +351,19 @@ class RepartidorController extends BaseController
         $repartidorId = $this->usuarioId();
         $db = Database::getInstance();
 
-        // Verificar que la parada pertenece a este repartidor
+        // Verificar que la parada pertenece a este repartidor y obtener pedido+sucursal
         $stmt = $db->prepare(
-            'SELECT rd.id FROM ruta_detalle rd
+            'SELECT rd.id, rd.pedido_id, rd.sucursal_id FROM ruta_detalle rd
                JOIN rutas r ON r.id = rd.ruta_id
               WHERE rd.id = ? AND r.repartidor_id = ?'
         );
         $stmt->execute([$paradaId, $repartidorId]);
-        if (!$stmt->fetch()) {
+        $paradaRow = $stmt->fetch();
+        if (!$paradaRow) {
             $this->redirect('repartidor/inicio');
         }
+        $pedidoIdParada   = (int)$paradaRow['pedido_id'];
+        $sucursalIdParada = (int)$paradaRow['sucursal_id'];
 
         // Procesar firma (base64 → archivo)
         $firmaPath = null;
@@ -352,11 +377,18 @@ class RepartidorController extends BaseController
             $fotoPath = $this->guardarFoto($_FILES['foto'], $paradaId);
         }
 
-        // Guardar evidencia
+        // Guardar evidencia en tabla dedicada (rutas formales)
         $db->prepare(
             'INSERT INTO evidencias_entrega (ruta_detalle_id, nombre_receptor, firma_path, foto_path)
              VALUES (?, ?, ?, ?)'
         )->execute([$paradaId, $this->post('nombre_receptor'), $firmaPath, $fotoPath]);
+
+        // Sincronizar en pedido_sucursal para que el detalle del pedido muestre firma y foto
+        $db->prepare(
+            "UPDATE pedido_sucursal
+                SET estado = 'entregado', firma_path = ?, foto_entrega_path = ?, fecha_llegada = NOW()
+              WHERE pedido_id = ? AND sucursal_id = ?"
+        )->execute([$firmaPath, $fotoPath, $pedidoIdParada, $sucursalIdParada]);
 
         // Actualizar estado de parada
         $db->prepare(
@@ -364,11 +396,7 @@ class RepartidorController extends BaseController
         )->execute([$paradaId]);
 
         // Actualizar estado del pedido si todas las paradas están entregadas
-        $stmt = $db->prepare(
-            'SELECT pedido_id FROM ruta_detalle WHERE id = ?'
-        );
-        $stmt->execute([$paradaId]);
-        $pedidoId = (int)($stmt->fetch()['pedido_id'] ?? 0);
+        $pedidoId = $pedidoIdParada;
 
         if ($pedidoId) {
             $stmt2 = $db->prepare(

@@ -181,21 +181,68 @@ foreach ($sucursales as $i => $s) {
       </button>
     </div>
 
-    <!-- Paso 2: Foto de entrega -->
+    <!-- Paso 2: Foto + Firma de entrega -->
     <div id="entregaForm">
       <div class="card">
-        <div style="font-weight:700;font-size:.95rem;margin-bottom:6px">📷 Foto de evidencia — <?= htmlspecialchars($paradaActual['sucursal_nombre']) ?></div>
+        <div style="font-weight:700;font-size:.95rem;margin-bottom:6px">📷 Evidencia de entrega — <?= htmlspecialchars($paradaActual['sucursal_nombre']) ?></div>
         <p style="font-size:.8rem;color:#94A3B8;margin-bottom:14px;line-height:1.5">
-          Toma una foto como prueba de entrega en esta sucursal.
+          Toma una foto y obtén la firma del receptor como prueba de entrega.
         </p>
         <form method="POST"
               action="<?= BASE_URL ?>repartidor/confirmarParadaDirecta/<?= (int)$paradaActual['id'] ?>"
-              enctype="multipart/form-data">
-          <label class="field-label">Foto de evidencia *</label>
-          <input type="file" name="foto" accept="image/*" capture="environment" required
-                 class="file-input" style="margin-bottom:14px">
-          <button type="submit" class="btn btn-green"
-                  onclick="return confirm('¿Confirmar entrega en <?= htmlspecialchars(addslashes($paradaActual['sucursal_nombre'])) ?>?')">
+              enctype="multipart/form-data"
+              id="formEntregaDirecta">
+
+          <!-- ── Foto de evidencia ── -->
+          <label class="field-label" style="margin-bottom:8px">📷 Foto de evidencia *</label>
+
+          <!-- Video live (cámara activa) -->
+          <video id="videoPreviewDir" autoplay playsinline
+                 style="display:none;width:100%;border-radius:10px;background:#000;max-height:220px;object-fit:cover;margin-bottom:8px"></video>
+          <!-- Canvas de captura (oculto) -->
+          <canvas id="canvasCapturaDir" style="display:none"></canvas>
+          <!-- Preview foto tomada -->
+          <div id="fotoPreviewContDir" style="display:none;position:relative;margin-bottom:8px">
+            <img id="fotoPreviewDir" src="" alt="Foto"
+                 style="width:100%;border-radius:10px;max-height:220px;object-fit:cover">
+            <button type="button" onclick="repetirFotoDir()"
+                    style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.65);color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:.75rem;cursor:pointer">
+              🔄 Repetir
+            </button>
+          </div>
+
+          <!-- Botones principales (cámara / galería) -->
+          <div id="btnsFotoDir" style="display:flex;gap:8px;margin-bottom:8px">
+            <button type="button" id="btnAbrirCamaraDir" onclick="abrirCamaraDir()"
+                    style="flex:1;padding:11px;background:#1E40AF;color:#fff;border:none;border-radius:9px;font-size:.82rem;font-weight:700;cursor:pointer">
+              📷 Abrir cámara
+            </button>
+            <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px;padding:11px;background:#1E293B;color:#94A3B8;border:1px dashed #475569;border-radius:9px;font-size:.8rem;cursor:pointer">
+              🖼 Galería
+              <input type="file" name="foto" id="fotoFileDir" accept="image/*" style="display:none"
+                     onchange="previewGaleriaDir(this)">
+            </label>
+          </div>
+          <!-- Botón tomar foto (visible cuando cámara activa) -->
+          <button type="button" id="btnTomarFotoDir" onclick="tomarFotoDir()"
+                  style="display:none;width:100%;padding:13px;background:#059669;color:#fff;border:none;border-radius:9px;font-size:.9rem;font-weight:700;cursor:pointer;margin-bottom:8px">
+            📸 Tomar foto
+          </button>
+          <!-- Hidden: base64 de foto tomada con cámara -->
+          <input type="hidden" name="foto_base64" id="fotoBase64Dir">
+
+          <!-- ── Firma digital ── -->
+          <label class="field-label" style="margin-top:14px;margin-bottom:6px">✍ Firma del receptor *</label>
+          <canvas id="firmaDirectaCanvas" height="130"
+                  style="width:100%;border:2px solid #4B5563;border-radius:8px;background:#1F2937;touch-action:none;display:block"></canvas>
+          <button type="button" onclick="limpiarFirmaDir()"
+                  style="margin-top:6px;width:100%;padding:9px;background:#1E293B;color:#64748B;border:1px solid #334155;border-radius:7px;font-size:.78rem;cursor:pointer">
+            Borrar firma
+          </button>
+          <input type="hidden" name="firma_data" id="firmaDataDir">
+
+          <button type="submit" id="btnConfirmarDir" class="btn btn-green" style="margin-top:16px"
+                  onclick="return prepararEnvioDir('<?= htmlspecialchars(addslashes($paradaActual['sucursal_nombre'])) ?>')">
             ✅ &nbsp;Confirmar entrega
           </button>
         </form>
@@ -406,6 +453,151 @@ function _checkGuardarPos(lat, lng) {
   };
 </script>
 <?php endif; ?>
+
+<script>
+// ── Cámara directa (getUserMedia) ─────────────────────────────────────────────
+var _streamDir = null;
+
+function abrirCamaraDir() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    // Fallback: activar input de archivo
+    document.getElementById('fotoFileDir').click();
+    return;
+  }
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false })
+    .then(function(stream) {
+      _streamDir = stream;
+      var video = document.getElementById('videoPreviewDir');
+      video.srcObject = stream;
+      video.style.display = 'block';
+      document.getElementById('btnAbrirCamaraDir').style.display = 'none';
+      document.getElementById('btnTomarFotoDir').style.display   = 'block';
+      document.getElementById('fotoPreviewContDir').style.display = 'none';
+      document.getElementById('fotoBase64Dir').value = '';
+    })
+    .catch(function() {
+      // Sin permisos o cámara no disponible → abrir selector de galería
+      document.getElementById('fotoFileDir').click();
+    });
+}
+
+function tomarFotoDir() {
+  var video  = document.getElementById('videoPreviewDir');
+  var canvas = document.getElementById('canvasCapturaDir');
+  canvas.width  = video.videoWidth  || 640;
+  canvas.height = video.videoHeight || 480;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  var dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+  document.getElementById('fotoBase64Dir').value = dataUrl;
+  document.getElementById('fotoPreviewDir').src  = dataUrl;
+  document.getElementById('fotoPreviewContDir').style.display = 'block';
+  video.style.display = 'none';
+  document.getElementById('btnTomarFotoDir').style.display = 'none';
+  document.getElementById('btnAbrirCamaraDir').style.display = 'block';
+  // Detener stream
+  if (_streamDir) { _streamDir.getTracks().forEach(function(t){ t.stop(); }); _streamDir = null; }
+}
+
+function repetirFotoDir() {
+  document.getElementById('fotoPreviewContDir').style.display = 'none';
+  document.getElementById('fotoBase64Dir').value = '';
+  document.getElementById('fotoFileDir').value   = '';
+  abrirCamaraDir();
+}
+
+function previewGaleriaDir(input) {
+  if (!input.files || !input.files[0]) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    document.getElementById('fotoPreviewDir').src = e.target.result;
+    document.getElementById('fotoPreviewContDir').style.display = 'block';
+    document.getElementById('fotoBase64Dir').value = ''; // usar el file
+  };
+  reader.readAsDataURL(input.files[0]);
+  // Parar cámara si estaba activa
+  if (_streamDir) { _streamDir.getTracks().forEach(function(t){ t.stop(); }); _streamDir = null; }
+  document.getElementById('videoPreviewDir').style.display = 'none';
+  document.getElementById('btnTomarFotoDir').style.display = 'none';
+  document.getElementById('btnAbrirCamaraDir').style.display = 'block';
+}
+
+// ── Firma digital (pedido directo) ────────────────────────────────────────────
+(function() {
+  var canvas = document.getElementById('firmaDirectaCanvas');
+  if (!canvas) return;
+  // Sincronizar tamaño interno con el tamaño real renderizado
+  // (sin esto el canvas.width por defecto es 300px aunque se muestre más ancho,
+  //  lo que hace que el check de "vacío" falle y la firma no se envíe)
+  canvas.width  = canvas.offsetWidth  || 300;
+  canvas.height = canvas.offsetHeight || 130;
+  var ctx    = canvas.getContext('2d');
+  var dibujando = false;
+
+  function getPos(e) {
+    var r = canvas.getBoundingClientRect();
+    var src = e.touches ? e.touches[0] : e;
+    return { x: (src.clientX - r.left) * (canvas.width / r.width),
+             y: (src.clientY - r.top)  * (canvas.height / r.height) };
+  }
+
+  canvas.addEventListener('mousedown',  function(e){ dibujando=true; var p=getPos(e); ctx.beginPath(); ctx.moveTo(p.x,p.y); });
+  canvas.addEventListener('mousemove',  function(e){ if(!dibujando) return; var p=getPos(e); ctx.lineTo(p.x,p.y); ctx.strokeStyle='#F9FAFB'; ctx.lineWidth=2; ctx.stroke(); });
+  canvas.addEventListener('mouseup',    function(){ dibujando=false; });
+  canvas.addEventListener('touchstart', function(e){ e.preventDefault(); dibujando=true; var p=getPos(e); ctx.beginPath(); ctx.moveTo(p.x,p.y); }, {passive:false});
+  canvas.addEventListener('touchmove',  function(e){ e.preventDefault(); if(!dibujando) return; var p=getPos(e); ctx.lineTo(p.x,p.y); ctx.strokeStyle='#F9FAFB'; ctx.lineWidth=2; ctx.stroke(); }, {passive:false});
+  canvas.addEventListener('touchend',   function(){ dibujando=false; });
+
+  window.limpiarFirmaDir = function() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  };
+
+  window._getFirmaDataDir = function() {
+    var imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    var vacio = !imgData.data.some(function(c){ return c !== 0; });
+    if (vacio) return null;
+    // Exportar negro sobre blanco para que la imagen sea legible en cualquier contexto
+    // (pestaña nueva, ZIP, PDF). El canvas visual del repartidor no cambia.
+    var tmp = document.createElement('canvas');
+    tmp.width  = canvas.width;
+    tmp.height = canvas.height;
+    var tmpCtx = tmp.getContext('2d');
+    tmpCtx.fillStyle = '#FFFFFF';
+    tmpCtx.fillRect(0, 0, tmp.width, tmp.height);
+    var d = imgData.data;
+    for (var i = 0; i < d.length; i += 4) {
+      if (d[i + 3] > 10) {          // píxel con trazo → invertir color
+        d[i]     = 255 - d[i];
+        d[i + 1] = 255 - d[i + 1];
+        d[i + 2] = 255 - d[i + 2];
+        d[i + 3] = 255;             // forzar opaco
+      } else {                      // píxel vacío → transparente (el fondo blanco lo cubre)
+        d[i + 3] = 0;
+      }
+    }
+    tmpCtx.putImageData(imgData, 0, 0);
+    return tmp.toDataURL('image/png');
+  };
+})();
+
+window.prepararEnvioDir = function(nombreSucursal) {
+  // Validar foto
+  var base64 = document.getElementById('fotoBase64Dir').value;
+  var fileInput = document.getElementById('fotoFileDir');
+  var tieneFile = fileInput && fileInput.files && fileInput.files.length > 0;
+  if (!base64 && !tieneFile) {
+    alert('Debes tomar una foto o seleccionar una imagen de la galería.');
+    return false;
+  }
+  // Validar firma
+  var firmaData = window._getFirmaDataDir ? window._getFirmaDataDir() : null;
+  if (!firmaData) {
+    alert('El receptor debe firmar antes de confirmar la entrega.');
+    return false;
+  }
+  document.getElementById('firmaDataDir').value = firmaData;
+  return confirm('¿Confirmar entrega en ' + nombreSucursal + '?');
+};
+</script>
 
 </body>
 </html>

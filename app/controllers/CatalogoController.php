@@ -50,6 +50,18 @@ class CatalogoController extends BaseController
         }
         $favoritosSet = array_flip($favoritosIds);
 
+        // Precios especiales del comprador actual (indexados por producto_id)
+        $preciosEspeciales = [];
+        if ($this->rolActual() === 'comprador') {
+            $especiales = $this->model->getPreciosEspecialesComprador(
+                $this->usuarioId() ?? 0,
+                $this->empresaId()
+            );
+            foreach ($especiales as $pe) {
+                $preciosEspeciales[(int)$pe['producto_id']] = (float)$pe['precio'];
+            }
+        }
+
         // Combos disponibles según rol
         $comboModel = new ComboModel();
         $combos = [];

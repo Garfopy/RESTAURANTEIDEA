@@ -53,6 +53,12 @@ class AuthController extends BaseController
         $usuarioModel = new UsuarioModel();
         $usuario      = $usuarioModel->getByEmail($email);
 
+        // Cuenta desactivada: mensaje específico, sin contar intento fallido
+        if ($usuario && !(int)$usuario['activo']) {
+            $this->flash('error', 'Tu cuenta ha sido desactivada. Ponte en contacto con el administrador para reactivarla.');
+            $this->redirect('auth/login');
+        }
+
         if (!$usuario || !password_verify($password, $usuario['password'])) {
             // Registrar intento fallido
             $stmt = $db->prepare("INSERT INTO login_intentos (ip, email) VALUES (?, ?)");
@@ -75,7 +81,7 @@ class AuthController extends BaseController
 
         // Cuenta inactiva
         if (empty($usuario['activo'])) {
-            $this->flash('error', 'Tu cuenta está desactivada. Contacta al administrador.');
+            $this->flash('error', 'Tu cuenta está deshabilitada. Por favor comunícate con un administrador para volver a activarla.');
             $this->redirect('auth/login');
         }
 

@@ -134,6 +134,21 @@
     .navbar.scrolled a:not(.btn-primary) { color: #374151 !important; }
     .navbar.scrolled a:not(.btn-primary):hover { color: #111827 !important; background: rgba(0,0,0,.04) !important; }
     .navbar.scrolled span { color: #374151 !important; }
+    .navbar.scrolled #menu-toggle { color: #374151; }
+
+    /* ── Menú móvil ── */
+    #mobile-menu {
+      position: fixed; top: 64px; left: 0; width: 100%; z-index: 40;
+      background: rgba(15, 23, 42, 0.97);
+      backdrop-filter: blur(12px);
+      max-height: 0; overflow: hidden;
+      transition: max-height .35s cubic-bezier(.4,0,.2,1), opacity .25s;
+      opacity: 0;
+    }
+    #mobile-menu.open { max-height: 420px; opacity: 1; }
+    .navbar.scrolled ~ #mobile-menu { background: rgba(255,255,255,.97); }
+    .navbar.scrolled ~ #mobile-menu a:not(.btn-primary) { color: #374151; }
+    .navbar.scrolled ~ #mobile-menu .mobile-divider { border-color: #e5e7eb; }
 
     /* ── Shimmer en botón CTA ── */
     .btn-shimmer { position:relative; overflow:hidden; }
@@ -213,28 +228,72 @@
   <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
     <a href="<?= BASE_URL ?>" class="flex items-center gap-2 no-underline">
       <?php if ($appLogo): ?>
-        <img src="<?= htmlspecialchars($appLogo) ?>" alt="Logo" class="h-9 object-contain">
+        <img src="<?= htmlspecialchars($appLogo) ?>" alt="Logo" style="height:48px;width:auto;object-fit:contain">
       <?php else: ?>
-        <span class="text-xl font-black text-white tracking-tight"><?= htmlspecialchars($appName) ?></span>
+        <span style="font-size:1.5rem;font-weight:900;color:#fff;letter-spacing:-0.025em;line-height:1"><?= htmlspecialchars($appName) ?></span>
       <?php endif; ?>
     </a>
-    <div class="hidden md:flex items-center gap-1">
-      <a href="#roles"    class="text-sm font-medium text-white/70 px-4 py-2 rounded-lg hover:text-white hover:bg-white/10 transition-all">Experiencias</a>
-      <a href="#features" class="text-sm font-medium text-white/70 px-4 py-2 rounded-lg hover:text-white hover:bg-white/10 transition-all">Funciones</a>
-      <a href="#how"      class="text-sm font-medium text-white/70 px-4 py-2 rounded-lg hover:text-white hover:bg-white/10 transition-all">¿Cómo funciona?</a>
-      <a href="#precios"  class="text-sm font-medium text-white/70 px-4 py-2 rounded-lg hover:text-white hover:bg-white/10 transition-all">Precios</a>
+    <!-- Links de navegación -->
+    <div id="nav-links" style="display:none;align-items:center;gap:4px">
+      <a href="#roles"    style="font-size:.875rem;font-weight:500;color:rgba(255,255,255,.7);padding:8px 16px;border-radius:8px;text-decoration:none;transition:color .2s,background .2s" onmouseover="this.style.color='#fff';this.style.background='rgba(255,255,255,.1)'" onmouseout="this.style.color='rgba(255,255,255,.7)';this.style.background='transparent'">Experiencias</a>
+      <a href="#features" style="font-size:.875rem;font-weight:500;color:rgba(255,255,255,.7);padding:8px 16px;border-radius:8px;text-decoration:none;transition:color .2s,background .2s" onmouseover="this.style.color='#fff';this.style.background='rgba(255,255,255,.1)'" onmouseout="this.style.color='rgba(255,255,255,.7)';this.style.background='transparent'">Funciones</a>
+      <a href="#how"      style="font-size:.875rem;font-weight:500;color:rgba(255,255,255,.7);padding:8px 16px;border-radius:8px;text-decoration:none;transition:color .2s,background .2s" onmouseover="this.style.color='#fff';this.style.background='rgba(255,255,255,.1)'" onmouseout="this.style.color='rgba(255,255,255,.7)';this.style.background='transparent'">¿Cómo funciona?</a>
+      <a href="#precios"  style="font-size:.875rem;font-weight:500;color:rgba(255,255,255,.7);padding:8px 16px;border-radius:8px;text-decoration:none;transition:color .2s,background .2s" onmouseover="this.style.color='#fff';this.style.background='rgba(255,255,255,.1)'" onmouseout="this.style.color='rgba(255,255,255,.7)';this.style.background='transparent'">Precios</a>
     </div>
-    <div class="flex items-center gap-2">
-      <a href="<?= BASE_URL ?>auth/login" class="text-sm font-semibold text-white/80 px-4 py-2 hover:text-white transition-colors">
-        Iniciar sesión
-      </a>
+    <div style="display:flex;align-items:center;gap:8px">
+      <!-- Siempre visible: CTA principal -->
       <a href="<?= BASE_URL ?>planes"
-         class="btn-primary btn-shimmer text-sm font-bold px-5 py-2.5 rounded-xl">
+         class="btn-primary btn-shimmer"
+         style="font-size:.875rem;font-weight:700;padding:10px 20px;border-radius:12px;text-decoration:none;white-space:nowrap">
         Ver planes
       </a>
+      <!-- Iniciar sesión: solo desktop -->
+      <a id="nav-login" href="<?= BASE_URL ?>auth/login"
+         style="display:none;font-size:.875rem;font-weight:600;color:rgba(255,255,255,.8);padding:8px 16px;text-decoration:none;white-space:nowrap">
+        Iniciar sesión
+      </a>
+      <!-- Botón hamburguesa: solo móvil -->
+      <button id="menu-toggle"
+              style="display:none;align-items:center;justify-content:center;width:40px;height:40px;border-radius:8px;background:none;border:none;color:#fff;cursor:pointer;flex-shrink:0;padding:0"
+              aria-label="Abrir menú" aria-expanded="false">
+        <svg id="icon-open" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
+        </svg>
+        <svg id="icon-close" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="display:none">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
     </div>
   </div>
 </nav>
+<script>
+// Responsive navbar — sin depender de Tailwind CDN
+(function() {
+  function navResponsive() {
+    var isMobile = window.innerWidth < 768;
+    document.getElementById('nav-links').style.display   = isMobile ? 'none'         : 'flex';
+    document.getElementById('nav-login').style.display   = isMobile ? 'none'         : 'inline-block';
+    document.getElementById('menu-toggle').style.display = isMobile ? 'flex'         : 'none';
+    if (!isMobile && typeof closeMobileMenu === 'function') closeMobileMenu();
+  }
+  navResponsive();
+  window.addEventListener('resize', navResponsive);
+})();
+</script>
+
+<!-- ══════════════════════════════════════════════════════════ MENÚ MÓVIL -->
+<div id="mobile-menu" role="dialog" aria-label="Menú de navegación">
+  <div class="max-w-6xl mx-auto px-6 py-4 flex flex-col gap-1">
+    <a href="#roles"    class="mobile-menu-link text-base font-medium text-white/80 px-4 py-3 rounded-lg hover:text-white hover:bg-white/10 transition-all">Experiencias</a>
+    <a href="#features" class="mobile-menu-link text-base font-medium text-white/80 px-4 py-3 rounded-lg hover:text-white hover:bg-white/10 transition-all">Funciones</a>
+    <a href="#how"      class="mobile-menu-link text-base font-medium text-white/80 px-4 py-3 rounded-lg hover:text-white hover:bg-white/10 transition-all">¿Cómo funciona?</a>
+    <a href="#precios"  class="mobile-menu-link text-base font-medium text-white/80 px-4 py-3 rounded-lg hover:text-white hover:bg-white/10 transition-all">Precios</a>
+    <hr class="mobile-divider border-white/10 my-1">
+    <a href="<?= BASE_URL ?>auth/login" class="mobile-menu-link text-base font-semibold text-white/80 px-4 py-3 rounded-lg hover:text-white hover:bg-white/10 transition-all">
+      Iniciar sesión
+    </a>
+  </div>
+</div>
 
 <!-- ══════════════════════════════════════════════════════════ HERO -->
 <section class="hero-bg relative min-h-screen flex flex-col justify-center overflow-hidden pt-16">
@@ -831,6 +890,31 @@
 // ── Navbar scroll ──────────────────────────────────────────
 window.addEventListener('scroll', () => {
   document.querySelector('.navbar').classList.toggle('scrolled', window.scrollY > 40);
+  closeMobileMenu();
+});
+
+// ── Menú hamburguesa ──────────────────────────────────────
+const menuToggle  = document.getElementById('menu-toggle');
+const mobileMenu  = document.getElementById('mobile-menu');
+const iconOpen    = document.getElementById('icon-open');
+const iconClose   = document.getElementById('icon-close');
+
+function closeMobileMenu() {
+  mobileMenu.classList.remove('open');
+  iconOpen.style.display  = '';
+  iconClose.style.display = 'none';
+  menuToggle.setAttribute('aria-expanded', 'false');
+}
+
+menuToggle.addEventListener('click', () => {
+  const isOpen = mobileMenu.classList.toggle('open');
+  iconOpen.style.display  = isOpen ? 'none'  : '';
+  iconClose.style.display = isOpen ? 'block' : 'none';
+  menuToggle.setAttribute('aria-expanded', String(isOpen));
+});
+
+document.querySelectorAll('.mobile-menu-link').forEach(link => {
+  link.addEventListener('click', closeMobileMenu);
 });
 
 // ── Scroll reveal ──────────────────────────────────────────

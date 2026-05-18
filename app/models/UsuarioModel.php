@@ -10,7 +10,7 @@ class UsuarioModel extends BaseModel
                     CONCAT(u.nombre, " ", u.apellido_paterno) AS nombre_completo
                FROM usuarios u
                JOIN roles r ON r.id = u.rol_id
-              WHERE u.email = ? AND u.activo = 1',
+              WHERE u.email = ?',
             [$email]
         );
     }
@@ -22,9 +22,19 @@ class UsuarioModel extends BaseModel
                     CONCAT(u.nombre, " ", u.apellido_paterno) AS nombre_completo
                FROM usuarios u
                JOIN roles r ON r.id = u.rol_id
-              WHERE u.empresa_id = ? AND u.activo = 1
-              ORDER BY r.id, u.nombre',
+              WHERE u.empresa_id = ?
+              ORDER BY u.activo DESC, r.id, u.nombre',
             [$empresaId]
+        );
+    }
+
+    public function getComprador(int $id, int $empresaId): ?array
+    {
+        return $this->queryOne(
+            "SELECT u.id, u.nombre, u.apellido_paterno, u.email
+               FROM usuarios u JOIN roles r ON r.id = u.rol_id
+              WHERE u.id = ? AND u.empresa_id = ? AND r.slug = 'comprador'",
+            [$id, $empresaId]
         );
     }
 
@@ -76,7 +86,7 @@ class UsuarioModel extends BaseModel
 
     public function listadoConRol(array $filtros = [], int $page = 1): array
     {
-        $where  = ['u.activo = 1'];
+        $where  = ['1=1'];
         $params = [];
 
         if (!empty($filtros['empresa_id'])) {

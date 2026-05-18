@@ -82,6 +82,15 @@ class EmpresaInventarioController extends BaseController
             $this->redirect('empresa-inventario');
         }
 
+        // Validar stock suficiente para salida/merma
+        if (in_array($tipo, ['salida', 'merma'])) {
+            $stockActual = $this->movModel->stockActual($productoId);
+            if ($cantidad > $stockActual) {
+                $this->flash('error', 'Stock insuficiente. Disponible: ' . number_format($stockActual, 2) . '. No es posible registrar una salida mayor al stock actual.');
+                $this->redirect('empresa-inventario/movimiento/' . $tipo);
+            }
+        }
+
         $result = $this->productoModel->ajustarStock($productoId, $tipo, $cantidad);
 
         $this->movModel->registrar([

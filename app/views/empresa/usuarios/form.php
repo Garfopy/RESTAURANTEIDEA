@@ -35,8 +35,10 @@ $rolSelec = $usuario['rol_slug'] ?? '';
         </div>
         <div>
           <label style="display:block;font-size:.8rem;font-weight:600;color:#374151;margin-bottom:4px">Teléfono *</label>
-          <input type="text" name="telefono" required value="<?= htmlspecialchars($usuario['telefono'] ?? '') ?>"
+          <input type="tel" name="telefono" required value="<?= htmlspecialchars($usuario['telefono'] ?? '') ?>"
                  placeholder="10 dígitos"
+                 maxlength="10" minlength="10" pattern="[0-9]{10}" inputmode="numeric"
+                 oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,10)"
                  style="width:100%;padding:9px 12px;border:1px solid #D1D5DB;border-radius:6px;font-size:.875rem;box-sizing:border-box">
         </div>
       </div>

@@ -1,17 +1,33 @@
 <?php
 // Vista: Configurar PayPal plan IDs (superadmin)
+$modoActivo = $modoActivo ?? 'sandbox';
+$colMensual = $modoActivo === 'live' ? 'paypal_plan_id_live'       : 'paypal_plan_id';
+$colAnual   = $modoActivo === 'live' ? 'paypal_plan_id_anual_live' : 'paypal_plan_id_anual';
 $todosConId = array_reduce($planes, fn($ok, $p) =>
-    $ok && !empty($p['paypal_plan_id']) && !empty($p['paypal_plan_id_anual']), true);
+    $ok && !empty($p[$colMensual]) && !empty($p[$colAnual]), true);
 ?>
 <div style="max-width:700px">
 
+  <!-- Indicador de modo activo -->
+  <div style="margin-bottom:14px;display:flex;align-items:center;gap:10px">
+    <?php if ($modoActivo === 'live'): ?>
+    <span style="display:inline-flex;align-items:center;gap:5px;background:#FFF7ED;border:1px solid #FED7AA;border-radius:20px;padding:4px 12px;font-size:.78rem;font-weight:700;color:#9A3412">
+      🚀 Modo activo: LIVE
+    </span>
+    <?php else: ?>
+    <span style="display:inline-flex;align-items:center;gap:5px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:20px;padding:4px 12px;font-size:.78rem;font-weight:700;color:#166534">
+      🧪 Modo activo: SANDBOX
+    </span>
+    <?php endif; ?>
+    <a href="<?= BASE_URL ?>config/apis" style="font-size:.75rem;color:#6B7280;text-decoration:underline">Cambiar modo</a>
+  </div>
   <?php if ($todosConId): ?>
   <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;padding:14px 16px;margin-bottom:20px;font-size:.875rem;color:#166534">
-    Todos los planes están sincronizados con PayPal.
+    Todos los planes están sincronizados con PayPal (<?= strtoupper($modoActivo) ?>).
   </div>
   <?php else: ?>
   <div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:14px 16px;margin-bottom:20px;font-size:.875rem;color:#92400E">
-    Hay planes sin ID de PayPal. Usa el botón para generarlos automáticamente.
+    Hay planes sin ID de PayPal en modo <?= strtoupper($modoActivo) ?>. Usa el botón para generarlos automáticamente.
   </div>
   <?php endif; ?>
 
@@ -30,9 +46,10 @@ $todosConId = array_reduce($planes, fn($ok, $p) =>
 
   <!-- Estado actual de los IDs -->
   <div style="background:#fff;border-radius:12px;border:1px solid #E5E7EB;padding:24px">
-    <h2 style="font-size:.95rem;font-weight:700;margin-bottom:16px;color:#111827">
+    <h2 style="font-size:.95rem;font-weight:700;margin-bottom:4px;color:#111827">
       PayPal Plan IDs actuales
     </h2>
+    <p style="font-size:.78rem;color:#6B7280;margin-bottom:16px">Mostrando IDs del modo: <strong><?= strtoupper($modoActivo) ?></strong></p>
     <div style="display:flex;flex-direction:column;gap:16px">
       <?php foreach ($planes as $plan): ?>
       <div style="border:1px solid #E5E7EB;border-radius:8px;padding:14px">
@@ -69,16 +86,16 @@ $todosConId = array_reduce($planes, fn($ok, $p) =>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:.8rem">
           <div>
             <div style="color:#6B7280;margin-bottom:3px">Mensual</div>
-            <?php if (!empty($plan['paypal_plan_id'])): ?>
-              <code style="background:#F3F4F6;padding:3px 8px;border-radius:4px;color:#111827"><?= htmlspecialchars($plan['paypal_plan_id']) ?></code>
+            <?php if (!empty($plan[$colMensual])): ?>
+              <code style="background:#F3F4F6;padding:3px 8px;border-radius:4px;color:#111827"><?= htmlspecialchars($plan[$colMensual]) ?></code>
             <?php else: ?>
               <span style="color:#EF4444">Sin ID</span>
             <?php endif; ?>
           </div>
           <div>
             <div style="color:#6B7280;margin-bottom:3px">Anual</div>
-            <?php if (!empty($plan['paypal_plan_id_anual'])): ?>
-              <code style="background:#F3F4F6;padding:3px 8px;border-radius:4px;color:#111827"><?= htmlspecialchars($plan['paypal_plan_id_anual']) ?></code>
+            <?php if (!empty($plan[$colAnual])): ?>
+              <code style="background:#F3F4F6;padding:3px 8px;border-radius:4px;color:#111827"><?= htmlspecialchars($plan[$colAnual]) ?></code>
             <?php else: ?>
               <span style="color:#EF4444">Sin ID</span>
             <?php endif; ?>

@@ -173,6 +173,9 @@ $tipoIcPath = match ($tipo) {
           <div id="nuevoStockInfo" style="display:none;margin-top:8px;padding:9px 13px;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px;font-size:.82rem;color:#374151">
             Stock resultante: <strong id="nuevoStockValor" style="color:<?= $tipoColor ?>"></strong>
           </div>
+          <div id="stockWarning" style="display:none;margin-top:8px;padding:9px 13px;background:#FEE2E2;border:1px solid #FECACA;border-radius:8px;font-size:.82rem;color:#991B1B;font-weight:600">
+            ⚠ Stock insuficiente. Máximo disponible: <strong id="stockWarningMax"></strong>
+          </div>
         </div>
 
         <!-- Motivo -->
@@ -196,7 +199,7 @@ $tipoIcPath = match ($tipo) {
         </div>
 
         <div style="display:flex;gap:10px">
-          <button type="submit"
+          <button type="submit" id="btnSubmit"
                   style="flex:1;padding:13px;background:<?= $tipoColor ?>;color:#fff;border:none;border-radius:10px;font-weight:700;font-size:.9rem;cursor:pointer;font-family:'Inter',sans-serif;display:flex;align-items:center;justify-content:center;gap:7px;transition:opacity .15s">
             <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="<?= $tipoIcPath ?>"/></svg>
             Registrar <?= $tipoLabel ?>
@@ -296,5 +299,16 @@ function calcularNuevoStock() {
 
   document.getElementById('panelNuevoStock').style.display = 'block';
   document.getElementById('panelNuevoStockVal').textContent = nuevo.toFixed(1) + ' ' + unidad;
+
+  // Validación stock insuficiente para salida/merma
+  const btnSubmit = document.getElementById('btnSubmit');
+  if ((tipo === 'salida' || tipo === 'merma') && cantidad > stockActual) {
+    document.getElementById('stockWarning').style.display = 'block';
+    document.getElementById('stockWarningMax').textContent = stockActual.toFixed(1) + ' ' + unidad;
+    if (btnSubmit) { btnSubmit.disabled = true; btnSubmit.style.opacity = '0.45'; btnSubmit.style.cursor = 'not-allowed'; }
+  } else {
+    document.getElementById('stockWarning').style.display = 'none';
+    if (btnSubmit) { btnSubmit.disabled = false; btnSubmit.style.opacity = '1'; btnSubmit.style.cursor = 'pointer'; }
+  }
 }
 </script>

@@ -73,6 +73,8 @@ class ConfigController extends BaseController
                 'facturalo_nombre', 'facturalo_regimen', 'facturalo_cp',
                 'facturalo_key_pem', 'facturalo_cer_pem', 'facturalo_csd_pass',
                 'paypal_client_id', 'paypal_secret', 'paypal_mode',
+                'paypal_client_id_sandbox', 'paypal_secret_sandbox',
+                'paypal_client_id_live',    'paypal_secret_live',
                 'shelly_api_url', 'shelly_auth_key',
                 'hikvision_host', 'hikvision_user', 'hikvision_pass',
                 'firebase_api_key', 'firebase_auth_domain',

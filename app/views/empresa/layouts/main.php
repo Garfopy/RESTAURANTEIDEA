@@ -33,9 +33,10 @@ $esComprador   = $rol === 'comprador';
 
     /* ── Sidebar dark premium ── */
     .sidebar {
-      width: 256px;
+      width: 260px;
       height: 100vh;
-      background: #fff;
+      background: var(--color-secondary);
+      color: #fff;
       flex-shrink: 0;
       display: flex;
       flex-direction: column;
@@ -44,65 +45,63 @@ $esComprador   = $rol === 'comprador';
       z-index: 100;
       overflow: hidden;
       transition: transform .3s ease;
-      border-right: 1px solid #E5E7EB;
     }
     .sidebar-logo-area {
-      padding: 18px 20px 16px;
-      border-bottom: 1px solid #F3F4F6;
-    }
-    .sidebar-company {
-      font-size: .72rem;
-      color: #9CA3AF;
-      font-weight: 500;
-      margin-top: 6px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      padding: 18px 20px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-shrink: 0;
+      border-bottom: 1px solid rgba(255,255,255,.07);
     }
     .sidebar nav {
       flex: 1;
       min-height: 0;
-      padding: 8px 0;
+      padding: 10px 0;
       overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255,255,255,.15) transparent;
     }
+    .sidebar nav::-webkit-scrollbar { width: 4px; }
+    .sidebar nav::-webkit-scrollbar-track { background: transparent; }
+    .sidebar nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,.15); border-radius: 999px; }
+    .sidebar nav::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.3); }
     .sidebar a {
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 9px 14px;
-      font-size: .845rem;
-      color: #6B7280;
+      padding: 10px 20px;
+      font-size: .875rem;
+      color: #D1D5DB;
       text-decoration: none;
-      border-radius: 8px;
-      margin: 1px 10px;
+      border-radius: 6px;
+      margin: 2px 10px;
       transition: background .15s, color .15s;
-      border-left: 3px solid transparent;
       font-weight: 500;
     }
     .sidebar a:hover {
-      background: #F9FAFB;
-      color: #111827;
+      background: rgba(255,255,255,.1);
+      color: #fff;
     }
     .sidebar a.active {
-      background: #FEF2F2;
-      color: var(--color-primary);
+      background: rgba(255,255,255,.1);
+      color: #fff;
       font-weight: 700;
-      border-left-color: var(--color-primary);
     }
     .sidebar a svg { flex-shrink: 0; opacity: .75; }
     .sidebar a:hover svg, .sidebar a.active svg { opacity: 1; }
     .sidebar-section {
-      font-size: .63rem;
+      font-size: .7rem;
       font-weight: 700;
-      letter-spacing: .1em;
-      color: #D1D5DB;
-      padding: 14px 18px 4px;
+      letter-spacing: .08em;
+      color: #6B7280;
+      padding: 16px 20px 4px;
       text-transform: uppercase;
     }
     .sidebar-user {
-      padding: 14px 16px;
-      border-top: 1px solid #F3F4F6;
-      background: #FAFAFA;
+      padding: 12px 16px;
+      border-top: 1px solid rgba(255,255,255,.1);
+      background: rgba(0,0,0,.2);
       flex-shrink: 0;
     }
     .sidebar-user-info {
@@ -114,22 +113,22 @@ $esComprador   = $rol === 'comprador';
     .sidebar-avatar {
       width: 34px; height: 34px;
       border-radius: 50%;
-      background: #FEF2F2;
-      border: 1.5px solid #FECACA;
+      background: rgba(255,255,255,.12);
+      border: 1.5px solid rgba(255,255,255,.25);
       display: flex; align-items: center; justify-content: center;
       font-weight: 800; font-size: .85rem;
-      color: var(--color-primary); flex-shrink: 0;
+      color: #fff; flex-shrink: 0;
     }
     .sidebar-user-name {
       font-size: .8rem; font-weight: 600;
-      color: #111827;
+      color: #F3F4F6;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     .badge-rol {
       font-size: .62rem; padding: 2px 8px;
       border-radius: 999px;
-      background: #FEF2F2;
-      color: var(--color-primary); font-weight: 700;
+      background: rgba(255,255,255,.12);
+      color: #D1D5DB; font-weight: 700;
       letter-spacing: .03em;
     }
     .sidebar-logout {
@@ -138,20 +137,20 @@ $esComprador   = $rol === 'comprador';
       border-radius: 7px;
       font-size: .78rem; color: #9CA3AF;
       text-decoration: none;
-      border: 1px solid #E5E7EB;
+      border: 1px solid rgba(255,255,255,.12);
       transition: color .15s, border-color .15s, background .15s;
     }
     .sidebar-logout:hover {
-      color: var(--color-primary);
-      border-color: #FECACA;
-      background: #FEF2F2;
+      color: #fff;
+      border-color: rgba(255,255,255,.3);
+      background: rgba(255,255,255,.08);
     }
 
     /* ── Main content ── */
     .main-content {
-      margin-left: 256px;
+      margin-left: 260px;
       min-height: 100vh;
-      width: calc(100% - 256px);
+      width: calc(100% - 260px);
       background: #F4F6FA;
       display: flex; flex-direction: column;
     }
@@ -218,7 +217,7 @@ $esComprador   = $rol === 'comprador';
     @media (max-width: 768px) {
       .sidebar       { transform: translateX(-100%); }
       .sidebar.open  { transform: translateX(0); }
-      .main-content  { margin-left: 0; }
+      .main-content  { margin-left: 0; width: 100%; }
       .hide-mobile   { display: none !important; }
     }
     @media (min-width: 769px) {
@@ -233,20 +232,15 @@ $esComprador   = $rol === 'comprador';
 <aside class="sidebar">
 
   <div class="sidebar-logo-area">
-    <a href="<?= BASE_URL ?>" style="display:inline-flex;align-items:center;text-decoration:none">
+    <a href="<?= BASE_URL ?>" style="display:flex;justify-content:center;align-items:center;text-decoration:none">
     <?php if ($appLogo): ?>
       <img src="<?= htmlspecialchars($appLogo) ?>" alt="Logo"
-           style="height:38px;max-width:180px;object-fit:contain">
+           style="height:72px;max-width:220px;object-fit:contain;filter:brightness(0) invert(1)">
     <?php else: ?>
       <img src="<?= BASE_URL ?>public/img/logo.svg" alt="<?= htmlspecialchars($appName) ?>"
-           style="height:38px;max-width:180px;object-fit:contain">
+           style="height:72px;max-width:220px;object-fit:contain;filter:brightness(0) invert(1)">
     <?php endif; ?>
     </a>
-    <?php if (!empty($empresa)): ?>
-      <div class="sidebar-company" title="<?= htmlspecialchars($empresa['razon_social']) ?>">
-        <?= htmlspecialchars($empresa['razon_social']) ?>
-      </div>
-    <?php endif; ?>
   </div>
 
   <nav>
@@ -304,6 +298,10 @@ $esComprador   = $rol === 'comprador';
     </a>
 
     <div class="sidebar-section">Mi empresa</div>
+    <a href="<?= BASE_URL ?>empresa-config/empresa" class="<?= ($activeMenu??'')==='perfil_empresa'?'active':'' ?>">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0H5m14 0h2M5 21H3M10 21V12h4v9"/></svg>
+      Mi empresa
+    </a>
     <a href="<?= BASE_URL ?>empresa-usuario/index" class="<?= ($activeMenu??'')==='usuarios'?'active':'' ?>">
       <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a4 4 0 00-4-4h-1M9 20H4v-2a4 4 0 014-4h1m4-4a4 4 0 110-8 4 4 0 010 8z"/></svg>
       Mi equipo

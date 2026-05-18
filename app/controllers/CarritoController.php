@@ -59,6 +59,12 @@ class CarritoController extends BaseController
         $compradorId = $this->usuarioId();
         $combos      = $this->comboModel->getCombosParaComprador($compradorId, $empresaId);
 
+        // Precios especiales del comprador: map producto_id => precio
+        $preciosEspeciales = [];
+        foreach ($this->productoModel->getPreciosEspecialesComprador($compradorId, $empresaId) as $pe) {
+            $preciosEspeciales[(int)$pe['producto_id']] = (float)$pe['precio'];
+        }
+
         $carrito    = $_SESSION['carrito']['items'] ?? [];
         $flash      = $this->getFlash();
         $pageTitle  = 'Hacer pedido — Paso 1: Productos';

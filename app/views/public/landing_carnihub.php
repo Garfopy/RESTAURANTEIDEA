@@ -105,6 +105,19 @@
     .navbar.scrolled a:not(.btn-primary) { color: #374151 !important; }
     .navbar.scrolled a:not(.btn-primary):hover { color: #111827 !important; background: rgba(0,0,0,.04) !important; }
     .navbar.scrolled span { color: #374151 !important; }
+    .navbar.scrolled #menu-toggle { color: #374151; }
+    #mobile-menu {
+      position: fixed; top: 64px; left: 0; width: 100%; z-index: 40;
+      background: rgba(15, 23, 42, 0.97);
+      backdrop-filter: blur(12px);
+      max-height: 0; overflow: hidden;
+      transition: max-height .35s cubic-bezier(.4,0,.2,1), opacity .25s;
+      opacity: 0;
+    }
+    #mobile-menu.open { max-height: 420px; opacity: 1; }
+    .navbar.scrolled ~ #mobile-menu { background: rgba(255,255,255,.97); }
+    .navbar.scrolled ~ #mobile-menu a { color: #374151; }
+    .navbar.scrolled ~ #mobile-menu hr { border-color: #e5e7eb; }
     .btn-shimmer { position:relative; overflow:hidden; }
     .btn-shimmer::after { content:''; position:absolute; top:0; left:-100%; width:60%; height:100%; background:linear-gradient(90deg,transparent,rgba(255,255,255,.3),transparent); animation:shimmer 2.5s infinite; }
     @keyframes shimmer { 0%{left:-100%} 100%{left:200%} }
@@ -171,23 +184,69 @@
   <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
     <a href="<?= BASE_URL ?>" class="flex items-center gap-2 no-underline">
       <?php if ($appLogo): ?>
-        <img src="<?= htmlspecialchars($appLogo) ?>" alt="Logo" class="h-9 object-contain">
+        <img src="<?= htmlspecialchars($appLogo) ?>" alt="Logo" style="height:48px;width:auto;object-fit:contain">
       <?php else: ?>
-        <span class="text-xl font-black text-white tracking-tight"><?= htmlspecialchars($appName) ?></span>
+        <span style="font-size:1.5rem;font-weight:900;color:#fff;letter-spacing:-0.025em;line-height:1"><?= htmlspecialchars($appName) ?></span>
       <?php endif; ?>
     </a>
-    <div class="hidden md:flex items-center gap-1">
-      <a href="#roles"    class="text-sm font-medium text-white/70 px-4 py-2 rounded-lg hover:text-white hover:bg-white/10 transition-all">Experiencias</a>
-      <a href="#features" class="text-sm font-medium text-white/70 px-4 py-2 rounded-lg hover:text-white hover:bg-white/10 transition-all">Funciones</a>
-      <a href="#how"      class="text-sm font-medium text-white/70 px-4 py-2 rounded-lg hover:text-white hover:bg-white/10 transition-all">¿Cómo funciona?</a>
-      <a href="#precios"  class="text-sm font-medium text-white/70 px-4 py-2 rounded-lg hover:text-white hover:bg-white/10 transition-all">Precios</a>
+    <!-- Links de navegación -->
+    <div id="nav-links" style="display:none;align-items:center;gap:4px">
+      <a href="#roles"    style="font-size:.875rem;font-weight:500;color:rgba(255,255,255,.7);padding:8px 16px;border-radius:8px;text-decoration:none;transition:color .2s,background .2s" onmouseover="this.style.color='#fff';this.style.background='rgba(255,255,255,.1)'" onmouseout="this.style.color='rgba(255,255,255,.7)';this.style.background='transparent'">Experiencias</a>
+      <a href="#features" style="font-size:.875rem;font-weight:500;color:rgba(255,255,255,.7);padding:8px 16px;border-radius:8px;text-decoration:none;transition:color .2s,background .2s" onmouseover="this.style.color='#fff';this.style.background='rgba(255,255,255,.1)'" onmouseout="this.style.color='rgba(255,255,255,.7)';this.style.background='transparent'">Funciones</a>
+      <a href="#how"      style="font-size:.875rem;font-weight:500;color:rgba(255,255,255,.7);padding:8px 16px;border-radius:8px;text-decoration:none;transition:color .2s,background .2s" onmouseover="this.style.color='#fff';this.style.background='rgba(255,255,255,.1)'" onmouseout="this.style.color='rgba(255,255,255,.7)';this.style.background='transparent'">¿Cómo funciona?</a>
+      <a href="#precios"  style="font-size:.875rem;font-weight:500;color:rgba(255,255,255,.7);padding:8px 16px;border-radius:8px;text-decoration:none;transition:color .2s,background .2s" onmouseover="this.style.color='#fff';this.style.background='rgba(255,255,255,.1)'" onmouseout="this.style.color='rgba(255,255,255,.7)';this.style.background='transparent'">Precios</a>
     </div>
-    <div class="flex items-center gap-2">
-      <a href="<?= BASE_URL ?>auth/login" class="text-sm font-semibold text-white/80 px-4 py-2 hover:text-white transition-colors">Iniciar sesión</a>
-      <a href="<?= BASE_URL ?>planes" class="btn-primary btn-shimmer text-sm font-bold px-5 py-2.5 rounded-xl">Ver planes</a>
+    <div style="display:flex;align-items:center;gap:8px">
+      <!-- Siempre visible: CTA principal -->
+      <a href="<?= BASE_URL ?>planes"
+         class="btn-primary btn-shimmer"
+         style="font-size:.875rem;font-weight:700;padding:10px 20px;border-radius:12px;text-decoration:none;white-space:nowrap">
+        Ver planes
+      </a>
+      <!-- Iniciar sesión: solo desktop -->
+      <a id="nav-login" href="<?= BASE_URL ?>auth/login"
+         style="display:none;font-size:.875rem;font-weight:600;color:rgba(255,255,255,.8);padding:8px 16px;text-decoration:none;white-space:nowrap">
+        Iniciar sesión
+      </a>
+      <!-- Botón hamburguesa: solo móvil -->
+      <button id="menu-toggle"
+              style="display:none;align-items:center;justify-content:center;width:40px;height:40px;border-radius:8px;background:none;border:none;color:#fff;cursor:pointer;flex-shrink:0;padding:0"
+              aria-label="Abrir menú" aria-expanded="false">
+        <svg id="icon-open" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
+        </svg>
+        <svg id="icon-close" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="display:none">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
     </div>
   </div>
 </nav>
+<script>
+(function() {
+  function navResponsive() {
+    var isMobile = window.innerWidth < 768;
+    document.getElementById('nav-links').style.display   = isMobile ? 'none'         : 'flex';
+    document.getElementById('nav-login').style.display   = isMobile ? 'none'         : 'inline-block';
+    document.getElementById('menu-toggle').style.display = isMobile ? 'flex'         : 'none';
+    if (!isMobile && typeof closeMobileMenu === 'function') closeMobileMenu();
+  }
+  navResponsive();
+  window.addEventListener('resize', navResponsive);
+})();
+</script>
+
+<!-- ══ MENÚ MÓVIL ══ -->
+<div id="mobile-menu" role="dialog" aria-label="Menú de navegación">
+  <div style="max-width:72rem;margin:0 auto;padding:16px 24px;display:flex;flex-direction:column;gap:4px">
+    <a href="#roles"    class="mobile-menu-link" style="font-size:1rem;font-weight:500;color:rgba(255,255,255,.8);padding:12px 16px;border-radius:8px;text-decoration:none">Experiencias</a>
+    <a href="#features" class="mobile-menu-link" style="font-size:1rem;font-weight:500;color:rgba(255,255,255,.8);padding:12px 16px;border-radius:8px;text-decoration:none">Funciones</a>
+    <a href="#how"      class="mobile-menu-link" style="font-size:1rem;font-weight:500;color:rgba(255,255,255,.8);padding:12px 16px;border-radius:8px;text-decoration:none">¿Cómo funciona?</a>
+    <a href="#precios"  class="mobile-menu-link" style="font-size:1rem;font-weight:500;color:rgba(255,255,255,.8);padding:12px 16px;border-radius:8px;text-decoration:none">Precios</a>
+    <hr style="border-color:rgba(255,255,255,.1);margin:4px 0">
+    <a href="<?= BASE_URL ?>auth/login" class="mobile-menu-link" style="font-size:1rem;font-weight:600;color:rgba(255,255,255,.8);padding:12px 16px;border-radius:8px;text-decoration:none">Iniciar sesión</a>
+  </div>
+</div>
 
 <!-- ══ SLIDER HERO ══ -->
 <div class="slider-wrap pt-16" id="hero-slider">
@@ -1068,6 +1127,151 @@
   </div>
 </section>
 
+<script>
+(function () {
+  // ── Polling: actualiza la sección de precios sin recargar la página ──
+  var BASE = '<?= BASE_URL ?>';
+  <?php
+  $planesNorm = array_map(function($p){
+    $f = !empty($p['features']) ? (is_array($p['features']) ? $p['features'] : (json_decode($p['features'],true)??[])) : [];
+    return ['id'=>(int)$p['id'],'nombre'=>$p['nombre'],'slug'=>$p['slug'],
+            'precio_mensual'=>(float)$p['precio_mensual'],
+            'precio_anual'=>!empty($p['precio_anual'])?(float)$p['precio_anual']:null,
+            'max_usuarios'=>(int)$p['max_usuarios'],'max_productos'=>(int)$p['max_productos'],
+            'max_sucursales'=>(int)$p['max_sucursales'],'features'=>array_slice($f,0,6)];
+  }, $planes ?? []);
+  ?>
+  var lastHash  = '<?= md5(json_encode($planesNorm)) ?>';
+  var gridEl    = null; // se asigna tras el primer render
+  var INTERVAL  = 10000; // ms
+
+  var SVG_CHECK = '<svg class="w-5 h-5 mt-0.5 flex-shrink-0 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">'
+                + '<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>';
+  var SVG_STAR  = '<svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">'
+                + '<path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>';
+
+  function formatNum(n) {
+    return n.toLocaleString('en-US', {maximumFractionDigits: 0});
+  }
+
+  function buildCard(plan, popular, delay) {
+    var pct = '';
+    if (plan.precio_anual) {
+      pct = Math.round((1 - plan.precio_anual / (plan.precio_mensual * 12)) * 100);
+    }
+
+    var badge = popular
+      ? '<div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold text-white mb-4" style="background:var(--cp)">'
+        + SVG_STAR + ' Más popular</div>'
+      : '';
+
+    var btnClass = popular
+      ? 'btn-primary btn-shimmer'
+      : 'border-2 border-gray-200 text-gray-700 hover:border-primary hover:text-primary';
+
+    var anualHtml = plan.precio_anual
+      ? '<div class="text-sm text-green-600 font-medium">o $' + formatNum(plan.precio_anual) + ' MXN/año'
+        + '<span class="text-xs text-green-500"> (ahorra ' + pct + '%)</span></div>'
+      : '';
+
+    var featuresHtml = '';
+    if (plan.features && plan.features.length) {
+      featuresHtml = '<ul class="space-y-3">';
+      plan.features.forEach(function (f) {
+        featuresHtml += '<li class="flex items-start gap-3 text-sm text-gray-600">' + SVG_CHECK
+                      + '<span>' + f.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</span></li>';
+      });
+      featuresHtml += '</ul>';
+    } else {
+      featuresHtml = '<ul class="space-y-3">';
+      if (plan.max_usuarios  > 0) featuresHtml += '<li class="flex items-center gap-3 text-sm text-gray-600">' + SVG_CHECK + 'Hasta ' + plan.max_usuarios  + ' usuarios</li>';
+      if (plan.max_productos > 0) featuresHtml += '<li class="flex items-center gap-3 text-sm text-gray-600">' + SVG_CHECK + 'Hasta ' + plan.max_productos + ' productos</li>';
+      if (plan.max_sucursales> 0) featuresHtml += '<li class="flex items-center gap-3 text-sm text-gray-600">' + SVG_CHECK + 'Hasta ' + plan.max_sucursales+ ' sucursales</li>';
+      featuresHtml += '<li class="flex items-center gap-3 text-sm text-gray-600">' + SVG_CHECK + 'GPS repartidores</li>';
+      featuresHtml += '<li class="flex items-center gap-3 text-sm text-gray-600">' + SVG_CHECK + 'Soporte incluido</li>';
+      featuresHtml += '</ul>';
+    }
+
+    return '<div class="plan-card bg-white rounded-2xl p-8 border border-gray-200 shadow-sm reveal'
+      + (popular ? ' plan-popular' : '') + '" style="transition-delay:' + delay + 'ms">'
+      + badge
+      + '<h3 class="text-xl font-extrabold text-gray-900 mb-1">' + plan.nombre + '</h3>'
+      + '<p class="text-sm text-gray-400 mb-6">Plan ' + plan.nombre.toLowerCase() + '</p>'
+      + '<div class="mb-6">'
+      +   '<div class="flex items-end gap-1 mb-1">'
+      +     '<span class="text-4xl font-black text-gray-900">$' + formatNum(plan.precio_mensual) + '</span>'
+      +     '<span class="text-gray-400 mb-1.5">MXN/mes</span>'
+      +   '</div>'
+      +   anualHtml
+      + '</div>'
+      + '<a href="' + BASE + 'planes/registro?plan=' + encodeURIComponent(plan.slug) + '&ciclo=mensual"'
+      +  ' class="block text-center font-bold py-3.5 rounded-xl mb-8 transition-all ' + btnClass + '">'
+      +  'Comenzar ahora</a>'
+      + featuresHtml
+      + '</div>';
+  }
+
+  function renderPlanes(planes) {
+    var section = document.getElementById('precios');
+    if (!section) return;
+
+    var wrapper = section.querySelector('.max-w-6xl');
+    if (!wrapper) return;
+
+    // Eliminar grid anterior si existe
+    var oldGrid = wrapper.querySelector('.grid');
+    var oldFallback = wrapper.querySelector('[data-planes-fallback]');
+    if (oldGrid)     oldGrid.remove();
+    if (oldFallback) oldFallback.remove();
+
+    if (!planes || planes.length === 0) {
+      var fb = document.createElement('div');
+      fb.setAttribute('data-planes-fallback', '1');
+      fb.className = 'text-center';
+      fb.innerHTML = '<a href="' + BASE + 'planes" class="btn-primary btn-shimmer inline-block font-bold text-base px-10 py-4 rounded-xl">Ver planes y precios →</a>';
+      wrapper.appendChild(fb);
+      return;
+    }
+
+    var midIndex = Math.floor(planes.length / 2);
+    var cols = Math.min(planes.length, 3);
+    var grid = document.createElement('div');
+    grid.className = 'grid grid-cols-1 md:grid-cols-' + cols + ' gap-6 items-start';
+
+    planes.forEach(function (plan, i) {
+      grid.insertAdjacentHTML('beforeend', buildCard(plan, i === midIndex, i * 100));
+    });
+
+    wrapper.appendChild(grid);
+    // Mostrar inmediatamente (el IntersectionObserver no observa elementos nuevos)
+    grid.querySelectorAll('.reveal').forEach(function(el) { el.classList.add('visible'); });
+  }
+
+  function fetchPlanes() {
+    fetch(BASE + 'api/planes', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+      .then(function (data) {
+        if (data.hash && data.hash !== lastHash) {
+          lastHash = data.hash;
+          renderPlanes(data.planes);
+        }
+      })
+      .catch(function () { /* fallo silencioso: la sección conserva su estado actual */ });
+  }
+
+  // Consulta inicial al cargar
+  fetchPlanes();
+
+  // Polling cada 10 segundos
+  setInterval(fetchPlanes, INTERVAL);
+
+  // Al volver a la pestaña, consultar de inmediato
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) fetchPlanes();
+  });
+})();
+</script>
+
 <!-- ══ TESTIMONIALES ══ -->
 <section class="bg-slate-50 py-24">
   <div class="max-w-6xl mx-auto px-6">
@@ -1261,7 +1465,40 @@
 <script>
 // Navbar scroll
 window.addEventListener('scroll', () => {
-  document.querySelector('.navbar').classList.toggle('scrolled', window.scrollY > 40);
+  const isScrolled = window.scrollY > 40;
+  document.querySelector('.navbar').classList.toggle('scrolled', isScrolled);
+  var btn = document.getElementById('menu-toggle');
+  if (btn) btn.style.color = isScrolled ? '#374151' : '#fff';
+  // Actualizar color de links del menú móvil según fondo
+  var linkColor = isScrolled ? '#374151' : 'rgba(255,255,255,.8)';
+  document.querySelectorAll('.mobile-menu-link').forEach(function(a) {
+    a.style.color = linkColor;
+  });
+  if (typeof closeMobileMenu === 'function') closeMobileMenu();
+});
+
+// Menú hamburguesa
+const menuToggle = document.getElementById('menu-toggle');
+const mobileMenu = document.getElementById('mobile-menu');
+const iconOpen   = document.getElementById('icon-open');
+const iconClose  = document.getElementById('icon-close');
+
+function closeMobileMenu() {
+  mobileMenu.classList.remove('open');
+  iconOpen.style.display  = '';
+  iconClose.style.display = 'none';
+  menuToggle.setAttribute('aria-expanded', 'false');
+}
+
+menuToggle.addEventListener('click', () => {
+  const isOpen = mobileMenu.classList.toggle('open');
+  iconOpen.style.display  = isOpen ? 'none'  : '';
+  iconClose.style.display = isOpen ? 'block' : 'none';
+  menuToggle.setAttribute('aria-expanded', String(isOpen));
+});
+
+document.querySelectorAll('.mobile-menu-link').forEach(link => {
+  link.addEventListener('click', closeMobileMenu);
 });
 
 // Reveal

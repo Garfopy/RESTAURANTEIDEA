@@ -102,6 +102,77 @@ class EmpresaConfigController extends BaseController
         require ROOT_PATH . '/app/views/empresa/layouts/main.php';
     }
 
+    public function empresa(?string $p = null): void
+    {
+        $empresaId = $this->empresaId();
+
+        if ($this->isPost()) {
+            $campos = ['razon_social', 'rfc', 'email', 'telefono', 'tipo_negocio'];
+            $set    = [];
+            $values = [];
+            foreach ($campos as $c) {
+                $set[]    = "`{$c}` = ?";
+                $values[] = trim($this->post($c, ''));
+            }
+
+            // Logo upload
+            if (!empty($_FILES['logo']['name']) && $_FILES['logo']['error'] === UPLOAD_ERR_OK) {
+                $file    = $_FILES['logo'];
+                $allowed = ['image/jpeg', 'image/png', 'image/webp'];
+                $mime    = mime_content_type($file['tmp_name']);
+                if (!in_array($mime, $allowed, true)) {
+                    $this->flash('error', 'El logo debe ser una imagen JPG, PNG o WEBP.');
+                    $this->redirect('empresa-config/empresa');
+                }
+                if ($file['size'] > 2 * 1024 * 1024) {
+                    $this->flash('error', 'El logo no puede superar los 2 MB.');
+                    $this->redirect('empresa-config/empresa');
+                }
+                $ext     = pathinfo($file['name'], PATHINFO_EXTENSION);
+                $nombre  = 'logo_' . $empresaId . '_' . time() . '.' . strtolower($ext);
+                $dir     = UPLOAD_PATH . 'empresa/';
+                if (!is_dir($dir)) {
+                    mkdir($dir, 0755, true);
+                }
+                move_uploaded_file($file['tmp_name'], $dir . $nombre);
+                $set[]    = '`logo_path` = ?';
+                $values[] = $nombre;
+            } elseif (!empty($this->post('eliminar_logo', ''))) {
+                $set[]    = '`logo_path` = ?';
+                $values[] = null;
+            }
+
+            $values[] = $empresaId;
+            $this->db->prepare(
+                'UPDATE empresas SET ' . implode(', ', $set) . ' WHERE id = ?'
+            )->execute($values);
+
+            // Refrescar sesión de empresa
+            $empresaModel = new EmpresaModel();
+            $_SESSION['empresa'] = $empresaModel->find($empresaId);
+
+            $this->log('Guardar perfil empresa', 'configuracion');
+            $this->flash('success', 'Datos de la empresa guardados correctamente.');
+            $this->redirect('empresa-config/empresa');
+        }
+
+        $stmt = $this->db->prepare(
+            'SELECT razon_social, rfc, email, telefono, tipo_negocio, logo_path
+               FROM empresas WHERE id = ? LIMIT 1'
+        );
+        $stmt->execute([$empresaId]);
+        $empresa = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+
+        $flash      = $this->getFlash();
+        $pageTitle  = 'Mi empresa';
+        $activeMenu = 'perfil_empresa';
+
+        ob_start();
+        require ROOT_PATH . '/app/views/empresa/config/perfil_empresa.php';
+        $content = ob_get_clean();
+        require ROOT_PATH . '/app/views/empresa/layouts/main.php';
+    }
+
     // Convert uploaded .cer (DER) to PEM
     private function convertirCer(array $file, array &$errors): ?string
     {
