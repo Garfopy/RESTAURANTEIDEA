@@ -320,6 +320,26 @@ $esComprador   = $rol === 'comprador';
       <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
       Reportes y analítica
     </a>
+
+    <?php /* ── Restaurante (accesos rápidos para pruebas del módulo restaurante) ── */ ?>
+    <?php $restSlug = 'la-comalada'; // ajustar si se prueba otro restaurante ?>
+    <div class="sidebar-section">Restaurante</div>
+    <a href="<?= BASE_URL ?>menu/<?= $restSlug ?>" target="_blank" rel="noopener">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7h18M3 12h18M3 17h18"/></svg>
+      Menú QR (Cliente)
+    </a>
+    <a href="<?= BASE_URL ?>acceso/<?= $restSlug ?>" target="_blank" rel="noopener">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12H3m0 0l4-4m-4 4l4 4m6-11h6a2 2 0 012 2v10a2 2 0 01-2 2h-6"/></svg>
+      Acceso Staff (Login)
+    </a>
+    <a href="<?= BASE_URL ?>rest-chef/dashboard" target="_blank" rel="noopener">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3l8 4v6c0 4.418-3.582 8-8 8s-8-3.582-8-8V7l8-4z"/><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6"/></svg>
+      Cocina (Chef)
+    </a>
+    <a href="<?= BASE_URL ?>rest-mesero" target="_blank" rel="noopener">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2a4 4 0 014-4h4m-8 6h.01M5 21h14a2 2 0 002-2V7l-5-4H7a2 2 0 00-2 2v16z"/></svg>
+      Mesero
+    </a>
     <?php endif; ?>
 
     <?php /* ── SUPERVISOR ──────────────────────────────────────────── */ ?>
