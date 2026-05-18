@@ -382,32 +382,46 @@ sort($ingCategorias);
       <!-- Panel CarniHub -->
       <div class="rst-tab-panel" id="panelCh">
         <div style="background:#FAF5FF;border:1.5px solid #DDD6FE;border-radius:10px;padding:14px;margin-bottom:14px;font-size:.85rem">
-          <div style="font-weight:700;color:#5B21B6;margin-bottom:4px">⚡ Sincronizado con CarniHub</div>
-          <div style="color:#6D28D9;line-height:1.4">Los productos que compraste a tu distribuidor aparecen aquí. El stock se actualiza automáticamente con cada pedido recibido.</div>
+          <div style="font-weight:700;color:#5B21B6;margin-bottom:4px">⚡ Vincular con CarniHub</div>
+          <div style="color:#6D28D9;line-height:1.4">Selecciona el producto CarniHub que corresponde a este ingrediente. Los pedidos automáticos se generarán hacia la empresa de ese producto.</div>
         </div>
         <?php if (!empty($productosCarnihub)): ?>
+        <div style="margin-bottom:10px">
+          <input type="text" id="chBuscar" class="form-input" placeholder="Buscar producto…"
+                 oninput="filtrarCh(this.value)" style="font-size:.83rem">
+        </div>
         <div style="border:1.5px solid #E5E7EB;border-radius:10px;overflow:hidden;margin-bottom:12px">
           <div style="padding:8px 12px;background:#F9FAFB;font-size:.72rem;font-weight:700;color:#9CA3AF;
                       text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid #E5E7EB">
             Selecciona un producto
           </div>
-          <div style="max-height:180px;overflow-y:auto">
-          <?php foreach ($productosCarnihub as $pc): ?>
-          <div style="padding:10px 14px;border-bottom:1px solid #F3F4F6;display:flex;justify-content:space-between;align-items:center;cursor:pointer;transition:.1s"
+          <div style="max-height:220px;overflow-y:auto" id="chListaProductos">
+          <?php
+          $empresaActual = null;
+          foreach ($productosCarnihub as $pc):
+            if ($pc['empresa_nombre'] !== $empresaActual):
+              $empresaActual = $pc['empresa_nombre'];
+          ?>
+          <div class="ch-empresa-sep" style="padding:5px 14px;background:#F3F4F6;font-size:.7rem;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid #E5E7EB">
+            <?= htmlspecialchars($empresaActual) ?>
+          </div>
+          <?php endif; ?>
+          <div class="ch-prod-row" style="padding:9px 14px;border-bottom:1px solid #F3F4F6;display:flex;justify-content:space-between;align-items:center;cursor:pointer;transition:.1s"
+               data-nombre="<?= htmlspecialchars(strtolower($pc['nombre'])) ?>"
                onmouseover="this.style.background='#FAF5FF'" onmouseout="this.style.background=''"
                onclick="seleccionarCarniHub(<?= $pc['id'] ?>, '<?= htmlspecialchars($pc['nombre'], ENT_QUOTES) ?>')">
             <div>
               <div style="font-weight:600;font-size:.875rem"><?= htmlspecialchars($pc['nombre']) ?></div>
-              <div style="font-size:.75rem;color:#9CA3AF"><?= htmlspecialchars($pc['unidad'] ?? '') ?></div>
+              <div style="font-size:.73rem;color:#9CA3AF"><?= htmlspecialchars($pc['unidad'] ?? '') ?></div>
             </div>
-            <span class="badge badge-purple">CarniHub</span>
+            <span class="badge badge-purple" style="font-size:.68rem;white-space:nowrap">CarniHub</span>
           </div>
           <?php endforeach; ?>
           </div>
         </div>
         <?php else: ?>
         <div class="empty-state" style="padding:24px">
-          <div style="font-size:.85rem">No tienes pedidos de CarniHub aún. Cuando compres productos a tu distribuidor, aparecerán aquí.</div>
+          <div style="font-size:.85rem">No hay productos registrados en CarniHub aún. Agrega productos en el panel de empresa primero.</div>
         </div>
         <?php endif; ?>
         <div class="form-group" id="chNombreWrap" style="display:none">
@@ -604,8 +618,28 @@ function seleccionarCarniHub(id, nombre) {
   document.getElementById('ingCarniHubId').value = id;
   document.getElementById('ingNombreCh').value   = nombre;
   document.getElementById('chNombreWrap').style.display = 'block';
-  document.querySelectorAll('#panelCh [onclick]').forEach(r => r.style.background = '');
-  event.currentTarget.style.background = 'var(--cp-light)';
+  document.querySelectorAll('.ch-prod-row').forEach(r => r.style.background = '');
+  event.currentTarget.style.background = 'var(--cp-light, #FAF5FF)';
+}
+
+function filtrarCh(q) {
+  q = q.toLowerCase().trim();
+  let empresaVis = {};
+  document.querySelectorAll('.ch-prod-row').forEach(row => {
+    const match = !q || row.dataset.nombre.includes(q);
+    row.style.display = match ? '' : 'none';
+    if (match) {
+      const sep = row.previousElementSibling;
+      if (sep && sep.classList.contains('ch-empresa-sep')) empresaVis[sep.textContent.trim()] = sep;
+    }
+  });
+  document.querySelectorAll('.ch-empresa-sep').forEach(sep => {
+    const hasVisible = [...document.querySelectorAll('.ch-prod-row')].some(r =>
+      r.style.display !== 'none' &&
+      r.previousElementSibling === sep
+    );
+    sep.style.display = hasVisible ? '' : 'none';
+  });
 }
 
 function resetIngForm() {

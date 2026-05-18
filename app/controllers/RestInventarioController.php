@@ -29,25 +29,20 @@ class RestInventarioController extends BaseController
         $pageTitle        = 'Inventario';
         $activeMenu       = 'rest_inventario';
 
-        // Productos CarniHub disponibles para importar al inventario
+        // Productos CarniHub disponibles para vincular al inventario del restaurante
+        // Muestra todos los productos activos del catálogo (cualquier empresa proveedora)
         $productosCarnihub = [];
         try {
-            $restaurante = (new RestauranteModel())->find($restauranteId);
-            $empresaId   = $restaurante['empresa_id'] ?? 0;
-            if ($empresaId) {
-                $db   = Database::getInstance();
-                $stmt = $db->prepare(
-                    "SELECT DISTINCT p.id, p.nombre, p.unidad
-                     FROM productos p
-                     JOIN pedido_items pi ON pi.producto_id = p.id
-                     JOIN pedidos ped ON ped.id = pi.pedido_id
-                     WHERE ped.empresa_id = ? AND p.activo = 1
-                     ORDER BY p.nombre
-                     LIMIT 100"
-                );
-                $stmt->execute([$empresaId]);
-                $productosCarnihub = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            }
+            $db   = Database::getInstance();
+            $stmt = $db->query(
+                "SELECT p.id, p.nombre, p.unidad, e.razon_social AS empresa_nombre
+                 FROM productos p
+                 JOIN empresas e ON e.id = p.empresa_id
+                 WHERE p.activo = 1
+                 ORDER BY e.razon_social, p.nombre
+                 LIMIT 300"
+            );
+            $productosCarnihub = $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (\Throwable $e) {}
 
         $this->render('restaurante/inventario/index', compact(
