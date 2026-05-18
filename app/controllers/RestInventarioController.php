@@ -165,4 +165,243 @@ class RestInventarioController extends BaseController
             'unidad_principal' => $r['unidad_principal'],
         ], $rows));
     }
+
+    // ── SISTEMA DE FORECAST Y PEDIDOS SUGERIDOS ───────────────────
+
+    /**
+     * Dashboard de proyección inteligente de inventario.
+     * Carga todos los ingredientes y calcula el forecast para cada uno.
+     */
+    public function proyecciones(?string $p = null): void
+    {
+        require_once ROOT_PATH . '/app/services/RestForecastService.php';
+        require_once ROOT_PATH . '/app/models/RestPedidoSugeridoModel.php';
+
+        $restauranteId = $this->restauranteId();
+        $ingredientes  = $this->model->getByRestaurante($restauranteId, true);
+
+        $forecast  = new RestForecastService();
+        $analisis  = $forecast->analizarIngredientes($ingredientes, $restauranteId);
+
+        $sugeridoModel  = new RestPedidoSugeridoModel();
+        $pedidosPendientes = $sugeridoModel->countPendientes($restauranteId);
+
+        $criticos    = array_filter($analisis, fn($i) => $i['nivel_alerta'] === 'critico');
+        $advertencias = array_filter($analisis, fn($i) => $i['nivel_alerta'] === 'advertencia');
+
+        $flash      = $this->getFlash();
+        $pageTitle  = 'Proyección de Inventario';
+        $activeMenu = 'rest_inventario';
+
+        $this->render('restaurante/inventario/proyecciones', compact(
+            'analisis', 'criticos', 'advertencias',
+            'pedidosPendientes', 'flash', 'pageTitle', 'activeMenu'
+        ));
+    }
+
+    /**
+     * Lista de pedidos sugeridos (órdenes de compra inteligentes).
+     */
+    public function pedidosSugeridos(?string $p = null): void
+    {
+        require_once ROOT_PATH . '/app/models/RestPedidoSugeridoModel.php';
+
+        $restauranteId = $this->restauranteId();
+        $sugeridoModel = new RestPedidoSugeridoModel();
+        $estado        = $this->get('estado', '');
+
+        $pedidos    = $sugeridoModel->getByRestaurante($restauranteId, $estado);
+        $flash      = $this->getFlash();
+        $pageTitle  = 'Pedidos Sugeridos';
+        $activeMenu = 'rest_inventario';
+
+        $this->render('restaurante/inventario/pedidos_sugeridos', compact(
+            'pedidos', 'estado', 'flash', 'pageTitle', 'activeMenu'
+        ));
+    }
+
+    /**
+     * Genera pedidos sugeridos para todos los ingredientes críticos que
+     * tienen proveedor CarniHub. Crea un pedido sugerido por empresa.
+     * Responde JSON.
+     */
+    public function generarPedidoSugerido(?string $p = null): void
+    {
+        if (!$this->isPost()) {
+            $this->json(['ok' => false, 'error' => 'Método no permitido'], 405);
+        }
+
+        require_once ROOT_PATH . '/app/services/RestForecastService.php';
+        require_once ROOT_PATH . '/app/models/RestPedidoSugeridoModel.php';
+
+        $restauranteId = $this->restauranteId();
+        $ingredientes  = $this->model->getByRestaurante($restauranteId, true);
+
+        $forecast  = new RestForecastService();
+        $analisis  = $forecast->analizarIngredientes($ingredientes, $restauranteId);
+        $grupos    = $forecast->agruparPorEmpresa($analisis);
+
+        if (empty($grupos)) {
+            $this->json(['ok' => false, 'error' => 'No hay ingredientes críticos con proveedor CarniHub vinculado.']);
+        }
+
+        $sugeridoModel = new RestPedidoSugeridoModel();
+        $creados       = [];
+
+        foreach ($grupos as $empresaId => $grupo) {
+            $items = [];
+            foreach ($grupo['items'] as $ing) {
+                $precio = (float)($ing['empresa']['precio_base'] ?? $ing['costo_unitario'] ?? 0);
+                $cant   = (float)$ing['cantidad_sugerida'];
+                $items[] = [
+                    'ingrediente_id'       => (int)$ing['id'],
+                    'carnihub_producto_id' => (int)$ing['carnihub_producto_id'],
+                    'cantidad_sugerida'    => $cant,
+                    'unidad'              => $ing['unidad_principal'],
+                    'precio_unit_estimado' => $precio,
+                    'subtotal_estimado'   => round($cant * $precio, 2),
+                ];
+            }
+
+            try {
+                $id = $sugeridoModel->crear([
+                    'restaurante_id' => $restauranteId,
+                    'empresa_id'     => $empresaId,
+                    'usuario_id'     => $this->usuarioId(),
+                    'notas'          => 'Generado automáticamente por sistema de forecast ' . date('d/m/Y H:i'),
+                ], $items);
+                $creados[] = ['id' => $id, 'empresa' => $grupo['empresa']['razon_social']];
+            } catch (\Throwable $e) {
+                // Continuar con otras empresas si una falla
+            }
+        }
+
+        if (empty($creados)) {
+            $this->json(['ok' => false, 'error' => 'No se pudieron crear los pedidos. Verifica los ingredientes.']);
+        }
+
+        $this->json(['ok' => true, 'creados' => $creados]);
+    }
+
+    /**
+     * Aprueba un pedido sugerido y lo convierte en pedido real de CarniHub.
+     * POST: pedido_id, cantidades[] (opcional, para ajustar)
+     */
+    public function aprobarPedidoSugerido(?string $id = null): void
+    {
+        if (!$this->isPost()) $this->redirect('rest-inventario/pedidosSugeridos');
+
+        require_once ROOT_PATH . '/app/models/RestPedidoSugeridoModel.php';
+
+        $pedidoId      = (int)($id ?? $this->post('pedido_id'));
+        $sugeridoModel = new RestPedidoSugeridoModel();
+        $pedido        = $sugeridoModel->find($pedidoId);
+
+        if (!$pedido || (int)$pedido['restaurante_id'] !== $this->restauranteId()) {
+            $this->flash('error', 'Pedido no encontrado.');
+            $this->redirect('rest-inventario/pedidosSugeridos');
+        }
+
+        // Actualizar cantidades aprobadas si se enviaron
+        $cantidades = (array)$this->post('cantidades', []);
+        if (!empty($cantidades)) {
+            $sugeridoModel->actualizarCantidades($pedidoId, $cantidades);
+        }
+
+        // Marcar como aprobado
+        $sugeridoModel->cambiarEstado($pedidoId, 'aprobado', $this->usuarioId());
+
+        try {
+            $carnihubId = $sugeridoModel->convertirACarnihub($pedidoId, $this->usuarioId());
+            $this->flash('success', "Pedido aprobado y enviado a CarniHub (folio interno #$carnihubId). La empresa recibirá la orden.");
+        } catch (\Throwable $e) {
+            $this->flash('error', 'El pedido fue aprobado pero no se pudo crear en CarniHub: ' . $e->getMessage());
+        }
+
+        $this->redirect('rest-inventario/pedidosSugeridos');
+    }
+
+    /**
+     * Rechaza un pedido sugerido.
+     */
+    public function rechazarPedidoSugerido(?string $id = null): void
+    {
+        if (!$this->isPost()) $this->redirect('rest-inventario/pedidosSugeridos');
+
+        require_once ROOT_PATH . '/app/models/RestPedidoSugeridoModel.php';
+
+        $pedidoId      = (int)($id ?? $this->post('pedido_id'));
+        $sugeridoModel = new RestPedidoSugeridoModel();
+        $pedido        = $sugeridoModel->find($pedidoId);
+
+        if (!$pedido || (int)$pedido['restaurante_id'] !== $this->restauranteId()) {
+            $this->flash('error', 'Pedido no encontrado.');
+            $this->redirect('rest-inventario/pedidosSugeridos');
+        }
+
+        $sugeridoModel->cambiarEstado($pedidoId, 'rechazado', $this->usuarioId());
+        $this->flash('success', 'Pedido sugerido rechazado.');
+        $this->redirect('rest-inventario/pedidosSugeridos');
+    }
+
+    /**
+     * Endpoint JSON: retorna análisis de forecast para un ingrediente específico.
+     * Usado por la vista de proyecciones para el mini-chart al hacer hover/clic.
+     */
+    public function forecastJson(?string $id = null): void
+    {
+        require_once ROOT_PATH . '/app/services/RestForecastService.php';
+
+        $ingredienteId = (int)$id;
+        $restauranteId = $this->restauranteId();
+
+        $ing = $this->model->find($ingredienteId);
+        if (!$ing || (int)$ing['restaurante_id'] !== $restauranteId) {
+            $this->json(['ok' => false], 404);
+        }
+
+        $forecast      = new RestForecastService();
+        $cpd           = $forecast->calcularConsumoPromedioDiario($ingredienteId, $restauranteId, 7);
+        $movil         = $forecast->calcularPromedioMovil($ingredienteId, $restauranteId, 3);
+        $diasRestantes = $forecast->calcularDiasRestantes((float)$ing['stock'], $cpd);
+        $proyeccion    = $forecast->proyeccionSemanal($ingredienteId, $restauranteId, (float)$ing['stock'], 7);
+
+        $this->json([
+            'ok'             => true,
+            'cpd'            => round($cpd, 4),
+            'promedio_movil' => $movil['promedio'],
+            'dias_restantes' => $diasRestantes === INF ? null : round($diasRestantes, 1),
+            'proyeccion_7d'  => $proyeccion,
+            'dias_consumo'   => $movil['dias'],
+        ]);
+    }
+
+    /**
+     * Endpoint JSON: retorna los items de un pedido sugerido (para modal en vista).
+     */
+    public function pedidoSugeridoItems(?string $id = null): void
+    {
+        require_once ROOT_PATH . '/app/models/RestPedidoSugeridoModel.php';
+
+        $pedidoId      = (int)$id;
+        $sugeridoModel = new RestPedidoSugeridoModel();
+        $pedido        = $sugeridoModel->find($pedidoId);
+
+        if (!$pedido || (int)$pedido['restaurante_id'] !== $this->restauranteId()) {
+            $this->json(['ok' => false, 'error' => 'No encontrado'], 404);
+        }
+
+        $items   = $sugeridoModel->getItems($pedidoId);
+        $db      = \Database::getInstance();
+        $stmt    = $db->prepare('SELECT razon_social FROM empresas WHERE id = ?');
+        $stmt->execute([(int)$pedido['empresa_id']]);
+        $emp     = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+        $this->json([
+            'ok'      => true,
+            'items'   => $items,
+            'total'   => $pedido['total_estimado'],
+            'empresa' => $emp ? $emp['razon_social'] : '',
+        ]);
+    }
 }

@@ -123,6 +123,8 @@
              onfocus="this.style.borderColor='var(--cp)'" onblur="this.style.borderColor='#E5E7EB'">
     </div>
     <a href="<?= BASE_URL ?>rest-inventario/movimientos" class="btn btn-outline btn-sm" style="white-space:nowrap">Ver historial</a>
+    <a href="<?= BASE_URL ?>rest-inventario/proyecciones" class="btn btn-outline btn-sm" style="white-space:nowrap">📊 Proyecciones</a>
+    <a href="<?= BASE_URL ?>rest-inventario/pedidosSugeridos" class="btn btn-outline btn-sm" style="white-space:nowrap">📦 Pedidos sugeridos</a>
     <button onclick="toggleGuia()" title="Ayuda"
             style="padding:7px 11px;border:1.5px solid #E5E7EB;border-radius:10px;background:#fff;
                    cursor:pointer;font-size:.85rem;color:#6B7280;transition:.15s"

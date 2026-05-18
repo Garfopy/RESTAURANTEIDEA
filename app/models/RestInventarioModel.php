@@ -131,4 +131,27 @@ class RestInventarioModel extends BaseModel
                 ORDER BY mv.created_at DESC";
         return $this->paginate($sql, [$restauranteId], $page);
     }
+
+    /**
+     * Consumo histórico agrupado por ingrediente y día.
+     * Alimenta al RestForecastService para los cálculos de forecast.
+     * Solo considera tipo='salida' (consumo real, excluye entradas/ajustes).
+     *
+     * @return array  [['ingrediente_id', 'dia', 'total_consumido'], ...]
+     */
+    public function getConsumoHistorico(int $restauranteId, int $dias = 30): array
+    {
+        return $this->query(
+            "SELECT ingrediente_id,
+                    DATE(created_at) AS dia,
+                    SUM(cantidad)    AS total_consumido
+             FROM rest_movimientos_inventario
+             WHERE restaurante_id = ?
+               AND tipo           = 'salida'
+               AND created_at    >= DATE_SUB(NOW(), INTERVAL ? DAY)
+             GROUP BY ingrediente_id, DATE(created_at)
+             ORDER BY ingrediente_id, dia DESC",
+            [$restauranteId, $dias]
+        );
+    }
 }
