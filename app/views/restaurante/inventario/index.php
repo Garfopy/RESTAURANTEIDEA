@@ -201,6 +201,14 @@
             class="btn btn-primary" style="flex:1;justify-content:center;font-size:.82rem;padding:8px 12px">
       Modificar
     </button>
+    <button onclick="eliminarIngrediente(<?= (int)$ing['id'] ?>, '<?= htmlspecialchars(addslashes($ing['nombre']), ENT_QUOTES) ?>')"
+            class="btn btn-danger" title="Eliminar ingrediente"
+            style="padding:8px 10px;flex-shrink:0;background:#FEF2F2;color:#DC2626;border:1.5px solid #FECACA">
+      <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+      </svg>
+    </button>
   </div>
 </div>
 <?php endforeach; ?>
@@ -914,6 +922,29 @@ function prepararMovimiento() {
     document.getElementById('modifCantFinal').value = convUnidad(cant, fromU, modifIng.unidad_principal).toFixed(6);
   }
   return true;
+}
+
+// —— Eliminar ingrediente (soft-delete) ——
+function eliminarIngrediente(id, nombre) {
+  if (!confirm('¿Eliminar el ingrediente "' + nombre + '"?\nEsta acción lo desactivará del inventario.')) return;
+  const BASE = '<?= BASE_URL ?>';
+  fetch(BASE + 'rest-inventario/eliminar/' + id, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (!data.ok) throw new Error('Error del servidor');
+    const card = document.getElementById('inv-card-' + id);
+    if (card) {
+      card.style.transition = 'opacity .25s, transform .25s';
+      card.style.opacity = '0';
+      card.style.transform = 'scale(.95)';
+      setTimeout(() => card.remove(), 260);
+    }
+  })
+  .catch(() => alert('No se pudo eliminar el ingrediente. Intenta de nuevo.'));
 }
 
 // —— Polling de stock en tiempo real ——

@@ -177,7 +177,14 @@ class RestInventarioController extends BaseController
     public function eliminar(?string $id = null): void
     {
         $this->model->update((int)$id, ['activo' => 0]);
-        $this->flash('success', 'Ingrediente desactivado.');
+
+        // Si es petición AJAX responder JSON, de lo contrario redirigir
+        if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) &&
+            strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
+            $this->json(['ok' => true]);
+        }
+
+        $this->flash('success', 'Ingrediente eliminado.');
         $this->redirect('rest-inventario/index');
     }
 
