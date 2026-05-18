@@ -88,17 +88,69 @@
     <p>Basada en consumo de los últimos 7 días · Actualizada al <?= date('d/m/Y H:i') ?></p>
   </div>
   <div style="display:flex;gap:8px;flex-wrap:wrap">
-    <a href="<?= BASE_URL ?>rest-inventario/pedidosSugeridos" class="btn btn-outline btn-sm" style="white-space:nowrap">
-      📦 Pedidos sugeridos<?php if ($pedidosPendientes > 0): ?>
-        <span style="background:var(--cp);color:#fff;border-radius:999px;padding:1px 6px;font-size:.7rem;margin-left:4px"><?= $pedidosPendientes ?></span>
-      <?php endif; ?>
-    </a>
+    <a href="<?= BASE_URL ?>rest-inventario/pedidosSugeridos" class="btn btn-outline btn-sm" style="white-space:nowrap">📋 Historial</a>
     <a href="<?= BASE_URL ?>rest-inventario/index" class="btn btn-outline btn-sm">← Inventario</a>
   </div>
 </div>
 
 <?php if ($flash): ?>
 <div class="alert alert-<?= $flash['type'] ?>" style="margin-bottom:16px"><?= $flash['message'] ?></div>
+<?php endif; ?>
+
+<!-- ── Comprobante: pedido generado automáticamente ─────────────── -->
+<?php if (!empty($comprobante)): ?>
+<div style="background:#F0FDF4;border:2px solid #4ADE80;border-radius:16px;padding:20px 24px;margin-bottom:20px">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+    <div style="width:44px;height:44px;background:#DCFCE7;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0">✅</div>
+    <div>
+      <div style="font-size:1rem;font-weight:700;color:#14532D">Pedido generado automáticamente</div>
+      <div style="font-size:.78rem;color:#16A34A"><?= date('d/m/Y \a \l\a\s H:i') ?> &middot; <?= count($comprobante) ?> pedido(s) enviado(s) al proveedor CarniHub</div>
+    </div>
+  </div>
+  <?php foreach ($comprobante as $c): ?>
+  <div style="background:#fff;border:1.5px solid #BBF7D0;border-radius:12px;margin-bottom:12px;overflow:hidden">
+    <div style="background:#DCFCE7;padding:10px 16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <div>
+        <span style="font-weight:700;color:#14532D;font-size:.92rem"><?= htmlspecialchars($c['empresa']) ?></span>
+        <span style="margin-left:10px;font-size:.74rem;font-family:monospace;background:#fff;color:#166534;border:1px solid #BBF7D0;padding:2px 8px;border-radius:10px"><?= htmlspecialchars($c['folio']) ?></span>
+      </div>
+      <strong style="color:#14532D;font-size:.95rem">Total: $<?= number_format($c['total'],2) ?></strong>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:.82rem">
+      <thead>
+        <tr style="background:#F0FDF4">
+          <th style="padding:7px 14px;text-align:left;color:#166534;font-weight:600">Ingrediente</th>
+          <th style="padding:7px 14px;text-align:right;color:#166534;font-weight:600">Cantidad</th>
+          <th style="padding:7px 14px;text-align:right;color:#166534;font-weight:600">Precio unit.</th>
+          <th style="padding:7px 14px;text-align:right;color:#166534;font-weight:600">Subtotal</th>
+        </tr>
+      </thead>
+      <tbody>
+        <?php foreach ($c['items'] as $it): ?>
+        <tr style="border-top:1px solid #DCFCE7">
+          <td style="padding:7px 14px;color:#111827"><?= htmlspecialchars($it['nombre']) ?></td>
+          <td style="padding:7px 14px;text-align:right;color:#374151"><?= number_format($it['cantidad'],3) ?> <span style="font-size:.72rem;color:#9CA3AF"><?= htmlspecialchars($it['unidad']) ?></span></td>
+          <td style="padding:7px 14px;text-align:right;color:#374151">$<?= number_format($it['precio'],2) ?></td>
+          <td style="padding:7px 14px;text-align:right;font-weight:700;color:#111827">$<?= number_format($it['subtotal'],2) ?></td>
+        </tr>
+        <?php endforeach; ?>
+      </tbody>
+    </table>
+    <div style="padding:8px 16px;font-size:.72rem;color:#6B7280;display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px">
+      <span>El proveedor recibió este pedido con estado <strong>pendiente</strong></span>
+      <a href="<?= BASE_URL ?>rest-inventario/pedidosSugeridos" style="color:#2563EB">Ver historial &rarr;</a>
+    </div>
+  </div>
+  <?php endforeach; ?>
+</div>
+<?php elseif (!empty($ultimoPedidoAt)): ?>
+<div style="background:#EFF6FF;border:1.5px solid #BFDBFE;border-radius:12px;padding:13px 18px;margin-bottom:20px;font-size:.84rem;color:#1D4ED8;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+  <span>📦 <strong>Pedido automático enviado</strong> el <?= date('d/m/Y \a \l\a\s H:i', strtotime($ultimoPedidoAt)) ?></span>
+  <div style="display:flex;gap:12px;align-items:center">
+    <a href="<?= BASE_URL ?>rest-inventario/pedidosSugeridos" style="color:#2563EB;font-size:.8rem">Ver historial &rarr;</a>
+    <a href="<?= BASE_URL ?>rest-inventario/proyecciones?forzar=1" style="color:#9CA3AF;font-size:.75rem">Forzar nuevo pedido</a>
+  </div>
+</div>
 <?php endif; ?>
 
 <!-- KPIs -->
@@ -133,18 +185,18 @@ $puedenPedirse = count(array_filter($analisis, fn($i) => $i['requiere_pedido'] &
   </div>
 </div>
 
-<!-- Panel de acción: generar pedido sugerido -->
-<?php if ($puedenPedirse > 0): ?>
-<div class="fc-actions" style="border-color:#BFDBFE;background:#EFF6FF">
-  <h3 style="color:#1E40AF">🤖 Acción recomendada</h3>
-  <p style="font-size:.85rem;color:#374151;margin:0 0 14px">
-    <?= $puedenPedirse ?> ingrediente<?= $puedenPedirse > 1 ? 's' : '' ?> requieren reabastecimiento
-    y tienen proveedor CarniHub vinculado. El sistema puede generar los pedidos automáticamente.
+<?php
+// Ingredientes críticos sin vínculo CarniHub (no pueden pedirse automáticamente)
+$criticosSinLink = count(array_filter($analisis, fn($i) => $i['requiere_pedido'] && empty($i['empresa'])));
+?>
+<?php if ($criticosSinLink > 0): ?>
+<div class="fc-actions" style="border-color:#FDE68A;background:#FFFBEB">
+  <h3 style="color:#92400E">⚠️ <?= $criticosSinLink ?> ingrediente<?= $criticosSinLink>1?'s':'' ?> crítico<?= $criticosSinLink>1?'s':'' ?> sin proveedor CarniHub</h3>
+  <p style="font-size:.85rem;color:#374151;margin:0">
+    Para que los pedidos se generen automáticamente al cargar esta página,
+    vincula estos ingredientes a productos de tu empresa proveedora CarniHub
+    desde el formulario de inventario (<strong>Proveedor CarniHub</strong>).
   </p>
-  <button id="btnGenerar" onclick="generarPedidos()" class="btn btn-primary" style="min-width:200px">
-    ⚡ Generar pedidos sugeridos ahora
-  </button>
-  <span id="genStatus" style="font-size:.82rem;color:#6B7280;margin-left:12px;display:none">Procesando…</span>
 </div>
 <?php endif; ?>
 
@@ -319,6 +371,37 @@ $puedenPedirse = count(array_filter($analisis, fn($i) => $i['requiere_pedido'] &
 </style>
 
 <script>
+function filtrarNivel(nivel) {
+  document.querySelectorAll('.fc-row').forEach(tr => {
+    tr.style.display = (nivel === 'all' || tr.dataset.nivel === nivel) ? '' : 'none';
+  });
+  document.querySelectorAll('.fc-f-btn').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById('f-' + nivel);
+  if (btn) btn.classList.add('active');
+}
+</script>
+
+<?php
+$content = ob_get_clean();
+require ROOT_PATH . '/app/views/restaurante/layouts/main.php';
+?>
+  <div style="background:#fff;border-radius:16px;width:100%;max-width:680px;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 25px 60px rgba(0,0,0,.25)">
+    <div style="padding:20px 24px;border-bottom:1px solid #E5E7EB;display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <h3 style="margin:0;font-size:1rem;font-weight:700;color:#111827">✅ Pedidos enviados a proveedores</h3>
+        <p id="modalSubtitle" style="margin:3px 0 0;font-size:.78rem;color:#6B7280"></p>
+      </div>
+      <button onclick="cerrarModal()" style="background:none;border:none;font-size:1.5rem;cursor:pointer;color:#9CA3AF">×</button>
+    </div>
+    <div id="modalCuerpo" style="padding:20px 24px;overflow-y:auto;flex:1"></div>
+    <div style="padding:14px 24px;border-top:1px solid #E5E7EB;display:flex;justify-content:space-between;align-items:center">
+      <a href="<?= BASE_URL ?>rest-inventario/pedidosSugeridos" style="font-size:.82rem;color:#2563EB">Ver historial completo →</a>
+      <button onclick="cerrarModal()" class="btn btn-primary btn-sm">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<script>
 const BASE = '<?= BASE_URL ?>';
 
 function filtrarNivel(nivel) {
@@ -330,45 +413,97 @@ function filtrarNivel(nivel) {
   if (btn) btn.classList.add('active');
 }
 
+function cerrarModal() {
+  document.getElementById('modalPedidos').style.display = 'none';
+}
+
 async function generarPedidos() {
   const btn    = document.getElementById('btnGenerar');
   const status = document.getElementById('genStatus');
   btn.disabled = true;
-  btn.textContent = '⏳ Generando…';
+  btn.textContent = '⏳ Procesando…';
   status.style.display = 'inline';
 
   try {
-    const res  = await fetch(BASE + 'rest-inventario/generarPedidoSugerido', {
+    const res  = await fetch(BASE + 'rest-inventario/generarPedidoAutomatico', {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'X-Requested-With': 'XMLHttpRequest' },
     });
     const data = await res.json();
 
-    if (data.ok) {
-      const empresas = data.creados.map(c => c.empresa).join(', ');
-      status.style.display = 'none';
-      btn.textContent = '✅ Pedidos creados';
-      btn.style.background = '#16A34A';
+    status.style.display = 'none';
 
-      // Notificación inline
-      const notif = document.createElement('div');
-      notif.style.cssText = 'background:#DCFCE7;border:1px solid #BBF7D0;border-radius:8px;padding:10px 14px;margin-top:10px;font-size:.84rem;color:#166534';
-      notif.innerHTML = `✅ Se crearon ${data.creados.length} pedido(s) sugerido(s) para: <strong>${empresas}</strong>. <a href="${BASE}rest-inventario/pedidosSugeridos" style="color:#16A34A;font-weight:700">Ver pedidos →</a>`;
-      btn.parentElement.appendChild(notif);
+    if (data.ok) {
+      btn.textContent = '✅ Pedidos enviados';
+      btn.style.background = '#16A34A';
+      btn.style.borderColor = '#16A34A';
+      mostrarModalDetalle(data.pedidos);
     } else {
       btn.disabled = false;
-      btn.textContent = '⚡ Generar pedidos sugeridos ahora';
+      btn.textContent = '⚡ Generar pedidos automáticamente';
       status.textContent = '⚠️ ' + (data.error || 'Error desconocido');
+      status.style.display = 'inline';
       status.style.color = '#DC2626';
     }
   } catch (e) {
     btn.disabled = false;
-    btn.textContent = '⚡ Generar pedidos sugeridos ahora';
+    btn.textContent = '⚡ Generar pedidos automáticamente';
     status.textContent = '⚠️ Error de red';
+    status.style.display = 'inline';
     status.style.color = '#DC2626';
   }
 }
+
+function mostrarModalDetalle(pedidos) {
+  const totalGeneral = pedidos.reduce((s, p) => s + parseFloat(p.total), 0);
+  document.getElementById('modalSubtitle').textContent =
+    pedidos.length + ' pedido(s) generado(s) · Total: $' + totalGeneral.toFixed(2);
+
+  let html = '';
+  pedidos.forEach(p => {
+    html += `
+      <div style="margin-bottom:20px;border:1.5px solid #E5E7EB;border-radius:12px;overflow:hidden">
+        <div style="background:#F9FAFB;padding:10px 14px;display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <span style="font-weight:700;font-size:.9rem;color:#111827">${p.empresa}</span>
+            <span style="margin-left:10px;font-size:.75rem;color:#6B7280;background:#E5E7EB;padding:2px 8px;border-radius:12px">${p.folio}</span>
+          </div>
+          <span style="font-weight:700;color:#111827">$${parseFloat(p.total).toFixed(2)}</span>
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:.8rem">
+          <thead>
+            <tr style="background:#F3F4F6">
+              <th style="padding:7px 12px;text-align:left;color:#374151">Ingrediente</th>
+              <th style="padding:7px 12px;text-align:right;color:#374151">Cantidad</th>
+              <th style="padding:7px 12px;text-align:right;color:#374151">Precio unit.</th>
+              <th style="padding:7px 12px;text-align:right;color:#374151">Subtotal</th>
+            </tr>
+          </thead>
+          <tbody>`;
+    p.items.forEach(it => {
+      html += `<tr style="border-bottom:1px solid #F3F4F6">
+        <td style="padding:7px 12px">${it.nombre}</td>
+        <td style="padding:7px 12px;text-align:right">${parseFloat(it.cantidad).toFixed(2)} ${it.unidad}</td>
+        <td style="padding:7px 12px;text-align:right">$${parseFloat(it.precio).toFixed(2)}</td>
+        <td style="padding:7px 12px;text-align:right;font-weight:600">$${parseFloat(it.subtotal).toFixed(2)}</td>
+      </tr>`;
+    });
+    html += `</tbody></table>
+        <div style="padding:8px 14px;text-align:right;font-size:.75rem;color:#6B7280">
+          El proveedor ya recibió este pedido con estado <strong>pendiente</strong>.
+        </div>
+      </div>`;
+  });
+
+  document.getElementById('modalCuerpo').innerHTML = html;
+  const modal = document.getElementById('modalPedidos');
+  modal.style.display = 'flex';
+}
+
+document.getElementById('modalPedidos').addEventListener('click', function(e) {
+  if (e.target === this) cerrarModal();
+});
 </script>
 
 <?php
