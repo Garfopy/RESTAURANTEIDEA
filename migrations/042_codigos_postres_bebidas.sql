@@ -103,4 +103,33 @@ JOIN rest_ingredientes mp
 WHERE p.restaurante_id = @rest_id
   AND (p.codigo REGEXP '^DP[0-9]+$' OR p.codigo REGEXP '^B[0-9]+$');
 
+-- ── 4. Reasignar categoría correcta a platillos DP* / B* de La Comalada ───
+-- Corrige casos en los que un LIMIT 1 sin ORDER BY apuntó a una categoría
+-- duplicada/incorrecta. Elige la categoría con id más alto (la que insertó
+-- 036, normalmente la que tiene descripción poblada).
+
+SET @cat_postres_id = (
+  SELECT id FROM rest_categorias_menu
+  WHERE restaurante_id = @rest_id AND nombre = 'Dulces y Postres'
+  ORDER BY id DESC LIMIT 1
+);
+
+SET @cat_bebidas_id = (
+  SELECT id FROM rest_categorias_menu
+  WHERE restaurante_id = @rest_id AND nombre = 'Bebidas'
+  ORDER BY id DESC LIMIT 1
+);
+
+UPDATE rest_platillos
+   SET categoria_id = @cat_postres_id
+ WHERE restaurante_id = @rest_id
+   AND codigo REGEXP '^DP[0-9]+$'
+   AND @cat_postres_id IS NOT NULL;
+
+UPDATE rest_platillos
+   SET categoria_id = @cat_bebidas_id
+ WHERE restaurante_id = @rest_id
+   AND codigo REGEXP '^B[0-9]+$'
+   AND @cat_bebidas_id IS NOT NULL;
+
 -- ── Fin ─────────────────────────────────────────────────────────────────────
