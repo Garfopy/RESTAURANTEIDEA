@@ -88,30 +88,57 @@
 
     /* ── Ingredientes (receta) ── */
     .receta-block {
-      margin-top: 8px; padding: 8px 10px;
+      margin-top: 8px; padding: 10px 12px;
       background: #0D1117; border: 1px solid #21262D; border-radius: 8px;
     }
     .receta-title {
       font-size: .68rem; font-weight: 700; text-transform: uppercase;
       letter-spacing: .08em; color: #8B949E; margin-bottom: 6px;
+      display: flex; align-items: center; gap: 6px;
     }
-    .receta-group { margin-bottom: 6px; }
+    .receta-group { margin-bottom: 8px; }
     .receta-group:last-child { margin-bottom: 0; }
     .receta-group-label {
-      font-size: .65rem; font-weight: 600; color: #6E7681;
-      text-transform: uppercase; letter-spacing: .05em; margin-bottom: 3px;
+      font-size: .65rem; font-weight: 700; color: #6E7681;
+      text-transform: uppercase; letter-spacing: .06em; margin-bottom: 4px;
+      display: flex; align-items: center; gap: 4px;
     }
+    .receta-group-mp .receta-group-label { color: #FCA5A5; }
+    .receta-group-gn .receta-group-label { color: #86EFAC; }
+
     .ing-chip {
-      display: inline-flex; align-items: center; gap: 4px;
-      padding: 3px 7px; margin: 2px 3px 2px 0;
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 4px 9px; margin: 3px 4px 3px 0;
       background: #161B22; border: 1px solid #30363D; border-radius: 6px;
-      font-size: .72rem; color: #E6EDF3;
+      font-size: .75rem; color: #E6EDF3;
     }
+    .ing-chip.tipo-mp { border-color: #7F1D1D; background: #2D1416; }
+    .ing-chip.tipo-gn { border-color: #14532D; background: #0F2117; }
+    .ing-chip.informativo { border-style: dashed; opacity: .85; }
+
     .ing-code {
       font-family: ui-monospace, "Cascadia Code", monospace;
-      font-weight: 700; color: #FBBF24;
+      font-weight: 800; font-size: .8rem;
+      padding: 1px 6px; border-radius: 4px;
+      background: rgba(0,0,0,.35);
     }
-    .ing-qty { color: #8B949E; font-size: .68rem; }
+    .tipo-mp .ing-code { color: #FCA5A5; }
+    .tipo-gn .ing-code { color: #86EFAC; }
+    .ing-qty  { color: #8B949E; font-size: .7rem; font-variant-numeric: tabular-nums; }
+    .ing-note { color: #6E7681; font-size: .68rem; font-style: italic; }
+
+    .armado-instr {
+      background: #1E2A1E; border-left: 3px solid #86EFAC;
+      padding: 8px 10px; border-radius: 6px; margin-bottom: 8px;
+      font-size: .78rem; color: #D1FAE5; line-height: 1.4;
+      white-space: pre-wrap;
+    }
+    .platillo-codigo {
+      display: inline-block; padding: 2px 7px; margin-right: 6px;
+      background: #312E81; color: #C7D2FE; border-radius: 4px;
+      font-family: ui-monospace, "Cascadia Code", monospace;
+      font-size: .72rem; font-weight: 800;
+    }
 
     /* ── Botones ── */
     .btn-action {
@@ -226,44 +253,56 @@ function esc(s) {
 }
 
 // ── Receta: códigos de materia prima y guarniciones ──
-function renderReceta(raw, cantidadPlatillo) {
-  if (!raw) return '';
+// Formato esperado por item (separador ||, campos |):
+//   codigo | nombre | tipo | cantidad | unidad | notas | es_informativo
+//   tipo ∈ { materia_prima, guarnicion, bebida, otro }
+function renderReceta(raw, cantidadPlatillo, instruccionesArmado) {
   const cant = Number(cantidadPlatillo) || 1;
-  const items = raw.split('||').map(s => {
-    const [id, nombre, categoria, qty, unidad] = s.split('|');
+  const items = (raw || '').split('||').map(s => {
+    const [codigo, nombre, tipo, qty, unidad, notas, esInfo] = s.split('|');
     return {
-      id: id || '',
+      codigo: (codigo || '').trim(),
       nombre: nombre || '',
-      categoria: (categoria || '').trim(),
-      qty: (Number(qty) || 0) * cant,
-      unidad: unidad || ''
+      tipo:   (tipo || 'otro').trim().toLowerCase(),
+      qty:    (Number(qty) || 0) * cant,
+      unidad: unidad || '',
+      notas:  notas || '',
+      esInfo: esInfo === '1' || esInfo === 1
     };
-  }).filter(i => i.id);
+  }).filter(i => i.codigo || i.nombre);
 
-  if (!items.length) return '';
+  if (!items.length && !instruccionesArmado) return '';
 
-  const esGuarnicion = c => /guarn/i.test(c);
-  const guarniciones = items.filter(i => esGuarnicion(i.categoria));
-  const materiaPrima = items.filter(i => !esGuarnicion(i.categoria));
+  const materiaPrima = items.filter(i => i.tipo === 'materia_prima');
+  const guarniciones = items.filter(i => i.tipo === 'guarnicion');
+  const otros        = items.filter(i => i.tipo !== 'materia_prima' && i.tipo !== 'guarnicion');
 
-  const chip = i => `
-    <span class="ing-chip" title="${esc(i.categoria)}">
-      <span class="ing-code">#${esc(i.id)}</span>
+  const chip = (i, cls) => `
+    <span class="ing-chip ${cls}${i.esInfo ? ' informativo' : ''}"
+          title="${esc(i.notas || i.nombre)}">
+      ${i.codigo ? `<span class="ing-code">${esc(i.codigo)}</span>` : ''}
       <span>${esc(i.nombre)}</span>
       ${i.qty ? `<span class="ing-qty">${i.qty.toFixed(2)} ${esc(i.unidad)}</span>` : ''}
+      ${i.notas ? `<span class="ing-note">· ${esc(i.notas)}</span>` : ''}
     </span>`;
 
-  const grupo = (label, arr) => arr.length
-    ? `<div class="receta-group">
-         <div class="receta-group-label">${label}</div>
-         ${arr.map(chip).join('')}
+  const grupo = (label, icon, arr, cls, chipCls) => arr.length
+    ? `<div class="receta-group ${cls}">
+         <div class="receta-group-label">${icon} ${label} (${arr.length})</div>
+         ${arr.map(i => chip(i, chipCls)).join('')}
        </div>` : '';
+
+  const instrHtml = instruccionesArmado
+    ? `<div class="armado-instr">🧱 <strong>Armado:</strong> ${esc(instruccionesArmado)}</div>`
+    : '';
 
   return `
     <div class="receta-block">
-      <div class="receta-title">🧾 Receta · preparar con</div>
-      ${grupo('Materia prima', materiaPrima)}
-      ${grupo('Guarniciones', guarniciones)}
+      <div class="receta-title">🧾 Instrucciones de armado</div>
+      ${instrHtml}
+      ${grupo('Materia prima', '🥩', materiaPrima, 'receta-group-mp', 'tipo-mp')}
+      ${grupo('Guarniciones',  '🥗', guarniciones, 'receta-group-gn', 'tipo-gn')}
+      ${grupo('Otros',         '•',  otros,        'receta-group-ot', '')}
     </div>`;
 }
 
@@ -282,11 +321,14 @@ function renderColumna(pedidos, colId) {
     const itemsHtml = ped.items.map(it => `
       <div class="item-row">
         <div style="flex:1">
-          <div class="item-nombre">${it.platillo_nombre}</div>
+          <div class="item-nombre">
+            ${it.platillo_codigo ? `<span class="platillo-codigo">${esc(it.platillo_codigo)}</span>` : ''}
+            ${esc(it.platillo_nombre)}
+          </div>
           <div class="item-sub">×${it.cantidad}${it.tiempo_preparacion_min ? ' · ' + it.tiempo_preparacion_min + ' min' : ''}</div>
-          ${it.exclusiones ? `<span class="pill pill-exclu">🚫 Sin: ${it.exclusiones}</span>` : ''}
-          ${it.item_notas   ? `<span class="pill pill-nota">💬 ${it.item_notas}</span>`       : ''}
-          ${renderReceta(it.ingredientes_raw, it.cantidad)}
+          ${it.exclusiones ? `<span class="pill pill-exclu">🚫 Sin: ${esc(it.exclusiones)}</span>` : ''}
+          ${it.item_notas   ? `<span class="pill pill-nota">💬 ${esc(it.item_notas)}</span>`       : ''}
+          ${renderReceta(it.ingredientes_raw, it.cantidad, it.instrucciones_armado)}
         </div>
         <div>
           ${!esPrepCol && it.item_estado === 'pendiente'

@@ -85,6 +85,16 @@ class RestInventarioModel extends BaseModel
 
     public function descontarPorOrden(int $pedidoId, int $restauranteId, ?int $usuarioId = null): void
     {
+        // Idempotencia: si ya se descontó stock para este pedido, no repetir.
+        $ref = 'rest_pedido:' . $pedidoId;
+        $ya = $this->queryOne(
+            "SELECT COUNT(*) AS c FROM rest_movimientos_inventario WHERE referencia = ?",
+            [$ref]
+        );
+        if ($ya && (int)$ya['c'] > 0) {
+            return;
+        }
+
         $items = $this->query(
             "SELECT pi.cantidad AS cantidad_pedida, pi.exclusiones,
                     ri.ingrediente_id, ri.cantidad AS cant_receta, ri.unidad,
@@ -94,7 +104,8 @@ class RestInventarioModel extends BaseModel
              JOIN rest_recetas rec ON rec.platillo_id = pl.id
              JOIN rest_receta_ingredientes ri ON ri.receta_id = rec.id
              JOIN rest_ingredientes i ON i.id = ri.ingrediente_id
-             WHERE pi.pedido_id = ?",
+             WHERE pi.pedido_id = ?
+               AND COALESCE(ri.es_informativo, 0) = 0",
             [$pedidoId]
         );
 

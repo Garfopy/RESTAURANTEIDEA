@@ -179,14 +179,9 @@ class RestPublicoController extends BaseController
             'mesero_id'      => null,
         ], $items);
 
-        // Descontar stock automáticamente al confirmar el pedido.
-        // Se ejecuta fuera de la transacción del pedido: un fallo de inventario
-        // no revierte el pedido ya guardado.
-        try {
-            $this->inventarioModel->descontarPorOrden($pedidoId, $restauranteId);
-        } catch (\Throwable $e) {
-            error_log('[RestauranteStock] pedido=' . $pedidoId . ' ' . $e->getMessage());
-        }
+        // El descuento de stock ya NO ocurre aquí: se aplica automáticamente
+        // cuando el pedido pase a estado 'entregado'
+        // (ver RestPedidoModel::cambiarEstadoPedido).
 
         $this->visitaModel->actualizarTotales((int)$visitaId);
 

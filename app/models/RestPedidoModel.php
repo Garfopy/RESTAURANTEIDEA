@@ -86,21 +86,33 @@ class RestPedidoModel extends BaseModel
 
     public function getKitchenQueue(int $restauranteId): array
     {
+        // Formato ingredientes_raw (separador ||, campos |):
+        //   codigo | nombre | tipo | cantidad | unidad | notas | es_informativo
+        //   - tipo: materia_prima | guarnicion | bebida | otro
+        //   - es_informativo=1 → no descuenta stock, sólo muestra al chef
         return $this->query(
             "SELECT p.id, p.folio, p.created_at, p.notas AS pedido_notas,
                     m.nombre AS mesa_nombre,
                     pi.id AS item_id, pi.cantidad, pi.notas AS item_notas, pi.estado AS item_estado,
                     pi.exclusiones,
                     pl.nombre AS platillo_nombre, pl.tiempo_preparacion_min,
+                    COALESCE(pl.codigo,'') AS platillo_codigo,
+                    (SELECT r.notas
+                       FROM rest_recetas r
+                      WHERE r.platillo_id = pi.platillo_id LIMIT 1) AS instrucciones_armado,
                     (SELECT GROUP_CONCAT(
                                 CONCAT_WS('|',
-                                    ri.ingrediente_id,
+                                    COALESCE(ing.codigo, CONCAT('#', ing.id)),
                                     ing.nombre,
-                                    COALESCE(ing.categoria,''),
+                                    COALESCE(ing.tipo, 'otro'),
                                     ri.cantidad,
-                                    ri.unidad
+                                    ri.unidad,
+                                    COALESCE(ri.notas,''),
+                                    COALESCE(ri.es_informativo, 0)
                                 )
-                                ORDER BY ing.categoria, ing.nombre
+                                ORDER BY
+                                    FIELD(COALESCE(ing.tipo,'otro'),'materia_prima','guarnicion','bebida','otro'),
+                                    COALESCE(ing.codigo, ing.nombre)
                                 SEPARATOR '||'
                             )
                      FROM rest_recetas r
@@ -119,10 +131,31 @@ class RestPedidoModel extends BaseModel
 
     public function cambiarEstadoPedido(int $pedidoId, string $estado): bool
     {
-        return $this->execute(
+        // Capturar estado actual + restaurante_id para detectar transición a 'entregado'.
+        $row = $this->queryOne(
+            "SELECT estado, restaurante_id FROM rest_pedidos WHERE id = ?",
+            [$pedidoId]
+        );
+        $estadoPrevio = $row['estado'] ?? null;
+
+        $ok = $this->execute(
             "UPDATE rest_pedidos SET estado = ? WHERE id = ?",
             [$estado, $pedidoId]
         );
+
+        // Descontar stock SOLO al transitar a 'entregado' (idempotente en el modelo).
+        if ($ok && $estado === 'entregado' && $estadoPrevio !== 'entregado' && $row) {
+            try {
+                (new RestInventarioModel())->descontarPorOrden(
+                    $pedidoId,
+                    (int)$row['restaurante_id']
+                );
+            } catch (\Throwable $e) {
+                error_log('[RestauranteStock] entrega pedido=' . $pedidoId . ' ' . $e->getMessage());
+            }
+        }
+
+        return $ok;
     }
 
     public function cambiarEstadoItem(int $itemId, string $estado): bool
