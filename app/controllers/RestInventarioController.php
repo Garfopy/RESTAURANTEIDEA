@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 require_once ROOT_PATH . '/app/controllers/BaseController.php';
 
 class RestInventarioController extends BaseController
@@ -30,12 +30,12 @@ class RestInventarioController extends BaseController
         $activeMenu       = 'rest_inventario';
 
         // Productos CarniHub disponibles para vincular al inventario del restaurante
-        // Muestra todos los productos activos del catálogo (cualquier empresa proveedora)
+        // Muestra todos los productos activos del catÃ¡logo (cualquier empresa proveedora)
         $productosCarnihub = [];
         try {
             $db   = Database::getInstance();
             $stmt = $db->query(
-                "SELECT p.id, p.nombre, p.unidad, e.razon_social AS empresa_nombre
+                "SELECT p.id, p.nombre, p.presentacion AS unidad, e.razon_social AS empresa_nombre
                  FROM productos p
                  JOIN empresas e ON e.id = p.empresa_id
                  WHERE p.activo = 1
@@ -149,7 +149,7 @@ class RestInventarioController extends BaseController
         $this->redirect('rest-inventario/index');
     }
 
-    /** Endpoint JSON — devuelve stocks actuales para polling en tiempo real */
+    /** Endpoint JSON â€” devuelve stocks actuales para polling en tiempo real */
     public function stocks(?string $p = null): void
     {
         $rows = $this->model->getByRestaurante($this->restauranteId());
@@ -161,10 +161,10 @@ class RestInventarioController extends BaseController
         ], $rows));
     }
 
-    // ── SISTEMA DE FORECAST Y PEDIDOS AUTOMÁTICOS ────────────────
+    // â”€â”€ SISTEMA DE FORECAST Y PEDIDOS AUTOMÃTICOS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     /**
-     * Dashboard de proyección inteligente de inventario.
+     * Dashboard de proyecciÃ³n inteligente de inventario.
      */
     public function proyecciones(?string $p = null): void
     {
@@ -178,13 +178,13 @@ class RestInventarioController extends BaseController
         $criticos     = array_filter($analisis, fn($i) => $i['nivel_alerta'] === 'critico');
         $advertencias = array_filter($analisis, fn($i) => $i['nivel_alerta'] === 'advertencia');
 
-        // ── AUTO-GENERAR PEDIDO ─────────────────────────────────────────
+        // â”€â”€ AUTO-GENERAR PEDIDO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         $comprobante    = null;
         $ultimoPedidoAt = null;
         $forzar         = (bool)$this->get('forzar', 0);
         $db = \Database::getInstance();
 
-        // ¿Ya se generó un pedido automático en las últimas 12 horas?
+        // Â¿Ya se generÃ³ un pedido automÃ¡tico en las Ãºltimas 12 horas?
         $stCheck = $db->prepare(
             "SELECT MAX(created_at) FROM pedidos
              WHERE notas LIKE ? AND created_at >= DATE_SUB(NOW(), INTERVAL 12 HOUR)"
@@ -201,7 +201,7 @@ class RestInventarioController extends BaseController
         }
 
         $flash      = $this->getFlash();
-        $pageTitle  = 'Proyección de Inventario';
+        $pageTitle  = 'ProyecciÃ³n de Inventario';
         $activeMenu = 'rest_inventario';
 
         $this->render('restaurante/inventario/proyecciones', compact(
@@ -211,7 +211,7 @@ class RestInventarioController extends BaseController
     }
 
     /**
-     * Historial de pedidos generados automáticamente por el sistema de forecast.
+     * Historial de pedidos generados automÃ¡ticamente por el sistema de forecast.
      */
     public function pedidosSugeridos(?string $p = null): void
     {
@@ -230,7 +230,7 @@ class RestInventarioController extends BaseController
         $pedidos = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
         $flash      = $this->getFlash();
-        $pageTitle  = 'Historial de Pedidos Automáticos';
+        $pageTitle  = 'Historial de Pedidos AutomÃ¡ticos';
         $activeMenu = 'rest_inventario';
 
         $this->render('restaurante/inventario/pedidos_sugeridos', compact(
@@ -239,12 +239,12 @@ class RestInventarioController extends BaseController
     }
 
     /**
-     * Genera pedidos forzados vía AJAX (sin cooldown). Responde JSON.
+     * Genera pedidos forzados vÃ­a AJAX (sin cooldown). Responde JSON.
      */
     public function generarPedidoAutomatico(?string $p = null): void
     {
         if (!$this->isPost()) {
-            $this->json(['ok' => false, 'error' => 'Método no permitido'], 405);
+            $this->json(['ok' => false, 'error' => 'MÃ©todo no permitido'], 405);
         }
 
         require_once ROOT_PATH . '/app/services/RestForecastService.php';
@@ -257,7 +257,7 @@ class RestInventarioController extends BaseController
         $grupos   = $forecast->agruparPorEmpresa($analisis);
 
         if (empty($grupos)) {
-            $this->json(['ok' => false, 'error' => 'No hay ingredientes críticos con proveedor CarniHub vinculado.']);
+            $this->json(['ok' => false, 'error' => 'No hay ingredientes crÃ­ticos con proveedor CarniHub vinculado.']);
         }
 
         $creados = $this->_autoGenerarPedidos($restauranteId, $grupos);
@@ -321,7 +321,7 @@ class RestInventarioController extends BaseController
                     $empresaId,
                     $compradorId,
                     $subtotal,
-                    'Pedido automático · Forecast de inventario · Restaurante ID: ' . $restauranteId . ' · ' . date('d/m/Y H:i'),
+                    'Pedido automÃ¡tico Â· Forecast de inventario Â· Restaurante ID: ' . $restauranteId . ' Â· ' . date('d/m/Y H:i'),
                 ]);
                 $pedidoId = (int)$db->lastInsertId();
 
@@ -357,7 +357,7 @@ class RestInventarioController extends BaseController
     }
 
     /**
-     * Endpoint JSON: retorna análisis de forecast para un ingrediente específico.
+     * Endpoint JSON: retorna anÃ¡lisis de forecast para un ingrediente especÃ­fico.
      */
     public function forecastJson(?string $id = null): void
     {
