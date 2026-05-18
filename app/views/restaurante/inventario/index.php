@@ -527,16 +527,16 @@ sort($ingCategorias);
         <input type="hidden" name="proveedor_carnihub" id="modifEditCarnihub" value="0">
         <input type="hidden" name="carnihub_producto_id" id="modifEditCarnihubId" value="">
 
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-          <div class="form-group" style="grid-column:span 2">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+          <div class="form-group" style="grid-column:span 2;margin-bottom:0">
             <label class="form-label">Nombre *</label>
             <input type="text" name="nombre" id="modifEditNombre" class="form-input" required>
           </div>
-          <div class="form-group">
+          <div class="form-group" style="margin-bottom:0">
             <label class="form-label">Categoría</label>
             <input type="text" name="categoria" id="modifEditCategoria" class="form-input" list="dlCatIng">
           </div>
-          <div class="form-group">
+          <div class="form-group" style="margin-bottom:0">
             <label class="form-label">Unidad de medida</label>
             <select name="unidad_principal" id="modifEditUnidad" class="form-select"
                     onchange="document.getElementById('modifEditUnidadLabel').textContent=this.value;
@@ -548,7 +548,7 @@ sort($ingCategorias);
               <option value="bolsa">bolsa</option>
             </select>
           </div>
-          <div class="form-group">
+          <div class="form-group" style="margin-bottom:0">
             <label class="form-label">Costo/<span id="modifEditUnidadLabel">kg</span></label>
             <div style="display:flex;align-items:center;gap:6px">
               <span style="color:#6B7280;font-weight:600">$</span>
@@ -556,15 +556,75 @@ sort($ingCategorias);
                      min="0" step="0.0001" placeholder="0.00">
             </div>
           </div>
-          <div class="form-group">
+          <div class="form-group" style="margin-bottom:0">
             <label class="form-label">Stock mínimo (alerta)</label>
             <input type="number" name="stock_minimo" id="modifEditMinimo" class="form-input"
                    min="0" step="0.001" placeholder="0.000">
           </div>
-          <div class="form-group" id="modifEditProvWrap">
-            <label class="form-label">Proveedor</label>
+        </div>
+
+        <!-- Sección proveedor con toggle Externo / CarniHub -->
+        <div style="border:1.5px solid #E5E7EB;border-radius:10px;overflow:hidden;margin-bottom:12px">
+          <div style="padding:7px 12px;background:#F9FAFB;border-bottom:1px solid #E5E7EB;
+                      display:flex;align-items:center;gap:8px">
+            <span style="font-size:.78rem;font-weight:700;color:#374151">Proveedor</span>
+            <div style="display:flex;gap:4px;margin-left:auto">
+              <button type="button" id="modifProvBtnExt" onclick="switchModifProv('ext')"
+                      style="padding:3px 10px;font-size:.72rem;font-weight:600;border-radius:6px;
+                             border:1.5px solid var(--cp);background:var(--cp);color:#fff;cursor:pointer;transition:.15s">
+                Externo
+              </button>
+              <button type="button" id="modifProvBtnCh" onclick="switchModifProv('ch')"
+                      style="padding:3px 10px;font-size:.72rem;font-weight:600;border-radius:6px;
+                             border:1.5px solid #E5E7EB;background:#fff;color:#6B7280;cursor:pointer;transition:.15s">
+                ⚡ CarniHub
+              </button>
+            </div>
+          </div>
+
+          <!-- Panel proveedor externo -->
+          <div id="modifEditProvPanelExt" style="padding:10px 12px">
             <input type="text" name="proveedor_nombre" id="modifEditProveedor" class="form-input"
-                   placeholder="Ej: Mercado, Walmart">
+                   placeholder="Ej: Mercado, Walmart, Don José">
+          </div>
+
+          <!-- Panel proveedor CarniHub -->
+          <div id="modifEditProvPanelCh" style="display:none;padding:10px 12px">
+            <?php if (!empty($productosCarnihub)): ?>
+            <input type="text" id="modifChBuscar" class="form-input"
+                   placeholder="Buscar producto CarniHub…"
+                   oninput="filtrarChEdit(this.value)"
+                   style="font-size:.83rem;margin-bottom:8px">
+            <div style="border:1.5px solid #E5E7EB;border-radius:8px;overflow:hidden">
+              <div style="max-height:170px;overflow-y:auto" id="modifChListaProductos">
+              <?php foreach ($productosCarnihub as $pc): ?>
+              <div class="modif-ch-prod-row"
+                   data-id="<?= $pc['id'] ?>"
+                   data-nombre="<?= htmlspecialchars(strtolower($pc['nombre']), ENT_QUOTES) ?>"
+                   style="padding:8px 12px;border-bottom:1px solid #F3F4F6;display:flex;
+                          justify-content:space-between;align-items:center;cursor:pointer;transition:.1s"
+                   onmouseover="if(!this.classList.contains('ch-sel'))this.style.background='#FAF5FF'"
+                   onmouseout="if(!this.classList.contains('ch-sel'))this.style.background=''"
+                   onclick="seleccionarCarniHubEdit(<?= $pc['id'] ?>, '<?= htmlspecialchars($pc['nombre'], ENT_QUOTES) ?>')">
+                <div>
+                  <div style="font-weight:600;font-size:.85rem"><?= htmlspecialchars($pc['nombre']) ?></div>
+                  <div style="font-size:.72rem;color:#9CA3AF"><?= htmlspecialchars($pc['unidad'] ?? '') ?></div>
+                </div>
+                <span class="badge badge-purple" style="font-size:.68rem">CarniHub</span>
+              </div>
+              <?php endforeach; ?>
+              </div>
+            </div>
+            <div id="modifChSelWrap" style="display:none;margin-top:8px;padding:6px 10px;
+                 background:#FAF5FF;border:1px solid #DDD6FE;border-radius:8px;
+                 font-size:.8rem;color:#5B21B6;font-weight:600">
+              ✓ <span id="modifChSelNombre">—</span>
+            </div>
+            <?php else: ?>
+            <div style="font-size:.83rem;color:#9CA3AF;text-align:center;padding:12px 0">
+              No hay productos CarniHub disponibles.
+            </div>
+            <?php endif; ?>
           </div>
         </div>
 
@@ -704,7 +764,21 @@ function abrirModificar(ing) {
   document.getElementById('modifEditCosto').value = ing.costo_unitario || 0;
   document.getElementById('modifEditMinimo').value = ing.stock_minimo || 0;
   document.getElementById('modifEditProveedor').value = ing.proveedor_nombre || '';
-  document.getElementById('modifEditProvWrap').style.display = ing.proveedor_carnihub ? 'none' : '';
+
+  // Toggle proveedor: inicializa panel según tipo actual
+  switchModifProv(ing.proveedor_carnihub ? 'ch' : 'ext');
+  if (ing.proveedor_carnihub && ing.carnihub_producto_id) {
+    const row = document.querySelector(`.modif-ch-prod-row[data-id="${ing.carnihub_producto_id}"]`);
+    if (row) {
+      document.querySelectorAll('.modif-ch-prod-row').forEach(r => { r.style.background=''; r.classList.remove('ch-sel'); });
+      row.style.background = 'var(--cp-light, #FAF5FF)';
+      row.classList.add('ch-sel');
+      row.scrollIntoView({ block: 'nearest' });
+      const nombre = row.querySelector('div > div:first-child')?.textContent.trim() || '';
+      document.getElementById('modifChSelNombre').textContent = nombre;
+      document.getElementById('modifChSelWrap').style.display = 'block';
+    }
+  }
   document.getElementById('modifEditUnidadWarn').style.display = 'none';
 
   switchModifTab('mov');
@@ -717,6 +791,49 @@ function switchModifTab(tab) {
   });
   document.getElementById('panelModifMov').classList.toggle('active', tab === 'mov');
   document.getElementById('panelModifEdit').classList.toggle('active', tab === 'edit');
+}
+
+function switchModifProv(tipo) {
+  const isExt = tipo === 'ext';
+  document.getElementById('modifEditCarnihub').value = isExt ? '0' : '1';
+  document.getElementById('modifEditProvPanelExt').style.display = isExt ? '' : 'none';
+  document.getElementById('modifEditProvPanelCh').style.display  = isExt ? 'none' : '';
+  const btnExt = document.getElementById('modifProvBtnExt');
+  const btnCh  = document.getElementById('modifProvBtnCh');
+  if (btnExt) {
+    btnExt.style.background  = isExt ? 'var(--cp)' : '#fff';
+    btnExt.style.color       = isExt ? '#fff' : '#6B7280';
+    btnExt.style.borderColor = isExt ? 'var(--cp)' : '#E5E7EB';
+  }
+  if (btnCh) {
+    btnCh.style.background  = !isExt ? '#5B21B6' : '#fff';
+    btnCh.style.color       = !isExt ? '#fff' : '#6B7280';
+    btnCh.style.borderColor = !isExt ? '#5B21B6' : '#E5E7EB';
+  }
+  if (isExt) {
+    document.getElementById('modifEditCarnihubId').value = '';
+    const selWrap = document.getElementById('modifChSelWrap');
+    if (selWrap) selWrap.style.display = 'none';
+    document.querySelectorAll('.modif-ch-prod-row').forEach(r => { r.style.background=''; r.classList.remove('ch-sel'); });
+    const buscar = document.getElementById('modifChBuscar');
+    if (buscar) { buscar.value = ''; filtrarChEdit(''); }
+  }
+}
+
+function seleccionarCarniHubEdit(id, nombre) {
+  document.getElementById('modifEditCarnihubId').value = id;
+  document.querySelectorAll('.modif-ch-prod-row').forEach(r => { r.style.background=''; r.classList.remove('ch-sel'); });
+  const row = document.querySelector(`.modif-ch-prod-row[data-id="${id}"]`);
+  if (row) { row.style.background = 'var(--cp-light, #FAF5FF)'; row.classList.add('ch-sel'); }
+  document.getElementById('modifChSelNombre').textContent = nombre;
+  document.getElementById('modifChSelWrap').style.display = 'block';
+}
+
+function filtrarChEdit(q) {
+  q = (q || '').toLowerCase().trim();
+  document.querySelectorAll('.modif-ch-prod-row').forEach(row => {
+    row.style.display = (!q || row.dataset.nombre.includes(q)) ? '' : 'none';
+  });
 }
 
 document.querySelectorAll('.mtipo-lbl').forEach(lbl => {

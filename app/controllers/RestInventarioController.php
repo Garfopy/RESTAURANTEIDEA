@@ -29,24 +29,56 @@ class RestInventarioController extends BaseController
         $pageTitle        = 'Inventario';
         $activeMenu       = 'rest_inventario';
 
-        // Productos CarniHub disponibles para vincular al inventario del restaurante
-        // Muestra todos los productos activos del catÃ¡logo (cualquier empresa proveedora)
-        $productosCarnihub = [];
+        // Obtener la empresa proveedora vinculada al restaurante
+        $empresaProveedorId   = null;
+        $empresaProveedorNombre = null;
         try {
             $db   = Database::getInstance();
-            $stmt = $db->query(
-                "SELECT p.id, p.nombre, p.presentacion AS unidad, e.razon_social AS empresa_nombre
-                 FROM productos p
-                 JOIN empresas e ON e.id = p.empresa_id
-                 WHERE p.activo = 1
-                 ORDER BY e.razon_social, p.nombre
-                 LIMIT 300"
+            $stmtRest = $db->prepare(
+                "SELECT rr.empresa_proveedor_id, e.razon_social
+                 FROM rest_restaurantes rr
+                 LEFT JOIN empresas e ON e.id = rr.empresa_proveedor_id
+                 WHERE rr.id = ?"
             );
+            $stmtRest->execute([$restauranteId]);
+            $restRow = $stmtRest->fetch(PDO::FETCH_ASSOC);
+            if ($restRow) {
+                $empresaProveedorId     = $restRow['empresa_proveedor_id'] ? (int)$restRow['empresa_proveedor_id'] : null;
+                $empresaProveedorNombre = $restRow['razon_social'] ?? null;
+            }
+        } catch (\Throwable $e) {}
+
+        // Productos CarniHub disponibles — solo de la empresa vinculada al restaurante
+        // Si no hay empresa vinculada, muestra todos (comportamiento retrocompatible)
+        $productosCarnihub = [];
+        try {
+            if (!isset($db)) $db = Database::getInstance();
+            if ($empresaProveedorId) {
+                $stmt = $db->prepare(
+                    "SELECT p.id, p.nombre, p.presentacion AS unidad, e.razon_social AS empresa_nombre
+                     FROM productos p
+                     LEFT JOIN empresas e ON e.id = p.empresa_id
+                     WHERE p.activo = 1 AND p.empresa_id = ?
+                     ORDER BY p.nombre
+                     LIMIT 300"
+                );
+                $stmt->execute([$empresaProveedorId]);
+            } else {
+                $stmt = $db->query(
+                    "SELECT p.id, p.nombre, p.presentacion AS unidad, e.razon_social AS empresa_nombre
+                     FROM productos p
+                     LEFT JOIN empresas e ON e.id = p.empresa_id
+                     WHERE p.activo = 1
+                     ORDER BY e.razon_social, p.nombre
+                     LIMIT 300"
+                );
+            }
             $productosCarnihub = $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (\Throwable $e) {}
 
         $this->render('restaurante/inventario/index', compact(
-            'ingredientes','alertas','productosCarnihub','movRecientes','flash','pageTitle','activeMenu'
+            'ingredientes','alertas','productosCarnihub','empresaProveedorId','empresaProveedorNombre',
+            'movRecientes','flash','pageTitle','activeMenu'
         ));
     }
 
@@ -66,7 +98,7 @@ class RestInventarioController extends BaseController
             $stmt->execute([$carnihubProdId]);
             $prod   = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
             $nombre = $prod['nombre'] ?? $this->post('nombre', '');
-            $unidad = $prod['unidad'] ?? 'kg';
+            $unidad = $prod['presentacion'] ?? 'kg';
         } else {
             $nombre = trim($this->post('nombre', ''));
             $unidad = $this->post('unidad_principal', 'kg');
@@ -221,7 +253,7 @@ class RestInventarioController extends BaseController
             "SELECT p.id, p.folio, p.total, p.estado, p.created_at, p.notas,
                     e.razon_social AS empresa_nombre
              FROM pedidos p
-             JOIN empresas e ON e.id = p.empresa_id
+             LEFT JOIN empresas e ON e.id = p.empresa_id
              WHERE p.notas LIKE ?
              ORDER BY p.created_at DESC
              LIMIT 60"
