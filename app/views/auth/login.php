@@ -6,6 +6,8 @@ $_appName  = $_cfgLogin->get('app_name', APP_NAME);
 $_waNumero = $_cfgLogin->get('whatsapp_numero_contacto', '');
 $_telefono = $_waNumero ?: $_cfgLogin->get('telefono_contacto', '');
 $_waPhone  = preg_replace('/[^0-9]/', '', $_telefono);
+$_isRest   = defined('RESTAURANTE_STANDALONE') && RESTAURANTE_STANDALONE;
+if ($_isRest) { $_appName = 'Restaurante'; }
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -335,6 +337,81 @@ $_waPhone  = preg_replace('/[^0-9]/', '', $_telefono);
       transition: color .15s;
     }
     .forgot-link:hover { color: #A00D24; text-decoration: underline; }
+
+    <?php if ($_isRest): ?>
+    /* ── Restaurante theme override: café, burdeos, azul marino, verde oliva ── */
+    .login-bg { background: #1A1410; }
+    .login-bg::before {
+      background:
+        radial-gradient(ellipse 55% 45% at 12% 25%, rgba(124,45,58,.22) 0%, transparent 65%),
+        radial-gradient(ellipse 45% 55% at 88% 75%, rgba(30,58,95,.55) 0%, transparent 65%),
+        radial-gradient(ellipse 70% 35% at 50% 110%, rgba(85,107,47,.10) 0%, transparent 60%);
+    }
+    .login-card-wrap {
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,.03),
+        0 32px 80px rgba(0,0,0,.65),
+        0 80px 160px rgba(0,0,0,.40),
+        0 0 120px rgba(124,45,58,.18);
+    }
+    .login-left {
+      background: linear-gradient(150deg, #3E2723 0%, #2A1A14 45%, #1E3A5F 100%);
+    }
+    .login-glow-top {
+      background: radial-gradient(circle, rgba(124,45,58,.55) 0%, transparent 70%);
+    }
+    .login-glow-btm {
+      background: radial-gradient(circle, rgba(85,107,47,.35) 0%, transparent 70%);
+    }
+    .login-accent-bar {
+      background: linear-gradient(90deg, #7C2D3A 0%, #6B4423 50%, #556B2F 100%);
+      box-shadow: 0 2px 12px rgba(124,45,58,.5);
+    }
+    .login-feature-dot {
+      background: #6B4423;
+      box-shadow: 0 2px 8px rgba(107,68,35,.5);
+    }
+    .shimmer-heading {
+      background: linear-gradient(
+        90deg,
+        #E2D5C7 30%,
+        #C99A6B 46%,
+        #7C2D3A 50%,
+        #C99A6B 54%,
+        #E2D5C7 70%
+      );
+      background-size: 200% auto;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .login-right::before {
+      background: linear-gradient(90deg, #7C2D3A 0%, #1E3A5F 50%, #556B2F 100%);
+      background-size: 200% 100%;
+    }
+    .input-wrap:focus-within .input-icon-left { color: #7C2D3A; }
+    .input-login:focus {
+      border-color: #7C2D3A;
+      box-shadow: 0 0 0 3px rgba(124,45,58,.12);
+    }
+    .btn-login-submit {
+      background: linear-gradient(135deg, #7C2D3A 0%, #581C2E 100%);
+      box-shadow: 0 4px 16px rgba(124,45,58,.40);
+    }
+    .btn-login-submit:hover {
+      box-shadow: 0 8px 28px rgba(124,45,58,.50);
+    }
+    .btn-login-submit:active {
+      box-shadow: 0 3px 10px rgba(124,45,58,.30);
+    }
+    .flash-box.is-error {
+      background: #F4E3E3;
+      border-left: 4px solid #7C2D3A;
+      color: #4A1820;
+    }
+    .forgot-link { color: #1E3A5F; }
+    .forgot-link:hover { color: #0F2444; }
+    <?php endif; ?>
   </style>
 </head>
 <body class="login-bg">
@@ -360,10 +437,18 @@ $_waPhone  = preg_replace('/[^0-9]/', '', $_telefono);
       <div class="login-accent-bar"></div>
 
       <h2 class="shimmer-heading" style="font-size:1.45rem;font-weight:800;margin-bottom:10px;text-align:center;line-height:1.25">
-        Abasto Inteligente<br>de Carne
+        <?php if ($_isRest): ?>
+          Gestión Integral<br>de Restaurante
+        <?php else: ?>
+          Abasto Inteligente<br>de Carne
+        <?php endif; ?>
       </h2>
       <p style="color:#94A3B8;text-align:center;font-size:.84rem;line-height:1.65;max-width:240px;margin:0">
-        La plataforma B2B que conecta tu negocio con el mejor abasto cárnico.
+        <?php if ($_isRest): ?>
+          Mesas, menú, cocina y pagos sincronizados en tiempo real.
+        <?php else: ?>
+          La plataforma B2B que conecta tu negocio con el mejor abasto cárnico.
+        <?php endif; ?>
       </p>
 
       <div class="login-stats">
@@ -383,7 +468,12 @@ $_waPhone  = preg_replace('/[^0-9]/', '', $_telefono);
 
       <div class="login-features">
         <?php
-          $features = [
+          $features = $_isRest ? [
+            ['Mesas y reservas en tiempo real',  'M5 13l4 4L19 7'],
+            ['Menú digital y pedidos por QR',    'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2'],
+            ['Cocina con piezas tipo Lego',      'M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0'],
+            ['Reportes y propinas',              'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z'],
+          ] : [
             ['Precios escalonados dinámicos', 'M5 13l4 4L19 7'],
             ['Pedidos multi-sucursal',        'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2'],
             ['Logística inteligente',         'M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0'],
@@ -403,7 +493,7 @@ $_waPhone  = preg_replace('/[^0-9]/', '', $_telefono);
 
     </div>
 
-    <div class="login-tagline">Plataforma líder en abasto cárnico B2B</div>
+    <div class="login-tagline"><?= $_isRest ? 'Sistema integral de gestión gastronómica' : 'Plataforma líder en abasto cárnico B2B' ?></div>
   </div>
 
   <!-- Panel derecho — formulario -->
