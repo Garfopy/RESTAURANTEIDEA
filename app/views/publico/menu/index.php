@@ -255,8 +255,13 @@ $catNombres = array_column($categorias, 'nombre', 'id');
 <div style="position:fixed;left:0;right:0;bottom:0;background:rgba(20,18,16,.92);
             backdrop-filter:blur(10px);border-top:1px solid rgba(255,255,255,.08);
             padding:14px 18px;text-align:center;font-size:.82rem;color:rgba(240,238,232,.75);z-index:40">
+  <?php if (!empty($mesaInvalida)): ?>
+  ⚠️ <strong style="color:#FFB4B4">Esta mesa ya no está disponible.</strong>
+  Pide al personal un nuevo QR para ordenar.
+  <?php else: ?>
   👀 <strong style="color:#fff">Vista previa del menú.</strong>
   Para ordenar, escanea el QR de tu mesa dentro del restaurante.
+  <?php endif; ?>
 </div>
 <?php endif; ?>
 

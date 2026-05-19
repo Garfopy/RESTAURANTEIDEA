@@ -15,7 +15,7 @@ class RestMesaController extends BaseController
     public function index(?string $p = null): void
     {
         $restauranteId = $this->restauranteId();
-        $mesas  = $this->model->getByRestaurante($restauranteId);
+        $mesas  = $this->model->getByRestaurante($restauranteId, true);
         $zonas  = $this->model->getZonas($restauranteId);
         $rest   = (new RestauranteModel())->find($restauranteId);
         $flash  = $this->getFlash();

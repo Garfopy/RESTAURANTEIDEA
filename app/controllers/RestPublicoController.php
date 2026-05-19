@@ -75,8 +75,10 @@ class RestPublicoController extends BaseController
 
         $mesa = null;
         $mesaQr = $this->get('mesa');
+        $mesaInvalida = false;
         if ($mesaQr) {
             $mesa = (new RestMesaModel())->getByQr($mesaQr);
+            $mesaInvalida = !$mesa; // QR escaneado pero la mesa fue eliminada o no existe
         }
 
         // Recuperar visita previa de cookie (para agregar más pedidos a la misma visita)
@@ -92,7 +94,7 @@ class RestPublicoController extends BaseController
         }
 
         $pageTitle = $restaurante['nombre'];
-        $this->render('publico/menu/index', compact('restaurante','categorias','platillos','recetaIngredientes','mesa','visitaId','pageTitle'));
+        $this->render('publico/menu/index', compact('restaurante','categorias','platillos','recetaIngredientes','mesa','mesaInvalida','visitaId','pageTitle'));
     }
 
     public function ordenar(?string $slug = null): void
