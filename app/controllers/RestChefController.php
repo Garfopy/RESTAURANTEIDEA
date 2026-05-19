@@ -29,7 +29,78 @@ class RestChefController extends BaseController
 
     public function marcarPreparacion(?string $itemId = null): void
     {
-        $this->model->cambiarEstadoItem((int)$itemId, 'en_preparacion');
+        $itemId = (int)$itemId;
+        $this->model->cambiarEstadoItem($itemId, 'en_preparacion');
+
+        // ── Descontar ingredientes de inventario al iniciar preparación ───────
+        try {
+            $db       = Database::getInstance();
+            $stmtItem = $db->prepare(
+                "SELECT pi.platillo_id, pi.cantidad, pi.pedido_id, p.restaurante_id
+                 FROM rest_pedido_items pi
+                 JOIN rest_pedidos p ON p.id = pi.pedido_id
+                 WHERE pi.id = ? LIMIT 1"
+            );
+            $stmtItem->execute([$itemId]);
+            $item = $stmtItem->fetch(\PDO::FETCH_ASSOC);
+
+            if ($item && $item['restaurante_id']) {
+                $restauranteId  = (int)$item['restaurante_id'];
+                $platilloId     = (int)$item['platillo_id'];
+                $cantidadPlatos = max(1, (int)$item['cantidad']);
+                $pedidoId       = (int)$item['pedido_id'];
+                $ref            = 'rest_item:' . $itemId;
+                $invModel       = new RestInventarioModel();
+
+                // Ingredientes de la receta que sí descuentan stock (es_informativo = 0)
+                $stmtRec = $db->prepare(
+                    "SELECT ri.ingrediente_id, ri.cantidad
+                     FROM rest_receta_ingredientes ri
+                     JOIN rest_recetas rec ON rec.id = ri.receta_id
+                     WHERE rec.platillo_id = ?
+                       AND ri.es_informativo = 0"
+                );
+                $stmtRec->execute([$platilloId]);
+                $recIngredientes = $stmtRec->fetchAll(\PDO::FETCH_ASSOC);
+
+                if (!empty($recIngredientes)) {
+                    // Platillo con receta → descontar ingredientes
+                    foreach ($recIngredientes as $ri) {
+                        $delta = (float)$ri['cantidad'] * $cantidadPlatos;
+                        $invModel->ajustarStock(
+                            (int)$ri['ingrediente_id'],
+                            -$delta,
+                            'salida',
+                            'Preparación (pedido #' . $pedidoId . ')',
+                            $ref,
+                            $restauranteId,
+                            null
+                        );
+                    }
+                } else {
+                    // Sin receta → deducir por ingrediente directo (bebidas, postres, etc.)
+                    $stmtDir = $db->prepare(
+                        "SELECT ingrediente_directo_id FROM rest_platillos WHERE id = ? LIMIT 1"
+                    );
+                    $stmtDir->execute([$platilloId]);
+                    $ingDirectoId = (int)$stmtDir->fetchColumn();
+                    if ($ingDirectoId) {
+                        $invModel->ajustarStock(
+                            $ingDirectoId,
+                            -(float)$cantidadPlatos,
+                            'salida',
+                            'Preparación (pedido #' . $pedidoId . ')',
+                            $ref,
+                            $restauranteId,
+                            null
+                        );
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            // No bloquea el flujo — el ítem ya quedó marcado como en preparación
+        }
+
         $this->json(['ok' => true]);
     }
 
@@ -54,54 +125,6 @@ class RestChefController extends BaseController
             $stmt2->execute([$pedidoId]);
             if ((int)$stmt2->fetchColumn() === 0) {
                 $this->model->cambiarEstadoPedido($pedidoId, 'listo');
-            }
-
-            // ── Descontar ingredientes de inventario ──────────────────────
-            try {
-                // Obtener platillo_id, cantidad del ítem y restaurante_id del pedido
-                $stmtItem = $db->prepare(
-                    "SELECT pi.platillo_id, pi.cantidad, p.restaurante_id
-                     FROM rest_pedido_items pi
-                     JOIN rest_pedidos p ON p.id = pi.pedido_id
-                     WHERE pi.id = ? LIMIT 1"
-                );
-                $stmtItem->execute([$itemId]);
-                $item = $stmtItem->fetch(\PDO::FETCH_ASSOC);
-
-                if ($item && $item['restaurante_id']) {
-                    $restauranteId  = (int)$item['restaurante_id'];
-                    $cantidadPlatos = max(1, (int)$item['cantidad']);
-
-                    // Ingredientes de la receta que sí descuentan stock (es_informativo = 0)
-                    $stmtRec = $db->prepare(
-                        "SELECT ri.ingrediente_id, ri.cantidad
-                         FROM rest_receta_ingredientes ri
-                         JOIN rest_recetas rec ON rec.id = ri.receta_id
-                         WHERE rec.platillo_id = ?
-                           AND ri.es_informativo = 0"
-                    );
-                    $stmtRec->execute([(int)$item['platillo_id']]);
-                    $recIngredientes = $stmtRec->fetchAll(\PDO::FETCH_ASSOC);
-
-                    if (!empty($recIngredientes)) {
-                        $invModel = new RestInventarioModel();
-                        $ref      = 'rest_item:' . $itemId;
-                        foreach ($recIngredientes as $ri) {
-                            $delta = (float)$ri['cantidad'] * $cantidadPlatos;
-                            $invModel->ajustarStock(
-                                (int)$ri['ingrediente_id'],
-                                $delta,
-                                'salida',
-                                'Preparación (pedido #' . $pedidoId . ')',
-                                $ref,
-                                $restauranteId,
-                                null
-                            );
-                        }
-                    }
-                }
-            } catch (\Throwable $e) {
-                // No bloquea el flujo — el ítem ya quedó marcado como listo
             }
         }
 

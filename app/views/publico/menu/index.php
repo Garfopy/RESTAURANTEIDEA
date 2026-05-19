@@ -403,7 +403,10 @@ const MENU = <?= json_encode(array_combine(
           'precio' => (float)$p['precio'],
           'imagen' => $p['imagen'] ?? '',
           'cat_id' => (int)($p['categoria_id'] ?? 0),
-          'ings'   => array_values($recetaIngredientes[(int)$p['id']] ?? []),
+          'ings'   => array_values(array_filter(
+              $recetaIngredientes[(int)$p['id']] ?? [],
+              fn($r) => ($r['tipo_componente'] ?? 'guarnicion') !== 'materia_prima'
+          )),
       ];
   }, $platillos)
 ), JSON_UNESCAPED_UNICODE) ?>;

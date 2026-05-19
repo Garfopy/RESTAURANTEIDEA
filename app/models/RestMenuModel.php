@@ -92,7 +92,8 @@ class RestMenuModel extends BaseModel
         $rows = $this->query(
             "SELECT rec.platillo_id, ri.ingrediente_id, i.nombre AS ingrediente_nombre,
                     ri.cantidad, ri.unidad, ri.es_informativo,
-                    COALESCE(ri.precio_extra, 0) AS precio_extra
+                    COALESCE(ri.precio_extra, 0) AS precio_extra,
+                    ri.tipo_componente
              FROM rest_recetas rec
              JOIN rest_receta_ingredientes ri ON ri.receta_id = rec.id
              JOIN rest_ingredientes i ON i.id = ri.ingrediente_id

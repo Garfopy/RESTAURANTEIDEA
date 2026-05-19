@@ -127,6 +127,20 @@
                    value="<?= htmlspecialchars($platillo['contiene'] ?? '') ?>">
             <div style="font-size:.73rem;color:#6B7280;margin-top:4px">Escríbe aquí condimentos y especias que no se miden con báscula pero el cliente debe saber</div>
           </div>
+
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label" style="font-size:.82rem">🍺 Ingrediente directo de inventario <span style="font-weight:400;color:#9CA3AF">(para bebidas / postres sin receta)</span></label>
+            <select name="ingrediente_directo_id" class="form-input">
+              <option value="">— Sin vínculo directo —</option>
+              <?php foreach ($ingredientes as $ing): ?>
+              <option value="<?= (int)$ing['id'] ?>"
+                <?= ((int)($platillo['ingrediente_directo_id'] ?? 0)) === (int)$ing['id'] ? 'selected' : '' ?>>
+                <?= htmlspecialchars($ing['nombre']) ?> (<?= htmlspecialchars($ing['unidad_principal']) ?>)
+              </option>
+              <?php endforeach; ?>
+            </select>
+            <div style="font-size:.73rem;color:#6B7280;margin-top:4px">Al marcar «en preparación» en el KDS se descontará 1 unidad de este ingrediente (solo si el platillo no tiene receta)</div>
+          </div>
         </div>
 
         <div class="wizard-nav">
@@ -142,7 +156,7 @@
         <div style="font-weight:700;color:#111827;font-size:1.05rem;margin-bottom:2px">Receta del platillo</div>
         <div style="font-size:.85rem;color:#6B7280;margin-bottom:18px;line-height:1.5">
           Define qué ingredientes lleva y cuánto. CarniHub
-          <strong>descontará automáticamente del inventario</strong> cuando el chef marque el pedido como listo.
+          <strong>descontará automáticamente del inventario</strong> cuando el chef marque el ítem como «en preparación».
           <span style="color:#DC2626;font-weight:600">Requerido para publicar.</span>
         </div>
 

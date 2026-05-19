@@ -57,6 +57,7 @@ class RestMenuController extends BaseController
             'disponible'             => $this->post('disponible', 1),
             'alergenos'              => $alergenosStr ?: null,
             'contiene'               => $this->post('contiene') ?: null,
+            'ingrediente_directo_id' => $this->post('ingrediente_directo_id') ?: null,
         ];
 
         if ($id) {
