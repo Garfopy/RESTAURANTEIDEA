@@ -103,11 +103,27 @@ abstract class BaseController
     {
         $this->requireRole(['comprador', 'admin_restaurante']);
         $rol = $this->rolActual();
-        if ($rol === 'admin_restaurante') {
-            return; // admin_restaurante no requiere restaurante_activo_id en sesión
+
+        // admin_restaurante: auto-seleccionar el primer restaurante de su empresa
+        if ($rol === 'admin_restaurante' && empty($_SESSION['restaurante_activo_id'])) {
+            $empresaId = $this->empresaId();
+            if ($empresaId) {
+                $restModel = new RestauranteModel();
+                $rests     = $restModel->getByEmpresa($empresaId);
+                if (!empty($rests)) {
+                    $_SESSION['restaurante_activo_id'] = (int)$rests[0]['id'];
+                }
+            }
         }
+
         $restauranteId = $_SESSION['restaurante_activo_id'] ?? null;
         if (!$restauranteId) {
+            if ($rol === 'admin_restaurante') {
+                // No hay restaurantes asociados a su empresa: cerrar sesión con mensaje.
+                $this->flash('error', 'Tu cuenta no tiene ningún restaurante asignado. Contacta al administrador.');
+                session_destroy();
+                $this->redirect('auth/login');
+            }
             $this->redirect('restaurante/seleccionar');
         }
     }
