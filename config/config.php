@@ -40,3 +40,7 @@ define('PAYPAL_TEST_MODE', false);
 // Google Maps Places API key (agregar en cPanel o aquí directamente)
 // Obtener en: https://console.cloud.google.com → APIs → Maps JavaScript API + Places API
 define('GOOGLE_MAPS_KEY', getenv('GOOGLE_MAPS_KEY') ?: '');
+
+// Stripe — pago con tarjeta (MXN)
+define('STRIPE_PUBLIC_KEY', getenv('STRIPE_PUBLIC_KEY') ?: '');
+define('STRIPE_SECRET_KEY', getenv('STRIPE_SECRET_KEY') ?: '');

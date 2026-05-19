@@ -179,15 +179,8 @@ class RestPublicoController extends BaseController
             'mesero_id'      => null,
         ], $items);
 
-        // Descontar stock automáticamente al confirmar el pedido.
-        // Se ejecuta fuera de la transacción del pedido: un fallo de inventario
-        // no revierte el pedido ya guardado.
-        try {
-            $this->inventarioModel->descontarPorOrden($pedidoId, $restauranteId);
-        } catch (\Throwable $e) {
-            error_log('[RestauranteStock] pedido=' . $pedidoId . ' ' . $e->getMessage());
-        }
-
+        // Stock se descuenta cuando la cocina marca el ítem como "en_preparacion"
+        // (RestChefController::marcarPreparacion) — no al hacer el pedido.
         $this->visitaModel->actualizarTotales((int)$visitaId);
 
         // Marcar mesa como ocupada
@@ -305,7 +298,7 @@ class RestPublicoController extends BaseController
         }
 
         $pageTitle = 'Pagar cuenta';
-        $this->render('publico/menu/pagar', compact('restaurante','ticket','todoItems','pageTitle'));
+        $this->render('publico/menu/pagar', compact('restaurante','ticket','todoItems','visita','visitaId','pageTitle'));
     }
 
     // POST /menu/{slug}/confirmarPago/{ticketId} — endpoint PÚBLICO (sin login)
@@ -353,6 +346,35 @@ class RestPublicoController extends BaseController
                 $_SESSION['flash_error'] = 'Error al conectar con PayPal. Elige otro método.';
                 $this->redirect('menu/' . $realSlug . '/pagar/' . $ticket['visita_id']);
             }
+        }
+
+        if ($metodo === 'tarjeta') {
+            $intentId = trim($this->post('payment_intent_id', ''));
+            $sesKey   = 'stripe_intent_' . $ticketId;
+
+            if (!$intentId || empty($_SESSION[$sesKey]) || $_SESSION[$sesKey] !== $intentId) {
+                $_SESSION['flash_error'] = 'Confirmación de pago inválida. Intenta de nuevo.';
+                $this->redirect('menu/' . $realSlug . '/pagar/' . $ticket['visita_id']);
+                return;
+            }
+            unset($_SESSION[$sesKey]);
+
+            try {
+                \Stripe\Stripe::setApiKey(STRIPE_SECRET_KEY);
+                $intent = \Stripe\PaymentIntent::retrieve($intentId);
+                if ($intent->status !== 'succeeded') {
+                    throw new \RuntimeException('Estado Stripe: ' . $intent->status);
+                }
+            } catch (\Throwable $e) {
+                $_SESSION['flash_error'] = 'El pago con tarjeta no se completó. Intenta de nuevo.';
+                $this->redirect('menu/' . $realSlug . '/pagar/' . $ticket['visita_id']);
+                return;
+            }
+
+            $this->ticketModel->marcarPagado($ticketId, 'tarjeta', $intentId);
+            $this->visitaModel->marcarPagada((int)$ticket['visita_id']);
+            $this->redirect('menu/' . $realSlug . '/confirmacion/' . $ticket['visita_id'] . '?pagado=1');
+            return;
         }
 
         $this->ticketModel->marcarPagado($ticketId, $metodo, null);
@@ -614,6 +636,46 @@ class RestPublicoController extends BaseController
             'mensaje'  => '¡Salida registrada! Mesa liberada.',
             'redirect' => BASE_URL . 'menu/gracias?qr=' . urlencode($visita['qr_code'] ?? ''),
         ]);
+        exit;
+    }
+
+    // POST /menu/stripeIntent/{slug}/{ticketId}
+    public function stripeIntent(?string $slug = null): void
+    {
+        header('Content-Type: application/json');
+        if (!$this->isPost()) { echo json_encode(['ok' => false]); exit; }
+
+        $parts    = explode('/', $slug ?? '');
+        $realSlug = $parts[0] ?? '';
+        $ticketId = (int)($parts[1] ?? 0);
+
+        $restaurante = $this->restModel->getBySlug($realSlug);
+        $ticket      = $this->ticketModel->find($ticketId);
+
+        if (!$restaurante || !$ticket
+            || (int)$ticket['restaurante_id'] !== (int)$restaurante['id']
+            || ($ticket['estado'] ?? '') === 'pagado') {
+            echo json_encode(['ok' => false, 'error' => 'Ticket no válido']);
+            exit;
+        }
+
+        try {
+            \Stripe\Stripe::setApiKey(STRIPE_SECRET_KEY);
+            $centavos = (int)round((float)($ticket['total'] ?? 0) * 100);
+            $intent = \Stripe\PaymentIntent::create([
+                'amount'   => max(1000, $centavos),
+                'currency' => 'mxn',
+                'metadata' => [
+                    'ticket_id'   => $ticketId,
+                    'folio'       => $ticket['folio'] ?? '',
+                    'restaurante' => $restaurante['nombre'] ?? '',
+                ],
+            ]);
+            $_SESSION['stripe_intent_' . $ticketId] = $intent->id;
+            echo json_encode(['ok' => true, 'clientSecret' => $intent->client_secret]);
+        } catch (\Throwable $e) {
+            echo json_encode(['ok' => false, 'error' => 'Error al crear pago con tarjeta']);
+        }
         exit;
     }
 

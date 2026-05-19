@@ -30,6 +30,29 @@ class RestChefController extends BaseController
     public function marcarPreparacion(?string $itemId = null): void
     {
         $itemId = (int)$itemId;
+
+        // ── Leer estado actual ANTES de cambiar (idempotencia) ────────────────
+        try {
+            $db       = Database::getInstance();
+            $stmtItem = $db->prepare(
+                "SELECT pi.platillo_id, pi.cantidad, pi.pedido_id, pi.estado,
+                        p.restaurante_id
+                 FROM rest_pedido_items pi
+                 JOIN rest_pedidos p ON p.id = pi.pedido_id
+                 WHERE pi.id = ? LIMIT 1"
+            );
+            $stmtItem->execute([$itemId]);
+            $item = $stmtItem->fetch(\PDO::FETCH_ASSOC);
+
+            // Si ya estaba en preparación, no descontar stock de nuevo
+            if ($item && $item['estado'] === 'en_preparacion') {
+                $this->json(['ok' => true]);
+                return;
+            }
+        } catch (\Throwable $e) {
+            // Si falla la lectura previa, dejar que continúe el flujo normal
+        }
+
         $this->model->cambiarEstadoItem($itemId, 'en_preparacion');
 
         // ── Descontar ingredientes de inventario al iniciar preparación ───────

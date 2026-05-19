@@ -6,6 +6,7 @@
   <title>Pagar cuenta — <?= htmlspecialchars($restaurante['nombre'] ?? '') ?></title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="<?= BASE_URL ?>public/css/restaurant.css">
+  <script src="https://js.stripe.com/v3/"></script>
   <style>
     :root {
       --cp: <?= htmlspecialchars($restaurante['color_primario'] ?? '#C8102E') ?>;
@@ -46,6 +47,24 @@
       <div style="font-size:.85rem;color:#6B7280;margin-top:4px">Mesa: <?= htmlspecialchars($ticket['mesa_nombre']) ?></div>
       <?php endif; ?>
     </div>
+
+    <!-- Desglose de ítems ordenados -->
+    <?php if (!empty($todoItems)): ?>
+    <div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px dashed #E5E7EB">
+      <div style="font-size:.72rem;font-weight:700;color:#9CA3AF;text-transform:uppercase;
+                  letter-spacing:.07em;margin-bottom:10px">Lo que ordenaste</div>
+      <?php foreach ($todoItems as $it): ?>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;
+                  padding:5px 0;font-size:.88rem;border-bottom:1px solid #F9FAFB">
+        <div style="flex:1;padding-right:10px">
+          <?= htmlspecialchars($it['platillo_nombre'] ?? $it['nombre'] ?? '?') ?>
+          <span style="color:#9CA3AF;font-size:.78rem"> ×<?= (int)$it['cantidad'] ?></span>
+        </div>
+        <span style="font-weight:600;white-space:nowrap">$<?= number_format((float)$it['subtotal'], 2) ?></span>
+      </div>
+      <?php endforeach; ?>
+    </div>
+    <?php endif; ?>
 
     <!-- Detalle montos -->
     <div style="space-y:8px">
@@ -106,6 +125,15 @@
     <form method="POST" action="<?= BASE_URL ?>menu/confirmarPago/<?= htmlspecialchars($restaurante['slug'] ?? '') ?>/<?= (int)($ticket['id'] ?? 0) ?>" id="formPago">
       <input type="hidden" name="metodo_pago" id="inpMetodo" value="efectivo">
       <input type="hidden" name="propina" id="inpPropina" value="0">
+      <input type="hidden" name="payment_intent_id" id="inpIntentId" value="">
+
+      <!-- Stripe Card Element (visible sólo cuando se selecciona Tarjeta) -->
+      <div id="stripeWrap" style="display:none;margin-bottom:16px">
+        <div style="font-size:.85rem;font-weight:600;color:#374151;margin-bottom:8px">Datos de tarjeta</div>
+        <div id="cardElement"
+             style="padding:12px 14px;border:1.5px solid #E5E7EB;border-radius:10px;background:#fff"></div>
+        <div id="cardErrors" style="color:#EF4444;font-size:.8rem;margin-top:6px"></div>
+      </div>
 
       <!-- Propina selector -->
       <div style="margin-bottom:16px">
@@ -180,6 +208,18 @@
     <?php endif; ?>
   </div>
 
+  <?php if (($ticket['estado'] ?? '') !== 'pagado'): ?>
+  <a href="<?= BASE_URL ?>menu/<?= htmlspecialchars($restaurante['slug'] ?? '') ?>"
+     style="display:block;width:100%;margin-top:12px;padding:14px;border-radius:14px;
+            border:2px solid rgba(255,255,255,.25);background:transparent;color:#fff;
+            font-size:.95rem;font-weight:600;text-align:center;text-decoration:none;
+            transition:.15s"
+     onmouseover="this.style.background='rgba(255,255,255,.1)'"
+     onmouseout="this.style.background='transparent'">
+    ← Seguir ordenando
+  </a>
+  <?php endif; ?>
+
   <div style="text-align:center;margin-top:16px;font-size:.72rem;color:rgba(255,255,255,.5)">
     Potenciado por <strong style="color:rgba(255,255,255,.7)">CarniHub</strong>
   </div>
@@ -196,9 +236,12 @@ const subtotal = <?= (float)($ticket['subtotal'] ?? 0) ?>;
 const baseTotal = <?= (float)($ticket['total'] ?? 0) ?>;
 const TICKET_ID = <?= (int)($ticket['id'] ?? 0) ?>;
 const SLUG_PAGO = '<?= htmlspecialchars($restaurante['slug'] ?? '') ?>';
+const STRIPE_PK = '<?= STRIPE_PUBLIC_KEY ?>';
 let propinaMonto = 0;
 let metodoActual = 'efectivo';
-let splitSubtotal = null;     // null = paga todo; number = paga sólo su parte
+let splitSubtotal = null;
+
+let stripeInstance = null, cardElement = null, stripeInited = false;
 
 // Inicializar
 seleccionarMetodo('efectivo');
@@ -241,6 +284,25 @@ function seleccionarMetodo(metodo) {
   document.querySelectorAll('.metodo-btn').forEach(b => b.classList.remove('selected'));
   const btn = document.querySelector(`.metodo-btn[data-metodo="${metodo}"]`);
   if (btn) btn.classList.add('selected');
+
+  const wrap = document.getElementById('stripeWrap');
+  if (metodo === 'tarjeta') {
+    wrap.style.display = 'block';
+    if (!stripeInited) {
+      stripeInstance = Stripe(STRIPE_PK);
+      const elements = stripeInstance.elements();
+      cardElement = elements.create('card', {
+        style: { base: { fontSize: '16px', color: '#111827', '::placeholder': { color: '#9CA3AF' } } }
+      });
+      cardElement.mount('#cardElement');
+      cardElement.on('change', e => {
+        document.getElementById('cardErrors').textContent = e.error ? e.error.message : '';
+      });
+      stripeInited = true;
+    }
+  } else {
+    wrap.style.display = 'none';
+  }
 }
 
 // ── Dividir cuenta ────────────────────────────────────────────────────────────
@@ -269,6 +331,41 @@ document.addEventListener('change', e => {
   document.getElementById('inpSplitSubtotal').value = suma.toFixed(2);
   document.getElementById('splitTotal').textContent = '$' + suma.toFixed(2);
   actualizarTotalDisplay();
+});
+
+// ── Interceptor Stripe ──────────────────────────────────────────────────────────
+document.getElementById('formPago').addEventListener('submit', async function(e) {
+  if (metodoActual !== 'tarjeta') return; // flujo normal para otros métodos
+
+  e.preventDefault();
+  const btn = document.getElementById('btnPagar');
+  const errDiv = document.getElementById('cardErrors');
+  btn.disabled = true;
+  btn.textContent = 'Procesando…';
+  errDiv.textContent = '';
+
+  try {
+    const res = await fetch(`<?= BASE_URL ?>menu/stripeIntent/${SLUG_PAGO}/${TICKET_ID}`, {
+      method: 'POST'
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Error al iniciar pago');
+
+    const { paymentIntent, error } = await stripeInstance.confirmCardPayment(data.clientSecret, {
+      payment_method: { card: cardElement }
+    });
+
+    if (error) throw new Error(error.message);
+    if (paymentIntent.status !== 'succeeded') throw new Error('Pago no completado');
+
+    document.getElementById('inpIntentId').value = paymentIntent.id;
+    this.submit();
+
+  } catch (err) {
+    errDiv.textContent = err.message;
+    btn.disabled = false;
+    btn.textContent = 'Confirmar pago $' + document.getElementById('totalFinal').textContent + ' →';
+  }
 });
 </script>
 </body>
