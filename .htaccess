@@ -1,6 +1,9 @@
 Options -Indexes
 RewriteEngine On
-RewriteBase /carnihub/
+# RewriteBase intencionalmente OMITIDO: el mismo .htaccess funciona en cualquier
+# subdirectorio (/carnihub/, /restaurante/, /, etc.) porque la sustitución
+# `index.php?url=$1` es relativa y Apache la resuelve contra la carpeta actual.
+# El BASE_URL del PHP se autodetecta en config/config.php desde SCRIPT_NAME.
 
 # ── Content Security Policy ───────────────────────────────────────────────────
 # Incluye todos los dominios necesarios para Google Maps JS API + Embed API + Firebase
