@@ -178,13 +178,22 @@ class RestInventarioController extends BaseController
 
     public function eliminar(?string $id = null): void
     {
+        $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) &&
+            strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+
+        $restauranteId = $this->restauranteId();
+        $ing = $this->model->find((int)$id);
+
+        if (!$ing || (int)($ing['restaurante_id'] ?? 0) !== $restauranteId) {
+            if ($isAjax) $this->json(['ok' => false, 'error' => 'No autorizado']);
+            $this->flash('error', 'Ingrediente no encontrado.');
+            $this->redirect('rest-inventario/index');
+            return;
+        }
+
         $this->model->update((int)$id, ['activo' => 0]);
 
-        // Si es petición AJAX responder JSON, de lo contrario redirigir
-        if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) &&
-            strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
-            $this->json(['ok' => true]);
-        }
+        if ($isAjax) $this->json(['ok' => true]);
 
         $this->flash('success', 'Ingrediente eliminado.');
         $this->redirect('rest-inventario/index');
@@ -205,7 +214,7 @@ class RestInventarioController extends BaseController
     /** Endpoint JSON â€” devuelve stocks actuales para polling en tiempo real */
     public function stocks(?string $p = null): void
     {
-        $rows = $this->model->getByRestaurante($this->restauranteId());
+        $rows = $this->model->getByRestaurante($this->restauranteId(), true);
         $this->json(array_map(fn($r) => [
             'id'               => (int)$r['id'],
             'stock'            => (float)$r['stock'],
