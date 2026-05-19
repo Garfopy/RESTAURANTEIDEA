@@ -227,6 +227,10 @@
                    placeholder="G1, MP2…" title="Código KDS (ej: G1, MP2, SA1)"
                    style="font-size:.78rem;text-transform:uppercase"
                    value="<?= htmlspecialchars($ing['codigo_display'] ?? '') ?>">
+            <input type="number" name="precio_extra[]" class="form-input" step="0.01" min="0"
+                   placeholder="$ extra" title="Precio extra (0 = incluida, >0 muestra botón +Extra en el menú)"
+                   style="font-size:.78rem;width:72px"
+                   value="<?= (float)($ing['precio_extra'] ?? 0) ?>">
             <label style="display:flex;align-items:center;gap:4px;font-size:.75rem;color:#6B7280;cursor:pointer;white-space:nowrap" title="No descuenta stock, solo aparece en la info del cliente">
               <input type="checkbox" name="es_informativo[]" value="<?= (int)$ing['ingrediente_id'] ?>"
                      <?= ($ing['es_informativo'] ?? 0) ? 'checked' : '' ?> style="cursor:pointer">
@@ -583,6 +587,9 @@ function addIngrediente() {
     </select>
     <input type="text" name="codigo_display[]" class="form-input" maxlength="10"
            placeholder="G1…" title="Código KDS" style="font-size:.78rem;text-transform:uppercase">
+    <input type="number" name="precio_extra[]" class="form-input" step="0.01" min="0"
+           placeholder="$ extra" title="Precio extra (0 = incluida, >0 muestra botón +Extra en el menú)"
+           style="font-size:.78rem;width:72px" value="0">
     <label style="display:flex;align-items:center;gap:4px;font-size:.75rem;color:#6B7280;cursor:pointer;white-space:nowrap;padding-top:8px"
            title="No descuenta stock, solo aparece en info del cliente">
       <input type="checkbox" name="es_informativo[]" value="_new" style="cursor:pointer">
