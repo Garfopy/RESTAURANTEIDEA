@@ -15,7 +15,7 @@ class RestInventarioController extends BaseController
     public function index(?string $p = null): void
     {
         $restauranteId    = $this->restauranteId();
-        $ingredientes     = $this->model->getByRestaurante($restauranteId);
+        $ingredientes     = $this->model->getByRestaurante($restauranteId, true);
         $alertas          = $this->model->alertasStockBajo($restauranteId);
         $flash            = $this->getFlash();
 
@@ -76,9 +76,11 @@ class RestInventarioController extends BaseController
             $productosCarnihub = $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (\Throwable $e) {}
 
+        $inactivos = $this->model->getInactivos($restauranteId);
+
         $this->render('restaurante/inventario/index', compact(
             'ingredientes','alertas','productosCarnihub','empresaProveedorId','empresaProveedorNombre',
-            'movRecientes','flash','pageTitle','activeMenu'
+            'movRecientes','flash','pageTitle','activeMenu','inactivos'
         ));
     }
 
@@ -185,6 +187,18 @@ class RestInventarioController extends BaseController
         }
 
         $this->flash('success', 'Ingrediente eliminado.');
+        $this->redirect('rest-inventario/index');
+    }
+
+    public function reactivar(?string $id = null): void
+    {
+        $restauranteId = $this->restauranteId();
+        $ing = $this->model->find((int)$id);
+        if (!$ing || (int)($ing['restaurante_id'] ?? 0) !== $restauranteId) {
+            $this->redirect('rest-inventario/index');
+        }
+        $this->model->update((int)$id, ['activo' => 1]);
+        $this->flash('success', 'Ingrediente restaurado al inventario.');
         $this->redirect('rest-inventario/index');
     }
 

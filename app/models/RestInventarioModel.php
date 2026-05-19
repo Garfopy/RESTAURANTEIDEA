@@ -154,4 +154,12 @@ class RestInventarioModel extends BaseModel
             [$restauranteId, $dias]
         );
     }
+
+    public function getInactivos(int $restauranteId): array
+    {
+        return $this->query(
+            "SELECT * FROM rest_ingredientes WHERE restaurante_id = ? AND activo = 0 ORDER BY nombre",
+            [$restauranteId]
+        );
+    }
 }

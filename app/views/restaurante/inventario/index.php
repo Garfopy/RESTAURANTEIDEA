@@ -225,6 +225,38 @@
 </div>
 <?php endif; ?>
 
+<?php if (!empty($inactivos)): ?>
+<!-- Papelera: ingredientes desactivados -->
+<details style="background:#FFF7ED;border:1.5px solid #FED7AA;border-radius:14px;padding:16px 20px;margin-bottom:24px">
+  <summary style="cursor:pointer;font-size:.9rem;font-weight:600;color:#C2410C;list-style:none;display:flex;align-items:center;gap:8px">
+    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+    </svg>
+    Ingredientes eliminados (<?= count($inactivos) ?>) — clic para restaurar
+  </summary>
+  <div style="margin-top:14px;display:flex;flex-direction:column;gap:8px">
+    <?php foreach ($inactivos as $ing): ?>
+    <div style="display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid #FED7AA;border-radius:10px;padding:10px 14px">
+      <div>
+        <span style="font-weight:600;font-size:.88rem;color:#374151"><?= htmlspecialchars($ing['nombre']) ?></span>
+        <?php if (!empty($ing['proveedor_carnihub'])): ?>
+          <span style="font-size:.72rem;background:#EDE9FE;color:#6D28D9;padding:1px 6px;border-radius:6px;margin-left:6px">🔗 CarniHub</span>
+        <?php endif; ?>
+        <?php if (!empty($ing['categoria'])): ?>
+          <span style="font-size:.72rem;color:#9CA3AF;margin-left:6px"><?= htmlspecialchars($ing['categoria']) ?></span>
+        <?php endif; ?>
+      </div>
+      <a href="<?= BASE_URL ?>rest-inventario/reactivar/<?= (int)$ing['id'] ?>"
+         onclick="return confirm('¿Restaurar el ingrediente \'<?= htmlspecialchars(addslashes($ing['nombre']), ENT_QUOTES) ?>\' al inventario?')"
+         style="font-size:.78rem;font-weight:600;color:#16A34A;background:#F0FDF4;border:1px solid #86EFAC;padding:5px 12px;border-radius:8px;text-decoration:none;white-space:nowrap">
+        ↩ Restaurar
+      </a>
+    </div>
+    <?php endforeach; ?>
+  </div>
+</details>
+<?php endif; ?>
+
 <!-- Movimientos recientes -->
 <?php if (!empty($movRecientes)): ?>
 <div style="background:#fff;border-radius:14px;border:1.5px solid #E5E7EB;padding:20px;margin-bottom:24px">

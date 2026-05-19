@@ -61,10 +61,22 @@ class RestMenuController extends BaseController
         ];
 
         if ($id) {
-            $this->model->update($id, array_diff_key($data, ['restaurante_id' => '']));
+            try {
+                $this->model->update($id, array_diff_key($data, ['restaurante_id' => '']));
+            } catch (\PDOException $e) {
+                // Fallback: si la columna ingrediente_directo_id aún no existe (migración pendiente)
+                $safeData = array_diff_key($data, ['restaurante_id' => '', 'ingrediente_directo_id' => '']);
+                $this->model->update($id, $safeData);
+            }
             $platilloId = $id;
         } else {
-            $platilloId = $this->model->insert($data);
+            try {
+                $platilloId = $this->model->insert($data);
+            } catch (\PDOException $e) {
+                // Fallback: si la columna ingrediente_directo_id aún no existe (migración pendiente)
+                $safeData = array_diff_key($data, ['ingrediente_directo_id' => '']);
+                $platilloId = $this->model->insert($safeData);
+            }
         }
 
         // Guardar receta si vienen ingredientes
