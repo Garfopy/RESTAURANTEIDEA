@@ -73,6 +73,20 @@ class RestConfigController extends BaseController
             }
         }
 
+        // Banner upload
+        if (!empty($_FILES['imagen_banner']['tmp_name'])) {
+            $ext     = strtolower(pathinfo($_FILES['imagen_banner']['name'], PATHINFO_EXTENSION));
+            $allowed = ['jpg','jpeg','png','webp'];
+            if (in_array($ext, $allowed)) {
+                $filename = 'rest_banner_' . $restauranteId . '_' . time() . '.' . $ext;
+                $dest     = ROOT_PATH . '/public/uploads/restaurantes/' . $filename;
+                @mkdir(dirname($dest), 0755, true);
+                if (move_uploaded_file($_FILES['imagen_banner']['tmp_name'], $dest)) {
+                    $base['imagen_banner'] = 'public/uploads/restaurantes/' . $filename;
+                }
+            }
+        }
+
         $this->model->update($restauranteId, $base);
 
         // Migration-026 fields (may not exist on older installs — skip silently)

@@ -178,19 +178,27 @@
 <body>
 
 <!-- Hero -->
-<div class="pub-hero">
-  <?php if ($restaurante['logo']): ?>
-  <img src="<?= BASE_URL . htmlspecialchars($restaurante['logo']) ?>" alt=""
-       style="height:60px;object-fit:contain;margin-bottom:14px;display:block;margin-inline:auto;filter:drop-shadow(0 3px 10px rgba(0,0,0,.3)) brightness(1.05)">
-  <?php endif; ?>
-  <h1 style="font-family:'Playfair Display',Georgia,serif;font-size:1.85rem;font-weight:800;margin:0 0 6px;color:#fff;text-shadow:0 2px 12px rgba(0,0,0,.25);letter-spacing:-.01em">
-    <?= htmlspecialchars($restaurante['nombre']) ?>
-  </h1>
-  <?php if ($restaurante['descripcion']): ?>
-  <p style="font-size:.875rem;color:rgba(255,255,255,.75);margin:0;line-height:1.6;max-width:340px;margin-inline:auto">
-    <?= htmlspecialchars($restaurante['descripcion']) ?>
-  </p>
-  <?php endif; ?>
+<?php
+  $hasBanner = !empty($restaurante['imagen_banner']);
+  $heroClass  = $hasBanner ? 'pub-hero pub-hero--banner' : 'pub-hero';
+  $heroStyle  = $hasBanner
+    ? 'style="background-image:url(\'' . BASE_URL . htmlspecialchars($restaurante['imagen_banner']) . '\')"'
+    : '';
+?>
+<div class="<?= $heroClass ?>" <?= $heroStyle ?>>
+  <div class="pub-hero-content">
+    <?php if ($restaurante['logo']): ?>
+    <img src="<?= BASE_URL . htmlspecialchars($restaurante['logo']) ?>" alt=""
+         class="pub-hero-logo <?= $hasBanner ? '' : 'pub-hero-logo--contain' ?>">
+    <?php endif; ?>
+    <h1 style="font-family:'Playfair Display',Georgia,serif;font-size:1.85rem;font-weight:800;margin:0 0 6px;color:#fff;text-shadow:0 2px 16px rgba(0,0,0,.4);letter-spacing:-.01em">
+      <?= htmlspecialchars($restaurante['nombre']) ?>
+    </h1>
+    <?php if ($restaurante['descripcion']): ?>
+    <p style="font-size:.875rem;color:rgba(255,255,255,.8);margin:0;line-height:1.6;max-width:340px;text-shadow:0 1px 6px rgba(0,0,0,.3)">
+      <?= htmlspecialchars($restaurante['descripcion']) ?>
+    </p>
+    <?php endif; ?>
 
   <?php if ($mesa): ?>
   <div style="display:inline-flex;align-items:center;gap:6px;margin-top:14px;
@@ -221,7 +229,8 @@
     <div id="statusContent">Verificando estado del pedido…</div>
   </div>
   <?php endif; ?>
-</div>
+  </div><!-- /pub-hero-content -->
+</div><!-- /pub-hero -->
 
 <!-- Tabs de categoría -->
 <?php
@@ -291,7 +300,11 @@ $catNombres = array_column($categorias, 'nombre', 'id');
   <div class="mn-list">
   <?php foreach ($platos as $p):
     $pId   = (int)$p['id'];
-    $ings  = $recetaIngredientes[$pId] ?? [];
+    $ings  = array_values(array_filter(
+        $recetaIngredientes[$pId] ?? [],
+        fn($r) => ($r['tipo_componente'] ?? null) !== 'materia_prima'
+                  || (float)($r['precio_extra'] ?? 0) > 0
+    ));
     $chips = (!$esSinIng && !empty($ings)) ? array_slice($ings, 0, 4) : [];
     $more  = (!$esSinIng && !empty($ings)) ? max(0, count($ings) - count($chips)) : 0;
     $icon  = $catIconos[$cid] ?? '🍽';

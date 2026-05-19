@@ -245,10 +245,21 @@ body {
   background: linear-gradient(150deg, var(--cs) 0%, color-mix(in srgb, var(--cs) 78%, var(--cp)) 60%, color-mix(in srgb, var(--cp) 55%, #0d0d18) 100%);
   border-bottom: 1px solid rgba(255,255,255,.06);
   color: #fff;
-  padding: 44px 20px 32px;
+  padding: 48px 24px 36px;
   text-align: center;
   position: relative;
   overflow: hidden;
+  min-height: 180px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.pub-hero--banner {
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  min-height: 220px;
 }
 .pub-hero::before {
   content: '';
@@ -256,6 +267,34 @@ body {
   inset: 0;
   background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(201,164,48,.18) 0%, transparent 70%);
   pointer-events: none;
+}
+.pub-hero--banner::before {
+  background: linear-gradient(to bottom, rgba(0,0,0,.45) 0%, rgba(0,0,0,.68) 100%);
+}
+.pub-hero-logo {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid rgba(255,255,255,.35);
+  margin-bottom: 14px;
+  display: block;
+  box-shadow: 0 4px 20px rgba(0,0,0,.35);
+  position: relative;
+  z-index: 1;
+}
+.pub-hero-logo--contain {
+  object-fit: contain;
+  background: rgba(255,255,255,.12);
+  backdrop-filter: blur(6px);
+  padding: 6px;
+}
+.pub-hero-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 .pub-cat-bar {
   display: flex;

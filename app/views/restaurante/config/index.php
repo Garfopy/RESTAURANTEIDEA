@@ -270,6 +270,16 @@
                  style="height:36px;margin-top:6px;border-radius:4px;object-fit:contain;display:block">
             <?php endif; ?>
           </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Foto de portada <span style="font-weight:400;color:#9CA3AF">(banner del menú público)</span></label>
+            <input type="file" name="imagen_banner" accept=".jpg,.jpeg,.png,.webp"
+                   class="form-input" style="padding:6px">
+            <?php if (!empty($restaurante['imagen_banner'])): ?>
+            <img src="<?= BASE_URL . htmlspecialchars($restaurante['imagen_banner']) ?>"
+                 style="width:100%;max-height:120px;margin-top:8px;border-radius:8px;object-fit:cover;display:block">
+            <?php endif; ?>
+            <div style="font-size:.72rem;color:#9CA3AF;margin-top:4px">Se muestra como fondo del encabezado en la vista del cliente. Recomendado: 1200×400 px.</div>
+          </div>
         </div>
       </div>
 
