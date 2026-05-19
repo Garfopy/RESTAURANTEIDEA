@@ -98,10 +98,14 @@ abstract class BaseController
         $this->requireRole(['repartidor']);
     }
 
-    /** Admin del restaurante (comprador con restaurante activo) */
+    /** Admin del restaurante (comprador con restaurante activo o admin_restaurante) */
     protected function requireRestaurante(): void
     {
-        $this->requireRole(['comprador']);
+        $this->requireRole(['comprador', 'admin_restaurante']);
+        $rol = $this->rolActual();
+        if ($rol === 'admin_restaurante') {
+            return; // admin_restaurante no requiere restaurante_activo_id en sesión
+        }
         $restauranteId = $_SESSION['restaurante_activo_id'] ?? null;
         if (!$restauranteId) {
             $this->redirect('restaurante/seleccionar');

@@ -8,7 +8,7 @@ class RestauranteController extends BaseController
     public function __construct()
     {
         parent::__construct();
-        $this->requireRole(['comprador']);
+        $this->requireRole(['comprador', 'admin_restaurante']);
         $this->model = new RestauranteModel();
     }
 
