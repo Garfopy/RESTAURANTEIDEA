@@ -430,7 +430,7 @@ if ($_isRest) { $_appName = 'Restaurante'; }
         <img src="<?= htmlspecialchars($_appLogo) ?>" alt="<?= htmlspecialchars($_appName) ?>"
              style="height:64px;margin-bottom:20px;object-fit:contain">
       <?php else: ?>
-        <img src="<?= BASE_URL ?>public/img/logo-light.svg" alt="<?= htmlspecialchars($_appName) ?>"
+        <img src="<?= BASE_URL ?>public/img/logo-carnisync-light.svg" alt="<?= htmlspecialchars($_appName) ?>"
              style="height:64px;margin-bottom:20px">
       <?php endif; ?>
 
@@ -505,7 +505,7 @@ if ($_isRest) { $_appName = 'Restaurante'; }
           <img src="<?= htmlspecialchars($_appLogo) ?>" alt="<?= htmlspecialchars($_appName) ?>"
                style="height:44px;margin-bottom:14px;object-fit:contain">
         <?php else: ?>
-          <img src="<?= BASE_URL ?>public/img/logo.svg" alt="<?= htmlspecialchars($_appName) ?>"
+          <img src="<?= BASE_URL ?>public/img/logo-carnisync.svg" alt="<?= htmlspecialchars($_appName) ?>"
                style="height:44px;margin-bottom:14px">
         <?php endif; ?>
       </div>
