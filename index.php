@@ -60,10 +60,15 @@ if (in_array($ctrlSlug, ['menu', 'acceso'], true)) {
     }
 }
 
-// ── Ruta raíz → landing pública ──────────────────────────────────────────────
+// ── Ruta raíz: landing pública ó login según modo de deploy ─────────────────
 if ($path === '') {
-    $ctrlSlug = 'landing';
-    $action   = 'landing';
+    if (defined('RESTAURANTE_STANDALONE') && RESTAURANTE_STANDALONE) {
+        $ctrlSlug = 'auth';
+        $action   = 'login';
+    } else {
+        $ctrlSlug = 'landing';
+        $action   = 'landing';
+    }
 }
 // ── Redirects 301: rutas antiguas → nuevas rutas SEO ─────────────────────
 $oldRouteRedirects = [

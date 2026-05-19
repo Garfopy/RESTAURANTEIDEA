@@ -9,6 +9,48 @@ SET @rest_id = 1; -- Cambiar si el restaurante_id es distinto de 1
 
 -- ── 1. Nuevas columnas (compatible MySQL 5.7, sin IF NOT EXISTS) ──────────
 
+-- rest_receta_ingredientes.precio_extra
+SET @sql := (
+  SELECT IF(
+    COUNT(*) = 0,
+    'ALTER TABLE `rest_receta_ingredientes` ADD COLUMN `precio_extra` DECIMAL(10,2) NOT NULL DEFAULT 0.00 AFTER `es_informativo`',
+    'SELECT 1'
+  )
+  FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'rest_receta_ingredientes'
+    AND COLUMN_NAME = 'precio_extra'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- rest_receta_ingredientes.tipo_componente
+SET @sql := (
+  SELECT IF(
+    COUNT(*) = 0,
+    'ALTER TABLE `rest_receta_ingredientes` ADD COLUMN `tipo_componente` VARCHAR(30) NULL DEFAULT NULL AFTER `precio_extra`',
+    'SELECT 1'
+  )
+  FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'rest_receta_ingredientes'
+    AND COLUMN_NAME = 'tipo_componente'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- rest_receta_ingredientes.codigo_display
+SET @sql := (
+  SELECT IF(
+    COUNT(*) = 0,
+    'ALTER TABLE `rest_receta_ingredientes` ADD COLUMN `codigo_display` VARCHAR(20) NULL DEFAULT NULL AFTER `tipo_componente`',
+    'SELECT 1'
+  )
+  FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'rest_receta_ingredientes'
+    AND COLUMN_NAME = 'codigo_display'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
 -- rest_platillos.codigo
 SET @sql := (
   SELECT IF(

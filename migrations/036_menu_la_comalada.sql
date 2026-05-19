@@ -6,16 +6,6 @@
 -- Precios estimados — ajustar desde el admin (rest-menu/index)
 -- ============================================================
 
--- ── 1. Nuevas columnas ──────────────────────────────────────────────────────
-
-ALTER TABLE `rest_receta_ingredientes`
-  ADD COLUMN IF NOT EXISTS `precio_extra` DECIMAL(10,2) NOT NULL DEFAULT 0.00
-  COMMENT 'Costo para el comensal por solicitar una porción extra de esta guarnición';
-
-ALTER TABLE `rest_pedido_items`
-  ADD COLUMN IF NOT EXISTS `extras` TEXT NULL
-  COMMENT 'JSON: [{ingrediente_id, nombre, precio_extra, cantidad}]';
-
 -- ── 2. Categorías del menú ──────────────────────────────────────────────────
 
 SET @rest_id = 1;
@@ -132,76 +122,76 @@ VALUES
 -- ── 5. Platillos — Dulces y Postres ────────────────────────────────────────
 
 INSERT IGNORE INTO `rest_platillos`
-  (restaurante_id, categoria_id, codigo, es_armado, nombre, precio, tiempo_preparacion_min, disponible, activo)
+  (restaurante_id, categoria_id, nombre, precio, tiempo_preparacion_min, disponible, activo)
 VALUES
-  (@rest_id, @cat_postres, 'DP1',  1, 'Ate de Guayaba con Queso 6 Pzs.',          70.00, 3, 1, 1),
-  (@rest_id, @cat_postres, 'DP2',  1, 'Ate de Membrillo con Queso 6 Pzs.',        70.00, 3, 1, 1),
-  (@rest_id, @cat_postres, 'DP3',  1, 'Glorias de Leche Quemada 3 Pzs.',          65.00, 3, 1, 1),
-  (@rest_id, @cat_postres, 'DP4',  1, 'Obleas de Cajeta 3 Pzs.',                  55.00, 3, 1, 1),
-  (@rest_id, @cat_postres, 'DP5',  1, 'Camote de Puebla 3 Pzs.',                  60.00, 3, 1, 1),
-  (@rest_id, @cat_postres, 'DP6',  1, 'Borrachitos de Fresa 5 Pzs.',              65.00, 3, 1, 1),
-  (@rest_id, @cat_postres, 'DP7',  1, 'Fruta Cristalizada Higo 150 Gr.',          75.00, 3, 1, 1),
-  (@rest_id, @cat_postres, 'DP8',  1, 'Fruta Cristalizada Pera 150 Gr.',          75.00, 3, 1, 1),
-  (@rest_id, @cat_postres, 'DP9',  1, 'Fruta Cristalizada Calabazete 150 Gr.',    75.00, 3, 1, 1),
-  (@rest_id, @cat_postres, 'DP10', 1, 'Orejonas 150 Gr.',                         70.00, 3, 1, 1),
-  (@rest_id, @cat_postres, 'DP11', 1, 'Cocadas 3 Pzs.',                           60.00, 3, 1, 1),
-  (@rest_id, @cat_postres, 'DP12', 1, 'Palanquetas 1 Pza.',                       55.00, 3, 1, 1),
-  (@rest_id, @cat_postres, 'DP13', 1, 'Merengues 3 Pzs.',                         60.00, 3, 1, 1),
-  (@rest_id, @cat_postres, 'DP14', 1, 'Natillas Qro. 150 Gr.',                    65.00, 3, 1, 1),
-  (@rest_id, @cat_postres, 'DP15', 1, 'Natillas Bernal 4 Pzs.',                   70.00, 3, 1, 1),
-  (@rest_id, @cat_postres, 'DP16', 1, 'Ollitas de Tamarindo 3 Pzs.',              55.00, 3, 1, 1),
-  (@rest_id, @cat_postres, 'DP17', 1, 'Tamal de Maíz Dulce de Piña 2 Pzs.',       70.00, 5, 1, 1),
-  (@rest_id, @cat_postres, 'DP18', 1, 'Tamal de Dulce de Fresa 2 Pzs.',           70.00, 5, 1, 1);
+  (@rest_id, @cat_postres, 'Ate de Guayaba con Queso 6 Pzs.',          70.00, 3, 1, 1),
+  (@rest_id, @cat_postres, 'Ate de Membrillo con Queso 6 Pzs.',        70.00, 3, 1, 1),
+  (@rest_id, @cat_postres, 'Glorias de Leche Quemada 3 Pzs.',          65.00, 3, 1, 1),
+  (@rest_id, @cat_postres, 'Obleas de Cajeta 3 Pzs.',                  55.00, 3, 1, 1),
+  (@rest_id, @cat_postres, 'Camote de Puebla 3 Pzs.',                  60.00, 3, 1, 1),
+  (@rest_id, @cat_postres, 'Borrachitos de Fresa 5 Pzs.',              65.00, 3, 1, 1),
+  (@rest_id, @cat_postres, 'Fruta Cristalizada Higo 150 Gr.',          75.00, 3, 1, 1),
+  (@rest_id, @cat_postres, 'Fruta Cristalizada Pera 150 Gr.',          75.00, 3, 1, 1),
+  (@rest_id, @cat_postres, 'Fruta Cristalizada Calabazete 150 Gr.',    75.00, 3, 1, 1),
+  (@rest_id, @cat_postres, 'Orejonas 150 Gr.',                         70.00, 3, 1, 1),
+  (@rest_id, @cat_postres, 'Cocadas 3 Pzs.',                           60.00, 3, 1, 1),
+  (@rest_id, @cat_postres, 'Palanquetas 1 Pza.',                       55.00, 3, 1, 1),
+  (@rest_id, @cat_postres, 'Merengues 3 Pzs.',                         60.00, 3, 1, 1),
+  (@rest_id, @cat_postres, 'Natillas Qro. 150 Gr.',                    65.00, 3, 1, 1),
+  (@rest_id, @cat_postres, 'Natillas Bernal 4 Pzs.',                   70.00, 3, 1, 1),
+  (@rest_id, @cat_postres, 'Ollitas de Tamarindo 3 Pzs.',              55.00, 3, 1, 1),
+  (@rest_id, @cat_postres, 'Tamal de Maíz Dulce de Piña 2 Pzs.',       70.00, 5, 1, 1),
+  (@rest_id, @cat_postres, 'Tamal de Dulce de Fresa 2 Pzs.',           70.00, 5, 1, 1);
 
 -- ── 6. Platillos — Bebidas ─────────────────────────────────────────────────
 
 INSERT IGNORE INTO `rest_platillos`
-  (restaurante_id, categoria_id, codigo, es_armado, nombre, precio, tiempo_preparacion_min, disponible, activo)
+  (restaurante_id, categoria_id, nombre, precio, tiempo_preparacion_min, disponible, activo)
 VALUES
   -- Mezcales
-  (@rest_id, @cat_bebidas, 'B1',  1, 'Mezcal Sol 2 Oz.',                         90.00, 2, 1, 1),
-  (@rest_id, @cat_bebidas, 'B2',  1, 'Mezcal Luna 2 Oz.',                        95.00, 2, 1, 1),
-  (@rest_id, @cat_bebidas, 'B3',  1, 'Mezcal Orgullo 2 Oz.',                    100.00, 2, 1, 1),
-  (@rest_id, @cat_bebidas, 'B4',  1, 'Mezcal Noche 2 Oz.',                      100.00, 2, 1, 1),
-  (@rest_id, @cat_bebidas, 'B5',  1, 'Mezcal Amor 2 Oz.',                        95.00, 2, 1, 1),
+  (@rest_id, @cat_bebidas, 'Mezcal Sol 2 Oz.',                         90.00, 2, 1, 1),
+  (@rest_id, @cat_bebidas, 'Mezcal Luna 2 Oz.',                        95.00, 2, 1, 1),
+  (@rest_id, @cat_bebidas, 'Mezcal Orgullo 2 Oz.',                    100.00, 2, 1, 1),
+  (@rest_id, @cat_bebidas, 'Mezcal Noche 2 Oz.',                      100.00, 2, 1, 1),
+  (@rest_id, @cat_bebidas, 'Mezcal Amor 2 Oz.',                        95.00, 2, 1, 1),
   -- Tequilas
-  (@rest_id, @cat_bebidas, 'B6',  1, 'Tequila Blanco 2 Oz.',                     80.00, 2, 1, 1),
-  (@rest_id, @cat_bebidas, 'B7',  1, 'Tequila Reposado 2 Oz.',                   90.00, 2, 1, 1),
-  (@rest_id, @cat_bebidas, 'B8',  1, 'Tequila Añejo 2 Oz.',                     100.00, 2, 1, 1),
+  (@rest_id, @cat_bebidas, 'Tequila Blanco 2 Oz.',                     80.00, 2, 1, 1),
+  (@rest_id, @cat_bebidas, 'Tequila Reposado 2 Oz.',                   90.00, 2, 1, 1),
+  (@rest_id, @cat_bebidas, 'Tequila Añejo 2 Oz.',                     100.00, 2, 1, 1),
   -- Cervezas artesanales
-  (@rest_id, @cat_bebidas, 'B9',  1, 'Cerveza Artesanal Clara',                   75.00, 2, 1, 1),
-  (@rest_id, @cat_bebidas, 'B10', 1, 'Cerveza Artesanal Morena',                  75.00, 2, 1, 1),
-  (@rest_id, @cat_bebidas, 'B11', 1, 'Cerveza Artesanal Oscura',                  80.00, 2, 1, 1),
+  (@rest_id, @cat_bebidas, 'Cerveza Artesanal Clara',                   75.00, 2, 1, 1),
+  (@rest_id, @cat_bebidas, 'Cerveza Artesanal Morena',                  75.00, 2, 1, 1),
+  (@rest_id, @cat_bebidas, 'Cerveza Artesanal Oscura',                  80.00, 2, 1, 1),
   -- Cocktails Mezcal
-  (@rest_id, @cat_bebidas, 'B12', 1, 'Cocktail de Mezcal con Tamarindo',         120.00, 5, 1, 1),
-  (@rest_id, @cat_bebidas, 'B13', 1, 'Cocktail de Mezcal con Jamaica',           120.00, 5, 1, 1),
-  (@rest_id, @cat_bebidas, 'B14', 1, 'Cocktail de Mezcal Margarita',             125.00, 5, 1, 1),
+  (@rest_id, @cat_bebidas, 'Cocktail de Mezcal con Tamarindo',         120.00, 5, 1, 1),
+  (@rest_id, @cat_bebidas, 'Cocktail de Mezcal con Jamaica',           120.00, 5, 1, 1),
+  (@rest_id, @cat_bebidas, 'Cocktail de Mezcal Margarita',             125.00, 5, 1, 1),
   -- Cocktails Tequila
-  (@rest_id, @cat_bebidas, 'B15', 1, 'Cocktail de Tequila con Tamarindo',        110.00, 5, 1, 1),
-  (@rest_id, @cat_bebidas, 'B16', 1, 'Coctel de Tequila con Jamaica',            110.00, 5, 1, 1),
-  (@rest_id, @cat_bebidas, 'B17', 1, 'Cocktail de Tequila Margarita',            115.00, 5, 1, 1),
+  (@rest_id, @cat_bebidas, 'Cocktail de Tequila con Tamarindo',        110.00, 5, 1, 1),
+  (@rest_id, @cat_bebidas, 'Coctel de Tequila con Jamaica',            110.00, 5, 1, 1),
+  (@rest_id, @cat_bebidas, 'Cocktail de Tequila Margarita',            115.00, 5, 1, 1),
   -- Cafés y calientes
-  (@rest_id, @cat_bebidas, 'B18', 1, 'Café de Olla',                              45.00, 5, 1, 1),
-  (@rest_id, @cat_bebidas, 'B19', 1, 'Carajillo sin Cafeína Amanecer',            55.00, 5, 1, 1),
-  (@rest_id, @cat_bebidas, 'B20', 1, 'Carajillo sin Cafeína Anochecer',           55.00, 5, 1, 1),
+  (@rest_id, @cat_bebidas, 'Café de Olla',                              45.00, 5, 1, 1),
+  (@rest_id, @cat_bebidas, 'Carajillo sin Cafeína Amanecer',            55.00, 5, 1, 1),
+  (@rest_id, @cat_bebidas, 'Carajillo sin Cafeína Anochecer',           55.00, 5, 1, 1),
   -- Aguas
-  (@rest_id, @cat_bebidas, 'B21', 1, 'Agua de Horchata',                          40.00, 2, 1, 1),
-  (@rest_id, @cat_bebidas, 'B22', 1, 'Agua de Jamaica',                           40.00, 2, 1, 1),
-  (@rest_id, @cat_bebidas, 'B23', 1, 'Agua de Tamarindo',                         40.00, 2, 1, 1),
+  (@rest_id, @cat_bebidas, 'Agua de Horchata',                          40.00, 2, 1, 1),
+  (@rest_id, @cat_bebidas, 'Agua de Jamaica',                           40.00, 2, 1, 1),
+  (@rest_id, @cat_bebidas, 'Agua de Tamarindo',                         40.00, 2, 1, 1),
   -- Chocolates y Atoles
-  (@rest_id, @cat_bebidas, 'B24', 1, 'Chocolate con Agua',                        50.00, 5, 1, 1),
-  (@rest_id, @cat_bebidas, 'B25', 1, 'Chocolate con Leche',                       55.00, 5, 1, 1),
-  (@rest_id, @cat_bebidas, 'B26', 1, 'Atole de Fresa',                            50.00, 5, 1, 1),
-  (@rest_id, @cat_bebidas, 'B27', 1, 'Atole de Vainilla',                         50.00, 5, 1, 1),
+  (@rest_id, @cat_bebidas, 'Chocolate con Agua',                        50.00, 5, 1, 1),
+  (@rest_id, @cat_bebidas, 'Chocolate con Leche',                       55.00, 5, 1, 1),
+  (@rest_id, @cat_bebidas, 'Atole de Fresa',                            50.00, 5, 1, 1),
+  (@rest_id, @cat_bebidas, 'Atole de Vainilla',                         50.00, 5, 1, 1),
   -- Aguas naturales
-  (@rest_id, @cat_bebidas, 'B28', 1, 'Agua Mineral',                              35.00, 1, 1, 1),
-  (@rest_id, @cat_bebidas, 'B29', 1, 'Agua Sola',                                 25.00, 1, 1, 1),
+  (@rest_id, @cat_bebidas, 'Agua Mineral',                              35.00, 1, 1, 1),
+  (@rest_id, @cat_bebidas, 'Agua Sola',                                 25.00, 1, 1, 1),
   -- Percherones (mezcal 65 ml)
-  (@rest_id, @cat_bebidas, 'B30', 1, 'Percherón Mezcal Sol 65 Ml.',              160.00, 2, 1, 1),
-  (@rest_id, @cat_bebidas, 'B31', 1, 'Percherón Mezcal Luna 65 Ml.',             170.00, 2, 1, 1),
-  (@rest_id, @cat_bebidas, 'B32', 1, 'Percherón Mezcal Orgullo 65 Ml.',          180.00, 2, 1, 1),
-  (@rest_id, @cat_bebidas, 'B33', 1, 'Percherón Mezcal Amor 65 Ml.',             170.00, 2, 1, 1),
-  (@rest_id, @cat_bebidas, 'B34', 1, 'Percherón Mezcal Noche 65 Ml.',            180.00, 2, 1, 1);
+  (@rest_id, @cat_bebidas, 'Percherón Mezcal Sol 65 Ml.',              160.00, 2, 1, 1),
+  (@rest_id, @cat_bebidas, 'Percherón Mezcal Luna 65 Ml.',             170.00, 2, 1, 1),
+  (@rest_id, @cat_bebidas, 'Percherón Mezcal Orgullo 65 Ml.',          180.00, 2, 1, 1),
+  (@rest_id, @cat_bebidas, 'Percherón Mezcal Amor 65 Ml.',             170.00, 2, 1, 1),
+  (@rest_id, @cat_bebidas, 'Percherón Mezcal Noche 65 Ml.',            180.00, 2, 1, 1);
 
 -- ── 7. Recetas — una por cada platillo recién insertado ─────────────────────
 -- (solo platillos sin receta previa, evita duplicados)

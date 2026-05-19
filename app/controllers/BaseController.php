@@ -45,6 +45,7 @@ abstract class BaseController
             $rol === 'supervisor'                                      => $this->redirect('supervisor/dashboard'),
             $rol === 'comprador'                                       => $this->redirect('comprador/inicio'),
             $rol === 'admin_empresa'                                   => $this->redirect('empresa/dashboard'),
+            $rol === 'admin_restaurante'                               => $this->redirect('restaurante/dashboard'),
             $rol === 'superadmin'                                      => $this->redirect('panel/dashboard'),
             $rol === 'mesero'                                          => $this->redirect('rest-mesero/dashboard'),
             $rol === 'chef'                                            => $this->redirect('rest-chef/dashboard'),
