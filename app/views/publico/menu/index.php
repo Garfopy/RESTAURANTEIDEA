@@ -221,7 +221,9 @@ $catNombres = array_column($categorias, 'nombre', 'id');
         <?php if ($more > 0): ?><span class="mn-chip-more">+<?= $more ?> más</span><?php endif; ?>
       </div>
       <?php endif; ?>
+      <?php if ($mesa): ?>
       <button type="button" class="mn-card-btn">Ordenar</button>
+      <?php endif; ?>
     </div>
   </div>
   <?php endforeach; ?>
@@ -231,6 +233,7 @@ $catNombres = array_column($categorias, 'nombre', 'id');
 <?php endif; ?>
 
 <!-- Carrito flotante -->
+<?php if ($mesa): ?>
 <div class="pub-cart-bar" id="carritoBar">
   <div>
     <div style="font-size:.78rem;opacity:.6" id="carritoItems">0 items</div>
@@ -248,6 +251,14 @@ $catNombres = array_column($categorias, 'nombre', 'id');
     <button onclick="submitPedido()" class="pub-cart-btn">Ordenar →</button>
   </div>
 </div>
+<?php else: ?>
+<div style="position:fixed;left:0;right:0;bottom:0;background:rgba(20,18,16,.92);
+            backdrop-filter:blur(10px);border-top:1px solid rgba(255,255,255,.08);
+            padding:14px 18px;text-align:center;font-size:.82rem;color:rgba(240,238,232,.75);z-index:40">
+  👀 <strong style="color:#fff">Vista previa del menú.</strong>
+  Para ordenar, escanea el QR de tu mesa dentro del restaurante.
+</div>
+<?php endif; ?>
 
 <div class="mn-footer">Potenciado por <strong>CarniHub</strong></div>
 
@@ -271,6 +282,7 @@ $catNombres = array_column($categorias, 'nombre', 'id');
       <div class="mn-sec-lbl">Comentario al chef <span style="text-transform:none;font-weight:400;color:var(--text-muted)">(opcional)</span></div>
       <textarea id="sheetNota" class="mn-nota" rows="2" placeholder="Ej: bien cocido, sin picante, extra salsa…"></textarea>
     </div>
+    <?php if ($mesa): ?>
     <div class="mn-sheet-foot">
       <div class="mn-qty">
         <button type="button" onclick="cambiarQty(-1)">−</button>
@@ -279,6 +291,11 @@ $catNombres = array_column($categorias, 'nombre', 'id');
       </div>
       <button type="button" class="mn-add-btn" id="addBtn" onclick="confirmarModal()">Agregar · $0</button>
     </div>
+    <?php else: ?>
+    <div style="padding:14px 18px;text-align:center;font-size:.8rem;color:rgba(240,238,232,.6);border-top:1px solid rgba(255,255,255,.08)">
+      Escanea el QR de tu mesa para ordenar este platillo.
+    </div>
+    <?php endif; ?>
   </div>
 </div>
 

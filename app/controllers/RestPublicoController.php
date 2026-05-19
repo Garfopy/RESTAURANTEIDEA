@@ -105,6 +105,13 @@ class RestPublicoController extends BaseController
         $restauranteId = (int)$restaurante['id'];
         $mesaQr        = $this->post('mesa_qr');
         $mesa          = $mesaQr ? (new RestMesaModel())->getByQr($mesaQr) : null;
+
+        // Sin mesa válida no se permite ordenar (QR del local es solo lectura)
+        if (!$mesa) {
+            $this->flash('error', 'Para ordenar escanea el QR de tu mesa dentro del restaurante.');
+            $this->redirect('menu/' . $slug);
+        }
+
         $visitaId      = $this->post('visita_id') ?: null;
 
         // Crear visita si no existe
