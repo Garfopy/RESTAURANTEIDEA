@@ -42,7 +42,13 @@ class RestMenuModel extends BaseModel
     {
         $where = $soloActivos ? 'AND p.activo = 1' : '';
         return $this->query(
-            "SELECT p.*, c.nombre AS categoria_nombre
+            "SELECT p.*,
+                    c.nombre AS categoria_nombre,
+                    CASE WHEN EXISTS(
+                        SELECT 1 FROM rest_recetas r
+                        JOIN rest_receta_ingredientes ri ON ri.receta_id = r.id AND ri.es_informativo = 0
+                        WHERE r.platillo_id = p.id
+                    ) THEN 1 ELSE 0 END AS tiene_receta
              FROM rest_platillos p
              LEFT JOIN rest_categorias_menu c ON c.id = p.categoria_id
              WHERE p.restaurante_id = ? $where

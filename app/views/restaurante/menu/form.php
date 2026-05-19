@@ -135,7 +135,7 @@
               <?php foreach ($ingredientes as $ing): ?>
               <option value="<?= (int)$ing['id'] ?>"
                 <?= ((int)($platillo['ingrediente_directo_id'] ?? 0)) === (int)$ing['id'] ? 'selected' : '' ?>>
-                <?= htmlspecialchars($ing['nombre']) ?> (<?= htmlspecialchars($ing['unidad_principal']) ?>)
+                <?= htmlspecialchars($ing['nombre']) ?> (<?= htmlspecialchars($ing['unidad_principal']) ?>)<?= $ing['proveedor_carnihub'] ? ' 🔗 CarniHub' : '' ?>
               </option>
               <?php endforeach; ?>
             </select>
@@ -397,6 +397,7 @@ function ingBuildOpts(query) {
     const catStr = i.categoria || '';
     const nombre = i.nombre.replace(/</g,'&lt;').replace(/>/g,'&gt;');
     const cat    = catStr.replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const chBadge = i.proveedor_carnihub ? `<span style="font-size:.65rem;font-weight:700;background:#EFF6FF;color:#1D4ED8;border:1px solid #BFDBFE;border-radius:4px;padding:1px 5px;margin-left:4px">🔗 CarniHub</span>` : '';
     return `<div class="ing-opt"
       onmousedown="ingSeleccionar(event,this)"
       data-id="${i.id}"
@@ -404,9 +405,10 @@ function ingBuildOpts(query) {
       data-unidad="${(i.unidad_principal||'').replace(/"/g,'&quot;')}"
       data-costo="${parseFloat(i.costo_unitario)||0}"
       data-cat="${cat.replace(/"/g,'&quot;')}">
-      <div>
+      <div style="display:flex;align-items:center;flex-wrap:wrap;gap:2px">
         <div style="font-weight:600;font-size:.85rem;color:#111827">${nombre}</div>
-        ${cat ? `<div style="font-size:.72rem;color:#9CA3AF">${cat}</div>` : ''}
+        ${chBadge}
+        ${cat ? `<div style="font-size:.72rem;color:#9CA3AF;width:100%">${cat}</div>` : ''}
       </div>
       ${costoStr ? `<span style="font-size:.78rem;color:#6B7280;font-weight:600;white-space:nowrap">${costoStr}</span>` : ''}
     </div>`;

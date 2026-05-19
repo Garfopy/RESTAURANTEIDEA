@@ -136,6 +136,17 @@ $restauranteId = $_SESSION['restaurante_activo_id'] ?? 0;
           <?php if ($p['tiempo_preparacion_min'] ?? 0): ?>
           <span style="font-size:.68rem;color:#9CA3AF">⏱ <?= (int)$p['tiempo_preparacion_min'] ?>min</span>
           <?php endif; ?>
+          <?php
+            $tieneReceta  = !empty($p['tiene_receta']);
+            $tieneDirecto = !empty($p['ingrediente_directo_id']);
+            if (!$tieneReceta && !$tieneDirecto):
+          ?>
+          <span title="Este platillo no tiene receta ni ingrediente directo — el KDS no podrá descontar stock"
+                style="padding:2px 8px;border-radius:99px;font-size:.65rem;font-weight:700;
+                       background:#FEF3C7;color:#92400E;border:1px solid #FCD34D;cursor:help">
+            ⚠️ Sin vínculo stock
+          </span>
+          <?php endif; ?>
         </div>
       </div>
       <div class="menu-card-footer">

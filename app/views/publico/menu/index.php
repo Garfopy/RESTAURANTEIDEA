@@ -177,6 +177,23 @@
 </head>
 <body>
 
+<?php if ($visitaId > 0): ?>
+<!-- Barra de regreso al seguimiento del pedido -->
+<a href="<?= BASE_URL ?>menu/confirmacion/<?= htmlspecialchars($restaurante['slug']) ?>/<?= $visitaId ?>"
+   style="display:flex;align-items:center;justify-content:center;gap:8px;
+          padding:11px 16px;background:#111827;color:#fff;text-decoration:none;
+          font-size:.82rem;font-weight:700;letter-spacing:.01em;position:sticky;top:0;z-index:100;
+          border-bottom:2px solid rgba(201,164,48,.5)">
+  <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="flex-shrink:0">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"/>
+  </svg>
+  Ver seguimiento de mi pedido
+  <span style="background:var(--gold,#C9A430);color:#fff;font-size:.7rem;padding:2px 8px;border-radius:99px;font-weight:700">
+    En curso
+  </span>
+</a>
+<?php endif; ?>
+
 <!-- Hero -->
 <?php
   $hasBanner = !empty($restaurante['imagen_banner']);
