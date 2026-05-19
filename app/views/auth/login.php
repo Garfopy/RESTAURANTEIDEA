@@ -428,24 +428,24 @@ if ($_isRest) { $_appName = 'Restaurante'; }
 
       <?php if ($_appLogo): ?>
         <img src="<?= htmlspecialchars($_appLogo) ?>" alt="<?= htmlspecialchars($_appName) ?>"
-             style="height:60px;margin-bottom:20px;object-fit:contain;filter:brightness(0) invert(1)">
+             style="height:64px;margin-bottom:20px;object-fit:contain">
       <?php else: ?>
-        <img src="<?= BASE_URL ?>public/img/logo.svg" alt="<?= htmlspecialchars($_appName) ?>"
-             style="height:60px;margin-bottom:20px;filter:brightness(0) invert(1)">
+        <img src="<?= BASE_URL ?>public/img/logo-light.svg" alt="<?= htmlspecialchars($_appName) ?>"
+             style="height:64px;margin-bottom:20px">
       <?php endif; ?>
 
       <div class="login-accent-bar"></div>
 
       <h2 class="shimmer-heading" style="font-size:1.45rem;font-weight:800;margin-bottom:10px;text-align:center;line-height:1.25">
         <?php if ($_isRest): ?>
-          Gestión Integral<br>de Restaurante
+          Gestión de Restaurantes<br>y Flujo de Ventas
         <?php else: ?>
           Abasto Inteligente<br>de Carne
         <?php endif; ?>
       </h2>
-      <p style="color:#94A3B8;text-align:center;font-size:.84rem;line-height:1.65;max-width:240px;margin:0">
+      <p style="color:#94A3B8;text-align:center;font-size:.84rem;line-height:1.65;max-width:260px;margin:0">
         <?php if ($_isRest): ?>
-          Mesas, menú, cocina y pagos sincronizados en tiempo real.
+          Controla operación, ventas y cocina en un solo flujo en tiempo real.
         <?php else: ?>
           La plataforma B2B que conecta tu negocio con el mejor abasto cárnico.
         <?php endif; ?>
@@ -469,10 +469,10 @@ if ($_isRest) { $_appName = 'Restaurante'; }
       <div class="login-features">
         <?php
           $features = $_isRest ? [
-            ['Mesas y reservas en tiempo real',  'M5 13l4 4L19 7'],
-            ['Menú digital y pedidos por QR',    'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2'],
-            ['Cocina con piezas tipo Lego',      'M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0'],
-            ['Reportes y propinas',              'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z'],
+            ['Mesas, reservas y comandas en vivo', 'M5 13l4 4L19 7'],
+            ['Menú digital y pedidos por QR',      'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2'],
+            ['Flujo de ventas y cobros integrado', 'M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0'],
+            ['Reportes de ventas y propinas',       'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z'],
           ] : [
             ['Precios escalonados dinámicos', 'M5 13l4 4L19 7'],
             ['Pedidos multi-sucursal',        'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2'],
