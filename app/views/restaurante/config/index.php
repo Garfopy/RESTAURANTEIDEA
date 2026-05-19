@@ -116,6 +116,12 @@
         var sc = document.createElement('script');
         sc.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
         sc.onload = function() {
+          // Fix iconos por defecto de Leaflet (se rompen al cargar el JS dinámicamente)
+          L.Icon.Default.mergeOptions({
+            iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+            iconUrl:       'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+            shadowUrl:     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png'
+          });
           var el  = document.getElementById('rstMap');
           var dir = el.dataset.direccion;
           el.innerHTML = '';
