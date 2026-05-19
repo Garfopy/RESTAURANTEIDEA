@@ -9,15 +9,17 @@
   <style>
     /* ── Variables de marca ─────────────────────── */
     :root {
-      --cp: <?= htmlspecialchars($restaurante['color_primario']  ?? '#C8102E') ?>;
-      --cs: <?= htmlspecialchars($restaurante['color_secundario'] ?? '#1f2937') ?>;
+      --cp:       <?= htmlspecialchars($restaurante['color_primario']  ?? '#C8102E') ?>;
+      --cs:       <?= htmlspecialchars($restaurante['color_secundario'] ?? '#1f2937') ?>;
       --gold:     #c9a430;
       --gold-dim: rgba(201,164,48,.12);
-      --bg:       #FAFAF7;
+      --gold-hi:  rgba(201,164,48,.22);
+      --bg:       #F7F6F2;
       --card:     #FFFFFF;
       --line:     rgba(0,0,0,.07);
       --text-main:#1C1C2E;
       --text-muted:#6B7280;
+      --radius-card: 16px;
     }
 
     /* ── Reset ──────────────────────────────────── */
@@ -26,51 +28,112 @@
     a { color:inherit; text-decoration:none; }
 
     /* ── Barra de tabs ──────────────────────────── */
-    .mn-tab-bar { display:flex; gap:6px; padding:12px 16px 10px; overflow-x:auto; scrollbar-width:none; position:sticky; top:0; background:rgba(250,250,247,.97); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); z-index:20; border-bottom:1px solid #E5E7EB; box-shadow:0 2px 8px rgba(0,0,0,.04); }
+    .mn-tab-bar { display:flex; gap:8px; padding:10px 16px 10px; overflow-x:auto; scrollbar-width:none; position:sticky; top:0; background:rgba(247,246,242,.97); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); z-index:20; border-bottom:1px solid rgba(0,0,0,.07); box-shadow:0 2px 12px rgba(0,0,0,.05); }
     .mn-tab-bar::-webkit-scrollbar { display:none; }
-    .mn-tab { padding:8px 18px; border-radius:99px; font-size:.82rem; font-weight:600; border:1.5px solid #D1D5DB; background:transparent; color:var(--text-muted); cursor:pointer; white-space:nowrap; transition:all .18s; flex-shrink:0; }
-    .mn-tab:hover { border-color:var(--gold); color:var(--gold); background:var(--gold-dim); }
-    .mn-tab.active { background:var(--gold); border-color:var(--gold); color:#fff; box-shadow:0 3px 10px rgba(201,164,48,.35); }
+    .mn-tab { padding:7px 16px; border-radius:99px; font-size:.78rem; font-weight:600; border:1.5px solid #E2E3E6; background:#fff; color:var(--text-muted); cursor:pointer; white-space:nowrap; transition:all .18s; flex-shrink:0; display:flex; align-items:center; gap:5px; }
+    .mn-tab .mn-tab-count { font-size:.68rem; font-weight:700; background:#E5E7EB; color:var(--text-muted); border-radius:99px; padding:1px 6px; transition:all .18s; }
+    .mn-tab:hover { border-color:var(--gold); color:#7a5a00; background:var(--gold-dim); }
+    .mn-tab:hover .mn-tab-count { background:var(--gold-hi); color:#7a5a00; }
+    .mn-tab.active { background:var(--gold); border-color:var(--gold); color:#fff; box-shadow:0 3px 12px rgba(201,164,48,.4); }
+    .mn-tab.active .mn-tab-count { background:rgba(255,255,255,.25); color:#fff; }
 
-    /* ── Secciones y grid ───────────────────────── */
-    .mn-section-title { padding:22px 16px 10px; font-family:'Playfair Display',Georgia,serif; font-size:1.2rem; color:var(--gold); letter-spacing:.02em; border-bottom:2px solid rgba(201,164,48,.18); margin:0 16px 16px; display:flex; align-items:center; gap:8px; }
-    .mn-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(172px,1fr)); gap:16px; padding:0 16px 16px; }
+    /* ── Secciones ──────────────────────────────── */
+    .mn-section { margin-bottom:8px; }
+    .mn-section-title {
+      display:flex; align-items:center; gap:10px;
+      margin:20px 16px 0;
+      padding:14px 16px;
+      background:var(--card);
+      border-radius:var(--radius-card) var(--radius-card) 0 0;
+      border-bottom:1px solid rgba(0,0,0,.06);
+      position:sticky; top:50px; z-index:10;
+    }
+    .mn-section-icon { font-size:1.5rem; line-height:1; }
+    .mn-section-text { flex:1; }
+    .mn-section-text h2 { margin:0; font-family:'Playfair Display',Georgia,serif; font-size:1.1rem; font-weight:700; color:var(--text-main); line-height:1.2; }
+    .mn-section-text span { font-size:.72rem; color:var(--text-muted); font-weight:500; }
+    .mn-section-divider { height:1px; background:linear-gradient(90deg,var(--gold) 0%,transparent 70%); margin:0 16px 0; opacity:.35; }
 
-    /* ── Tarjeta ────────────────────────────────── */
-    .mn-card { background:var(--card); border:1px solid rgba(0,0,0,.06); border-radius:18px; overflow:hidden; display:flex; flex-direction:column; cursor:pointer; box-shadow:0 2px 12px rgba(0,0,0,.07); transition:box-shadow .22s,transform .2s,border-color .2s; }
-    .mn-card:hover { box-shadow:0 8px 32px rgba(201,164,48,.26); transform:translateY(-3px); border-color:rgba(201,164,48,.4); }
-    .mn-card-img { height:124px; position:relative; overflow:hidden; }
-    .mn-card-img img { width:100%; height:100%; object-fit:cover; transition:transform .3s; }
-    .mn-card:hover .mn-card-img img { transform:scale(1.05); }
-    .mn-placeholder { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:2.8rem; background:linear-gradient(135deg,#F5F3EE 0%,#EDE8DC 100%); }
-    .mn-price-badge { position:absolute; bottom:8px; right:8px; background:var(--gold); color:#fff; font-size:.76rem; font-weight:800; padding:4px 10px; border-radius:99px; box-shadow:0 2px 8px rgba(0,0,0,.2); letter-spacing:.01em; }
-    .mn-card-body { padding:12px 14px 14px; display:flex; flex-direction:column; flex:1; gap:6px; }
-    .mn-card-name { font-family:'Playfair Display',Georgia,serif; font-size:.95rem; font-weight:700; line-height:1.25; color:var(--text-main); }
-    .mn-chips { display:flex; flex-wrap:wrap; gap:4px; margin-top:2px; }
-    .mn-chip { font-size:.6rem; font-weight:600; padding:2px 7px; border-radius:99px; border:1px solid rgba(201,164,48,.3); color:rgba(150,112,12,.9); background:rgba(201,164,48,.09); white-space:nowrap; }
-    .mn-chip-more { font-size:.6rem; color:var(--text-muted); align-self:center; }
-    .mn-card-btn { margin-top:auto; padding:10px 0; background:var(--gold); border:none; border-radius:12px; color:#fff; font-size:.83rem; font-weight:700; cursor:pointer; width:100%; transition:filter .15s,transform .12s; letter-spacing:.03em; box-shadow:0 2px 8px rgba(201,164,48,.3); }
-    .mn-card-btn:hover { filter:brightness(1.1); transform:translateY(-1px); }
+    /* ── Lista de platillos ─────────────────────── */
+    .mn-list { background:var(--card); margin:0 16px; border-radius:0 0 var(--radius-card) var(--radius-card); overflow:hidden; }
+
+    /* ── Tarjeta horizontal ─────────────────────── */
+    .mn-card {
+      display:flex; align-items:stretch; gap:0;
+      padding:14px 16px;
+      border-bottom:1px solid rgba(0,0,0,.055);
+      cursor:pointer;
+      transition:background .15s;
+      animation:fadeIn .22s ease both;
+      position:relative;
+    }
+    .mn-card:last-child { border-bottom:none; }
+    .mn-card:hover { background:#FFFDF5; }
+    .mn-card:active { background:var(--gold-dim); }
+
+    /* Lado izquierdo: texto */
+    .mn-card-body { flex:1; display:flex; flex-direction:column; justify-content:center; gap:4px; padding-right:14px; min-width:0; }
+    .mn-card-name { font-size:.97rem; font-weight:700; color:var(--text-main); line-height:1.3; }
+    .mn-card-desc { font-size:.78rem; color:var(--text-muted); line-height:1.5; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; margin-top:2px; }
+    .mn-card-chips { display:flex; flex-wrap:wrap; gap:4px; margin-top:5px; }
+    .mn-chip { font-size:.62rem; font-weight:600; padding:2px 8px; border-radius:99px; border:1px solid rgba(201,164,48,.3); color:rgba(140,104,4,.95); background:rgba(201,164,48,.1); white-space:nowrap; }
+    .mn-chip-more { font-size:.62rem; color:var(--text-muted); align-self:center; }
+    .mn-card-price { font-size:.9rem; font-weight:800; color:var(--text-main); margin-top:6px; }
+
+    /* Lado derecho: imagen + botón + */
+    .mn-card-thumb { position:relative; flex-shrink:0; width:90px; height:90px; border-radius:12px; overflow:hidden; background:linear-gradient(135deg,#F5F3EE,#EDE8DC); align-self:center; }
+    .mn-card-thumb img { width:100%; height:100%; object-fit:cover; }
+    .mn-card-emoji { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:2.2rem; }
+    .mn-add-circle {
+      position:absolute; bottom:-1px; right:-1px;
+      width:30px; height:30px; border-radius:50%;
+      background:var(--gold); color:#fff;
+      border:2px solid var(--bg);
+      display:flex; align-items:center; justify-content:center;
+      font-size:1.1rem; font-weight:700; line-height:1;
+      box-shadow:0 2px 8px rgba(201,164,48,.45);
+      cursor:pointer;
+      transition:transform .15s, filter .15s;
+    }
+    .mn-add-circle:hover { transform:scale(1.12); filter:brightness(1.1); }
 
     /* ── Carrito flotante ───────────────────────── */
-    .pub-cart-bar { position:fixed; bottom:0; left:0; right:0; background:#fff; border-top:1px solid var(--gold); color:var(--text-main); padding:14px 20px; display:flex; justify-content:space-between; align-items:center; z-index:99; transform:translateY(100%); transition:transform .3s cubic-bezier(.4,0,.2,1); box-shadow:0 -4px 32px rgba(201,164,48,.15); }
+    .pub-cart-bar {
+      position:fixed; bottom:0; left:0; right:0;
+      background:linear-gradient(135deg,#1a1508 0%,#2c2100 100%);
+      color:#fff; padding:14px 20px;
+      display:flex; justify-content:space-between; align-items:center;
+      z-index:99; transform:translateY(100%);
+      transition:transform .3s cubic-bezier(.4,0,.2,1);
+      box-shadow:0 -4px 32px rgba(0,0,0,.22);
+      padding-bottom:max(14px,env(safe-area-inset-bottom));
+    }
     .pub-cart-bar.visible { transform:translateY(0); }
-    .pub-cart-btn { padding:10px 24px; background:var(--gold); color:#fff; border:none; border-radius:10px; font-weight:800; font-size:.9rem; cursor:pointer; transition:filter .15s; }
-    .pub-cart-btn:hover { filter:brightness(1.08); }
+    .pub-cart-btn { padding:11px 26px; background:var(--gold); color:#fff; border:none; border-radius:12px; font-weight:800; font-size:.92rem; cursor:pointer; transition:filter .15s, transform .12s; box-shadow:0 2px 12px rgba(201,164,48,.4); }
+    .pub-cart-btn:hover { filter:brightness(1.1); transform:translateY(-1px); }
+    .pub-cart-info-label { font-size:.72rem; color:rgba(255,255,255,.55); margin-bottom:2px; }
+    .pub-cart-info-total { font-weight:800; font-size:1.1rem; color:var(--gold); }
 
     /* ── Modal / bottom-sheet ───────────────────── */
-    .mn-backdrop { display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px); z-index:200; align-items:flex-end; justify-content:center; }
+    .mn-backdrop { display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px); z-index:200; align-items:flex-end; justify-content:center; }
     .mn-backdrop.open { display:flex; }
-    .mn-sheet { background:#fff; border-radius:24px 24px 0 0; width:100%; max-width:480px; max-height:88vh; overflow-y:auto; animation:slideUp .28s cubic-bezier(.34,1.12,.64,1) both; border-top:2px solid var(--gold); scrollbar-width:thin; scrollbar-color:#D1D5DB transparent; box-shadow:0 -8px 40px rgba(0,0,0,.12); }
+    .mn-sheet { background:#fff; border-radius:24px 24px 0 0; width:100%; max-width:520px; max-height:90vh; overflow-y:auto; animation:slideUp .28s cubic-bezier(.34,1.12,.64,1) both; scrollbar-width:thin; scrollbar-color:#D1D5DB transparent; box-shadow:0 -8px 40px rgba(0,0,0,.18); }
     .mn-sheet::-webkit-scrollbar { width:4px; }
     .mn-sheet::-webkit-scrollbar-thumb { background:#D1D5DB; border-radius:4px; }
     @keyframes slideUp { from { transform:translateY(100%); opacity:0; } to { transform:translateY(0); opacity:1; } }
-    .mn-drag { width:40px; height:4px; background:rgba(0,0,0,.12); border-radius:99px; margin:12px auto 0; }
-    .mn-sheet-hdr { padding:16px 20px 4px; }
-    .mn-sheet-title { font-family:'Playfair Display',Georgia,serif; font-size:1.2rem; font-weight:700; color:var(--text-main); margin:0 0 2px; }
-    .mn-sheet-sub { font-size:.82rem; color:var(--text-muted); margin:0 0 14px; }
+    .mn-drag { width:40px; height:4px; background:rgba(0,0,0,.12); border-radius:99px; margin:10px auto 0; }
+
+    /* Imagen del sheet */
+    .mn-sheet-img { width:100%; height:180px; object-fit:cover; display:block; }
+    .mn-sheet-img-placeholder { width:100%; height:140px; display:flex; align-items:center; justify-content:center; font-size:3.5rem; background:linear-gradient(135deg,#F5F3EE 0%,#EDE8DC 100%); }
+
+    .mn-sheet-hdr { padding:16px 20px 4px; position:relative; }
+    .mn-sheet-close { position:absolute; top:12px; right:16px; background:rgba(0,0,0,.07); border:none; width:30px; height:30px; border-radius:50%; color:var(--text-main); font-size:1rem; line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background .15s; }
+    .mn-sheet-close:hover { background:rgba(0,0,0,.12); }
+    .mn-sheet-title { font-family:'Playfair Display',Georgia,serif; font-size:1.25rem; font-weight:700; color:var(--text-main); margin:0 0 4px; padding-right:38px; }
+    .mn-sheet-sub { font-size:.83rem; color:var(--text-muted); margin:0 0 0; }
     .mn-sec { padding:0 20px 16px; }
-    .mn-sec-lbl { font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:var(--gold); margin-bottom:10px; }
+    .mn-sec-lbl { font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:var(--gold); margin-bottom:10px; margin-top:16px; }
     .mn-guar-row { display:flex; align-items:center; gap:10px; padding:9px 13px; border-radius:12px; border:1px solid #E5E7EB; margin-bottom:6px; background:#F9FAFB; transition:all .15s; }
     .mn-guar-row.excl { opacity:.5; border-color:rgba(239,68,68,.25); background:rgba(239,68,68,.04); }
     .mn-guar-tog { flex:1; display:flex; align-items:center; gap:8px; cursor:pointer; font-size:.85rem; color:var(--text-main); }
@@ -78,7 +141,7 @@
     .mn-tog-icon.incl { background:rgba(34,197,94,.15); color:#16a34a; }
     .mn-tog-icon.excl { background:rgba(239,68,68,.15); color:#dc2626; }
     .mn-extra-btn { font-size:.7rem; font-weight:700; padding:3px 8px; border-radius:99px; border:1px solid rgba(201,164,48,.38); color:#8a6800; background:var(--gold-dim); cursor:pointer; white-space:nowrap; flex-shrink:0; transition:background .12s; }
-    .mn-extra-btn:hover { background:rgba(201,164,48,.22); }
+    .mn-extra-btn:hover { background:var(--gold-hi); }
     .mn-xcnt { display:none; align-items:center; gap:6px; flex-shrink:0; }
     .mn-xcnt.show { display:flex; }
     .mn-xcnt button { width:24px; height:24px; border-radius:50%; border:1px solid #D1D5DB; background:#fff; color:var(--text-main); font-weight:700; cursor:pointer; font-size:.85rem; display:flex; align-items:center; justify-content:center; }
@@ -87,14 +150,29 @@
     .mn-nota::placeholder { color:var(--text-muted); }
     .mn-nota:focus { border-color:var(--gold); background:#fff; }
     .mn-sheet-foot { padding:14px 20px max(16px,env(safe-area-inset-bottom)); border-top:1px solid #E5E7EB; display:flex; gap:12px; align-items:center; background:#fff; position:sticky; bottom:0; }
-    .mn-qty { display:flex; align-items:center; gap:10px; background:#F3F4F6; border-radius:10px; padding:8px 12px; }
-    .mn-qty button { width:28px; height:28px; border-radius:50%; border:1px solid #D1D5DB; background:#fff; color:var(--text-main); font-weight:700; font-size:1rem; cursor:pointer; display:flex; align-items:center; justify-content:center; }
-    .mn-qty span { font-weight:700; min-width:20px; text-align:center; color:var(--text-main); }
-    .mn-add-btn { flex:1; padding:13px; background:var(--gold); color:#fff; border:none; border-radius:12px; font-size:.95rem; font-weight:800; cursor:pointer; transition:filter .15s; }
-    .mn-add-btn:hover { filter:brightness(1.08); }
-    .mn-footer { padding:28px 20px 110px; text-align:center; font-size:.75rem; color:rgba(0,0,0,.25); }
-    @keyframes fadeIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
-    .mn-card { animation:fadeIn .22s ease both; }
+    .mn-qty { display:flex; align-items:center; gap:10px; background:#F3F4F6; border-radius:10px; padding:8px 14px; }
+    .mn-qty button { width:30px; height:30px; border-radius:50%; border:1.5px solid #D1D5DB; background:#fff; color:var(--text-main); font-weight:700; font-size:1rem; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:border-color .15s; }
+    .mn-qty button:hover { border-color:var(--gold); color:var(--gold); }
+    .mn-qty span { font-weight:800; min-width:20px; text-align:center; font-size:1rem; color:var(--text-main); }
+    .mn-add-btn { flex:1; padding:14px; background:var(--gold); color:#fff; border:none; border-radius:14px; font-size:.95rem; font-weight:800; cursor:pointer; transition:filter .15s, transform .12s; box-shadow:0 3px 14px rgba(201,164,48,.35); }
+    .mn-add-btn:hover { filter:brightness(1.08); transform:translateY(-1px); }
+    .mn-footer { padding:28px 20px 110px; text-align:center; font-size:.75rem; color:rgba(0,0,0,.22); }
+
+    @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+
+    /* ── Vacío / sin platillos ──────────────────── */
+    .mn-empty { padding:72px 24px; text-align:center; }
+    .mn-empty-icon { font-size:3.5rem; margin-bottom:12px; }
+    .mn-empty-title { font-family:'Playfair Display',Georgia,serif; font-size:1.1rem; color:var(--text-muted); margin-bottom:6px; }
+    .mn-empty-sub { font-size:.87rem; color:var(--text-muted); line-height:1.6; opacity:.7; }
+
+    /* ── Responsive: pantallas grandes ─────────── */
+    @media (min-width:640px) {
+      .mn-list { display:grid; grid-template-columns:1fr 1fr; }
+      .mn-card { border-bottom:1px solid rgba(0,0,0,.055); border-right:1px solid rgba(0,0,0,.055); }
+      .mn-card:nth-child(2n) { border-right:none; }
+      .mn-card:nth-last-child(-n+2) { border-bottom:none; }
+    }
   </style>
 </head>
 <body>
@@ -147,19 +225,31 @@
 
 <!-- Tabs de categoría -->
 <?php
-$catIconos = [];
+$catIconos  = [];
+$catSinIng  = []; // IDs de categorías que NO muestran ingredientes (bebidas, dulces, postres)
+$catConteos = []; // cantidad de platillos por categoría
+
 foreach ($categorias as $cat) {
     $n = mb_strtolower($cat['nombre']);
     if (str_contains($n,'bebida'))                               $catIconos[$cat['id']] = '🥂';
     elseif (str_contains($n,'postre')||str_contains($n,'dulce')) $catIconos[$cat['id']] = '🍮';
     else                                                         $catIconos[$cat['id']] = '🫔';
+
+    if (str_contains($n,'bebida') || str_contains($n,'postre') || str_contains($n,'dulce')) {
+        $catSinIng[] = (int)$cat['id'];
+    }
 }
+// Contar platillos por categoría (se llenará después de armar $porCategoria)
 ?>
 <div class="mn-tab-bar">
-  <button class="mn-tab active" data-cat="">✨ Todos</button>
-  <?php foreach ($categorias as $cat): ?>
+  <button class="mn-tab active" data-cat="">✨ Todos <span class="mn-tab-count"><?= count($platillos) ?></span></button>
+  <?php foreach ($categorias as $cat):
+    $cnt = count(array_filter($platillos, fn($p) => (int)($p['categoria_id'] ?? 0) === (int)$cat['id']));
+    if ($cnt === 0) continue;
+  ?>
   <button class="mn-tab" data-cat="<?= (int)$cat['id'] ?>">
     <?= $catIconos[$cat['id']] ?> <?= htmlspecialchars($cat['nombre']) ?>
+    <span class="mn-tab-count"><?= $cnt ?></span>
   </button>
   <?php endforeach; ?>
 </div>
@@ -174,14 +264,10 @@ foreach ($categorias as $cat) {
 
 <!-- Platillos por sección -->
 <?php if (empty($platillos)): ?>
-<div style="padding:72px 24px;text-align:center;color:rgba(240,238,232,.3)">
-  <div style="font-size:3.5rem;margin-bottom:10px">🍽️</div>
-  <div style="font-family:'Playfair Display',Georgia,serif;font-size:1.1rem;margin-bottom:6px;color:rgba(240,238,232,.55)">
-    Menú en preparación
-  </div>
-  <div style="font-size:.88rem;line-height:1.6">
-    Aún no hay platillos disponibles.<br>Vuelve pronto o pide ayuda al personal.
-  </div>
+<div class="mn-empty">
+  <div class="mn-empty-icon">🍽️</div>
+  <div class="mn-empty-title">Menú en preparación</div>
+  <div class="mn-empty-sub">Aún no hay platillos disponibles.<br>Vuelve pronto o pide ayuda al personal.</div>
 </div>
 <?php else: ?>
 <?php
@@ -189,39 +275,51 @@ $porCategoria = [];
 foreach ($platillos as $p) { $porCategoria[(int)($p['categoria_id'] ?? 0)][] = $p; }
 $catNombres = array_column($categorias, 'nombre', 'id');
 ?>
-<?php foreach ($porCategoria as $cid => $platos): ?>
+<?php foreach ($porCategoria as $cid => $platos):
+  $esSinIng = in_array($cid, $catSinIng, true);
+?>
 <div class="mn-section" data-section-cat="<?= $cid ?>">
   <?php if (isset($catNombres[$cid])): ?>
-  <div class="mn-section-title"><?= ($catIconos[$cid] ?? '🍽') ?> <?= htmlspecialchars($catNombres[$cid]) ?></div>
+  <div class="mn-section-title">
+    <div class="mn-section-icon"><?= $catIconos[$cid] ?? '🍽' ?></div>
+    <div class="mn-section-text">
+      <h2><?= htmlspecialchars($catNombres[$cid]) ?></h2>
+      <span><?= count($platos) ?> <?= count($platos) === 1 ? 'platillo' : 'platillos' ?></span>
+    </div>
+  </div>
   <?php endif; ?>
-  <div class="mn-grid">
+  <div class="mn-list">
   <?php foreach ($platos as $p):
-    $pId    = (int)$p['id'];
-    $ings   = $recetaIngredientes[$pId] ?? [];
-    $chips  = array_slice($ings, 0, 3);
-    $more   = count($ings) - count($chips);
-    $icon   = $catIconos[$cid] ?? '🍽';
+    $pId   = (int)$p['id'];
+    $ings  = $recetaIngredientes[$pId] ?? [];
+    $chips = (!$esSinIng && !empty($ings)) ? array_slice($ings, 0, 4) : [];
+    $more  = (!$esSinIng && !empty($ings)) ? max(0, count($ings) - count($chips)) : 0;
+    $icon  = $catIconos[$cid] ?? '🍽';
+    $desc  = trim($p['descripcion'] ?? '');
   ?>
   <div class="mn-card" data-cat="<?= $cid ?>" onclick="abrirModal(<?= $pId ?>)">
-    <div class="mn-card-img">
-      <?php if (!empty($p['imagen'])): ?>
-      <img src="<?= BASE_URL . htmlspecialchars($p['imagen']) ?>" alt="">
-      <?php else: ?>
-      <div class="mn-placeholder"><?= $icon ?></div>
-      <?php endif; ?>
-      <span class="mn-price-badge">$<?= number_format((float)$p['precio'], 0) ?></span>
-    </div>
     <div class="mn-card-body">
       <div class="mn-card-name"><?= htmlspecialchars($p['nombre']) ?></div>
-      <?php if (!empty($ings)): ?>
-      <div class="mn-chips">
+      <?php if ($desc !== ''): ?>
+      <div class="mn-card-desc"><?= htmlspecialchars($desc) ?></div>
+      <?php endif; ?>
+      <?php if (!empty($chips)): ?>
+      <div class="mn-card-chips">
         <?php foreach ($chips as $ch): ?>
         <span class="mn-chip"><?= htmlspecialchars($ch['ingrediente_nombre']) ?></span>
         <?php endforeach; ?>
         <?php if ($more > 0): ?><span class="mn-chip-more">+<?= $more ?> más</span><?php endif; ?>
       </div>
       <?php endif; ?>
-      <button type="button" class="mn-card-btn">Ordenar</button>
+      <div class="mn-card-price">$<?= number_format((float)$p['precio'], 0) ?></div>
+    </div>
+    <div class="mn-card-thumb">
+      <?php if (!empty($p['imagen'])): ?>
+      <img src="<?= BASE_URL . htmlspecialchars($p['imagen']) ?>" alt="<?= htmlspecialchars($p['nombre']) ?>">
+      <?php else: ?>
+      <div class="mn-card-emoji"><?= $icon ?></div>
+      <?php endif; ?>
+      <button type="button" class="mn-add-circle" onclick="abrirModal(<?= $pId ?>);event.stopPropagation()">+</button>
     </div>
   </div>
   <?php endforeach; ?>
@@ -233,14 +331,14 @@ $catNombres = array_column($categorias, 'nombre', 'id');
 <!-- Carrito flotante -->
 <div class="pub-cart-bar" id="carritoBar">
   <div>
-    <div style="font-size:.78rem;opacity:.6" id="carritoItems">0 items</div>
-    <div style="font-weight:800;font-size:1.1rem;color:var(--gold)" id="carritoTotal">$0</div>
+    <div class="pub-cart-info-label" id="carritoItems">0 items</div>
+    <div class="pub-cart-info-total" id="carritoTotal">$0</div>
   </div>
   <div style="display:flex;gap:8px;align-items:center">
     <?php if ($visitaId): ?>
     <button id="btnPedirMismo" onclick="pedirLoMismo()"
-            style="padding:8px 14px;background:rgba(255,255,255,.1);color:#fff;
-                   border:1.5px solid rgba(255,255,255,.25);border-radius:10px;
+            style="padding:9px 14px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.85);
+                   border:1.5px solid rgba(255,255,255,.2);border-radius:10px;
                    font-size:.78rem;font-weight:600;cursor:pointer;display:none">
       🔁 Lo mismo
     </button>
@@ -255,11 +353,9 @@ $catNombres = array_column($categorias, 'nombre', 'id');
 <div id="mnBackdrop" class="mn-backdrop" onclick="handleBackdrop(event)">
   <div class="mn-sheet">
     <div class="mn-drag"></div>
-    <div class="mn-sheet-hdr" style="position:relative">
-      <button onclick="cerrarModal()" type="button"
-              style="position:absolute;top:0;right:0;background:none;border:none;
-                     color:var(--text-muted);font-size:1.3rem;line-height:1;
-                     cursor:pointer;padding:6px 10px">✕</button>
+    <div id="sheetImgWrap"></div>
+    <div class="mn-sheet-hdr">
+      <button onclick="cerrarModal()" type="button" class="mn-sheet-close">✕</button>
       <div class="mn-sheet-title" id="sheetTitle">—</div>
       <div class="mn-sheet-sub"   id="sheetSub">—</div>
     </div>
@@ -294,6 +390,9 @@ const MESA_QR   = '';
 <?php endif; ?>
 const VID       = <?= (int)($visitaId ?? 0) ?>;
 
+// Categorías que NO muestran ingredientes en el modal
+const CAT_SIN_ING = new Set(<?= json_encode($catSinIng) ?>);
+
 const PRECIOS = {<?php foreach ($platillos as $p): ?><?= (int)$p['id'] ?>:<?= (float)$p['precio'] ?>,<?php endforeach; ?>};
 
 const MENU = <?= json_encode(array_combine(
@@ -302,6 +401,8 @@ const MENU = <?= json_encode(array_combine(
       return [
           'nombre' => $p['nombre'],
           'precio' => (float)$p['precio'],
+          'imagen' => $p['imagen'] ?? '',
+          'cat_id' => (int)($p['categoria_id'] ?? 0),
           'ings'   => array_values($recetaIngredientes[(int)$p['id']] ?? []),
       ];
   }, $platillos)
@@ -338,12 +439,26 @@ function abrirModal(id) {
   document.getElementById('sheetSub').textContent   = `$${d.precio % 1 === 0 ? d.precio.toFixed(0) : d.precio.toFixed(2)} por orden`;
   document.getElementById('sheetQty').textContent   = 1;
   document.getElementById('sheetNota').value        = '';
-  const gSec = document.getElementById('guarSec');
-  const gList= document.getElementById('guarList');
-  if (d.ings && d.ings.length) {
+
+  // Imagen en el header del sheet
+  const imgWrap = document.getElementById('sheetImgWrap');
+  if (d.imagen) {
+    imgWrap.innerHTML = `<img class="mn-sheet-img" src="${BASE_URL}${d.imagen.replace(/^\//, '')}" alt="${esc(d.nombre)}">`;
+  } else {
+    imgWrap.innerHTML = '';
+  }
+
+  // Ingredientes solo si la categoría los muestra
+  const gSec  = document.getElementById('guarSec');
+  const gList = document.getElementById('guarList');
+  const mostrarIng = !CAT_SIN_ING.has(d.cat_id);
+  if (mostrarIng && d.ings && d.ings.length) {
     gSec.style.display = '';
     gList.innerHTML = d.ings.map(ing => guarRow(ing)).join('');
-  } else { gSec.style.display = 'none'; gList.innerHTML = ''; }
+  } else {
+    gSec.style.display = 'none';
+    gList.innerHTML = '';
+  }
   actualizarAddBtn();
   document.getElementById('mnBackdrop').classList.add('open');
   document.body.style.overflow = 'hidden';
