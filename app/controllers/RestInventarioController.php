@@ -26,7 +26,7 @@ class RestInventarioController extends BaseController
             $movRecientes = array_slice($resultado['movimientos'] ?? [], 0, 10);
         } catch (\Throwable $e) {}
 
-        $pageTitle        = 'Inventario';
+        $pageTitle        = 'Ingredientes';
         $activeMenu       = 'rest_inventario';
 
         // Productos CarniHub disponibles para importar al inventario

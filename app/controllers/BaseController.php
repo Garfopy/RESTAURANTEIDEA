@@ -131,7 +131,7 @@ abstract class BaseController
     /** Staff: mesero */
     protected function requireMesero(): void
     {
-        $this->requireRole(['mesero', 'comprador', 'admin_restaurante']);
+        $this->requireRole(['mesero', 'comprador']);
     }
 
     /** Staff: chef */

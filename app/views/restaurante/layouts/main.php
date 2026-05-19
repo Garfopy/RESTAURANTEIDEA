@@ -6,6 +6,11 @@ $colorSec   = $restaurante['color_secundario'] ?? '#1f2937';
 $restNombre = $restaurante['nombre'] ?? 'Mi Restaurante';
 $restLogo   = $restaurante['logo']   ?? '';
 $activeMenu = $activeMenu ?? '';
+
+// Roles para visibilidad del sidebar
+$_rol      = $usuario['rol_slug'] ?? '';
+$_isAdmin  = in_array($_rol, ['admin_restaurante', 'comprador'], true); // gestión del restaurante
+$_isMesero = in_array($_rol, ['mesero', 'comprador'], true);            // operación de salón
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -54,6 +59,7 @@ $activeMenu = $activeMenu ?? '';
       <svg style="width:16px;height:16px;flex-shrink:0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
       Mesas
     </a>
+    <?php if ($_isMesero): ?>
     <a class="rst-nav-link <?= $activeMenu === 'rest_pedidos' ? 'active' : '' ?>"
        href="<?= BASE_URL ?>rest-pedido/index">
       <svg style="width:16px;height:16px;flex-shrink:0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
@@ -69,6 +75,7 @@ $activeMenu = $activeMenu ?? '';
       <svg style="width:16px;height:16px;flex-shrink:0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"/></svg>
       Tickets
     </a>
+    <?php endif; ?>
 
     <div class="rst-nav-section">Financiero</div>
     <a class="rst-nav-link <?= $activeMenu === 'rest_finanzas' ? 'active' : '' ?>"
@@ -98,7 +105,7 @@ $activeMenu = $activeMenu ?? '';
     <a class="rst-nav-link <?= $activeMenu === 'rest_inventario' ? 'active' : '' ?>"
        href="<?= BASE_URL ?>rest-inventario/index">
       <svg style="width:16px;height:16px;flex-shrink:0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
-      Inventario
+      Ingredientes
     </a>
 
     <div class="rst-nav-section">Clientes</div>
