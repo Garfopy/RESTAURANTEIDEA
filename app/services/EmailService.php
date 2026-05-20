@@ -277,6 +277,95 @@ class EmailService
     }
 
     /**
+     * Notifica al restaurante que llegó una nueva solicitud de reservación del comensal (vía QR).
+     */
+    public function enviarNuevaReserva(
+        string $destEmail,
+        string $destNombre,
+        array $restaurante,
+        array $reserva
+    ): bool {
+        if (!$this->configured || !$destEmail) return false;
+
+        $restNombre = htmlspecialchars($restaurante['nombre'] ?? '');
+        $nombre     = htmlspecialchars($reserva['nombre'] ?? '');
+        $fecha      = $reserva['fecha'] ?? '';
+        $hora       = substr($reserva['hora'] ?? '', 0, 5);
+        $personas   = (int)($reserva['personas'] ?? 1);
+        $telefono   = htmlspecialchars($reserva['telefono'] ?? '—');
+        $notas      = htmlspecialchars($reserva['notas'] ?? '');
+        $urlAdmin   = BASE_URL . 'rest-reserva/index';
+
+        try {
+            $mail = new PHPMailer(true);
+            $mail->isSMTP();
+            $mail->Host        = $this->smtpHost;
+            $mail->SMTPAuth    = true;
+            $mail->Username    = $this->smtpUsername;
+            $mail->Password    = $this->smtpPassword;
+            $mail->Port        = (int)$this->smtpPort;
+            $mail->Timeout     = 10;
+            $mail->SMTPOptions = ['ssl' => ['verify_peer' => false, 'verify_peer_name' => false, 'allow_self_signed' => true]];
+            if ($this->smtpEncryption === 'tls')     $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+            elseif ($this->smtpEncryption === 'ssl') $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
+
+            $mail->setFrom($this->smtpFromEmail, $this->smtpFromName);
+            $mail->addAddress($destEmail, $destNombre);
+            $mail->isHTML(true);
+            $mail->CharSet = 'UTF-8';
+            $mail->Subject = "📅 Nueva solicitud de reservación — $restNombre";
+
+            $notasRow = $notas ? "<tr><td style='color:#6B7280;padding:10px 14px;background:#F9FAFB'>Notas</td><td style='padding:10px 14px;font-style:italic'>$notas</td></tr>" : '';
+
+            $mail->Body = '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#F3F4F6;font-family:Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#F3F4F6;padding:24px 0;">
+<tr><td align="center">
+<table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08);">
+  <tr><td style="background:#1F2937;padding:28px 30px;">
+    <p style="margin:0;color:#9CA3AF;font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;">' . $restNombre . '</p>
+    <h1 style="margin:6px 0 0;color:#fff;font-size:1.25rem;font-weight:700;">📅 Nueva solicitud de reservación</h1>
+  </td></tr>
+  <tr><td style="padding:28px 30px;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #E5E7EB;border-radius:8px;font-size:.88rem;border-collapse:collapse;">
+      <tr><td style="color:#6B7280;padding:10px 14px;width:38%">Nombre</td><td style="padding:10px 14px;font-weight:700">' . $nombre . '</td></tr>
+      <tr style="background:#F9FAFB"><td style="color:#6B7280;padding:10px 14px">Teléfono</td><td style="padding:10px 14px">' . $telefono . '</td></tr>
+      <tr><td style="color:#6B7280;padding:10px 14px">Fecha</td><td style="padding:10px 14px;font-weight:700">' . date('d/m/Y', strtotime($fecha)) . '</td></tr>
+      <tr style="background:#F9FAFB"><td style="color:#6B7280;padding:10px 14px">Hora</td><td style="padding:10px 14px;font-weight:700">' . $hora . '</td></tr>
+      <tr><td style="color:#6B7280;padding:10px 14px">Personas</td><td style="padding:10px 14px">' . $personas . '</td></tr>
+      ' . $notasRow . '
+    </table>
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:24px;">
+      <tr><td align="center">
+        <a href="' . $urlAdmin . '" style="display:inline-block;background:#1F2937;color:#fff;text-decoration:none;padding:12px 32px;border-radius:8px;font-weight:700;font-size:.95rem;">
+          Ver en panel de reservaciones →
+        </a>
+      </td></tr>
+    </table>
+  </td></tr>
+  <tr><td style="background:#F9FAFB;padding:16px 30px;text-align:center;border-top:1px solid #E5E7EB;">
+    <p style="margin:0;color:#9CA3AF;font-size:.72rem;">© ' . date('Y') . ' CarniHub</p>
+  </td></tr>
+</table>
+</td></tr></table>
+</body></html>';
+
+            $mail->AltBody = "Nueva solicitud de reservación en $restNombre\n\n"
+                . "Nombre: {$reserva['nombre']}\nTeléfono: {$reserva['telefono']}\n"
+                . "Fecha: $fecha  Hora: $hora  Personas: $personas\n"
+                . ($reserva['notas'] ? "Notas: {$reserva['notas']}\n" : '')
+                . "\nVer panel: $urlAdmin";
+
+            $mail->send();
+            error_log("[EmailService] Notificación reserva enviada a: $destEmail");
+            return true;
+        } catch (\Exception $e) {
+            error_log("[EmailService] Error enviarNuevaReserva a $destEmail: {$mail->ErrorInfo}");
+            return false;
+        }
+    }
+
+    /**
      * Verifica si el servicio de email está configurado correctamente
      *
      * @return bool True si está configurado

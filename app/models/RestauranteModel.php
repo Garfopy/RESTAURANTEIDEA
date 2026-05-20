@@ -61,4 +61,16 @@ class RestauranteModel extends BaseModel
         }
         return $slug;
     }
+
+    /** Devuelve email y nombre de la empresa dueña del restaurante (para notificaciones). */
+    public function getAdminEmail(int $restauranteId): ?array
+    {
+        return $this->queryOne(
+            "SELECT e.email, e.razon_social AS nombre
+             FROM rest_restaurantes r
+             JOIN empresas e ON e.id = r.empresa_id
+             WHERE r.id = ? LIMIT 1",
+            [$restauranteId]
+        );
+    }
 }

@@ -80,6 +80,7 @@ class RestReservaController extends BaseController
             'hora'           => $hora,
             'personas'       => (int)$this->post('personas', 2),
             'notas'          => $this->post('notas') ?: null,
+            'origen'         => 'restaurante',
         ];
 
         if ($id) {
@@ -112,6 +113,49 @@ class RestReservaController extends BaseController
         $stmt = $db->prepare("SELECT id, nombre FROM usuarios WHERE id = ? LIMIT 1");
         $stmt->execute([$meseroId]);
         $this->json(['ok' => true, 'mesero' => $stmt->fetch(PDO::FETCH_ASSOC)]);
+    }
+
+    // POST /rest-reserva/asignar/{id}  — asigna mesa y mesero a una reservación del comensal
+    public function asignar(?string $id = null): void
+    {
+        if (!$this->isPost()) $this->redirect('rest-reserva/index');
+
+        $reservaId     = (int)$id;
+        $restauranteId = $this->restauranteId();
+        $mesaId        = $this->post('mesa_id') ? (int)$this->post('mesa_id') : null;
+        $meseroId      = $this->post('mesero_id') ? (int)$this->post('mesero_id') : null;
+
+        // Verificar que la reservación pertenezca a este restaurante
+        $reserva = $this->model->find($reservaId);
+        if (!$reserva || (int)$reserva['restaurante_id'] !== $restauranteId) {
+            $this->flash('error', 'Reservación no encontrada.');
+            $this->redirect('rest-reserva/index');
+            return;
+        }
+
+        // Validar conflicto si se asigna mesa
+        if ($mesaId && !empty($reserva['fecha']) && !empty($reserva['hora'])) {
+            if ($this->model->hayConflicto($mesaId, $reserva['fecha'], $reserva['hora'], $reservaId)) {
+                $this->flash('error', 'Esa mesa ya tiene una reservación en ese horario (±2 horas).');
+                $this->redirect('rest-reserva/index');
+                return;
+            }
+        }
+
+        // Auto-asignar mesero por zona si no se eligió uno manualmente
+        if (!$meseroId && $mesaId) {
+            $meseroId = $this->model->meseroAsignadoPorMesa($mesaId, $restauranteId);
+        }
+
+        $this->model->asignar($reservaId, $mesaId, $meseroId);
+
+        // Confirmar automáticamente si estaba pendiente
+        if ($reserva['estado'] === 'pendiente') {
+            $this->model->cambiarEstado($reservaId, 'confirmada');
+        }
+
+        $this->flash('success', 'Mesa y mesero asignados. Reservación confirmada.');
+        $this->redirect('rest-reserva/index');
     }
 
     public function cambiarEstado(?string $id = null): void

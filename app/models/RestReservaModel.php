@@ -133,6 +133,14 @@ class RestReservaModel extends BaseModel
         return $ocupadas >= $totalMesas;
     }
 
+    public function asignar(int $id, ?int $mesaId, ?int $meseroId): void
+    {
+        $this->execute(
+            "UPDATE rest_reservaciones SET mesa_id = ?, mesero_id = ? WHERE id = ?",
+            [$mesaId, $meseroId, $id]
+        );
+    }
+
     public function cambiarEstado(int $id, string $estado): bool
     {
         return $this->execute(

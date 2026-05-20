@@ -822,7 +822,24 @@ class RestPublicoController extends BaseController
             'personas'       => $personas,
             'notas'          => $notas,
             'estado'         => 'pendiente',
+            'origen'         => 'comensal',
         ]);
+
+        // Notificar al restaurante por email (silencioso si falla)
+        try {
+            $admin = $this->restModel->getAdminEmail((int)$restaurante['id']);
+            if ($admin && !empty($admin['email'])) {
+                (new EmailService())->enviarNuevaReserva(
+                    $admin['email'],
+                    $admin['nombre'],
+                    $restaurante,
+                    ['nombre' => $nombre, 'telefono' => $telefono, 'fecha' => $fecha,
+                     'hora' => $hora, 'personas' => $personas, 'notas' => $notas ?? '']
+                );
+            }
+        } catch (\Throwable $e) {
+            error_log('[Reserva] Error enviando email notificación: ' . $e->getMessage());
+        }
 
         $this->redirect('menu/' . $slug . '/reservar?ok=1');
     }
