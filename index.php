@@ -24,7 +24,34 @@ if (file_exists(ROOT_PATH . '/vendor/autoload.php')) {
 }
 
 // ── Session ───────────────────────────────────────────────────────────────────
-session_name(SESSION_NAME);
+// Una cookie de sesión por ROL para que admin + chef + mesero + portero +
+// comensal puedan estar logueados simultáneamente en el mismo navegador.
+// Sin esto, todos los logins comparten capirest_session y el staff se pierde.
+$_earlyPath     = trim($_GET['url'] ?? '', '/');
+$_earlySegments = array_values(array_filter(explode('/', $_earlyPath)));
+$_earlyCtrl     = strtolower($_earlySegments[0] ?? '');
+$_earlyAction   = strtolower($_earlySegments[1] ?? '');
+
+$_roleCookies = [
+    'rest-chef'     => '_chef',
+    'rest-mesero'   => '_mesero',
+    'rest-portero'  => '_portero',
+    'rest-staff'    => '_staff',
+    'rest-propinas' => '_staff',
+    'menu'          => '_comensal',
+    'acceso'        => '_login',
+];
+$_cookieSuffix = $_roleCookies[$_earlyCtrl] ?? '';
+
+// auth/logoutStaff/{rol} destruye SOLO la cookie de ese rol
+if ($_earlyCtrl === 'auth' && $_earlyAction === 'logoutstaff') {
+    $_logoutRol = strtolower($_earlySegments[2] ?? '');
+    if (in_array($_logoutRol, ['chef', 'mesero', 'portero', 'staff', 'comensal', 'login'], true)) {
+        $_cookieSuffix = '_' . $_logoutRol;
+    }
+}
+
+session_name(SESSION_NAME . $_cookieSuffix);
 session_start();
 
 // ── Parse URL ─────────────────────────────────────────────────────────────────
