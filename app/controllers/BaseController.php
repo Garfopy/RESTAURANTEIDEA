@@ -41,7 +41,8 @@ abstract class BaseController
     protected function redirectSegunRol(string $rol): void
     {
         match (true) {
-            $rol === 'admin_restaurante', $rol === 'comprador'        => $this->redirect('restaurante/dashboard'),
+            $rol === 'admin_restaurante', $rol === 'comprador',
+            $rol === 'admin_local'                                     => $this->redirect('restaurante/dashboard'),
             $rol === 'mesero'                                          => $this->redirect('rest-mesero/dashboard'),
             $rol === 'chef'                                            => $this->redirect('rest-chef/dashboard'),
             $rol === 'portero'                                         => $this->redirect('rest-portero/dashboard'),
@@ -96,7 +97,7 @@ abstract class BaseController
     /** Admin del restaurante (comprador con restaurante activo o admin_restaurante) */
     protected function requireRestaurante(): void
     {
-        $this->requireRole(['comprador', 'admin_restaurante']);
+        $this->requireRole(['comprador', 'admin_restaurante', 'admin_local']);
         $rol = $this->rolActual();
 
         // admin_restaurante: auto-seleccionar el primer restaurante de su empresa
@@ -111,10 +112,18 @@ abstract class BaseController
             }
         }
 
+        // admin_local: auto-seleccionar el restaurante asignado a su usuario
+        if ($rol === 'admin_local' && empty($_SESSION['restaurante_activo_id'])) {
+            $restId = $_SESSION['usuario']['restaurante_id'] ?? null;
+            if ($restId) {
+                $_SESSION['restaurante_activo_id'] = (int)$restId;
+            }
+        }
+
         $restauranteId = $_SESSION['restaurante_activo_id'] ?? null;
         if (!$restauranteId) {
-            if ($rol === 'admin_restaurante') {
-                // No hay restaurantes asociados a su empresa: cerrar sesión con mensaje.
+            if (in_array($rol, ['admin_restaurante', 'admin_local'], true)) {
+                // No hay restaurante asociado: cerrar sesión con mensaje.
                 $this->flash('error', 'Tu cuenta no tiene ningún restaurante asignado. Contacta al administrador.');
                 session_destroy();
                 $this->redirect('auth/login');
