@@ -14,17 +14,18 @@ class StaffAccesoController extends BaseController
     // GET /acceso/{slug}
     public function index(?string $slug = null): void
     {
-        if (isset($_SESSION['usuario'])) {
-            $rol = $_SESSION['usuario']['rol_slug'] ?? '';
-            // Solo redirigir automáticamente a staff — comprador/admin puede ver la página para compartirla
-            if (in_array($rol, ['mesero', 'chef', 'portero'])) {
-                $this->redirectSegunRol($rol);
-            }
-        }
+        // Siempre mostrar la pantalla de login. No auto-redirigir aunque ya
+        // exista sesión staff: el admin puede compartir esta URL o querer
+        // entrar con otra cuenta, y el auto-redirect lo bloqueaba.
         $restaurante = $slug ? $this->restModel->getBySlug($slug) : null;
         $flash       = $this->getFlash();
         $pageTitle   = 'Acceso Staff — ' . ($restaurante['nombre'] ?? 'CarniHub');
-        $this->render('staff/login', compact('restaurante', 'flash', 'pageTitle', 'slug'));
+        $yaLogueado  = null;
+        if (isset($_SESSION['usuario'])
+            && in_array($_SESSION['usuario']['rol_slug'] ?? '', ['mesero', 'chef', 'portero'], true)) {
+            $yaLogueado = $_SESSION['usuario'];
+        }
+        $this->render('staff/login', compact('restaurante', 'flash', 'pageTitle', 'slug', 'yaLogueado'));
     }
 
     // POST /acceso/{slug}
