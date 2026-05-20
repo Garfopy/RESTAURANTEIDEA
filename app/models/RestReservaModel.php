@@ -148,4 +148,18 @@ class RestReservaModel extends BaseModel
             [$estado, $id]
         );
     }
+
+    /**
+     * Busca una reservación por su ID validando que pertenezca al restaurante
+     * y que el teléfono coincida (para cancelación pública sin login).
+     */
+    public function getParaCancelar(int $id, int $restauranteId, string $telefono): ?array
+    {
+        return $this->queryOne(
+            "SELECT * FROM rest_reservaciones
+             WHERE id = ? AND restaurante_id = ? AND telefono = ?
+               AND estado IN ('pendiente','confirmada')",
+            [$id, $restauranteId, $telefono]
+        );
+    }
 }

@@ -799,10 +799,11 @@ class RestPublicoController extends BaseController
             return;
         }
 
-        $ok    = $this->get('ok') === '1';
-        $flash = $this->getFlash();
-        $pageTitle = 'Reservar mesa — ' . htmlspecialchars($restaurante['nombre']);
-        $this->render('publico/reservar', compact('restaurante', 'pageTitle', 'ok', 'flash'));
+        $ok         = $this->get('ok') === '1';
+        $reservaId  = $ok ? (int)($this->get('ref') ?? 0) : 0;
+        $flash      = $this->getFlash();
+        $pageTitle  = 'Reservar mesa — ' . htmlspecialchars($restaurante['nombre']);
+        $this->render('publico/reservar', compact('restaurante', 'pageTitle', 'ok', 'flash', 'reservaId'));
     }
 
     // POST /menu/{slug}/guardarReserva
@@ -875,6 +876,82 @@ class RestPublicoController extends BaseController
             error_log('[Reserva] Error enviando email notificación: ' . $e->getMessage());
         }
 
-        $this->redirect('menu/' . $slug . '/reservar?ok=1');
+        $newId = $reservaModel->insert([
+            'restaurante_id' => (int)$restaurante['id'],
+            'mesa_id'        => null,
+            'mesero_id'      => null,
+            'nombre'         => $nombre,
+            'telefono'       => $telefono,
+            'email'          => $this->post('email') ?: null,
+            'fecha'          => $fecha,
+            'hora'           => $hora,
+            'personas'       => $personas,
+            'notas'          => $notas,
+            'estado'         => 'pendiente',
+            'origen'         => 'comensal',
+        ]);
+
+        // Notificar al restaurante por email (silencioso si falla)
+        try {
+            $admin = $this->restModel->getAdminEmail((int)$restaurante['id']);
+            if ($admin && !empty($admin['email'])) {
+                (new EmailService())->enviarNuevaReserva(
+                    $admin['email'],
+                    $admin['nombre'],
+                    $restaurante,
+                    ['nombre' => $nombre, 'telefono' => $telefono, 'fecha' => $fecha,
+                     'hora' => $hora, 'personas' => $personas, 'notas' => $notas ?? '']
+                );
+            }
+        } catch (\Throwable $e) {
+            error_log('[Reserva] Error enviando email notificación: ' . $e->getMessage());
+        }
+
+        $this->redirect('menu/' . $slug . '/reservar?ok=1&ref=' . $newId);
+    }
+
+    // GET  /menu/{slug}/cancelarReserva/{id}
+    // POST /menu/{slug}/cancelarReserva/{id}
+    public function cancelarReserva(?string $param = null): void
+    {
+        $parts       = explode('/', $param ?? '');
+        $slug        = $parts[0];
+        $reservaId   = isset($parts[1]) ? (int)$parts[1] : 0;
+        $restaurante = $this->restModel->getBySlug($slug);
+
+        if (!$restaurante || !$reservaId) {
+            http_response_code(404);
+            die('<h1>Reservación no encontrada</h1>');
+        }
+
+        $pageTitle = 'Cancelar reservación — ' . htmlspecialchars($restaurante['nombre']);
+
+        if ($this->isPost()) {
+            $telefono = trim($this->post('telefono', ''));
+            if (!$telefono) {
+                $flash = ['type' => 'error', 'message' => 'Ingresa el teléfono con el que hiciste la reservación.'];
+                $this->render('publico/cancelar_reserva', compact('restaurante', 'pageTitle', 'reservaId', 'flash'));
+                return;
+            }
+
+            $reservaModel = new RestReservaModel();
+            $reserva      = $reservaModel->getParaCancelar($reservaId, (int)$restaurante['id'], $telefono);
+
+            if (!$reserva) {
+                $flash = ['type' => 'error', 'message' => 'No encontramos una reservación activa con ese teléfono. Verifica los datos.'];
+                $this->render('publico/cancelar_reserva', compact('restaurante', 'pageTitle', 'reservaId', 'flash'));
+                return;
+            }
+
+            $reservaModel->cambiarEstado($reservaId, 'cancelada');
+            $cancelada = true;
+            $flash     = null;
+            $this->render('publico/cancelar_reserva', compact('restaurante', 'pageTitle', 'reservaId', 'cancelada', 'flash'));
+            return;
+        }
+
+        $cancelada = false;
+        $flash     = null;
+        $this->render('publico/cancelar_reserva', compact('restaurante', 'pageTitle', 'reservaId', 'cancelada', 'flash'));
     }
 }

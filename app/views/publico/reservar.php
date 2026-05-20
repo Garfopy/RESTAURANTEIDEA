@@ -159,6 +159,14 @@ $flashType = $flash['type']    ?? 'info';
         ¡Te esperamos pronto!
       </div>
       <a href="<?= BASE_URL ?>menu/<?= $slug ?>/reservar" class="btn-otra">Hacer otra reservación</a>
+      <?php if (!empty($reservaId)): ?>
+        <div style="margin-top:14px">
+          <a href="<?= BASE_URL ?>menu/<?= $slug ?>/cancelarReserva/<?= (int)$reservaId ?>"
+             style="font-size:.8rem;color:#6B7280;text-decoration:underline">
+            ¿Necesitas cancelar? Haz clic aquí
+          </a>
+        </div>
+      <?php endif; ?>
     </div>
 
   <?php else: ?>

@@ -8,7 +8,7 @@ class RestReservaController extends BaseController
     public function __construct()
     {
         parent::__construct();
-        $this->requireMesero();
+        $this->requireRestaurante();
         $this->model = new RestReservaModel();
     }
 
