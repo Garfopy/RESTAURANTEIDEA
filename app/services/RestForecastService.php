@@ -310,4 +310,125 @@ class RestForecastService
         }
         return $mapa;
     }
+
+    // ──────────────────────────────────────────────────────────────
+    // INTEGRACIÓN CARNIHUB — Convertir pedido sugerido en pedido B2B
+    // ──────────────────────────────────────────────────────────────
+
+    /**
+     * Convierte un pedido sugerido aprobado en un pedido B2B real en CarniHub.
+     *
+     * Flujo:
+     *   1. Carga el pedido sugerido y verifica que esté en estado 'aprobado'
+     *   2. Filtra los items que tienen carnihub_producto_id asignado
+     *   3. Llama a CarniHubApiService::crearPedido() con esos items
+     *   4. Si tiene éxito, guarda el pedido_carnihub_id y cambia estado a 'convertido'
+     *   5. Devuelve el resultado con detalles para mostrar al usuario
+     *
+     * @param  int $sugeridoId  ID de rest_pedidos_sugeridos
+     * @return array ['success'=>bool, 'pedido_carnihub_id'=>int|null, 'error'=>str, 'items_enviados'=>int]
+     */
+    public function convertirAOrdenCarnihub(int $sugeridoId): array
+    {
+        // Cargar el pedido sugerido
+        $sugerido = $this->db->query(
+            "SELECT ps.*, r.id AS rest_id
+               FROM rest_pedidos_sugeridos ps
+               JOIN rest_restaurantes r ON r.id = ps.restaurante_id
+              WHERE ps.id = ?
+              LIMIT 1",
+            [$sugeridoId]
+        )->fetch(\PDO::FETCH_ASSOC);
+
+        if (!$sugerido) {
+            return ['success' => false, 'error' => 'Pedido sugerido no encontrado', 'items_enviados' => 0];
+        }
+
+        if ($sugerido['estado'] !== 'aprobado') {
+            return [
+                'success'      => false,
+                'error'        => "El pedido debe estar en estado 'aprobado' (actual: {$sugerido['estado']})",
+                'items_enviados' => 0,
+            ];
+        }
+
+        if ($sugerido['pedido_carnihub_id']) {
+            return [
+                'success'             => false,
+                'error'               => 'Este pedido ya fue convertido anteriormente',
+                'pedido_carnihub_id'  => (int)$sugerido['pedido_carnihub_id'],
+                'items_enviados'      => 0,
+            ];
+        }
+
+        // Obtener items con producto en CarniHub
+        $items = $this->db->query(
+            "SELECT psi.id, psi.ingrediente_id, psi.carnihub_producto_id,
+                    COALESCE(psi.cantidad_aprobada, psi.cantidad_sugerida) AS cantidad,
+                    psi.precio_unit_estimado,
+                    ri.nombre AS ingrediente_nombre
+               FROM rest_pedido_sugerido_items psi
+               JOIN rest_ingredientes ri ON ri.id = psi.ingrediente_id
+              WHERE psi.pedido_sugerido_id = ?
+                AND psi.carnihub_producto_id IS NOT NULL",
+            [$sugeridoId]
+        )->fetchAll(\PDO::FETCH_ASSOC);
+
+        if (empty($items)) {
+            return [
+                'success'        => false,
+                'error'          => 'Ningún item tiene un producto de CarniHub asignado. Vincula ingredientes primero.',
+                'items_enviados' => 0,
+            ];
+        }
+
+        // Preparar payload para la API
+        $apiItems = array_map(fn($item) => [
+            'producto_id' => (int)$item['carnihub_producto_id'],
+            'cantidad'    => (float)$item['cantidad'],
+            'precio_unit' => (float)$item['precio_unit_estimado'],
+        ], $items);
+
+        $notas = "CapiRest pedido sugerido #{$sugeridoId} — " . date('d/m/Y H:i');
+
+        // Llamar a la API de CarniHub
+        $apiService = new CarniHubApiService();
+        $resultado  = $apiService->crearPedido((int)$sugerido['restaurante_id'], $apiItems, $notas);
+
+        if (!$resultado['success']) {
+            return array_merge($resultado, ['items_enviados' => 0]);
+        }
+
+        $pedidoCarnihubId = (int)($resultado['pedido_id'] ?? 0);
+
+        // Persistir el ID del pedido en CarniHub y cambiar estado
+        try {
+            $this->db->query(
+                "UPDATE rest_pedidos_sugeridos
+                    SET estado = 'convertido',
+                        pedido_carnihub_id = ?,
+                        aprobado_at = COALESCE(aprobado_at, NOW())
+                  WHERE id = ?",
+                [$pedidoCarnihubId, $sugeridoId]
+            );
+        } catch (\Throwable $e) {
+            error_log('[RestForecastService::convertirAOrdenCarnihub] Error al guardar pedido_carnihub_id: ' . $e->getMessage());
+            // El pedido se creó en CarniHub — devolver éxito con advertencia
+            return [
+                'success'            => true,
+                'pedido_carnihub_id' => $pedidoCarnihubId,
+                'folio'              => $resultado['folio'] ?? null,
+                'items_enviados'     => count($apiItems),
+                'advertencia'        => 'El pedido se creó en CarniHub pero no se pudo guardar el ID localmente. Anotarlo manualmente.',
+            ];
+        }
+
+        return [
+            'success'            => true,
+            'pedido_carnihub_id' => $pedidoCarnihubId,
+            'folio'              => $resultado['folio'] ?? null,
+            'estado'             => 'convertido',
+            'items_enviados'     => count($apiItems),
+        ];
+    }
 }

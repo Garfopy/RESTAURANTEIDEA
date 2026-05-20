@@ -1,0 +1,291 @@
+<?php
+/**
+ * CapiRest — CarniHubApiService v1.0
+ *
+ * Cliente HTTP que encapsula todas las llamadas a la API REST
+ * del sistema CarniHub externo.
+ *
+ * Configuración por restaurante: tabla `carnihub_api_config`
+ *   · carnihub_url   → URL base (ej: https://app.carnihub.mx/api/v1)
+ *   · api_key        → Bearer token emitido por CarniHub
+ *
+ * Uso:
+ *   $service = new CarniHubApiService();
+ *   $result  = $service->crearPedido($restauranteId, $items);
+ */
+class CarniHubApiService
+{
+    private const TIMEOUT_SECONDS   = 15;
+    private const CONNECT_TIMEOUT   = 5;
+    private const MAX_URL_LENGTH    = 2048;
+
+    // ── Config cache ───────────────────────────────────────────────
+    /** @var array<int, array|null> */
+    private array $configCache = [];
+
+    // ================================================================
+    // Métodos públicos
+    // ================================================================
+
+    /**
+     * Crear un pedido B2B en CarniHub.
+     *
+     * @param  int   $restauranteId  ID del restaurante en CapiRest
+     * @param  array $items          [['producto_id'=>int, 'cantidad'=>float, 'precio_unit'=>float], ...]
+     * @param  string $notas         Notas opcionales para el pedido
+     * @return array  ['success'=>bool, 'pedido_id'=>int, 'folio'=>str, ...] | ['success'=>false, 'error'=>str]
+     */
+    public function crearPedido(int $restauranteId, array $items, string $notas = ''): array
+    {
+        $config = $this->getConfig($restauranteId);
+        if ($config === null) {
+            return $this->errorResponse('No hay configuración de CarniHub para este restaurante');
+        }
+
+        if (empty($items)) {
+            return $this->errorResponse('La lista de items está vacía');
+        }
+
+        // Sanitizar items
+        $payload = ['items' => []];
+        if ($config['carnihub_empresa_id']) {
+            $payload['empresa_id'] = (int)$config['carnihub_empresa_id'];
+        }
+        if ($notas !== '') {
+            $payload['notas'] = substr($notas, 0, 500);
+        }
+
+        foreach ($items as $item) {
+            $productoId = (int)($item['producto_id'] ?? 0);
+            $cantidad   = (float)($item['cantidad']   ?? 0);
+            $precioUnit = (float)($item['precio_unit'] ?? 0);
+
+            if ($productoId <= 0 || $cantidad <= 0 || $precioUnit <= 0) {
+                return $this->errorResponse('Item inválido: producto_id, cantidad y precio_unit deben ser positivos');
+            }
+
+            $payload['items'][] = [
+                'producto_id' => $productoId,
+                'cantidad'    => $cantidad,
+                'precio_unit' => $precioUnit,
+            ];
+        }
+
+        return $this->request('POST', '/pedidos', $config, $payload);
+    }
+
+    /**
+     * Consultar el estado de un pedido en CarniHub.
+     *
+     * @param  int $restauranteId        ID del restaurante en CapiRest
+     * @param  int $pedidoCarnihubId     ID del pedido en CarniHub
+     * @return array  ['success'=>bool, 'pedido'=>array] | ['success'=>false, 'error'=>str]
+     */
+    public function consultarPedido(int $restauranteId, int $pedidoCarnihubId): array
+    {
+        $config = $this->getConfig($restauranteId);
+        if ($config === null) {
+            return $this->errorResponse('No hay configuración de CarniHub para este restaurante');
+        }
+
+        if ($pedidoCarnihubId <= 0) {
+            return $this->errorResponse('ID de pedido inválido');
+        }
+
+        return $this->request('GET', '/pedidos/' . $pedidoCarnihubId, $config);
+    }
+
+    /**
+     * Buscar productos en el catálogo de CarniHub.
+     *
+     * @param  int    $restauranteId  ID del restaurante en CapiRest
+     * @param  string $query          Término de búsqueda
+     * @param  string $categoria      Slug de categoría (opcional)
+     * @param  int    $page           Página (default 1)
+     * @return array  ['success'=>bool, 'productos'=>array, 'total'=>int] | ['success'=>false, 'error'=>str]
+     */
+    public function buscarProducto(int $restauranteId, string $query, string $categoria = '', int $page = 1): array
+    {
+        $config = $this->getConfig($restauranteId);
+        if ($config === null) {
+            return $this->errorResponse('No hay configuración de CarniHub para este restaurante');
+        }
+
+        $params = ['q' => trim($query), 'page' => max(1, $page), 'per_page' => 20];
+        if ($categoria !== '') {
+            $params['categoria'] = $categoria;
+        }
+
+        return $this->request('GET', '/productos?' . http_build_query($params), $config);
+    }
+
+    /**
+     * Obtener detalle de un producto por ID.
+     *
+     * @param  int $restauranteId    ID del restaurante en CapiRest
+     * @param  int $carnihubProductoId  ID del producto en CarniHub
+     * @return array  ['success'=>bool, 'producto'=>array] | ['success'=>false, 'error'=>str]
+     */
+    public function detalleProducto(int $restauranteId, int $carnihubProductoId): array
+    {
+        $config = $this->getConfig($restauranteId);
+        if ($config === null) {
+            return $this->errorResponse('No hay configuración de CarniHub para este restaurante');
+        }
+
+        if ($carnihubProductoId <= 0) {
+            return $this->errorResponse('ID de producto inválido');
+        }
+
+        return $this->request('GET', '/productos/' . $carnihubProductoId, $config);
+    }
+
+    /**
+     * Verificar que la conexión con CarniHub funciona.
+     * Hace una búsqueda vacía como ping.
+     *
+     * @return array ['success'=>bool, 'latency_ms'=>int] | ['success'=>false, 'error'=>str]
+     */
+    public function testConexion(int $restauranteId): array
+    {
+        $config = $this->getConfig($restauranteId);
+        if ($config === null) {
+            return $this->errorResponse('No hay configuración de CarniHub para este restaurante');
+        }
+
+        $start  = microtime(true);
+        $result = $this->request('GET', '/productos?per_page=1', $config);
+        $ms     = (int)round((microtime(true) - $start) * 1000);
+
+        if ($result['success']) {
+            $result['latency_ms'] = $ms;
+        }
+
+        // Actualizar última sincronización si fue exitoso
+        if ($result['success']) {
+            try {
+                Database::getInstance()->query(
+                    "UPDATE carnihub_api_config SET ultima_sincronizacion = NOW() WHERE restaurante_id = ?",
+                    [$restauranteId]
+                );
+            } catch (\Throwable) { /* silencioso */ }
+        }
+
+        return $result;
+    }
+
+    // ================================================================
+    // Métodos privados
+    // ================================================================
+
+    /**
+     * Carga la configuración API del restaurante desde BD.
+     * Cachea en memoria para la request actual.
+     */
+    private function getConfig(int $restauranteId): ?array
+    {
+        if (array_key_exists($restauranteId, $this->configCache)) {
+            return $this->configCache[$restauranteId];
+        }
+
+        try {
+            $row = Database::getInstance()->query(
+                "SELECT carnihub_url, api_key, carnihub_empresa_id, nombre_distribuidor
+                   FROM carnihub_api_config
+                  WHERE restaurante_id = ? AND activo = 1
+                  LIMIT 1",
+                [$restauranteId]
+            )->fetch(\PDO::FETCH_ASSOC);
+        } catch (\Throwable $e) {
+            error_log('[CarniHubApiService::getConfig] ' . $e->getMessage());
+            $row = false;
+        }
+
+        $this->configCache[$restauranteId] = $row ?: null;
+        return $this->configCache[$restauranteId];
+    }
+
+    /**
+     * Ejecuta una llamada HTTP a la API de CarniHub usando cURL.
+     *
+     * @param  string $method   'GET' | 'POST'
+     * @param  string $path     Path relativo (empieza con /)
+     * @param  array  $config   Fila de carnihub_api_config
+     * @param  array  $data     Body para POST (se serializa a JSON)
+     */
+    private function request(string $method, string $path, array $config, array $data = []): array
+    {
+        // Construir URL con validación básica
+        $baseUrl = rtrim($config['carnihub_url'], '/');
+        $url     = $baseUrl . $path;
+
+        if (strlen($url) > self::MAX_URL_LENGTH || !filter_var($baseUrl, FILTER_VALIDATE_URL)) {
+            return $this->errorResponse('URL de CarniHub inválida o demasiado larga');
+        }
+
+        // Solo HTTPS en producción
+        if (str_starts_with($url, 'http://') && !defined('CARNIHUB_ALLOW_HTTP')) {
+            return $this->errorResponse('La URL de CarniHub debe usar HTTPS');
+        }
+
+        $ch = curl_init();
+
+        $headers = [
+            'Authorization: Bearer ' . $config['api_key'],
+            'Content-Type: application/json',
+            'Accept: application/json',
+            'X-Source: CapiRest',
+        ];
+
+        curl_setopt_array($ch, [
+            CURLOPT_URL            => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => self::TIMEOUT_SECONDS,
+            CURLOPT_CONNECTTIMEOUT => self::CONNECT_TIMEOUT,
+            CURLOPT_HTTPHEADER     => $headers,
+            CURLOPT_FOLLOWLOCATION => false,   // Sin redirects para seguridad
+            CURLOPT_MAXREDIRS      => 0,
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_SSL_VERIFYHOST => 2,
+        ]);
+
+        if ($method === 'POST') {
+            $json = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $json);
+        }
+
+        $rawBody   = curl_exec($ch);
+        $httpCode  = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+        curl_close($ch);
+
+        if ($rawBody === false || $curlError !== '') {
+            error_log("[CarniHubApiService] cURL error: {$curlError} | URL: {$url}");
+            return $this->errorResponse('No se pudo conectar con CarniHub: ' . $curlError);
+        }
+
+        $decoded = json_decode($rawBody, true);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            error_log("[CarniHubApiService] Respuesta no JSON (HTTP {$httpCode}): " . substr($rawBody, 0, 200));
+            return $this->errorResponse("CarniHub devolvió una respuesta inesperada (HTTP {$httpCode})");
+        }
+
+        if ($httpCode < 200 || $httpCode >= 300) {
+            $errMsg = $decoded['error'] ?? "HTTP {$httpCode}";
+            return $this->errorResponse("CarniHub respondió con error: {$errMsg}", $httpCode);
+        }
+
+        return array_merge(['success' => true], $decoded);
+    }
+
+    /** Construye un array de error estándar */
+    private function errorResponse(string $message, int $httpCode = 0): array
+    {
+        return [
+            'success'   => false,
+            'error'     => $message,
+            'http_code' => $httpCode,
+        ];
+    }
+}

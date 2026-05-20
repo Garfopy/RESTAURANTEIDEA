@@ -1,14 +1,16 @@
 <?php
 /**
- * CarniHub — Front Controller / Router v2.1
+ * CapiRest — Front Controller / Router v1.0
  *
  * URL pattern: /{controller}/{action}/{param}
  * Portales:
- *   /panel/      → SuperAdmin + Admin (solo métricas y gestión de plataforma)
- *   /empresa/    → Admin Empresa (control total de su empresa)
- *   /supervisor/ → Supervisor (aprobaciones y supervisión)
- *   /comprador/  → Comprador (tienda y pedidos)
- *   /repartidor/ → Repartidor (app GPS de entregas)
+ *   /restaurante/  → Admin local del restaurante
+ *   /rest-*/       → Módulos del restaurante (menú, pedidos, inventario, etc.)
+ *   /rest-mesero/  → Portal mesero
+ *   /rest-chef/    → Portal chef
+ *   /rest-portero/ → Portal portero
+ *   /menu/         → Menú público (sin login)
+ *   /acceso/       → Login de staff por slug
  */
 
 define('ROOT_PATH', __DIR__);
@@ -61,106 +63,36 @@ if (in_array($ctrlSlug, ['menu', 'acceso'], true)) {
     }
 }
 
-// ── Ruta raíz → landing pública ──────────────────────────────────────────────
+// ── Ruta raíz → login ────────────────────────────────────────────────────────
 if ($path === '') {
-    $ctrlSlug = 'landing';
-    $action   = 'landing';
-}
-// ── Redirects 301: rutas antiguas → nuevas rutas SEO ─────────────────────
-$oldRouteRedirects = [
-    'taqueria'    => BASE_URL . 'distribuidora-carne-cerca-de-mi',
-    'restaurantes' => BASE_URL . 'carnihub/cortes-de-carne-para-restaurantes',
-    'cedis'       => BASE_URL . 'carnihub',
-];
-if (isset($oldRouteRedirects[$path])) {
-    header('Location: ' . $oldRouteRedirects[$path], true, 301);
-    exit;
-}
-// ── Nuevas rutas SEO HUB → PublicController ─────────────────────────────
-$seoRoutes = [
-    'distribuidora-carne-cerca-de-mi'             => 'taqueria',
-    'carnihub/cortes-de-carne-para-restaurantes'  => 'restaurantes',
-    'carnihub'                                    => 'carnihub',
-];
-if (isset($seoRoutes[$path])) {
-    $ctrlSlug = 'landing';
-    $action   = $seoRoutes[$path];
+    $ctrlSlug = 'auth';
+    $action   = 'login';
 }
 // ── Route map: URL slug → Controller class ────────────────────────────────────
 $routes = [
     // Auth (público)
-    'auth'                => 'AuthController',
-    // API (AJAX)
-    'api'                 => 'ApiController',
-    // Panel de plataforma — solo superadmin + admin (métricas, empresas, usuarios, pedidos globales)
-    'panel'               => 'PanelController',
-    'panel-empresa'       => 'EmpresaController',
-    'panel-usuario'       => 'PanelUsuarioController',
-    'panel-pedido'        => 'PanelPedidoController',
-    'panel-reporte'       => 'PanelReporteController',
-    'admin-storage'       => 'AdminStorageController',
-    'config'              => 'ConfigController',
-    // Portal empresa — solo admin_empresa (gestión de su empresa)
-    'empresa'             => 'EmpresaDashboardController',
-    'empresa-usuario'     => 'EmpresaUsuarioController',
-    'empresa-producto'    => 'EmpresaProductoController',
-    'empresa-inventario'  => 'EmpresaInventarioController',
-    'empresa-pedido'      => 'EmpresaPedidoController',
-    'empresa-logistica'   => 'EmpresaLogisticaController',
-    'empresa-combo'       => 'EmpresaComboController',
-    'empresa-sucursal'    => 'EmpresaSucursalController',
-    'empresa-vehiculo'    => 'EmpresaVehiculoController',
-    'empresa-reporte'     => 'EmpresaReporteController',
-    'empresa-evidencia'   => 'EmpresaEvidenciaController',
-    'empresa-factura'     => 'EmpresaFacturaController',
-    'empresa-config'      => 'EmpresaConfigController',
-    // Portal supervisor — solo supervisor
-    'supervisor'          => 'SupervisorController',
-    // Portal comprador — solo comprador
-    'comprador'           => 'CompradorController',
-    'comprador-sucursal'  => 'CompradorSucursalController',
-    'favorito'            => 'FavoritoController',
-    // Módulos compartidos (acceso según rol validado en cada controller)
-    'catalogo'            => 'CatalogoController',
-    'carrito'             => 'CarritoController',
-    'pedido'              => 'PedidoController',
-    'recurrente'          => 'RecurrenteController',
-    'limite'              => 'LimiteController',
-    'pago'                => 'PagoController',
-    'cuenta'              => 'CuentaController',
-    // App repartidor
-    'repartidor'          => 'RepartidorController',
-    // SaaS — Suscripciones
-    'suscripcion'         => 'SuscripcionController',
-    'empresa-suscripcion' => 'EmpresaSuscripcionController',
-    // Página pública de planes
-    'planes'              => 'PublicController',
-    // Landing page pública
-    'landing'             => 'PublicController',
-    // Landings de audiencia
-    'taqueria'            => 'PublicController',
-    'restaurantes'        => 'PublicController',
-    // Módulo restaurante — portal del comprador/admin
-    'restaurante'         => 'RestauranteController',
-    'rest-config'         => 'RestConfigController',
-    'rest-mesa'           => 'RestMesaController',
-    'rest-menu'           => 'RestMenuController',
-    'rest-inventario'     => 'RestInventarioController',
-    'rest-pedido'         => 'RestPedidoController',
-    'rest-finanzas'       => 'RestFinanzasController',
-    'rest-cliente'        => 'RestClienteController',
-    'rest-reserva'        => 'RestReservaController',
-    'rest-ticket'         => 'RestTicketController',
-    // Portales staff restaurante
-    'rest-mesero'         => 'RestMeseroController',
-    'rest-chef'           => 'RestChefController',
-    'rest-portero'        => 'RestPorteroController',
-    'rest-staff'          => 'RestStaffController',
-    'rest-propinas'       => 'RestPropinaController',
+    'auth'          => 'AuthController',
+    // Portal admin del restaurante
+    'restaurante'   => 'RestauranteController',
+    'rest-config'   => 'RestConfigController',
+    'rest-mesa'     => 'RestMesaController',
+    'rest-menu'     => 'RestMenuController',
+    'rest-inventario' => 'RestInventarioController',
+    'rest-pedido'   => 'RestPedidoController',
+    'rest-finanzas' => 'RestFinanzasController',
+    'rest-cliente'  => 'RestClienteController',
+    'rest-reserva'  => 'RestReservaController',
+    'rest-ticket'   => 'RestTicketController',
+    // Portales staff
+    'rest-mesero'   => 'RestMeseroController',
+    'rest-chef'     => 'RestChefController',
+    'rest-portero'  => 'RestPorteroController',
+    'rest-staff'    => 'RestStaffController',
+    'rest-propinas' => 'RestPropinaController',
     // Menú público (sin login)
-    'menu'                => 'RestPublicoController',
-    // Portal acceso staff por slug de restaurante
-    'acceso'              => 'StaffAccesoController',
+    'menu'          => 'RestPublicoController',
+    // Login de staff por slug de restaurante
+    'acceso'        => 'StaffAccesoController',
 ];
 
 // ── Auth guard ────────────────────────────────────────────────────────────────
@@ -173,21 +105,6 @@ $publicPaths = [
     'auth/sendreset',
     'auth/reset',
     'auth/doreset',
-    'planes/index',
-    'planes/registro',
-    'planes/checkout',
-    'planes/retorno',
-    'planes/cancelado',
-    'planes/simularpago',
-    'planes/aprobarpagotest',
-    'suscripcion/webhook',
-    'landing/landing',
-    'taqueria/taqueria',
-    'restaurantes/restaurantes',
-    // Nuevas rutas SEO HUB
-    'landing/taqueria',
-    'landing/restaurantes',
-    'landing/carnihub',
     // Menú público del restaurante
     'menu/index',
     'menu/ordenar',
@@ -221,20 +138,17 @@ if (!isset($_SESSION['usuario']) && !in_array($currentPath, $publicPaths, true) 
 // ── Redirect root to correct portal ──────────────────────────────────────────
 if ($ctrlSlug === 'auth' && $action === 'index' && isset($_SESSION['usuario'])) {
     $rol = $_SESSION['usuario']['rol_slug'] ?? '';
-    if ($rol === 'superadmin') {
-        header('Location: ' . BASE_URL . 'panel/dashboard'); exit;
+    if (in_array($rol, ['admin_local', 'superadmin'], true)) {
+        header('Location: ' . BASE_URL . 'restaurante/seleccionar'); exit;
     }
-    if ($rol === 'admin_empresa') {
-        header('Location: ' . BASE_URL . 'empresa/dashboard'); exit;
+    if ($rol === 'mesero') {
+        header('Location: ' . BASE_URL . 'rest-mesero/inicio'); exit;
     }
-    if ($rol === 'supervisor') {
-        header('Location: ' . BASE_URL . 'supervisor/dashboard'); exit;
+    if ($rol === 'chef') {
+        header('Location: ' . BASE_URL . 'rest-chef/inicio'); exit;
     }
-    if ($rol === 'comprador') {
-        header('Location: ' . BASE_URL . 'comprador/inicio'); exit;
-    }
-    if ($rol === 'repartidor') {
-        header('Location: ' . BASE_URL . 'repartidor/inicio'); exit;
+    if ($rol === 'portero') {
+        header('Location: ' . BASE_URL . 'rest-portero/inicio'); exit;
     }
     header('Location: ' . BASE_URL . 'auth/login'); exit;
 }

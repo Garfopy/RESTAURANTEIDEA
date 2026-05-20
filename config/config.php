@@ -1,6 +1,6 @@
 <?php
 /**
- * CarniHub — Global Configuration
+ * CapiRest — Global Configuration
  * Auto-detects BASE_URL regardless of subdirectory installation.
  */
 
@@ -17,7 +17,7 @@ define('BASE_URL_PATH', $basePath);
 define('BASE_PATH',     dirname(__DIR__));   // project root
 
 // Application
-define('APP_NAME',      'CarniHub');
+define('APP_NAME',      'CapiRest');
 define('APP_VERSION',   '1.0.0');
 define('APP_LOCALE',    'es_MX');
 
@@ -25,7 +25,7 @@ define('APP_LOCALE',    'es_MX');
 define('BRAND_COLOR',   '#C8102E');
 
 // Session name
-define('SESSION_NAME',  'carnihub_session');
+define('SESSION_NAME',  'capirest_session');
 
 // Upload directories
 define('UPLOAD_PATH',   BASE_PATH . '/public/uploads/');
@@ -34,11 +34,7 @@ define('UPLOAD_URL',    BASE_URL  . 'public/uploads/');
 // Pagination
 define('PER_PAGE', 20);
 
-// PayPal — false = flujo real (sandbox o live según credenciales configuradas)
-define('PAYPAL_TEST_MODE', false);
-
 // Google Maps Places API key (agregar en cPanel o aquí directamente)
-// Obtener en: https://console.cloud.google.com → APIs → Maps JavaScript API + Places API
 define('GOOGLE_MAPS_KEY', getenv('GOOGLE_MAPS_KEY') ?: '');
 
 // Stripe — pago con tarjeta (MXN)
