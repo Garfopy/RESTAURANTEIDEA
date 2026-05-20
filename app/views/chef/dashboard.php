@@ -28,7 +28,7 @@
     /* ── Layout columnas ── */
     .kds-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1fr 1px 1fr;
       gap: 0;
       padding: 0;
     }
