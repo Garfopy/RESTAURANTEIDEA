@@ -206,7 +206,7 @@
       <!-- Iniciar sesión: solo desktop -->
       <a id="nav-login" href="<?= BASE_URL ?>auth/login"
          style="display:none;font-size:.875rem;font-weight:600;color:rgba(255,255,255,.8);padding:8px 16px;text-decoration:none;white-space:nowrap">
-        Iniciar sesión
+        Iniciar Sesión 
       </a>
       <!-- Botón hamburguesa: solo móvil -->
       <button id="menu-toggle"
