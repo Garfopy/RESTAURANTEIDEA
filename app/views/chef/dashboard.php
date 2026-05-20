@@ -262,14 +262,14 @@ function renderReceta(raw, cantidadPlatillo, instruccionesArmado) {
     const [codigo, nombre, tipo, qty, unidad, notas, esInfo] = s.split('|');
     return {
       codigo: (codigo || '').trim(),
-      nombre: nombre || '',
+      nombre: (nombre || '').trim(),
       tipo:   (tipo || 'otro').trim().toLowerCase(),
       qty:    (Number(qty) || 0) * cant,
-      unidad: unidad || '',
-      notas:  notas || '',
-      esInfo: esInfo === '1' || esInfo === 1
+      unidad: (unidad || '').trim(),
+      notas:  (notas || '').trim(),
+      esInfo: (esInfo || '').trim() === '1'
     };
-  }).filter(i => i.codigo || i.nombre);
+  }).filter(i => i.nombre);
 
   if (!items.length && !instruccionesArmado) return '';
 
