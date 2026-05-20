@@ -331,12 +331,16 @@ sort($ingTipos);
                    placeholder="Ej: ING-001, SKU123">
           </div>
           <div class="form-group">
-            <label class="form-label">Tipo
-              <span style="color:#9CA3AF;font-weight:400;font-size:.72rem">— elige o escribe nuevo</span>
-            </label>
-            <input type="text" name="tipo" id="ingTipo" class="form-input"
-                   list="dlTipoIng"
-                   placeholder="Ej: carne, lácteo, verdura, otro">
+            <label class="form-label">Tipo</label>
+            <select name="tipo" id="ingTipo" class="form-select">
+              <option value="">— Selecciona —</option>
+              <?php
+                $opcionesTipo = !empty($ingTipos) ? $ingTipos : ['carne','lácteo','verdura','fruta','abarrote','bebida','otro'];
+                foreach ($opcionesTipo as $t):
+              ?>
+              <option value="<?= htmlspecialchars($t) ?>"><?= htmlspecialchars($t) ?></option>
+              <?php endforeach; ?>
+            </select>
           </div>
           <div class="form-group">
             <label class="form-label">Categoría
@@ -545,8 +549,12 @@ sort($ingTipos);
           </div>
           <div class="form-group">
             <label class="form-label">Tipo</label>
-            <input type="text" name="tipo" id="modifEditTipo" class="form-input" list="dlTipoIng"
-                   placeholder="Ej: carne, lácteo">
+            <select name="tipo" id="modifEditTipo" class="form-select">
+              <option value="">— Selecciona —</option>
+              <?php foreach (($opcionesTipo ?? []) as $t): ?>
+              <option value="<?= htmlspecialchars($t) ?>"><?= htmlspecialchars($t) ?></option>
+              <?php endforeach; ?>
+            </select>
           </div>
           <div class="form-group">
             <label class="form-label">Categoría</label>

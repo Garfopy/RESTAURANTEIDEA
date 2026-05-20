@@ -16,7 +16,10 @@ class RestauranteController extends BaseController
     {
         $this->requireRestaurante();
         $compradorId         = $this->usuarioId();
-        $sucursales          = $this->model->getByComprador($compradorId);
+        $rol                 = $this->rolActual();
+        $sucursales = $rol === 'admin_restaurante'
+            ? $this->model->getByEmpresa((int)$this->empresaId())
+            : $this->model->getByComprador($compradorId);
         $restauranteActivoId = $this->restauranteId();
         $menuModel           = new RestMenuModel();
         $invModel            = new RestInventarioModel();
