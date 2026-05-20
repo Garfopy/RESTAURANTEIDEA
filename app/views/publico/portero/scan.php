@@ -156,10 +156,10 @@ $nombre   = htmlspecialchars($restaurante['nombre'] ?? '');
     <?php endif; ?>
   </div>
 
-  <button id="btnSalida" class="btn-salida" onclick="registrarSalida()">
-    🚪 Registrar salida y liberar mesa
-  </button>
-  <div id="resultMsg" class="result-msg"></div>
+  <div style="background:#064E3B;border-radius:12px;padding:16px;text-align:center;margin-top:8px">
+    <div style="font-weight:700;color:#6EE7B7;font-size:.95rem">🚶 El portero registrará tu salida</div>
+    <div style="font-size:.78rem;color:#6EE7B7;opacity:.8;margin-top:4px">Muestra el QR de pago en tu pantalla al portero</div>
+  </div>
 
   <?php else: ?>
   <!-- ── Pago pendiente ──────────────────────────────────── -->
@@ -178,47 +178,6 @@ $nombre   = htmlspecialchars($restaurante['nombre'] ?? '');
 
 </div>
 
-<?php if ($pagado && !$yaSalio): ?>
-<script>
-const BASE_URL = '<?= BASE_URL ?>';
-const QR_TOKEN = '<?= addslashes($qr) ?>';
-
-async function registrarSalida() {
-  const btn = document.getElementById('btnSalida');
-  const msg = document.getElementById('resultMsg');
-  btn.disabled = true;
-  btn.textContent = 'Registrando…';
-
-  try {
-    const fd = new FormData();
-    fd.append('qr', QR_TOKEN);
-    const res  = await fetch(BASE_URL + 'menu/registrarSalidaPublica', { method: 'POST', body: fd });
-    const data = await res.json();
-
-    if (data.ok) {
-      btn.textContent = '✅ ¡Salida registrada!';
-      msg.className   = 'result-msg result-ok';
-      msg.textContent = data.mensaje || '¡Salida registrada! Mesa liberada.';
-      msg.style.display = 'block';
-      if (data.redirect) {
-        setTimeout(() => window.location.href = data.redirect, 1000);
-      }
-    } else {
-      btn.disabled    = false;
-      btn.textContent = '🚪 Registrar salida y liberar mesa';
-      msg.className   = 'result-msg result-err';
-      msg.textContent = data.mensaje || 'No se pudo registrar la salida.';
-      msg.style.display = 'block';
-    }
-  } catch (e) {
-    btn.disabled    = false;
-    btn.textContent = '🚪 Registrar salida y liberar mesa';
-    msg.className   = 'result-msg result-err';
-    msg.textContent = 'Error de conexión. Intenta de nuevo.';
-    msg.style.display = 'block';
-  }
-}
-</script>
-<?php endif; ?>
 </body>
 </html>
+
