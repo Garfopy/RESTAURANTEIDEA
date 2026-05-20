@@ -106,6 +106,10 @@ class RestPublicoController extends BaseController
                 $visitaId = 0;
                 setcookie($cookieName, '', ['expires' => time() - 1, 'path' => '/', 'httponly' => true, 'samesite' => 'Lax']);
             }
+            // Si no hay mesa en la URL pero la visita activa sí tiene mesa, recuperarla
+            elseif (!$mesa && !empty($visita['mesa_id'])) {
+                $mesa = (new RestMesaModel())->find((int)$visita['mesa_id']);
+            }
         }
 
         $pageTitle = $restaurante['nombre'];
