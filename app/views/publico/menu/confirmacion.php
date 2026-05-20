@@ -338,6 +338,7 @@ function actualizarBtnPagar(ticketEstado, qrCode) {
   if (!wrap) return;
   if (ticketEstado === 'pagado' && !cuentaPagada) {
     cuentaPagada = true;
+    clearInterval(pollTimer);
     wrap.innerHTML = '<div class="link-btn" style="background:#D1FAE5;color:#065F46;cursor:default">✅ Cuenta pagada</div>';
     // Ocultar botones de flujo
     document.querySelectorAll('.link-btn-cerrar,.link-btn-mas').forEach(el => el.style.display = 'none');
@@ -442,7 +443,8 @@ function pollEstado() {
 }
 
 pollEstado();
-setInterval(pollEstado, 3000);
+const pollTimer = setInterval(pollEstado, 3000);
+if (cuentaPagada) clearInterval(pollTimer);
 
 // ── Cancelar pedido ────────────────────────────────
 function cancelarPedido(pedidoId) {

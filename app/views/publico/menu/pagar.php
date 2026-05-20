@@ -209,7 +209,7 @@
   </div>
 
   <?php if (($ticket['estado'] ?? '') !== 'pagado'): ?>
-  <a href="<?= BASE_URL ?>menu/<?= htmlspecialchars($restaurante['slug'] ?? '') ?>"
+  <a href="<?= BASE_URL ?>menu/<?= htmlspecialchars($restaurante['slug'] ?? '') ?><?= !empty($mesaQr) ? '?mesa=' . urlencode($mesaQr) : '' ?>"
      style="display:block;width:100%;margin-top:12px;padding:14px;border-radius:14px;
             border:2px solid rgba(255,255,255,.25);background:transparent;color:#fff;
             font-size:.95rem;font-weight:600;text-align:center;text-decoration:none;

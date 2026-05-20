@@ -15,38 +15,103 @@ class RestReservaController extends BaseController
     public function index(?string $p = null): void
     {
         $restauranteId = $this->restauranteId();
+        $db            = Database::getInstance();
         $estado    = $this->get('estado', '');
         $page      = (int)$this->get('page', 1);
         $resultado = $this->model->getByRestaurante($restauranteId, $page, $estado ?: null);
         $proximas  = $this->model->getProximas($restauranteId);
+
+        // Mesas activas para el select del modal
+        $stmtM = $db->prepare(
+            "SELECT id, nombre, capacidad FROM rest_mesas
+             WHERE restaurante_id = ? AND activo = 1 ORDER BY nombre ASC"
+        );
+        $stmtM->execute([$restauranteId]);
+        $mesas = $stmtM->fetchAll(PDO::FETCH_ASSOC);
+
         $flash     = $this->getFlash();
         $pageTitle  = 'Reservaciones';
         $activeMenu = 'rest_reservas';
-        $this->render('restaurante/reservas/index', array_merge($resultado, compact('proximas','flash','pageTitle','activeMenu','estado')));
+        $this->render('restaurante/reservas/index',
+            array_merge($resultado, compact('proximas','mesas','flash','pageTitle','activeMenu','estado')));
     }
 
     public function guardar(?string $p = null): void
     {
         if (!$this->isPost()) $this->redirect('rest-reserva/index');
-        $id = (int)$this->post('id');
+
+        $restauranteId = $this->restauranteId();
+        $restaurante   = (new RestauranteModel())->find($restauranteId);
+
+        // Validar que las reservaciones estén habilitadas
+        if (empty($restaurante['reservas_habilitadas'])) {
+            $this->flash('error', 'Las reservaciones están deshabilitadas en la configuración del restaurante.');
+            $this->redirect('rest-reserva/index');
+            return;
+        }
+
+        $id     = (int)$this->post('id');
+        $mesaId = $this->post('mesa_id') ? (int)$this->post('mesa_id') : null;
+        $fecha  = $this->post('fecha');
+        $hora   = $this->post('hora');
+
+        // Validar conflicto de mesa (solo si se eligió una mesa)
+        if ($mesaId && $fecha && $hora) {
+            if ($this->model->hayConflicto($mesaId, $fecha, $hora, $id ?: null)) {
+                $this->flash('error', 'Esa mesa ya tiene una reservación en ese horario (±2 horas).');
+                $this->redirect('rest-reserva/index');
+                return;
+            }
+        }
+
+        // Auto-asignar mesero según zona de la mesa (solo en creaciones nuevas o sin mesero)
+        $meseroId = null;
+        if ($mesaId) {
+            $meseroId = $this->model->meseroAsignadoPorMesa($mesaId, $restauranteId);
+        }
+
         $data = [
-            'restaurante_id' => $this->restauranteId(),
-            'mesa_id'        => $this->post('mesa_id') ?: null,
+            'restaurante_id' => $restauranteId,
+            'mesa_id'        => $mesaId,
             'nombre'         => trim($this->post('nombre', '')),
             'telefono'       => $this->post('telefono') ?: null,
             'email'          => $this->post('email') ?: null,
-            'fecha'          => $this->post('fecha'),
-            'hora'           => $this->post('hora'),
+            'fecha'          => $fecha,
+            'hora'           => $hora,
             'personas'       => (int)$this->post('personas', 2),
             'notas'          => $this->post('notas') ?: null,
         ];
+
         if ($id) {
+            // En edición: solo actualizar mesero_id si aún está vacío
             $this->model->update($id, $data);
+            if ($meseroId) {
+                $db = Database::getInstance();
+                $db->prepare(
+                    "UPDATE rest_reservaciones SET mesero_id = ? WHERE id = ? AND mesero_id IS NULL"
+                )->execute([$meseroId, $id]);
+            }
         } else {
+            $data['mesero_id'] = $meseroId;
             $this->model->insert($data);
         }
-        $this->flash('success', 'Reservación guardada.');
+
+        $this->flash('success', 'Reservación guardada.' . ($meseroId ? ' Mesero auto-asignado.' : ''));
         $this->redirect('rest-reserva/index');
+    }
+
+    // GET /rest-reserva/meseroDeZona/{mesaId}  — JSON: mesero asignado a la zona de esa mesa hoy
+    public function meseroDeZona(?string $mesaId = null): void
+    {
+        $meseroId = $this->model->meseroAsignadoPorMesa((int)$mesaId, $this->restauranteId());
+        if (!$meseroId) {
+            $this->json(['ok' => true, 'mesero' => null]);
+            return;
+        }
+        $db   = Database::getInstance();
+        $stmt = $db->prepare("SELECT id, nombre FROM usuarios WHERE id = ? LIMIT 1");
+        $stmt->execute([$meseroId]);
+        $this->json(['ok' => true, 'mesero' => $stmt->fetch(PDO::FETCH_ASSOC)]);
     }
 
     public function cambiarEstado(?string $id = null): void

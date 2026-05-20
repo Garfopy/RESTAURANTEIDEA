@@ -87,7 +87,7 @@ class RestPublicoController extends BaseController
             // Si la visita ya terminó, ignorar cookie
             if (!$visita || in_array($visita['estado'], ['pagada','cancelada'])) {
                 $visitaId = 0;
-                setcookie($cookieName, '', time() - 1, '/');
+                setcookie($cookieName, '', ['expires' => time() - 1, 'path' => '/', 'httponly' => true, 'samesite' => 'Lax']);
             }
         }
 
@@ -107,6 +107,15 @@ class RestPublicoController extends BaseController
         $mesa          = $mesaQr ? (new RestMesaModel())->getByQr($mesaQr) : null;
         $visitaId      = $this->post('visita_id') ?: null;
 
+        // Validar que la visita pertenezca a este restaurante
+        if ($visitaId) {
+            $visitaExist = $this->visitaModel->find((int)$visitaId);
+            if (!$visitaExist || (int)$visitaExist['restaurante_id'] !== $restauranteId
+                || in_array($visitaExist['estado'], ['pagada','cancelada'])) {
+                $visitaId = null;
+            }
+        }
+
         // Crear visita si no existe
         if (!$visitaId) {
             $visitaId = $this->visitaModel->crear(
@@ -115,7 +124,7 @@ class RestPublicoController extends BaseController
             );
             // Guardar en cookie por 4 horas
             $cookieName = 'visita_' . $restauranteId;
-            setcookie($cookieName, (string)$visitaId, time() + 4 * 3600, '/');
+            setcookie($cookieName, (string)$visitaId, ['expires' => time() + 4 * 3600, 'path' => '/', 'httponly' => true, 'samesite' => 'Lax']);
         }
 
         $platillosIds = $this->post('platillo_id', []);
@@ -141,13 +150,25 @@ class RestPublicoController extends BaseController
             if (!empty($extrasPost[$platilloId])) {
                 $extrasDecoded = json_decode($extrasPost[$platilloId], true);
                 if (is_array($extrasDecoded)) {
-                    $extrasValidos = array_filter($extrasDecoded, fn($e) =>
-                        isset($e['ingrediente_id'], $e['nombre'], $e['precio_extra'], $e['cantidad'])
-                        && (int)$e['cantidad'] > 0
-                        && (float)$e['precio_extra'] >= 0
-                    );
+                    // Cargar precios reales desde BD para no confiar en el cliente
+                    $preciosExtrasDb = [];
+                    $receta = $this->menuModel->getReceta((int)$platilloId);
+                    if ($receta) {
+                        foreach ($this->menuModel->getIngredientesReceta((int)$receta['id']) as $ri) {
+                            $preciosExtrasDb[(int)$ri['ingrediente_id']] = (float)$ri['precio_extra'];
+                        }
+                    }
+                    $extrasValidos = [];
+                    foreach ($extrasDecoded as $e) {
+                        if (!isset($e['ingrediente_id'], $e['nombre'], $e['cantidad'])) continue;
+                        if ((int)$e['cantidad'] <= 0) continue;
+                        $ingId = (int)$e['ingrediente_id'];
+                        if (!array_key_exists($ingId, $preciosExtrasDb)) continue; // ingrediente no en receta
+                        $e['precio_extra'] = $preciosExtrasDb[$ingId]; // precio siempre de BD
+                        $extrasValidos[] = $e;
+                    }
                     if ($extrasValidos) {
-                        $extrasJson  = json_encode(array_values($extrasValidos));
+                        $extrasJson  = json_encode($extrasValidos);
                         $extrasCoste = array_sum(array_map(
                             fn($e) => (float)$e['precio_extra'] * (int)$e['cantidad'],
                             $extrasValidos
@@ -297,8 +318,13 @@ class RestPublicoController extends BaseController
             }
         }
 
+        $mesaQr    = null;
+        if (!empty($visita['mesa_id'])) {
+            $mesaObj = $this->mesaModel->find((int)$visita['mesa_id']);
+            $mesaQr  = $mesaObj['qr_code'] ?? null;
+        }
         $pageTitle = 'Pagar cuenta';
-        $this->render('publico/menu/pagar', compact('restaurante','ticket','todoItems','visita','visitaId','pageTitle'));
+        $this->render('publico/menu/pagar', compact('restaurante','ticket','todoItems','visita','visitaId','mesaQr','pageTitle'));
     }
 
     // POST /menu/{slug}/confirmarPago/{ticketId} — endpoint PÚBLICO (sin login)
@@ -318,6 +344,7 @@ class RestPublicoController extends BaseController
         }
 
         $metodo  = $this->post('metodo_pago', 'efectivo');
+        $metodo  = in_array($metodo, ['efectivo','tarjeta','transferencia','paypal'], true) ? $metodo : 'efectivo';
         $propina = max(0.0, (float)$this->post('propina', 0));
 
         // Si propina cambió, recalcular total
@@ -591,7 +618,28 @@ class RestPublicoController extends BaseController
         }
 
         $restaurante = $this->restModel->find((int)$visita['restaurante_id']);
-        $pageTitle   = 'Verificar salida';
+
+        // Salida ya registrada → directo a gracias (comensal rescaneó su QR)
+        if (!empty($visita['salida_at'])) {
+            $this->redirect('menu/gracias?qr=' . urlencode($qr));
+            return;
+        }
+
+        // Cuenta pagada y el comensal escanea su propio QR → procesar salida automáticamente
+        if (($visita['estado'] ?? '') === 'pagada') {
+            $this->visitaModel->marcarSalida((int)$visita['id']);
+            if (!empty($visita['mesa_id'])) {
+                $this->mesaModel->cambiarEstado((int)$visita['mesa_id'], 'disponible');
+            }
+            if ($restaurante) {
+                setcookie('visita_' . $restaurante['id'], '', ['expires' => time() - 1, 'path' => '/', 'httponly' => true, 'samesite' => 'Lax']);
+            }
+            $this->redirect('menu/gracias?qr=' . urlencode($qr));
+            return;
+        }
+
+        // Cuenta aún no pagada → mostrar pantalla de verificación al portero
+        $pageTitle = 'Verificar salida';
         $this->render('publico/portero/scan', compact('visita', 'restaurante', 'qr', 'pageTitle'));
     }
 
@@ -628,7 +676,7 @@ class RestPublicoController extends BaseController
         // Borrar cookie del comensal
         $restaurante = $this->restModel->find((int)$visita['restaurante_id']);
         if ($restaurante) {
-            setcookie('visita_' . $restaurante['id'], '', time() - 1, '/');
+            setcookie('visita_' . $restaurante['id'], '', ['expires' => time() - 1, 'path' => '/', 'httponly' => true, 'samesite' => 'Lax']);
         }
 
         echo json_encode([
@@ -696,7 +744,7 @@ class RestPublicoController extends BaseController
         }
 
         // Limpiar cookie de visita
-        setcookie('visita_' . ($restaurante['id'] ?? 0), '', time() - 1, '/');
+        setcookie('visita_' . ($restaurante['id'] ?? 0), '', ['expires' => time() - 1, 'path' => '/', 'httponly' => true, 'samesite' => 'Lax']);
 
         $pageTitle = '¡Gracias por tu visita!';
         $this->render('publico/menu/gracias', compact('restaurante', 'visita', 'pageTitle'));

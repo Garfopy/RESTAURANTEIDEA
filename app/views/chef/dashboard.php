@@ -282,10 +282,10 @@ function renderColumna(pedidos, colId) {
           ${armadoHtml}
         </div>
         <div>
-          ${!esPrepCol && it.item_estado === 'pendiente'
+          ${it.item_estado === 'pendiente'
             ? `<button class="btn-action btn-prep"  onclick="marcar('${BASE}rest-chef/marcarPreparacion/${it.item_id}',this)">Prep. ▶</button>`
             : ''}
-          ${esPrepCol && it.item_estado === 'en_preparacion'
+          ${it.item_estado === 'en_preparacion'
             ? `<button class="btn-action btn-listo" onclick="marcar('${BASE}rest-chef/marcarListo/${it.item_id}',this)">Listo ✓</button>`
             : ''}
         </div>
@@ -362,9 +362,22 @@ setInterval(() => {
 }, 30000);
 
 // ── Marcar item ──────────────────────────────────
+let _pollInterval = null;
+let _markInFlight = 0;
+
+function startPolling() {
+  if (!_pollInterval) _pollInterval = setInterval(loadQueue, 5000);
+}
+function stopPolling() {
+  clearInterval(_pollInterval);
+  _pollInterval = null;
+}
+
 async function marcar(url, btn) {
   const orig = btn.textContent;
   btn.disabled = true; btn.textContent = '...';
+  _markInFlight++;
+  stopPolling();
   try {
     const res = await fetch(url, { method: 'POST', credentials: 'same-origin' });
     if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -372,6 +385,9 @@ async function marcar(url, btn) {
   } catch (e) {
     console.error('marcar:', e);
     btn.disabled = false; btn.textContent = orig;
+  } finally {
+    _markInFlight--;
+    if (_markInFlight === 0) startPolling();
   }
 }
 
@@ -387,7 +403,7 @@ async function loadQueue() {
 }
 
 loadQueue();
-setInterval(loadQueue, 5000);
+startPolling();
 </script>
 </body>
 </html>

@@ -118,4 +118,87 @@ class RestStaffController extends BaseController
         $this->flash('success', 'Staff desactivado.');
         $this->redirect('rest-staff/index');
     }
+
+    // GET /rest-staff/turno  — asignación de zonas por turno (hoy)
+    public function turno(?string $p = null): void
+    {
+        $restauranteId = $this->restauranteId();
+        $db            = Database::getInstance();
+
+        // Meseros activos del restaurante
+        $stmtM = $db->prepare(
+            "SELECT u.id, u.nombre, rs.codigo
+             FROM rest_staff rs
+             JOIN usuarios u ON u.id = rs.usuario_id
+             WHERE rs.restaurante_id = ? AND rs.rol_slug = 'mesero' AND rs.activo = 1
+             ORDER BY u.nombre ASC"
+        );
+        $stmtM->execute([$restauranteId]);
+        $meseros = $stmtM->fetchAll(PDO::FETCH_ASSOC);
+
+        // Zonas del restaurante
+        $stmtZ = $db->prepare(
+            "SELECT id, nombre FROM rest_zonas WHERE restaurante_id = ? AND activo = 1 ORDER BY nombre ASC"
+        );
+        $stmtZ->execute([$restauranteId]);
+        $zonas = $stmtZ->fetchAll(PDO::FETCH_ASSOC);
+
+        // Asignaciones actuales para hoy
+        $stmtA = $db->prepare(
+            "SELECT usuario_id, zona_id FROM rest_mesero_turno
+             WHERE restaurante_id = ? AND turno_fecha = CURDATE() AND activo = 1"
+        );
+        $stmtA->execute([$restauranteId]);
+        $filas = $stmtA->fetchAll(PDO::FETCH_ASSOC);
+
+        // Indexar: [usuario_id => [zona_id, ...]]
+        $asignaciones = [];
+        foreach ($filas as $f) {
+            $asignaciones[(int)$f['usuario_id']][] = (int)$f['zona_id'];
+        }
+
+        $restaurante = $this->restModel->find($restauranteId);
+        $flash       = $this->getFlash();
+        $pageTitle   = 'Turno de hoy';
+        $activeMenu  = 'rest_staff';
+        $this->render('restaurante/staff/turno',
+            compact('meseros','zonas','asignaciones','restaurante','flash','pageTitle','activeMenu'));
+    }
+
+    // POST /rest-staff/guardarTurno  — guarda asignaciones del día
+    public function guardarTurno(?string $p = null): void
+    {
+        if (!$this->isPost()) {
+            $this->redirect('rest-staff/turno');
+            return;
+        }
+
+        $restauranteId = $this->restauranteId();
+        $db            = Database::getInstance();
+
+        // Desactivar asignaciones previas de hoy
+        $db->prepare(
+            "UPDATE rest_mesero_turno SET activo = 0
+             WHERE restaurante_id = ? AND turno_fecha = CURDATE()"
+        )->execute([$restauranteId]);
+
+        // asignaciones[usuario_id][] = zona_id
+        $asignaciones = $_POST['asignaciones'] ?? [];
+
+        $ins = $db->prepare(
+            "INSERT INTO rest_mesero_turno (restaurante_id, usuario_id, zona_id, turno_fecha, activo)
+             VALUES (?, ?, ?, CURDATE(), 1)
+             ON DUPLICATE KEY UPDATE activo = 1"
+        );
+
+        foreach ($asignaciones as $usuarioId => $zonaIds) {
+            if (!is_array($zonaIds)) continue;
+            foreach ($zonaIds as $zonaId) {
+                $ins->execute([$restauranteId, (int)$usuarioId, (int)$zonaId]);
+            }
+        }
+
+        $this->flash('success', 'Turno guardado correctamente.');
+        $this->redirect('rest-staff/turno');
+    }
 }

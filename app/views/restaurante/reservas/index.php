@@ -25,6 +25,7 @@
         <th style="padding:12px 16px;text-align:left;font-weight:600;color:#374151">Hora</th>
         <th style="padding:12px 16px;text-align:left;font-weight:600;color:#374151">Personas</th>
         <th style="padding:12px 16px;text-align:left;font-weight:600;color:#374151">Mesa</th>
+        <th style="padding:12px 16px;text-align:left;font-weight:600;color:#374151">Mesero</th>
         <th style="padding:12px 16px;text-align:left;font-weight:600;color:#374151">Estado</th>
         <th style="padding:12px 16px;text-align:left;font-weight:600;color:#374151">Acciones</th>
       </tr>
@@ -38,6 +39,7 @@
         <td style="padding:12px 16px"><?= substr($r['hora'],0,5) ?></td>
         <td style="padding:12px 16px;text-align:center"><?= (int)$r['personas'] ?></td>
         <td style="padding:12px 16px;color:#6B7280"><?= htmlspecialchars($r['mesa_nombre'] ?? '—') ?></td>
+        <td style="padding:12px 16px;color:#6B7280;font-size:.85rem"><?= htmlspecialchars($r['mesero_nombre'] ?? '—') ?></td>
         <td style="padding:12px 16px">
           <span style="padding:2px 8px;border-radius:99px;font-size:.72rem;font-weight:600;background:<?= $colors[0] ?>;color:<?= $colors[1] ?>">
             <?= $r['estado'] ?>
@@ -56,7 +58,7 @@
       </tr>
       <?php endforeach; ?>
       <?php if (empty($data)): ?>
-      <tr><td colspan="7" style="padding:32px;text-align:center;color:#9CA3AF">No hay reservaciones.</td></tr>
+      <tr><td colspan="8" style="padding:32px;text-align:center;color:#9CA3AF">No hay reservaciones.</td></tr>
       <?php endif; ?>
     </tbody>
   </table>
@@ -95,6 +97,17 @@
             style="width:100%;padding:8px 12px;border:1px solid #D1D5DB;border-radius:8px;margin-top:4px;font-size:.9rem">
         </div>
         <div style="grid-column:span 2">
+          <label style="font-size:.85rem;font-weight:500">Mesa</label>
+          <select name="mesa_id" id="selectMesaRes" onchange="previewMesero(this.value)"
+            style="width:100%;padding:8px 12px;border:1px solid #D1D5DB;border-radius:8px;margin-top:4px;font-size:.9rem">
+            <option value="">— Sin mesa asignada —</option>
+            <?php foreach ($mesas as $m): ?>
+            <option value="<?= (int)$m['id'] ?>"><?= htmlspecialchars($m['nombre']) ?> (<?= (int)$m['capacidad'] ?> personas)</option>
+            <?php endforeach; ?>
+          </select>
+          <div id="meseroPreview" style="margin-top:6px;font-size:.8rem;color:#6B7280;min-height:18px"></div>
+        </div>
+        <div style="grid-column:span 2">
           <label style="font-size:.85rem;font-weight:500">Notas</label>
           <input type="text" name="notas"
             style="width:100%;padding:8px 12px;border:1px solid #D1D5DB;border-radius:8px;margin-top:4px;font-size:.9rem">
@@ -109,6 +122,26 @@
     </form>
   </div>
 </div>
+<script>
+const BASE_RES = '<?= BASE_URL ?>';
+function previewMesero(mesaId) {
+  const el = document.getElementById('meseroPreview');
+  if (!mesaId) { el.textContent = ''; return; }
+  el.textContent = 'Buscando mesero de turno…';
+  fetch(BASE_RES + 'rest-reserva/meseroDeZona/' + mesaId)
+    .then(r => r.json())
+    .then(d => {
+      if (d.ok && d.mesero) {
+        el.innerHTML = '🧑‍💼 Se auto-asignará a: <strong>' + d.mesero.nombre + '</strong>';
+        el.style.color = '#1D4ED8';
+      } else {
+        el.textContent = 'Sin mesero de turno en esta zona hoy.';
+        el.style.color = '#9CA3AF';
+      }
+    })
+    .catch(() => { el.textContent = ''; });
+}
+</script>
 <?php
 $content = ob_get_clean();
 require ROOT_PATH . '/app/views/restaurante/layouts/main.php';

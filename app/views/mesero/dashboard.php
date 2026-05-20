@@ -76,6 +76,7 @@
     .mesa-card.ocupada    { border-color: #F59E0B; }
     .mesa-card.pagando    { border-color: #EF4444; }
     .mesa-card.reservada  { border-color: #6366F1; }
+    .mesa-card.mi-zona    { box-shadow: 0 0 0 3px #BFDBFE; }
     .mesa-estado-dot {
       display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px;
     }
@@ -149,21 +150,40 @@
 <!-- Órdenes listas para entregar -->
 <div id="listosBanner" class="hidden">
   <div style="font-weight:700;color:#166534;font-size:.88rem;margin-bottom:10px;display:flex;align-items:center;gap:6px">
-    ✅ Listos para entregar <span id="cnt-listos-text"></span>
+    ✅ Mis mesas — listas para entregar <span id="cnt-listos-text"></span>
   </div>
   <div id="listosList"></div>
+
+  <!-- Otras mesas (colapsable) -->
+  <div id="otrasSection" class="hidden" style="margin-top:14px">
+    <button onclick="toggleOtras()" id="btnOtras"
+      style="background:none;border:none;color:#6B7280;font-size:.8rem;font-weight:600;cursor:pointer;padding:0;display:flex;align-items:center;gap:4px">
+      ▶ Otras mesas <span id="cnt-otras-text"></span>
+    </button>
+    <div id="otrasList" class="hidden" style="margin-top:8px"></div>
+  </div>
 </div>
 
 <!-- Mesas -->
 <div class="section">
-  <div class="section-title" style="padding-left:0">Mesas</div>
+  <div class="section-title" style="padding-left:0">
+    Mesas
+    <?php if (!empty($misZonas)): ?>
+      <span style="font-size:.68rem;font-weight:500;color:#6B7280;text-transform:none;letter-spacing:0;margin-left:6px">
+        — 🟢 borde azul = tu zona
+      </span>
+    <?php endif; ?>
+  </div>
 </div>
 <div class="mesas-grid">
   <?php foreach ($mesas as $m): ?>
-  <div class="mesa-card <?= htmlspecialchars($m['estado']) ?>"
+  <div class="mesa-card <?= htmlspecialchars($m['estado']) ?> <?= $m['es_mi_zona'] ? 'mi-zona' : '' ?>"
        onclick="abrirMesa(<?= (int)$m['id'] ?>, '<?= htmlspecialchars(addslashes($m['nombre'])) ?>', '<?= htmlspecialchars($m['estado']) ?>')"
        id="mesa-card-<?= (int)$m['id'] ?>">
     <div id="badge-pedidos-<?= (int)$m['id'] ?>" class="pedidos-badge"></div>
+    <?php if ($m['es_mi_zona']): ?>
+      <div style="position:absolute;top:6px;left:6px;font-size:.6rem;background:#DBEAFE;color:#1D4ED8;padding:1px 5px;border-radius:6px;font-weight:700">MI ZONA</div>
+    <?php endif; ?>
     <div style="font-size:1.6rem;margin-bottom:6px">🪑</div>
     <div style="font-weight:700;font-size:.92rem;color:#111827"><?= htmlspecialchars($m['nombre']) ?></div>
     <div style="font-size:.7rem;color:#9CA3AF;margin-top:2px"><?= (int)$m['capacidad'] ?> personas</div>
@@ -187,6 +207,14 @@
     </div>
     <div id="modal-pedidos" style="font-size:.85rem;color:#6B7280;text-align:center;padding:20px 0">Cargando...</div>
   </div>
+</div>
+
+<!-- Reservas de hoy en mis zonas -->
+<div class="section" style="padding-bottom:4px">
+  <div class="section-title" style="padding-left:0">📅 Reservas de hoy</div>
+</div>
+<div id="reservasHoy" style="padding:0 16px 28px;min-height:40px">
+  <div style="font-size:.82rem;color:#9CA3AF">Cargando...</div>
 </div>
 
 <div id="m-toast"></div>
@@ -259,6 +287,55 @@ function atenderAlerta(id, btn) {
 
 // ── Listos polling ──────────────────────────────────────────────────────────
 let prevListosIds = new Set();
+let otrasExpanded = false;
+
+function toggleOtras() {
+  otrasExpanded = !otrasExpanded;
+  const lista = document.getElementById('otrasList');
+  const btn   = document.getElementById('btnOtras');
+  lista.classList.toggle('hidden', !otrasExpanded);
+  btn.textContent = (otrasExpanded ? '▼ ' : '▶ ') + 'Otras mesas ' + btn.textContent.replace(/^[▼▶]\s*Otras mesas\s*/,'');
+}
+
+function buildListoCard(p) {
+  const itemsText = (p.items || []).map(i => `${i.cantidad}× ${i.nombre}`).join(', ');
+
+  if (p.reclamado_otro) {
+    // Otro mesero ya lo reclamó — mostrar chip informativo
+    return `<div class="listo-card" id="listo-${p.id}" style="opacity:.7">
+      <div style="flex:1">
+        <div style="font-weight:700;font-size:.9rem;color:#111827">${p.folio} · Mesa ${p.mesa_nombre || '—'}</div>
+        ${itemsText ? `<div style="font-size:.78rem;color:#6B7280;margin-top:3px">${itemsText}</div>` : ''}
+      </div>
+      <span style="font-size:.75rem;font-weight:600;padding:4px 10px;border-radius:20px;background:#FEF3C7;color:#92400E;white-space:nowrap">
+        🚶 En camino
+      </span>
+    </div>`;
+  }
+
+  if (p.es_mi_reclamo) {
+    // Yo lo reclamé — mostrar Entregado directo
+    return `<div class="listo-card" id="listo-${p.id}" style="border-color:#BFDBFE">
+      <div style="flex:1">
+        <div style="font-weight:700;font-size:.9rem;color:#111827">${p.folio} · Mesa ${p.mesa_nombre || '—'} <span style="font-size:.7rem;background:#DBEAFE;color:#1D4ED8;padding:1px 6px;border-radius:8px;font-weight:700">RECLAMADO</span></div>
+        ${itemsText ? `<div style="font-size:.78rem;color:#6B7280;margin-top:3px">${itemsText}</div>` : ''}
+      </div>
+      <button class="btn-sm btn-entregar" onclick="marcarEntregado(${p.id},this)">Entregado ✓</button>
+    </div>`;
+  }
+
+  // Disponible — primero Reclamar, luego Entregar
+  return `<div class="listo-card" id="listo-${p.id}">
+    <div style="flex:1">
+      <div style="font-weight:700;font-size:.9rem;color:#111827">${p.folio} · Mesa ${p.mesa_nombre || '—'}</div>
+      ${itemsText ? `<div style="font-size:.78rem;color:#6B7280;margin-top:3px">${itemsText}</div>` : ''}
+    </div>
+    <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end">
+      <button class="btn-sm" style="background:#3B82F6;color:#fff" onclick="reclamar(${p.id},this)">Reclamar ▶</button>
+      <button class="btn-sm btn-entregar" onclick="marcarEntregado(${p.id},this)">Entregado ✓</button>
+    </div>
+  </div>`;
+}
 
 function pollListos() {
   fetch(BASE + 'rest-mesero/listos')
@@ -266,38 +343,66 @@ function pollListos() {
     .then(d => {
       if (!d.ok) return;
       const listos = d.listos;
-      const cnt    = listos.length;
 
-      // Topbar badge
+      const misMesas   = listos.filter(p => p.es_mi_zona && !p.reclamado_otro);
+      const otrosMesas = listos.filter(p => !p.es_mi_zona || p.reclamado_otro);
+      const cntMias    = misMesas.length;
+      const cntTotal   = listos.length;
+
+      // Badge topbar (solo los pendientes de mis mesas)
       const badge = document.getElementById('badge-listos');
-      badge.textContent = cnt;
-      badge.className   = 'badge-cnt ' + (cnt > 0 ? 'bc-verde' : 'bc-gris');
+      badge.textContent = cntMias || cntTotal;
+      badge.className   = 'badge-cnt ' + (cntTotal > 0 ? 'bc-verde' : 'bc-gris');
 
       const banner = document.getElementById('listosBanner');
-      if (!cnt) { banner.classList.add('hidden'); prevListosIds = new Set(); return; }
+      if (!cntTotal) { banner.classList.add('hidden'); prevListosIds = new Set(); return; }
 
-      // Detectar nuevos listos
-      const newIds = new Set(listos.map(l => l.id));
+      // Detectar nuevos en mis mesas
+      const newIds = new Set(misMesas.map(l => l.id));
       const hayNuevos = [...newIds].some(id => !prevListosIds.has(id));
-      if (hayNuevos && prevListosIds.size > 0) { vibrar(); toast('🔔 ¡Pedido listo para entregar!'); }
+      if (hayNuevos && prevListosIds.size > 0) { vibrar(); toast('🔔 ¡Pedido listo en tu zona!'); }
       prevListosIds = newIds;
 
-      document.getElementById('cnt-listos-text').textContent = `(${cnt})`;
-      let html = '';
-      listos.forEach(p => {
-        const itemsText = (p.items || []).map(i => `${i.cantidad}× ${i.nombre}`).join(', ');
-        html += `<div class="listo-card" id="listo-${p.id}">
-          <div style="flex:1">
-            <div style="font-weight:700;font-size:.9rem;color:#111827">${p.folio} · Mesa ${p.mesa_nombre || '—'}</div>
-            ${itemsText ? `<div style="font-size:.78rem;color:#6B7280;margin-top:3px">${itemsText}</div>` : ''}
-          </div>
-          <button class="btn-sm btn-entregar" onclick="marcarEntregado(${p.id},this)">Entregado ✓</button>
-        </div>`;
-      });
-      document.getElementById('listosList').innerHTML = html;
+      // Contar sin los "en camino"
+      const listosMios = misMesas.filter(p => !p.es_mi_reclamo || p.es_mi_reclamo).length;
+      document.getElementById('cnt-listos-text').textContent = listosMios ? `(${listosMios})` : '';
+      document.getElementById('listosList').innerHTML = misMesas.length
+        ? misMesas.map(buildListoCard).join('')
+        : '<div style="font-size:.82rem;color:#9CA3AF;padding:4px 0">Sin pedidos en tus mesas por ahora.</div>';
+
+      // Sección "Otras mesas"
+      const otrasSection = document.getElementById('otrasSection');
+      if (otrosMesas.length) {
+        document.getElementById('cnt-otras-text').textContent = `(${otrosMesas.length})`;
+        document.getElementById('otrasList').innerHTML = otrosMesas.map(buildListoCard).join('');
+        otrasSection.classList.remove('hidden');
+        // Actualizar texto del botón preservando estado expand
+        const btn = document.getElementById('btnOtras');
+        btn.childNodes[0].textContent = (otrasExpanded ? '▼ ' : '▶ ') + `Otras mesas (${otrosMesas.length})`;
+      } else {
+        otrasSection.classList.add('hidden');
+      }
+
       banner.classList.remove('hidden');
     })
     .catch(() => {});
+}
+
+function reclamar(pedidoId, btn) {
+  btn.disabled = true; btn.textContent = '...';
+  fetch(`${BASE}rest-mesero/reclamar/${pedidoId}`, { method: 'POST' })
+    .then(r => r.json())
+    .then(d => {
+      if (d.ok) {
+        toast('✅ Pedido reclamado — ve a entregarlo');
+        pollListos();
+      } else {
+        btn.disabled = false; btn.textContent = 'Reclamar ▶';
+        toast('⚠️ ' + (d.msg || 'No se pudo reclamar'));
+      }
+    })
+    .catch(() => { btn.disabled = false; btn.textContent = 'Reclamar ▶'; });
+}
 }
 
 function marcarEntregado(pedidoId, btn) {
@@ -317,6 +422,7 @@ function marcarEntregado(pedidoId, btn) {
         toast('✅ Pedido marcado como entregado');
       } else {
         btn.disabled = false; btn.textContent = 'Entregado ✓';
+        toast('⚠️ ' + (d.msg || 'No se pudo marcar como entregado'));
       }
     })
     .catch(() => { btn.disabled = false; btn.textContent = 'Entregado ✓'; });
@@ -374,9 +480,37 @@ function cerrarModal(e) {
   }
 }
 
+// ── Reservas de hoy ──────────────────────────────────────────────────────────
+function cargarReservasHoy() {
+  fetch(BASE + 'rest-mesero/reservasHoy')
+    .then(r => r.json())
+    .then(d => {
+      const cont = document.getElementById('reservasHoy');
+      if (!d.ok || !d.reservas.length) {
+        cont.innerHTML = '<div style="font-size:.82rem;color:#9CA3AF">Sin reservas en tus zonas hoy.</div>';
+        return;
+      }
+      cont.innerHTML = d.reservas.map(r => {
+        const bg    = r.estado === 'confirmada' ? '#DCFCE7' : '#FEF3C7';
+        const col   = r.estado === 'confirmada' ? '#166534' : '#92400E';
+        const hora  = (r.hora || '').substring(0, 5);
+        const mesa  = r.mesa_nombre || 'Sin mesa';
+        return `<div style="background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-weight:700;font-size:.9rem">${hora} — ${r.nombre}</div>
+            <div style="font-size:.75rem;color:#6B7280">${r.personas} personas · ${mesa}</div>
+          </div>
+          <span style="font-size:.72rem;font-weight:600;padding:3px 9px;border-radius:10px;background:${bg};color:${col};white-space:nowrap">${r.estado}</span>
+        </div>`;
+      }).join('');
+    })
+    .catch(() => {});
+}
+
 // ── Iniciar polling ──────────────────────────────────────────────────────────
 pollAlertas();
 pollListos();
+cargarReservasHoy();
 setInterval(pollAlertas, 5000);
 setInterval(pollListos,  5000);
 </script>

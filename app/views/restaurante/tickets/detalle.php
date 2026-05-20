@@ -8,10 +8,36 @@
       <div style="color:#6B7280;font-size:.875rem"><?= htmlspecialchars($ticket['mesa_nombre'] ?? '') ?></div>
     </div>
 
-    <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #F3F4F6;font-size:.9rem">
-      <span>Subtotal</span><span>$<?= number_format((float)$ticket['subtotal'],2) ?></span>
-    </div>
-    <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #F3F4F6;font-size:.9rem">
+    <?php if (!empty($todoItems)): ?>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:16px;font-size:.875rem">
+      <thead>
+        <tr style="border-bottom:2px solid #E5E7EB;color:#6B7280">
+          <th style="text-align:left;padding:6px 4px">Platillo</th>
+          <th style="text-align:center;padding:6px 4px">Cant.</th>
+          <th style="text-align:right;padding:6px 4px">P.Unit</th>
+          <th style="text-align:right;padding:6px 4px">Subtotal</th>
+        </tr>
+      </thead>
+      <tbody>
+        <?php foreach ($todoItems as $it): ?>
+        <tr style="border-bottom:1px solid #F3F4F6">
+          <td style="padding:7px 4px">
+            <?= htmlspecialchars($it['platillo_nombre']) ?>
+            <?php if (!empty($it['exclusiones'])): ?>
+              <div style="font-size:.75rem;color:#EF4444">Sin: <?= htmlspecialchars($it['exclusiones']) ?></div>
+            <?php endif; ?>
+            <?php if (!empty($it['notas'])): ?>
+              <div style="font-size:.75rem;color:#9CA3AF"><?= htmlspecialchars($it['notas']) ?></div>
+            <?php endif; ?>
+          </td>
+          <td style="text-align:center;padding:7px 4px"><?= (int)$it['cantidad'] ?></td>
+          <td style="text-align:right;padding:7px 4px">$<?= number_format((float)$it['precio_unit'],2) ?></td>
+          <td style="text-align:right;padding:7px 4px">$<?= number_format((float)$it['subtotal'],2) ?></td>
+        </tr>
+        <?php endforeach; ?>
+      </tbody>
+    </table>
+    <?php endif; ?>
       <span>Propina</span><span style="color:#10B981">$<?= number_format((float)$ticket['propina'],2) ?></span>
     </div>
     <div style="display:flex;justify-content:space-between;padding:12px 0;font-size:1.1rem;font-weight:700">

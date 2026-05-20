@@ -23,7 +23,10 @@
 
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
   <div></div>
-  <button onclick="rstModal('modalStaff')" class="btn btn-primary btn-sm">+ Nuevo staff</button>
+  <div style="display:flex;gap:8px">
+    <a href="<?= BASE_URL ?>rest-staff/turno" class="btn btn-outline btn-sm">📅 Turno de hoy</a>
+    <button onclick="rstModal('modalStaff')" class="btn btn-primary btn-sm">+ Nuevo staff</button>
+  </div>
 </div>
 
 <!-- Roles de acceso rápido -->

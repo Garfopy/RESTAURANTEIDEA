@@ -35,10 +35,26 @@ class RestTicketController extends BaseController
     {
         $ticket = $this->model->find((int)$id);
         if (!$ticket) { $this->flash('error', 'Ticket no encontrado.'); $this->redirect('rest-ticket/index'); }
+
+        // Cargar ítems de todos los pedidos de esta visita
+        $pedidoModel = new RestPedidoModel();
+        $pedidos     = $pedidoModel->getByVisita((int)$ticket['visita_id']);
+        $todoItems   = [];
+        foreach ($pedidos as $ped) {
+            $detalle = $pedidoModel->getConItems((int)$ped['id']);
+            if ($detalle && !empty($detalle['items'])) {
+                foreach ($detalle['items'] as $item) {
+                    if ($item['estado'] !== 'cancelado') {
+                        $todoItems[] = $item;
+                    }
+                }
+            }
+        }
+
         $flash  = $this->getFlash();
         $pageTitle  = 'Ticket ' . $ticket['folio'];
         $activeMenu = 'rest_tickets';
-        $this->render('restaurante/tickets/detalle', compact('ticket','flash','pageTitle','activeMenu'));
+        $this->render('restaurante/tickets/detalle', compact('ticket','todoItems','flash','pageTitle','activeMenu'));
     }
 
     public function confirmarPago(?string $id = null): void
