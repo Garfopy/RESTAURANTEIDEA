@@ -218,8 +218,17 @@ class RestPublicoController extends BaseController
             $pedidos[] = array_merge($ped, ['items' => $detalle['items'] ?? []]);
         }
         $ticket      = $this->ticketModel->getByVisita($visitaId);
+
+        // QR de la mesa para que "Agregar más items" regrese al menú de esa mesa
+        // (sin esto, el link va a /menu/{slug} sin mesa y se ve solo la vista previa).
+        $mesaQr = null;
+        if (!empty($visita['mesa_id'])) {
+            $mesa = $this->mesaModel->find((int)$visita['mesa_id']);
+            $mesaQr = $mesa['qr_codigo'] ?? null;
+        }
+
         $pageTitle   = '¡Pedido recibido!';
-        $this->render('publico/menu/confirmacion', compact('restaurante','visita','pedidos','ticket','pageTitle'));
+        $this->render('publico/menu/confirmacion', compact('restaurante','visita','pedidos','ticket','pageTitle','mesaQr'));
     }
 
     // POST /menu/{slug}/generarTicket/{visitaId} — consolida ticket sin pagar, devuelve JSON
@@ -361,6 +370,9 @@ class RestPublicoController extends BaseController
 
         $this->ticketModel->marcarPagado($ticketId, $metodo, null);
         $this->visitaModel->marcarPagada((int)$ticket['visita_id']);
+        // Pagado = entregado: cerrar el ciclo del pedido para que no quede
+        // colgado en "listo" cuando el comensal ya recibió y pagó.
+        $this->pedidoModel->marcarVisitaEntregada((int)$ticket['visita_id']);
 
         // Liberar mesa
         $visita = $this->visitaModel->find((int)$ticket['visita_id']);
@@ -419,6 +431,7 @@ class RestPublicoController extends BaseController
             }
             $this->ticketModel->marcarPagado($ticketId, 'paypal', $orderId);
             $this->visitaModel->marcarPagada((int)$ticket['visita_id']);
+            $this->pedidoModel->marcarVisitaEntregada((int)$ticket['visita_id']);
 
             $visita = $this->visitaModel->find((int)$ticket['visita_id']);
             if ($visita && !empty($visita['mesa_id'])) {

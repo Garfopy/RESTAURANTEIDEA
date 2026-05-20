@@ -255,7 +255,8 @@ $qrImgUrl  = $scanUrl
   <?php endif; ?>
 
   <?php if (!$ticketPagado): ?>
-  <a href="<?= BASE_URL ?>menu/<?= htmlspecialchars($slug) ?>"
+  <?php $menuLink = BASE_URL . 'menu/' . htmlspecialchars($slug) . (!empty($mesaQr) ? '?mesa=' . urlencode($mesaQr) : ''); ?>
+  <a href="<?= $menuLink ?>"
      class="link-btn link-btn-mas" style="background:#F3F4F6;color:#374151;margin-bottom:10px">
     ← Agregar más items
   </a>

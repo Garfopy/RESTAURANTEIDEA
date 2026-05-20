@@ -68,7 +68,7 @@
   </div>
 </div>
 
-<script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<script src="<?= BASE_URL ?>public/js/jsQR.min.js"></script>
 <script>
 const baseUrl = '<?= BASE_URL ?>';
 const video   = document.getElementById('video');

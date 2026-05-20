@@ -388,6 +388,17 @@ class AuthController extends BaseController
         if (!in_array($rol, ['chef', 'mesero', 'portero', 'staff', 'comensal'], true)) {
             header('Location: ' . BASE_URL); exit;
         }
+        // Capturar slug del restaurante ANTES de destruir la sesión para
+        // poder redirigir al login del restaurante correcto.
+        $restSlug = null;
+        $restId = $_SESSION['restaurante_activo_id'] ?? ($_SESSION['usuario']['restaurante_id'] ?? null);
+        if ($restId) {
+            try {
+                $rest = (new RestauranteModel())->find((int)$restId);
+                $restSlug = $rest['slug'] ?? null;
+            } catch (\Throwable $e) { /* fallback abajo */ }
+        }
+
         // La cookie correcta ya fue abierta por index.php (auth/logoutStaff/{rol}).
         $_SESSION = [];
         if (ini_get('session.use_cookies')) {
@@ -396,7 +407,9 @@ class AuthController extends BaseController
                 $p['path'], $p['domain'], $p['secure'], $p['httponly']);
         }
         session_destroy();
-        header('Location: ' . BASE_URL);
+
+        $target = $restSlug ? ('acceso/' . $restSlug) : '';
+        header('Location: ' . BASE_URL . $target);
         exit;
     }
 

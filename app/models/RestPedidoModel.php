@@ -166,6 +166,26 @@ class RestPedidoModel extends BaseModel
         );
     }
 
+    // Marca como entregados todos los pedidos e items aún no entregados/cancelados
+    // de una visita. Se llama al confirmar el pago: si se cobró ya se entregó.
+    public function marcarVisitaEntregada(int $visitaId): void
+    {
+        $pedidos = $this->query(
+            "SELECT id FROM rest_pedidos WHERE visita_id = ? AND estado NOT IN ('entregado','cancelado')",
+            [$visitaId]
+        );
+        foreach ($pedidos as $p) {
+            $this->cambiarEstadoPedido((int)$p['id'], 'entregado');
+        }
+        $this->execute(
+            "UPDATE rest_pedido_items pi
+             JOIN rest_pedidos p ON p.id = pi.pedido_id
+             SET pi.estado = 'entregado'
+             WHERE p.visita_id = ? AND pi.estado NOT IN ('entregado','cancelado')",
+            [$visitaId]
+        );
+    }
+
     public function getByVisita(int $visitaId): array
     {
         return $this->query(
