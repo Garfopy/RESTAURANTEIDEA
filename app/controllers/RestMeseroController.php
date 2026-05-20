@@ -237,6 +237,9 @@ class RestMeseroController extends BaseController
         }
         unset($ped);
 
+        $this->json(['ok' => true, 'listos' => $pedidos, 'mis_zonas' => $misZonas]);
+    }
+
     // GET /rest-mesero/reservasHoy  — reservaciones de hoy en las zonas del mesero
     public function reservasHoy(?string $p = null): void
     {

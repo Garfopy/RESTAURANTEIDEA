@@ -403,7 +403,6 @@ function reclamar(pedidoId, btn) {
     })
     .catch(() => { btn.disabled = false; btn.textContent = 'Reclamar ▶'; });
 }
-}
 
 function marcarEntregado(pedidoId, btn) {
   btn.disabled = true; btn.textContent = '...';

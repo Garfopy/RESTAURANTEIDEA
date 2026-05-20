@@ -749,4 +749,81 @@ class RestPublicoController extends BaseController
         $pageTitle = '¡Gracias por tu visita!';
         $this->render('publico/menu/gracias', compact('restaurante', 'visita', 'pageTitle'));
     }
+
+    // ── Reservaciones públicas por QR ────────────────────────────────────────
+
+    // GET /menu/{slug}/reservar
+    public function reservar(?string $param = null): void
+    {
+        $slug        = explode('/', $param ?? '')[0];
+        $restaurante = $this->restModel->getBySlug($slug);
+        if (!$restaurante) { http_response_code(404); die('<h1>Restaurante no encontrado</h1>'); }
+
+        if (empty($restaurante['reservas_habilitadas'])) {
+            $pageTitle = 'Reservaciones no disponibles';
+            $this->render('publico/reservar', compact('restaurante', 'pageTitle'));
+            return;
+        }
+
+        $ok    = $this->get('ok') === '1';
+        $flash = $this->getFlash();
+        $pageTitle = 'Reservar mesa — ' . htmlspecialchars($restaurante['nombre']);
+        $this->render('publico/reservar', compact('restaurante', 'pageTitle', 'ok', 'flash'));
+    }
+
+    // POST /menu/{slug}/guardarReserva
+    public function guardarReserva(?string $param = null): void
+    {
+        $slug        = explode('/', $param ?? '')[0];
+        $restaurante = $this->restModel->getBySlug($slug);
+        if (!$restaurante) { http_response_code(404); die('<h1>Restaurante no encontrado</h1>'); }
+
+        if (!$this->isPost()) {
+            $this->redirect('menu/' . $slug . '/reservar');
+            return;
+        }
+
+        if (empty($restaurante['reservas_habilitadas'])) {
+            $this->redirect('menu/' . $slug . '/reservar');
+            return;
+        }
+
+        $nombre   = trim($this->post('nombre', ''));
+        $telefono = trim($this->post('telefono', ''));
+        $fecha    = $this->post('fecha');
+        $hora     = $this->post('hora');
+        $personas = max(1, (int)$this->post('personas', 2));
+        $notas    = $this->post('notas') ?: null;
+
+        // Validación básica
+        if (!$nombre || !$telefono || !$fecha || !$hora) {
+            $this->flash('error', 'Por favor completa nombre, teléfono, fecha y hora.');
+            $this->redirect('menu/' . $slug . '/reservar');
+            return;
+        }
+
+        // Verificar que queden mesas disponibles esa fecha/hora
+        $reservaModel = new RestReservaModel();
+        if ($reservaModel->estaLleno((int)$restaurante['id'], $fecha, $hora)) {
+            $this->flash('error', 'Lo sentimos, no hay disponibilidad para ese horario. Elige otra fecha u hora.');
+            $this->redirect('menu/' . $slug . '/reservar');
+            return;
+        }
+
+        $reservaModel->insert([
+            'restaurante_id' => (int)$restaurante['id'],
+            'mesa_id'        => null,
+            'mesero_id'      => null,
+            'nombre'         => $nombre,
+            'telefono'       => $telefono,
+            'email'          => $this->post('email') ?: null,
+            'fecha'          => $fecha,
+            'hora'           => $hora,
+            'personas'       => $personas,
+            'notas'          => $notas,
+            'estado'         => 'pendiente',
+        ]);
+
+        $this->redirect('menu/' . $slug . '/reservar?ok=1');
+    }
 }

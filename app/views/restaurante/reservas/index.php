@@ -1,6 +1,14 @@
-<?php ob_start(); ?>
+<?php ob_start();
+// Obtener slug del restaurante para el QR
+$_resQr = (new RestauranteModel())->find($_SESSION['restaurante_activo_id'] ?? 0);
+$_qrSlug = $_resQr['slug'] ?? '';
+$_qrUrl  = BASE_URL . 'menu/' . $_qrSlug . '/reservar';
+?>
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
-  <div></div>
+  <button onclick="document.getElementById('modalQr').style.display='flex'"
+    style="padding:8px 14px;background:#fff;color:#374151;border:1px solid #D1D5DB;border-radius:8px;font-size:.85rem;font-weight:500;cursor:pointer">
+    📱 QR reservas
+  </button>
   <button onclick="document.getElementById('modalRes').style.display='flex'"
     style="padding:8px 16px;background:var(--color-primary);color:#fff;border:none;border-radius:8px;font-size:.85rem;font-weight:500;cursor:pointer">
     + Reservación
@@ -142,6 +150,30 @@ function previewMesero(mesaId) {
     .catch(() => { el.textContent = ''; });
 }
 </script>
+
+<!-- Modal QR -->
+<div id="modalQr" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:16px;padding:28px 24px;width:340px;max-width:94vw;text-align:center">
+    <h3 style="font-weight:700;margin-bottom:6px">📱 QR de reservaciones</h3>
+    <p style="font-size:.82rem;color:#6B7280;margin-bottom:16px">Muéstralo en tu local para que los comensales reserven sin app</p>
+    <img src="https://chart.googleapis.com/chart?cht=qr&chs=220x220&chld=M|1&chl=<?= urlencode($_qrUrl) ?>"
+         alt="QR Reservaciones" style="border:1px solid #E5E7EB;border-radius:10px;padding:8px;width:220px;height:220px">
+    <div style="margin-top:12px;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px;padding:8px 10px;font-size:.72rem;color:#6B7280;word-break:break-all">
+      <?= htmlspecialchars($_qrUrl) ?>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:16px;justify-content:center">
+      <a href="<?= htmlspecialchars($_qrUrl) ?>" target="_blank"
+         style="padding:8px 16px;background:#F3F4F6;color:#374151;border-radius:8px;font-size:.83rem;font-weight:600;text-decoration:none">
+        Abrir enlace
+      </a>
+      <button onclick="document.getElementById('modalQr').style.display='none'"
+        style="padding:8px 16px;background:var(--color-primary);color:#fff;border:none;border-radius:8px;font-size:.83rem;font-weight:600;cursor:pointer">
+        Cerrar
+      </button>
+    </div>
+  </div>
+</div>
+
 <?php
 $content = ob_get_clean();
 require ROOT_PATH . '/app/views/restaurante/layouts/main.php';

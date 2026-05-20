@@ -90,7 +90,7 @@ class RestReservaModel extends BaseModel
         $sql  = "SELECT COUNT(*) FROM rest_reservaciones
                  WHERE mesa_id = ? AND fecha = ?
                    AND estado IN ('pendiente','confirmada')
-                   AND ABS(TIMESTAMPDIFF(MINUTE, hora, ?)) < 120";
+                   AND ABS(TIME_TO_SEC(TIMEDIFF(hora, ?))) < 7200";
         $params = [$mesaId, $fecha, $hora];
         if ($excludeId) {
             $sql    .= " AND id != ?";
@@ -99,6 +99,38 @@ class RestReservaModel extends BaseModel
         $stmt = $db->prepare($sql);
         $stmt->execute($params);
         return (int)$stmt->fetchColumn() > 0;
+    }
+
+    /**
+     * Devuelve true si todas las mesas activas del restaurante ya tienen
+     * reservación pendiente/confirmada en esa fecha dentro de ±2 horas.
+     * Se usa para el form público donde no se elige mesa específica.
+     */
+    public function estaLleno(int $restauranteId, string $fecha, string $hora): bool
+    {
+        $db = Database::getInstance();
+
+        // Total de mesas activas
+        $stmtTotal = $db->prepare(
+            "SELECT COUNT(*) FROM rest_mesas WHERE restaurante_id = ? AND activo = 1"
+        );
+        $stmtTotal->execute([$restauranteId]);
+        $totalMesas = (int)$stmtTotal->fetchColumn();
+
+        if ($totalMesas === 0) return false; // sin mesas configuradas → aceptar
+
+        // Mesas ya ocupadas en ese horario
+        $stmtOcup = $db->prepare(
+            "SELECT COUNT(DISTINCT mesa_id) FROM rest_reservaciones
+             WHERE restaurante_id = ? AND fecha = ?
+               AND mesa_id IS NOT NULL
+               AND estado IN ('pendiente','confirmada')
+               AND ABS(TIME_TO_SEC(TIMEDIFF(hora, ?))) < 7200"
+        );
+        $stmtOcup->execute([$restauranteId, $fecha, $hora]);
+        $ocupadas = (int)$stmtOcup->fetchColumn();
+
+        return $ocupadas >= $totalMesas;
     }
 
     public function cambiarEstado(int $id, string $estado): bool
