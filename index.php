@@ -5,7 +5,7 @@
  * URL pattern: /{controller}/{action}/{param}
  * Portales:
  *   /restaurante/  → Admin local del restaurante
- *   /rest-*/       → Módulos del restaurante (menú, pedidos, inventario, etc.)
+ *   /rest-{mod}/   → Módulos del restaurante (menú, pedidos, inventario, etc.)
  *   /rest-mesero/  → Portal mesero
  *   /rest-chef/    → Portal chef
  *   /rest-portero/ → Portal portero

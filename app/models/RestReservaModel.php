@@ -19,11 +19,9 @@ class RestReservaModel extends BaseModel
     public function getProximas(int $restauranteId, int $dias = 7): array
     {
         return $this->query(
-            "SELECT r.*, m.nombre AS mesa_nombre,
-                    u.nombre AS mesero_nombre
+            "SELECT r.*, m.nombre AS mesa_nombre
              FROM rest_reservaciones r
              LEFT JOIN rest_mesas m ON m.id = r.mesa_id
-             LEFT JOIN usuarios u   ON u.id = r.mesero_id
              WHERE r.restaurante_id = ? AND r.fecha BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL ? DAY)
                AND r.estado IN ('pendiente','confirmada')
              ORDER BY r.fecha ASC, r.hora ASC",
