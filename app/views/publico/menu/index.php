@@ -218,42 +218,44 @@
     <?php endif; ?>
 
   <?php if ($mesa): ?>
-  <div style="display:inline-flex;align-items:center;gap:6px;margin-top:14px;
-              background:rgba(255,255,255,.15);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.25);border-radius:10px;padding:7px 14px;font-size:.85rem;color:#fff">
-    <svg width="14" height="14" fill="currentColor" viewBox="0 0 20 20" style="opacity:.6">
-      <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/>
-    </svg>
-    Mesa: <strong><?= htmlspecialchars($mesa['nombre']) ?></strong>
-  </div>
-  <?php if (!empty($meseroAtiende)): ?>
-  <div style="display:inline-flex;align-items:center;gap:6px;margin-top:8px;
-              background:rgba(201,164,48,.22);border:1px solid rgba(201,164,48,.4);border-radius:10px;padding:6px 14px;font-size:.82rem;color:#fff">
-    👋 Te atiende: <strong><?= htmlspecialchars($meseroAtiende) ?></strong>
-  </div>
-  <?php else: ?>
-  <div style="display:inline-flex;align-items:center;gap:5px;margin-top:8px;
-              background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:10px;padding:5px 12px;font-size:.78rem;color:rgba(255,255,255,.75)">
-    🙌 Pronto te atendemos
-  </div>
-  <?php endif; ?>
-  <div style="margin-top:10px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
-    <button id="btnLlamarMesero" onclick="llamarMesero()"
-            style="padding:8px 18px;background:rgba(255,255,255,.18);border:1.5px solid rgba(255,255,255,.35);
-                   color:#fff;border-radius:20px;font-size:.82rem;font-weight:600;cursor:pointer;backdrop-filter:blur(8px);box-shadow:0 2px 8px rgba(0,0,0,.15)">
-      🔔 Llamar mesero
-    </button>
-    <?php if ($visitaId): ?>
-    <button id="btnPedirCuenta" onclick="pedirCuenta()"
-            style="padding:8px 18px;background:rgba(239,68,68,.25);border:1.5px solid rgba(239,68,68,.5);
-                   color:#fff;border-radius:20px;font-size:.82rem;font-weight:600;cursor:pointer;backdrop-filter:blur(8px);box-shadow:0 2px 8px rgba(0,0,0,.15)">
-      🧾 Pedir la cuenta
-    </button>
-    <a href="<?= BASE_URL ?>menu/<?= htmlspecialchars($restaurante['slug']) ?>/pagar/<?= $visitaId ?>"
-       style="padding:8px 18px;background:rgba(255,255,255,.18);border:1.5px solid rgba(255,255,255,.35);
-              color:#fff;border-radius:20px;font-size:.82rem;font-weight:600;backdrop-filter:blur(8px);box-shadow:0 2px 8px rgba(0,0,0,.15)">
-      💳 Ver mi cuenta
-    </a>
+  <div style="display:flex;flex-direction:column;align-items:center;gap:8px;width:100%;margin-top:14px">
+    <div style="display:inline-flex;align-items:center;gap:6px;
+                background:rgba(255,255,255,.15);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.25);border-radius:10px;padding:7px 14px;font-size:.85rem;color:#fff">
+      <svg width="14" height="14" fill="currentColor" viewBox="0 0 20 20" style="opacity:.6">
+        <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/>
+      </svg>
+      Mesa: <strong><?= htmlspecialchars($mesa['nombre']) ?></strong>
+    </div>
+    <?php if (!empty($meseroAtiende)): ?>
+    <div style="display:inline-flex;align-items:center;gap:6px;
+                background:rgba(201,164,48,.22);border:1px solid rgba(201,164,48,.4);border-radius:10px;padding:6px 14px;font-size:.82rem;color:#fff">
+      👋 Te atiende: <strong><?= htmlspecialchars($meseroAtiende) ?></strong>
+    </div>
+    <?php else: ?>
+    <div style="display:inline-flex;align-items:center;gap:5px;
+                background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:10px;padding:5px 12px;font-size:.78rem;color:rgba(255,255,255,.75)">
+      🙌 Pronto te atendemos
+    </div>
     <?php endif; ?>
+    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+      <button id="btnLlamarMesero" onclick="llamarMesero()"
+              style="padding:8px 18px;background:rgba(255,255,255,.18);border:1.5px solid rgba(255,255,255,.35);
+                     color:#fff;border-radius:20px;font-size:.82rem;font-weight:600;cursor:pointer;backdrop-filter:blur(8px);box-shadow:0 2px 8px rgba(0,0,0,.15)">
+        🔔 Llamar mesero
+      </button>
+      <?php if ($visitaId): ?>
+      <button id="btnPedirCuenta" onclick="pedirCuenta()"
+              style="padding:8px 18px;background:rgba(239,68,68,.25);border:1.5px solid rgba(239,68,68,.5);
+                     color:#fff;border-radius:20px;font-size:.82rem;font-weight:600;cursor:pointer;backdrop-filter:blur(8px);box-shadow:0 2px 8px rgba(0,0,0,.15)">
+        🧾 Pedir la cuenta
+      </button>
+      <a href="<?= BASE_URL ?>menu/<?= htmlspecialchars($restaurante['slug']) ?>/pagar/<?= $visitaId ?>"
+         style="padding:8px 18px;background:rgba(255,255,255,.18);border:1.5px solid rgba(255,255,255,.35);
+                color:#fff;border-radius:20px;font-size:.82rem;font-weight:600;backdrop-filter:blur(8px);box-shadow:0 2px 8px rgba(0,0,0,.15)">
+        💳 Ver mi cuenta
+      </a>
+      <?php endif; ?>
+    </div>
   </div>
   <?php endif; ?>
   <?php if ($visitaId): ?>

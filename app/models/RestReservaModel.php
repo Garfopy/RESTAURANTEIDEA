@@ -35,24 +35,26 @@ class RestReservaModel extends BaseModel
     {
         if (empty($zonaIds)) {
             return $this->query(
-                "SELECT r.*, m.nombre AS mesa_nombre
+                "SELECT r.*, r.fecha, m.nombre AS mesa_nombre
                  FROM rest_reservaciones r
                  LEFT JOIN rest_mesas m ON m.id = r.mesa_id
-                 WHERE r.restaurante_id = ? AND r.fecha = CURDATE()
+                 WHERE r.restaurante_id = ?
+                   AND r.fecha BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 1 DAY)
                    AND r.estado IN ('pendiente','confirmada')
-                 ORDER BY r.hora ASC",
+                 ORDER BY r.fecha ASC, r.hora ASC",
                 [$restauranteId]
             );
         }
         $placeholders = implode(',', array_fill(0, count($zonaIds), '?'));
         return $this->query(
-            "SELECT r.*, m.nombre AS mesa_nombre
+            "SELECT r.*, r.fecha, m.nombre AS mesa_nombre
              FROM rest_reservaciones r
              JOIN rest_mesas m ON m.id = r.mesa_id
-             WHERE r.restaurante_id = ? AND r.fecha = CURDATE()
+             WHERE r.restaurante_id = ?
+               AND r.fecha BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 1 DAY)
                AND r.estado IN ('pendiente','confirmada')
                AND m.zona_id IN ($placeholders)
-             ORDER BY r.hora ASC",
+             ORDER BY r.fecha ASC, r.hora ASC",
             array_merge([$restauranteId], $zonaIds)
         );
     }

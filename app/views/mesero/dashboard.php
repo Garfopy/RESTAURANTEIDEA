@@ -243,12 +243,24 @@
   </div>
 </div>
 
-<!-- Reservas de hoy en mis zonas -->
+<!-- Reservas próximas en mis zonas -->
 <div class="section" style="padding-bottom:4px">
-  <div class="section-title" style="padding-left:0">📅 Reservas de hoy</div>
+  <div class="section-title" style="padding-left:0">📅 Próximas reservas (hoy y mañana)</div>
 </div>
 <div id="reservasHoy" style="padding:0 16px 28px;min-height:40px">
   <div style="font-size:.82rem;color:#9CA3AF">Cargando...</div>
+</div>
+
+<!-- Modal detalle reservación -->
+<div id="modal-reserva-det" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:60;align-items:center;justify-content:center;padding:16px">
+  <div style="background:#fff;border-radius:16px;padding:24px;width:100%;max-width:380px;max-height:90vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h3 style="font-weight:700;color:#111827;font-size:1rem">Detalle de reservación</h3>
+      <button onclick="document.getElementById('modal-reserva-det').style.display='none'"
+              style="background:none;border:none;font-size:1.3rem;cursor:pointer;color:#6B7280">✕</button>
+    </div>
+    <div id="modal-reserva-body"></div>
+  </div>
 </div>
 
 <button id="btnTomarZona" onclick="tomarZona(this)">⚡ Tomar mis listos <span id="cnt-tomar">0</span></button>
@@ -550,31 +562,108 @@ function cerrarModal(e) {
   }
 }
 
-// ── Reservas de hoy ──────────────────────────────────────────────────────────
+// ── Reservas hoy + mañana ────────────────────────────────────────────────────
+let _reservaData = {};
 function cargarReservasHoy() {
   fetch(BASE + 'rest-mesero/reservasHoy')
     .then(r => r.json())
     .then(d => {
       const cont = document.getElementById('reservasHoy');
       if (!d.ok || !d.reservas.length) {
-        cont.innerHTML = '<div style="font-size:.82rem;color:#9CA3AF">Sin reservas en tus zonas hoy.</div>';
+        cont.innerHTML = '<div style="font-size:.82rem;color:#9CA3AF">Sin reservas próximas en tus zonas.</div>';
         return;
       }
-      cont.innerHTML = d.reservas.map(r => {
-        const bg    = r.estado === 'confirmada' ? '#DCFCE7' : '#FEF3C7';
-        const col   = r.estado === 'confirmada' ? '#166534' : '#92400E';
-        const hora  = (r.hora || '').substring(0, 5);
-        const mesa  = r.mesa_nombre || 'Sin mesa';
-        return `<div style="background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
-          <div>
-            <div style="font-weight:700;font-size:.9rem">${hora} — ${r.nombre}</div>
-            <div style="font-size:.75rem;color:#6B7280">${r.personas} personas · ${mesa}</div>
-          </div>
-          <span style="font-size:.72rem;font-weight:600;padding:3px 9px;border-radius:10px;background:${bg};color:${col};white-space:nowrap">${r.estado}</span>
-        </div>`;
-      }).join('');
+      _reservaData = {};
+      d.reservas.forEach(r => { _reservaData[r.id] = r; });
+      const HOY    = '<?= date('Y-m-d') ?>';
+      const MANANA = '<?= date('Y-m-d', strtotime('+1 day')) ?>';
+      const hoyList    = d.reservas.filter(r => r.fecha === HOY);
+      const mananaList = d.reservas.filter(r => r.fecha === MANANA);
+      function renderGroup(list) {
+        return list.map(r => {
+          const bg   = r.estado === 'confirmada' ? '#DCFCE7' : '#FEF3C7';
+          const col  = r.estado === 'confirmada' ? '#166534' : '#92400E';
+          const hora = (r.hora || '').substring(0, 5);
+          const mesa = r.mesa_nombre || 'Sin mesa';
+          return `<div style="background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:8px">
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:700;font-size:.9rem">${hora} — ${r.nombre}</div>
+              <div style="font-size:.75rem;color:#6B7280">${r.personas} personas · ${mesa}</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="font-size:.72rem;font-weight:600;padding:3px 9px;border-radius:10px;background:${bg};color:${col};white-space:nowrap">${r.estado}</span>
+              <button onclick="abrirDetalleReserva(_reservaData[${r.id}])"
+                style="font-size:.72rem;padding:4px 9px;border:1px solid #9CA3AF;color:#6B7280;background:none;border-radius:6px;cursor:pointer;white-space:nowrap">👁</button>
+            </div>
+          </div>`;
+        }).join('');
+      }
+      let html = '';
+      if (hoyList.length) {
+        html += '<div style="font-size:.7rem;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.06em;margin:8px 0 6px">— Hoy —</div>';
+        html += renderGroup(hoyList);
+      }
+      if (mananaList.length) {
+        html += '<div style="font-size:.7rem;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.06em;margin:8px 0 6px">— Mañana —</div>';
+        html += renderGroup(mananaList);
+      }
+      cont.innerHTML = html || '<div style="font-size:.82rem;color:#9CA3AF">Sin reservas próximas.</div>';
     })
     .catch(() => {});
+}
+
+function abrirDetalleReserva(r) {
+  if (!r) return;
+  const fmtFecha = r.fecha ? r.fecha.split('-').reverse().join('/') : '—';
+  const hora = (r.hora || '').substring(0, 5) || '—';
+  const estadoMap = {
+    pendiente:  ['#FEF3C7','#92400E'],
+    confirmada: ['#DCFCE7','#166534'],
+    cancelada:  ['#FEE2E2','#991B1B'],
+    completada: ['#F3F4F6','#374151']
+  };
+  const [bg, fg] = estadoMap[r.estado] || ['#F3F4F6','#374151'];
+  document.getElementById('modal-reserva-body').innerHTML = `
+    <div style="display:grid;gap:14px">
+      <div>
+        <div style="font-size:.72rem;color:#9CA3AF;text-transform:uppercase;letter-spacing:.05em">Nombre</div>
+        <div style="font-weight:700;margin-top:2px;font-size:1rem">${r.nombre || '—'}</div>
+      </div>
+      ${r.telefono ? `<div>
+        <div style="font-size:.72rem;color:#9CA3AF;text-transform:uppercase;letter-spacing:.05em">Teléfono</div>
+        <div style="margin-top:2px"><a href="tel:${r.telefono}" style="color:#1D4ED8;font-weight:600">${r.telefono}</a></div>
+      </div>` : ''}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <div style="font-size:.72rem;color:#9CA3AF;text-transform:uppercase;letter-spacing:.05em">Fecha</div>
+          <div style="font-weight:600;margin-top:2px">${fmtFecha}</div>
+        </div>
+        <div>
+          <div style="font-size:.72rem;color:#9CA3AF;text-transform:uppercase;letter-spacing:.05em">Hora</div>
+          <div style="font-weight:600;margin-top:2px">${hora}</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <div style="font-size:.72rem;color:#9CA3AF;text-transform:uppercase;letter-spacing:.05em">Personas</div>
+          <div style="font-weight:600;margin-top:2px">${r.personas || '—'}</div>
+        </div>
+        <div>
+          <div style="font-size:.72rem;color:#9CA3AF;text-transform:uppercase;letter-spacing:.05em">Mesa</div>
+          <div style="font-weight:600;margin-top:2px">${r.mesa_nombre || '<span style="color:#EF4444">Sin asignar</span>'}</div>
+        </div>
+      </div>
+      ${r.notas ? `<div>
+        <div style="font-size:.72rem;color:#9CA3AF;text-transform:uppercase;letter-spacing:.05em">Notas</div>
+        <div style="margin-top:2px;font-style:italic;color:#6B7280">${r.notas}</div>
+      </div>` : ''}
+      <div>
+        <div style="font-size:.72rem;color:#9CA3AF;text-transform:uppercase;letter-spacing:.05em">Estado</div>
+        <div style="margin-top:4px"><span style="padding:3px 10px;border-radius:99px;font-size:.78rem;font-weight:600;background:${bg};color:${fg}">${r.estado}</span></div>
+      </div>
+    </div>
+  `;
+  document.getElementById('modal-reserva-det').style.display = 'flex';
 }
 
 // ── Iniciar polling ──────────────────────────────────────────────────────────

@@ -87,6 +87,14 @@ class RestPorteroController extends BaseController
             (new RestMesaModel())->cambiarEstado((int)$visita['mesa_id'], 'disponible');
         }
 
+        // Auto-completar reservación del día si aplica
+        if (!empty($visita['mesa_id'])) {
+            Database::getInstance()->prepare(
+                "UPDATE rest_reservaciones SET estado='completada'
+                 WHERE mesa_id = ? AND fecha = CURDATE() AND estado IN ('pendiente','confirmada')"
+            )->execute([(int)$visita['mesa_id']]);
+        }
+
         $this->json(['ok' => true, 'mensaje' => 'Salida registrada.']);
     }
 }

@@ -638,34 +638,26 @@ class RestPublicoController extends BaseController
 
         $restaurante = $this->restModel->find((int)$visita['restaurante_id']);
 
-        // Salida ya registrada → directo a gracias (comensal rescaneó su QR)
+        // Salida ya registrada → directo a gracias
         if (!empty($visita['salida_at'])) {
             $this->redirect('menu/gracias?qr=' . urlencode($qr));
             return;
         }
 
-        // Cuenta pagada y el comensal escanea su propio QR → procesar salida automáticamente
-        if (($visita['estado'] ?? '') === 'pagada') {
-            $this->visitaModel->marcarSalida((int)$visita['id']);
-            if (!empty($visita['mesa_id'])) {
-                $this->mesaModel->cambiarEstado((int)$visita['mesa_id'], 'disponible');
-            }
-            if ($restaurante) {
-                setcookie('visita_' . $restaurante['id'], '', ['expires' => time() - 1, 'path' => '/', 'httponly' => true, 'samesite' => 'Lax']);
-            }
-            $this->redirect('menu/gracias?qr=' . urlencode($qr));
-            return;
-        }
-
-        // Cuenta aún no pagada → mostrar pantalla de verificación al portero
+        // Mostrar estado (solo lectura — la salida la registra el portero autenticado)
         $pageTitle = 'Verificar salida';
         $this->render('publico/portero/scan', compact('visita', 'restaurante', 'qr', 'pageTitle'));
     }
 
-    // POST /menu/registrarSalidaPublica  — AJAX; seguro por token de alta entropía
+    // POST /menu/registrarSalidaPublica — requiere sesión de staff
     public function registrarSalidaPublica(?string $p = null): void
     {
         header('Content-Type: application/json');
+        if (!isset($_SESSION['usuario'])) {
+            http_response_code(403);
+            echo json_encode(['ok' => false, 'mensaje' => 'No autorizado.']);
+            exit;
+        }
         $qr     = trim($this->post('qr', ''));
         $visita = $qr ? $this->visitaModel->getByQr($qr) : null;
 
@@ -702,6 +694,25 @@ class RestPublicoController extends BaseController
             'ok'       => true,
             'mensaje'  => '¡Salida registrada! Mesa liberada.',
             'redirect' => BASE_URL . 'menu/gracias?qr=' . urlencode($visita['qr_code'] ?? ''),
+        ]);
+        exit;
+    }
+
+    // GET /menu/checkSalida?qr=TOKEN — polling del comensal para detectar salida
+    public function checkSalida(?string $p = null): void
+    {
+        header('Content-Type: application/json');
+        $qr     = trim($_GET['qr'] ?? '');
+        $visita = $qr ? $this->visitaModel->getByQr($qr) : null;
+        if (!$visita) {
+            echo json_encode(['ok' => false, 'salida' => false]);
+            exit;
+        }
+        $salida = !empty($visita['salida_at']);
+        echo json_encode([
+            'ok'      => true,
+            'salida'  => $salida,
+            'redirect'=> $salida ? BASE_URL . 'menu/gracias?qr=' . urlencode($qr) : null,
         ]);
         exit;
     }

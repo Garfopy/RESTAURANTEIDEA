@@ -140,6 +140,12 @@ $_meserosTurno = $_stmtMs->fetchAll(PDO::FETCH_ASSOC);
             <?php endif; ?>
             <a href="<?= BASE_URL ?>rest-reserva/eliminar/<?= $r['id'] ?>" onclick="return confirm('¿Eliminar esta solicitud?')"
                style="font-size:.75rem;color:#EF4444;text-decoration:none">Eliminar</a>
+            <button type="button"
+              data-r='<?= htmlspecialchars(json_encode(['id'=>(int)$r['id'],'nombre'=>$r['nombre']??'','telefono'=>$r['telefono']??'','fecha'=>$r['fecha']??'','hora'=>$r['hora']??'','personas'=>(int)($r['personas']??0),'mesa_nombre'=>$r['mesa_nombre']??'','mesero_nombre'=>$r['mesero_nombre']??'','notas'=>$r['notas']??'','estado'=>$r['estado']??'']), ENT_QUOTES) ?>'
+              onclick="abrirDetalleReserva(JSON.parse(this.dataset.r))"
+              style="font-size:.75rem;padding:4px 9px;border:1px solid #6B7280;color:#6B7280;background:none;border-radius:6px;cursor:pointer">
+              👁 Ver
+            </button>
           </div>
         </td>
       </tr>
@@ -188,6 +194,12 @@ $_meserosTurno = $_stmtMs->fetchAll(PDO::FETCH_ASSOC);
             </form>
             <a href="<?= BASE_URL ?>rest-reserva/eliminar/<?= $r['id'] ?>" onclick="return confirm('¿Eliminar?')"
                style="font-size:.75rem;color:#EF4444;text-decoration:none">Eliminar</a>
+            <button type="button"
+              data-r='<?= htmlspecialchars(json_encode(['id'=>(int)$r['id'],'nombre'=>$r['nombre']??'','telefono'=>$r['telefono']??'','fecha'=>$r['fecha']??'','hora'=>$r['hora']??'','personas'=>(int)($r['personas']??0),'mesa_nombre'=>$r['mesa_nombre']??'','mesero_nombre'=>$r['mesero_nombre']??'','notas'=>$r['notas']??'','estado'=>$r['estado']??'']), ENT_QUOTES) ?>'
+              onclick="abrirDetalleReserva(JSON.parse(this.dataset.r))"
+              style="font-size:.75rem;padding:4px 9px;border:1px solid #6B7280;color:#6B7280;background:none;border-radius:6px;cursor:pointer">
+              👁 Ver
+            </button>
           </div>
         </td>
       </tr>
@@ -197,6 +209,18 @@ $_meserosTurno = $_stmtMs->fetchAll(PDO::FETCH_ASSOC);
       <?php endif; ?>
       </tbody>
     </table>
+  </div>
+</div>
+
+<!-- ── Modal detalle reservación ────────────────────────────── -->
+<div id="modal-reserva-det" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;align-items:center;justify-content:center;padding:16px">
+  <div style="background:#fff;border-radius:16px;padding:24px;width:100%;max-width:400px;max-height:90vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h3 style="font-weight:700;font-size:1rem">Detalle de reservación</h3>
+      <button onclick="document.getElementById('modal-reserva-det').style.display='none'"
+              style="background:none;border:none;font-size:1.3rem;cursor:pointer;color:#6B7280">✕</button>
+    </div>
+    <div id="modal-reserva-body"></div>
   </div>
 </div>
 
@@ -325,6 +349,59 @@ $_meserosTurno = $_stmtMs->fetchAll(PDO::FETCH_ASSOC);
 
 <script>
 const BASE_RES = '<?= BASE_URL ?>';
+
+function abrirDetalleReserva(r) {
+  if (!r) return;
+  const fmtFecha = r.fecha ? r.fecha.split('-').reverse().join('/') : '—';
+  const hora = (r.hora || '').substring(0, 5) || '—';
+  const estadoMap = { pendiente:['#FEF3C7','#92400E'], confirmada:['#DCFCE7','#166534'], cancelada:['#FEE2E2','#991B1B'], completada:['#F3F4F6','#374151'] };
+  const [bg, fg] = estadoMap[r.estado] || ['#F3F4F6','#374151'];
+  document.getElementById('modal-reserva-body').innerHTML = `
+    <div style="display:grid;gap:14px">
+      <div>
+        <div style="font-size:.72rem;color:#9CA3AF;text-transform:uppercase;letter-spacing:.05em">Nombre</div>
+        <div style="font-weight:700;margin-top:2px;font-size:1rem">${r.nombre || '—'}</div>
+      </div>
+      ${r.telefono ? `<div>
+        <div style="font-size:.72rem;color:#9CA3AF;text-transform:uppercase;letter-spacing:.05em">Teléfono</div>
+        <div style="margin-top:2px"><a href="tel:${r.telefono}" style="color:#1D4ED8;font-weight:600">${r.telefono}</a></div>
+      </div>` : ''}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <div style="font-size:.72rem;color:#9CA3AF;text-transform:uppercase;letter-spacing:.05em">Fecha</div>
+          <div style="font-weight:600;margin-top:2px">${fmtFecha}</div>
+        </div>
+        <div>
+          <div style="font-size:.72rem;color:#9CA3AF;text-transform:uppercase;letter-spacing:.05em">Hora</div>
+          <div style="font-weight:600;margin-top:2px">${hora}</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <div style="font-size:.72rem;color:#9CA3AF;text-transform:uppercase;letter-spacing:.05em">Personas</div>
+          <div style="font-weight:600;margin-top:2px">${r.personas || '—'}</div>
+        </div>
+        <div>
+          <div style="font-size:.72rem;color:#9CA3AF;text-transform:uppercase;letter-spacing:.05em">Mesa</div>
+          <div style="font-weight:600;margin-top:2px">${r.mesa_nombre || '<span style="color:#EF4444">Sin asignar</span>'}</div>
+        </div>
+      </div>
+      ${r.mesero_nombre ? `<div>
+        <div style="font-size:.72rem;color:#9CA3AF;text-transform:uppercase;letter-spacing:.05em">Mesero</div>
+        <div style="font-weight:600;margin-top:2px">${r.mesero_nombre}</div>
+      </div>` : ''}
+      ${r.notas ? `<div>
+        <div style="font-size:.72rem;color:#9CA3AF;text-transform:uppercase;letter-spacing:.05em">Notas</div>
+        <div style="margin-top:2px;font-style:italic;color:#6B7280">${r.notas}</div>
+      </div>` : ''}
+      <div>
+        <div style="font-size:.72rem;color:#9CA3AF;text-transform:uppercase;letter-spacing:.05em">Estado</div>
+        <div style="margin-top:4px"><span style="padding:3px 10px;border-radius:99px;font-size:.78rem;font-weight:600;background:${bg};color:${fg}">${r.estado}</span></div>
+      </div>
+    </div>
+  `;
+  document.getElementById('modal-reserva-det').style.display = 'flex';
+}
 
 function previewMesero(mesaId) {
   const el = document.getElementById('meseroPreview');
