@@ -22,7 +22,16 @@ if (file_exists(ROOT_PATH . '/vendor/autoload.php')) {
 }
 
 // ── Session ───────────────────────────────────────────────────────────────────
-session_name(SESSION_NAME);
+// Detect early if this request belongs to the staff/comensal area so we can
+// use a SEPARATE session cookie and keep the admin session independent.
+$_earlyPath     = trim($_GET['url'] ?? '', '/');
+$_earlySegments = array_values(array_filter(explode('/', $_earlyPath)));
+$_earlyCtrl     = strtolower($_earlySegments[0] ?? '');
+$_staffArea     = in_array($_earlyCtrl, [
+    'acceso', 'menu',
+    'rest-mesero', 'rest-chef', 'rest-portero', 'rest-staff', 'rest-propinas',
+], true);
+session_name($_staffArea ? SESSION_NAME . '_staff' : SESSION_NAME);
 session_start();
 
 // ── Parse URL ─────────────────────────────────────────────────────────────────
