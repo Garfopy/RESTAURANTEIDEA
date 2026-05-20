@@ -4,6 +4,14 @@
  *
  * Copia este archivo a config/database.php y llena tus credenciales.
  * NUNCA subas config/database.php al repositorio.
+ *
+ * ── Deploy standalone restaurante (idactivos.digital/restaurante/) ──────────
+ * Agrega la siguiente constante para omitir la landing pública y arrancar
+ * directamente en el login:
+ *
+ *   define('RESTAURANTE_STANDALONE', true);
+ *
+ * En un deploy normal de CarniHub omite esa línea (o ponla en false).
  */
 
 define('DB_HOST',    'localhost');

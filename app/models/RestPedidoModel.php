@@ -86,13 +86,40 @@ class RestPedidoModel extends BaseModel
 
     public function getKitchenQueue(int $restauranteId): array
     {
+        // Formato ingredientes_raw (separador ||, campos |):
+        //   codigo | nombre | tipo | cantidad | unidad | notas | es_informativo
+        //   - tipo: materia_prima | guarnicion | bebida | otro
+        //   - es_informativo=1 → no descuenta stock, sólo muestra al chef
         return $this->query(
             "SELECT p.id, p.folio, p.created_at, p.notas AS pedido_notas,
                     TIMESTAMPDIFF(MINUTE, p.created_at, NOW()) AS minutos_espera,
                     m.nombre AS mesa_nombre,
                     pi.id AS item_id, pi.platillo_id, pi.cantidad, pi.notas AS item_notas, pi.estado AS item_estado,
                     pi.exclusiones,
-                    pl.nombre AS platillo_nombre, pl.tiempo_preparacion_min
+                    pl.nombre AS platillo_nombre, pl.tiempo_preparacion_min,
+                    COALESCE(pl.codigo,'') AS platillo_codigo,
+                    (SELECT r.notas
+                       FROM rest_recetas r
+                      WHERE r.platillo_id = pi.platillo_id LIMIT 1) AS instrucciones_armado,
+                    (SELECT GROUP_CONCAT(
+                                CONCAT_WS('|',
+                                    COALESCE(ing.codigo, CONCAT('#', ing.id)),
+                                    ing.nombre,
+                                    COALESCE(ing.tipo, 'otro'),
+                                    ri.cantidad,
+                                    ri.unidad,
+                                    COALESCE(ri.notas,''),
+                                    COALESCE(ri.es_informativo, 0)
+                                )
+                                ORDER BY
+                                    FIELD(COALESCE(ing.tipo,'otro'),'materia_prima','guarnicion','bebida','otro'),
+                                    COALESCE(ing.codigo, ing.nombre)
+                                SEPARATOR '||'
+                            )
+                     FROM rest_recetas r
+                     JOIN rest_receta_ingredientes ri ON ri.receta_id = r.id
+                     JOIN rest_ingredientes ing ON ing.id = ri.ingrediente_id
+                     WHERE r.platillo_id = pi.platillo_id) AS ingredientes_raw
              FROM rest_pedidos p
              JOIN rest_pedido_items pi ON pi.pedido_id = p.id
              JOIN rest_platillos pl ON pl.id = pi.platillo_id
@@ -105,10 +132,31 @@ class RestPedidoModel extends BaseModel
 
     public function cambiarEstadoPedido(int $pedidoId, string $estado): bool
     {
-        return $this->execute(
+        // Capturar estado actual + restaurante_id para detectar transición a 'entregado'.
+        $row = $this->queryOne(
+            "SELECT estado, restaurante_id FROM rest_pedidos WHERE id = ?",
+            [$pedidoId]
+        );
+        $estadoPrevio = $row['estado'] ?? null;
+
+        $ok = $this->execute(
             "UPDATE rest_pedidos SET estado = ? WHERE id = ?",
             [$estado, $pedidoId]
         );
+
+        // Descontar stock SOLO al transitar a 'entregado' (idempotente en el modelo).
+        if ($ok && $estado === 'entregado' && $estadoPrevio !== 'entregado' && $row) {
+            try {
+                (new RestInventarioModel())->descontarPorOrden(
+                    $pedidoId,
+                    (int)$row['restaurante_id']
+                );
+            } catch (\Throwable $e) {
+                error_log('[RestauranteStock] entrega pedido=' . $pedidoId . ' ' . $e->getMessage());
+            }
+        }
+
+        return $ok;
     }
 
     public function cambiarEstadoItem(int $itemId, string $estado): bool
@@ -116,6 +164,26 @@ class RestPedidoModel extends BaseModel
         return $this->execute(
             "UPDATE rest_pedido_items SET estado = ? WHERE id = ?",
             [$estado, $itemId]
+        );
+    }
+
+    // Marca como entregados todos los pedidos e items aún no entregados/cancelados
+    // de una visita. Se llama al confirmar el pago: si se cobró ya se entregó.
+    public function marcarVisitaEntregada(int $visitaId): void
+    {
+        $pedidos = $this->query(
+            "SELECT id FROM rest_pedidos WHERE visita_id = ? AND estado NOT IN ('entregado','cancelado')",
+            [$visitaId]
+        );
+        foreach ($pedidos as $p) {
+            $this->cambiarEstadoPedido((int)$p['id'], 'entregado');
+        }
+        $this->execute(
+            "UPDATE rest_pedido_items pi
+             JOIN rest_pedidos p ON p.id = pi.pedido_id
+             SET pi.estado = 'entregado'
+             WHERE p.visita_id = ? AND pi.estado NOT IN ('entregado','cancelado')",
+            [$visitaId]
         );
     }
 

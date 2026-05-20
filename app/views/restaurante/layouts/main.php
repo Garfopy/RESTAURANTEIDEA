@@ -6,6 +6,11 @@ $colorSec   = $restaurante['color_secundario'] ?? '#1f2937';
 $restNombre = $restaurante['nombre'] ?? 'Mi Restaurante';
 $restLogo   = $restaurante['logo']   ?? '';
 $activeMenu = $activeMenu ?? '';
+
+// Roles para visibilidad del sidebar
+$_rol      = $usuario['rol_slug'] ?? '';
+$_isAdmin  = in_array($_rol, ['admin_restaurante', 'comprador'], true); // gestión del restaurante
+$_isMesero = in_array($_rol, ['mesero', 'comprador'], true);            // operación de salón
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -54,6 +59,7 @@ $activeMenu = $activeMenu ?? '';
       <svg style="width:16px;height:16px;flex-shrink:0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
       Mesas
     </a>
+    <?php if ($_isMesero): ?>
     <a class="rst-nav-link <?= $activeMenu === 'rest_pedidos' ? 'active' : '' ?>"
        href="<?= BASE_URL ?>rest-pedido/index">
       <svg style="width:16px;height:16px;flex-shrink:0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
@@ -69,6 +75,7 @@ $activeMenu = $activeMenu ?? '';
       <svg style="width:16px;height:16px;flex-shrink:0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"/></svg>
       Tickets
     </a>
+    <?php endif; ?>
 
     <div class="rst-nav-section">Financiero</div>
     <a class="rst-nav-link <?= $activeMenu === 'rest_finanzas' ? 'active' : '' ?>"
@@ -98,7 +105,7 @@ $activeMenu = $activeMenu ?? '';
     <a class="rst-nav-link <?= $activeMenu === 'rest_inventario' ? 'active' : '' ?>"
        href="<?= BASE_URL ?>rest-inventario/index">
       <svg style="width:16px;height:16px;flex-shrink:0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
-      Inventario
+      Ingredientes
     </a>
 
     <div class="rst-nav-section">Clientes</div>
@@ -106,14 +113,6 @@ $activeMenu = $activeMenu ?? '';
        href="<?= BASE_URL ?>rest-cliente/index">
       <svg style="width:16px;height:16px;flex-shrink:0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
       Comensales
-    </a>
-    <a class="rst-nav-link"
-       href="<?= BASE_URL ?>rest-cliente/topConsumo" style="padding-left:38px;font-size:.82rem">
-      Top por Consumo
-    </a>
-    <a class="rst-nav-link"
-       href="<?= BASE_URL ?>rest-cliente/topVisitas" style="padding-left:38px;font-size:.82rem">
-      Top por Visitas
     </a>
 
     <div class="rst-nav-section">Ajustes</div>
@@ -136,10 +135,6 @@ $activeMenu = $activeMenu ?? '';
        href="<?= BASE_URL ?>rest-config/index">
       <svg style="width:16px;height:16px;flex-shrink:0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
       Configuración
-    </a>
-    <a class="rst-nav-link" href="<?= BASE_URL ?>comprador/inicio" style="margin-top:6px">
-      <svg style="width:16px;height:16px;flex-shrink:0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
-      Volver al portal
     </a>
   </nav>
 

@@ -14,17 +14,14 @@ class StaffAccesoController extends BaseController
     // GET /acceso/{slug}
     public function index(?string $slug = null): void
     {
-        if (isset($_SESSION['usuario'])) {
-            $rol = $_SESSION['usuario']['rol_slug'] ?? '';
-            // Solo redirigir automáticamente a staff — comprador/admin puede ver la página para compartirla
-            if (in_array($rol, ['mesero', 'chef', 'portero'])) {
-                $this->redirectSegunRol($rol);
-            }
-        }
+        // Siempre mostrar la pantalla de login. Con cookies de sesión por rol
+        // ya no tiene sentido detectar "ya logueado" aquí: cada rol vive en su
+        // propia cookie y esta pantalla usa la cookie _login (transitoria).
         $restaurante = $slug ? $this->restModel->getBySlug($slug) : null;
         $flash       = $this->getFlash();
         $pageTitle   = 'Acceso Staff — ' . ($restaurante['nombre'] ?? 'CarniHub');
-        $this->render('staff/login', compact('restaurante', 'flash', 'pageTitle', 'slug'));
+        $yaLogueado  = null;
+        $this->render('staff/login', compact('restaurante', 'flash', 'pageTitle', 'slug', 'yaLogueado'));
     }
 
     // POST /acceso/{slug}
@@ -90,7 +87,13 @@ class StaffAccesoController extends BaseController
             $this->redirect('acceso/' . $slug);
         }
 
-        $_SESSION['usuario'] = [
+        // Cambiar a la cookie de sesión propia del rol para que admin y otros
+        // staff conserven su sesión en el mismo navegador.
+        // IMPORTANTE: forzar un session_id NUEVO. PHP reusa el id actual al
+        // hacer session_name + session_start, lo que provocaba que todas las
+        // cookies por rol apuntaran al MISMO archivo de sesión (cada login
+        // pisaba al anterior).
+        $sessionData = [
             'id'           => $user['id'],
             'nombre'       => $user['nombre'],
             'email'        => $user['email'],
@@ -99,7 +102,21 @@ class StaffAccesoController extends BaseController
             'empresa_id'   => $user['empresa_id'] ?? null,
             'restaurante_id' => $restaurante['id'] ?? null,
         ];
-        $_SESSION['restaurante_activo_id'] = $restaurante['id'] ?? null;
+        $activeRest = $restaurante['id'] ?? null;
+
+        session_write_close();
+        $cookieName = SESSION_NAME . '_' . $user['rol_slug'];
+        session_name($cookieName);
+        // SIEMPRE id fresco. Esto:
+        //  1) evita que PHP reuse el id de la cookie _login (lo que provocaba
+        //     que todas las cookies por rol apuntaran al mismo archivo).
+        //  2) limpia "cookies corruptas" en navegadores que ya hicieron login
+        //     con el bug anterior.
+        session_id(session_create_id());
+        session_start();
+        $_SESSION                          = [];
+        $_SESSION['usuario']               = $sessionData;
+        $_SESSION['restaurante_activo_id'] = $activeRest;
 
         $this->redirectSegunRol($user['rol_slug']);
     }

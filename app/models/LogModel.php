@@ -12,20 +12,30 @@ class LogModel extends BaseModel
         string  $descripcion = ''
     ): void {
         $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
-        $this->execute(
-            'INSERT INTO action_logs (usuario_id, rol, empresa_id, accion, modulo, descripcion, ip)
-             VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [$usuarioId, $rol, $empresaId, $accion, $modulo, $descripcion, $ip]
-        );
+        try {
+            $this->execute(
+                'INSERT INTO action_logs (usuario_id, rol, empresa_id, accion, modulo, descripcion, ip)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)',
+                [$usuarioId, $rol, $empresaId, $accion, $modulo, $descripcion, $ip]
+            );
+        } catch (\Throwable $e) {
+            // La auditoría es opcional: si la tabla no existe (p.ej. deploy mínimo
+            // de restaurante) no debemos romper el flujo principal. Solo logueamos.
+            error_log('[LogModel::registrar] ' . $e->getMessage());
+        }
     }
 
     public function registrarError(string $nivel, string $mensaje, string $archivo = '', int $linea = 0, ?array $contexto = null): void
     {
-        $this->execute(
-            'INSERT INTO error_logs (nivel, mensaje, archivo, linea, contexto)
-             VALUES (?, ?, ?, ?, ?)',
-            [$nivel, $mensaje, $archivo, $linea, $contexto ? json_encode($contexto) : null]
-        );
+        try {
+            $this->execute(
+                'INSERT INTO error_logs (nivel, mensaje, archivo, linea, contexto)
+                 VALUES (?, ?, ?, ?, ?)',
+                [$nivel, $mensaje, $archivo, $linea, $contexto ? json_encode($contexto) : null]
+            );
+        } catch (\Throwable $e) {
+            error_log('[LogModel::registrarError] ' . $e->getMessage());
+        }
     }
 
     public function getBitacora(array $filtros = [], int $page = 1): array

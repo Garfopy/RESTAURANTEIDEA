@@ -16,7 +16,7 @@
 <body>
 <div class="topbar">
   <div style="font-weight:700">🚪 Portero — <?= htmlspecialchars($restaurante['nombre'] ?? '') ?></div>
-  <a href="<?= BASE_URL ?>auth/logout" style="color:#9CA3AF;font-size:.8rem">Salir</a>
+  <a href="<?= BASE_URL ?>auth/logoutStaff/portero" style="color:#9CA3AF;font-size:.8rem">Salir</a>
 </div>
 
 <div style="padding:28px;max-width:480px;margin:0 auto">
@@ -39,7 +39,7 @@
   <!-- Cámara QR (opcional) -->
   <div style="background:#1F2937;border-radius:16px;padding:24px;margin-bottom:20px">
     <div style="font-weight:600;margin-bottom:12px">Escanear QR con cámara</div>
-    <video id="video" style="width:100%;border-radius:10px;display:none;max-height:280px;object-fit:cover"></video>
+    <video id="video" playsinline muted autoplay style="width:100%;border-radius:10px;display:none;max-height:280px;object-fit:cover"></video>
     <canvas id="canvas" style="display:none"></canvas>
     <button id="btnCam"
       style="width:100%;padding:10px;background:#374151;color:#F9FAFB;border:none;border-radius:10px;cursor:pointer;font-size:.9rem">
@@ -68,7 +68,7 @@
   </div>
 </div>
 
-<script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<script src="<?= BASE_URL ?>public/js/jsQR.min.js"></script>
 <script>
 const baseUrl = '<?= BASE_URL ?>';
 const video   = document.getElementById('video');
@@ -180,29 +180,59 @@ document.getElementById('formEntrada').addEventListener('submit', async e => {
 
 // Cámara QR
 let scanning = false;
-document.getElementById('btnCam').addEventListener('click', () => {
-  if (scanning) { scanning = false; video.style.display='none'; document.getElementById('btnCam').textContent='📷 Activar cámara'; return; }
-  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }).then(stream => {
+let stream   = null;
+let lastScan = 0;
+
+document.getElementById('btnCam').addEventListener('click', async () => {
+  const btn = document.getElementById('btnCam');
+  if (scanning) {
+    scanning = false;
+    if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+    video.srcObject = null;
+    video.style.display = 'none';
+    btn.textContent = '📷 Activar cámara';
+    return;
+  }
+  if (typeof jsQR !== 'function') {
+    alert('Librería de QR no cargada. Revisa tu conexión.');
+    return;
+  }
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' } },
+      audio: false
+    });
     video.srcObject = stream;
+    video.setAttribute('playsinline', 'true');
+    video.muted = true;
+    await video.play();
     video.style.display = 'block';
-    video.play();
     scanning = true;
-    document.getElementById('btnCam').textContent = '⏹ Detener cámara';
+    btn.textContent = '⏹ Detener cámara';
     requestAnimationFrame(scan);
-  }).catch(() => alert('No se pudo acceder a la cámara.'));
+  } catch (err) {
+    console.error('getUserMedia error:', err);
+    alert('No se pudo acceder a la cámara: ' + (err.message || err.name));
+  }
 });
 
 function scan() {
   if (!scanning) return;
-  if (video.readyState === video.HAVE_ENOUGH_DATA) {
+  if (video.readyState >= video.HAVE_ENOUGH_DATA && video.videoWidth > 0) {
     canvas.width  = video.videoWidth;
     canvas.height = video.videoHeight;
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     const img  = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const code = jsQR(img.data, img.width, img.height);
-    if (code) { verificar(code.data); }
+    const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
+    if (code && code.data) {
+      const now = Date.now();
+      if (code.data !== lastQr || now - lastScan > 3000) {
+        lastScan = now;
+        verificar(code.data);
+      }
+    }
   }
-  if (scanning) requestAnimationFrame(scan);
+  requestAnimationFrame(scan);
 }
 </script>
 </body>

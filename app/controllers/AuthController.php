@@ -53,6 +53,12 @@ class AuthController extends BaseController
         $usuarioModel = new UsuarioModel();
         $usuario      = $usuarioModel->getByEmail($email);
 
+        // Cuenta desactivada: mensaje específico, sin contar intento fallido
+        if ($usuario && !(int)$usuario['activo']) {
+            $this->flash('error', 'Tu cuenta ha sido desactivada. Ponte en contacto con el administrador para reactivarla.');
+            $this->redirect('auth/login');
+        }
+
         if (!$usuario || !password_verify($password, $usuario['password'])) {
             // Registrar intento fallido
             $stmt = $db->prepare("INSERT INTO login_intentos (ip, email) VALUES (?, ?)");
@@ -67,9 +73,15 @@ class AuthController extends BaseController
             $this->redirect('auth/login');
         }
 
+        // Verificar que el email esté verificado
+        if (empty($usuario['email_verificado'])) {
+            $this->flash('error', 'Debes verificar tu email antes de iniciar sesión. Revisa tu bandeja de entrada (y spam) y haz clic en el link de verificación.');
+            $this->redirect('auth/login');
+        }
+
         // Cuenta inactiva
         if (empty($usuario['activo'])) {
-            $this->flash('error', 'Tu cuenta está desactivada. Contacta al administrador.');
+            $this->flash('error', 'Tu cuenta está deshabilitada. Por favor comunícate con un administrador para volver a activarla.');
             $this->redirect('auth/login');
         }
 
@@ -79,7 +91,17 @@ class AuthController extends BaseController
 
         $_SESSION['usuario'] = $usuario;
 
+        if (!empty($usuario['empresa_id'])) {
+            $empresaModel = new EmpresaModel();
+            $_SESSION['empresa'] = $empresaModel->find($usuario['empresa_id']);
+        }
+
         $this->log('Login exitoso', 'auth');
+
+        // Verificar si es primer login después de verificación
+        if ($usuario['email_verificado'] && empty($usuario['primer_login_completado'])) {
+            $this->flash('first_login', '¡Bienvenido! Te recomendamos cambiar tu contraseña para mayor seguridad.');
+        }
 
         $this->redirectSegunRol($usuario['rol_slug']);
     }
@@ -144,6 +166,9 @@ class AuthController extends BaseController
             $this->redirect('auth/login');
         }
 
+        // Si no es un usuario existente, el token no corresponde a nada válido
+        // (el flujo de registro pendiente SaaS no aplica en despliegue standalone).
+        error_log("[AuthController::verificar] Token no corresponde a ningún usuario");
         $this->flash('error', 'El link de verificación no es válido o ya fue usado.');
         $this->redirect('auth/login');
     }
@@ -153,6 +178,39 @@ class AuthController extends BaseController
         $this->log('Logout', 'auth');
         session_destroy();
         header('Location: ' . BASE_URL . 'auth/login');
+        exit;
+    }
+
+    // Cierra solo la cookie de sesión del rol indicado (chef|mesero|portero|staff|comensal)
+    // manteniendo intactas las otras sesiones (admin u otros staff).
+    public function logoutStaff(?string $rol = null): void
+    {
+        $rol = strtolower($rol ?? '');
+        if (!in_array($rol, ['chef', 'mesero', 'portero', 'staff', 'comensal'], true)) {
+            header('Location: ' . BASE_URL); exit;
+        }
+        // Capturar slug del restaurante ANTES de destruir la sesión para
+        // poder redirigir al login del restaurante correcto.
+        $restSlug = null;
+        $restId = $_SESSION['restaurante_activo_id'] ?? ($_SESSION['usuario']['restaurante_id'] ?? null);
+        if ($restId) {
+            try {
+                $rest = (new RestauranteModel())->find((int)$restId);
+                $restSlug = $rest['slug'] ?? null;
+            } catch (\Throwable $e) { /* fallback abajo */ }
+        }
+
+        // La cookie correcta ya fue abierta por index.php (auth/logoutStaff/{rol}).
+        $_SESSION = [];
+        if (ini_get('session.use_cookies')) {
+            $p = session_get_cookie_params();
+            setcookie(session_name(), '', time() - 42000,
+                $p['path'], $p['domain'], $p['secure'], $p['httponly']);
+        }
+        session_destroy();
+
+        $target = $restSlug ? ('acceso/' . $restSlug) : '';
+        header('Location: ' . BASE_URL . $target);
         exit;
     }
 
@@ -183,7 +241,7 @@ class AuthController extends BaseController
         $usuarioModel = new UsuarioModel();
         $usuario      = $usuarioModel->getByEmail($email);
 
-        if ($usuario) {
+        if ($usuario && !empty($usuario['email_verificado'])) {
             $token  = bin2hex(random_bytes(32));
             $expira = date('Y-m-d H:i:s', strtotime('+1 hour'));
 

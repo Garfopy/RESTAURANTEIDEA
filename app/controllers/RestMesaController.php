@@ -15,13 +15,17 @@ class RestMesaController extends BaseController
     public function index(?string $p = null): void
     {
         $restauranteId = $this->restauranteId();
-        $mesas  = $this->model->getByRestaurante($restauranteId);
+        $filtro = $_GET['estado'] ?? 'activas';
+        $activo = $filtro === 'inactivas' ? false : ($filtro === 'todas' ? null : true);
+        $mesas  = $this->model->getByRestaurante($restauranteId, $activo);
+        $countActivas   = count($this->model->getByRestaurante($restauranteId, true));
+        $countInactivas = count($this->model->getByRestaurante($restauranteId, false));
         $zonas  = $this->model->getZonas($restauranteId);
         $rest   = (new RestauranteModel())->find($restauranteId);
         $flash  = $this->getFlash();
         $pageTitle  = 'Mesas';
         $activeMenu = 'rest_mesas';
-        $this->render('restaurante/mesas/index', compact('mesas','zonas','rest','flash','pageTitle','activeMenu'));
+        $this->render('restaurante/mesas/index', compact('mesas','zonas','rest','flash','pageTitle','activeMenu','filtro','countActivas','countInactivas'));
     }
 
     public function layout(?string $p = null): void
@@ -66,6 +70,20 @@ class RestMesaController extends BaseController
         $this->model->update((int)$id, ['activo' => 0]);
         $this->flash('success', 'Mesa desactivada.');
         $this->redirect('rest-mesa/index');
+    }
+
+    public function activar(?string $id = null): void
+    {
+        $this->model->update((int)$id, ['activo' => 1]);
+        $this->flash('success', 'Mesa reactivada.');
+        $this->redirect('rest-mesa/index?estado=inactivas');
+    }
+
+    public function borrar(?string $id = null): void
+    {
+        $this->model->delete((int)$id);
+        $this->flash('success', 'Mesa eliminada permanentemente.');
+        $this->redirect('rest-mesa/index?estado=inactivas');
     }
 
     public function actualizarPosicion(?string $p = null): void

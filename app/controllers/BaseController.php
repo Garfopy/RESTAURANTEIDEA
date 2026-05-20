@@ -1,6 +1,6 @@
 <?php
 /**
- * CapiRest — Base Controller v2.0
+ * CarniHub — Base Controller v2.0
  */
 abstract class BaseController
 {
@@ -41,28 +41,84 @@ abstract class BaseController
     protected function redirectSegunRol(string $rol): void
     {
         match (true) {
+            $rol === 'admin_restaurante', $rol === 'comprador'        => $this->redirect('restaurante/dashboard'),
             $rol === 'mesero'                                          => $this->redirect('rest-mesero/dashboard'),
             $rol === 'chef'                                            => $this->redirect('rest-chef/dashboard'),
             $rol === 'portero'                                         => $this->redirect('rest-portero/dashboard'),
-            in_array($rol, ['admin_local', 'comprador'], true)         => $this->redirect('restaurante/seleccionar'),
             default                                                    => $this->redirect('auth/login'),
         };
     }
 
     // ── Protección de acceso ──────────────────────────────────────
 
-    /** Admin local del restaurante (nivel alto) */
+    /** Solo superadmin (panel de plataforma) */
     protected function requireAdmin(): void
     {
-        $this->requireRole(['admin_local']);
+        $this->requireRole(['superadmin']);
     }
 
-    /** Admin del restaurante con sucursal activa */
+    /** Solo superadmin (configuración global, crear admins) */
+    protected function requireSuperAdmin(): void
+    {
+        $this->requireRole(['superadmin']);
+    }
+
+    /** Roles del portal empresa: admin_empresa, supervisor, comprador */
+    protected function requireEmpresa(): void
+    {
+        $this->requireRole(['admin_empresa', 'supervisor', 'comprador']);
+    }
+
+    /** Puede hacer pedidos: admin_empresa y comprador */
+    protected function requireComprador(): void
+    {
+        $this->requireRole(['admin_empresa', 'comprador']);
+    }
+
+    /** Puede aprobar pedidos: admin_empresa y supervisor */
+    protected function requireSupervisor(): void
+    {
+        $this->requireRole(['admin_empresa', 'supervisor']);
+    }
+
+    /** Solo admin_empresa (gestión de su empresa) */
+    protected function requireAdminEmpresa(): void
+    {
+        $this->requireRole(['admin_empresa']);
+    }
+
+    /** Solo repartidor */
+    protected function requireRepartidor(): void
+    {
+        $this->requireRole(['repartidor']);
+    }
+
+    /** Admin del restaurante (comprador con restaurante activo o admin_restaurante) */
     protected function requireRestaurante(): void
     {
-        $this->requireRole(['admin_local', 'comprador']);
+        $this->requireRole(['comprador', 'admin_restaurante']);
+        $rol = $this->rolActual();
+
+        // admin_restaurante: auto-seleccionar el primer restaurante de su empresa
+        if ($rol === 'admin_restaurante' && empty($_SESSION['restaurante_activo_id'])) {
+            $empresaId = $this->empresaId();
+            if ($empresaId) {
+                $restModel = new RestauranteModel();
+                $rests     = $restModel->getByEmpresa($empresaId);
+                if (!empty($rests)) {
+                    $_SESSION['restaurante_activo_id'] = (int)$rests[0]['id'];
+                }
+            }
+        }
+
         $restauranteId = $_SESSION['restaurante_activo_id'] ?? null;
         if (!$restauranteId) {
+            if ($rol === 'admin_restaurante') {
+                // No hay restaurantes asociados a su empresa: cerrar sesión con mensaje.
+                $this->flash('error', 'Tu cuenta no tiene ningún restaurante asignado. Contacta al administrador.');
+                session_destroy();
+                $this->redirect('auth/login');
+            }
             $this->redirect('restaurante/seleccionar');
         }
     }
@@ -70,19 +126,19 @@ abstract class BaseController
     /** Staff: mesero */
     protected function requireMesero(): void
     {
-        $this->requireRole(['mesero', 'admin_local']);
+        $this->requireRole(['mesero', 'comprador']);
     }
 
     /** Staff: chef */
     protected function requireChef(): void
     {
-        $this->requireRole(['chef', 'admin_local']);
+        $this->requireRole(['chef', 'comprador']);
     }
 
     /** Staff: portero */
     protected function requirePortero(): void
     {
-        $this->requireRole(['portero', 'admin_local']);
+        $this->requireRole(['portero', 'comprador']);
     }
 
     /** Cualquier usuario autenticado */
@@ -135,9 +191,9 @@ abstract class BaseController
         return $this->rolActual() === 'superadmin';
     }
 
-    protected function esAdminLocal(): bool
+    protected function esAdminEmpresa(): bool
     {
-        return $this->rolActual() === 'admin_local';
+        return $this->rolActual() === 'admin_empresa';
     }
 
     // ── HTTP helpers ──────────────────────────────────────────────

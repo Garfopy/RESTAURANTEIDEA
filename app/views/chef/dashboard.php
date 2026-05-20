@@ -28,7 +28,7 @@
     /* ── Layout columnas ── */
     .kds-grid {
       display: grid;
-      grid-template-columns: 1fr 1px 1fr;
+      grid-template-columns: 1fr 1fr;
       gap: 0;
       padding: 0;
     }
@@ -86,6 +86,60 @@
     .pill-exclu { background: #7F1D1D; color: #FCA5A5; }
     .pill-nota  { background: #1E3A5F; color: #93C5FD; }
 
+    /* ── Ingredientes (receta) ── */
+    .receta-block {
+      margin-top: 8px; padding: 10px 12px;
+      background: #0D1117; border: 1px solid #21262D; border-radius: 8px;
+    }
+    .receta-title {
+      font-size: .68rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .08em; color: #8B949E; margin-bottom: 6px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .receta-group { margin-bottom: 8px; }
+    .receta-group:last-child { margin-bottom: 0; }
+    .receta-group-label {
+      font-size: .65rem; font-weight: 700; color: #6E7681;
+      text-transform: uppercase; letter-spacing: .06em; margin-bottom: 4px;
+      display: flex; align-items: center; gap: 4px;
+    }
+    .receta-group-mp .receta-group-label { color: #FCA5A5; }
+    .receta-group-gn .receta-group-label { color: #86EFAC; }
+
+    .ing-chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 4px 9px; margin: 3px 4px 3px 0;
+      background: #161B22; border: 1px solid #30363D; border-radius: 6px;
+      font-size: .75rem; color: #E6EDF3;
+    }
+    .ing-chip.tipo-mp { border-color: #7F1D1D; background: #2D1416; }
+    .ing-chip.tipo-gn { border-color: #14532D; background: #0F2117; }
+    .ing-chip.informativo { border-style: dashed; opacity: .85; }
+
+    .ing-code {
+      font-family: ui-monospace, "Cascadia Code", monospace;
+      font-weight: 800; font-size: .8rem;
+      padding: 1px 6px; border-radius: 4px;
+      background: rgba(0,0,0,.35);
+    }
+    .tipo-mp .ing-code { color: #FCA5A5; }
+    .tipo-gn .ing-code { color: #86EFAC; }
+    .ing-qty  { color: #8B949E; font-size: .7rem; font-variant-numeric: tabular-nums; }
+    .ing-note { color: #6E7681; font-size: .68rem; font-style: italic; }
+
+    .armado-instr {
+      background: #1E2A1E; border-left: 3px solid #86EFAC;
+      padding: 8px 10px; border-radius: 6px; margin-bottom: 8px;
+      font-size: .78rem; color: #D1FAE5; line-height: 1.4;
+      white-space: pre-wrap;
+    }
+    .platillo-codigo {
+      display: inline-block; padding: 2px 7px; margin-right: 6px;
+      background: #312E81; color: #C7D2FE; border-radius: 4px;
+      font-family: ui-monospace, "Cascadia Code", monospace;
+      font-size: .72rem; font-weight: 800;
+    }
+
     /* ── Botones ── */
     .btn-action {
       min-height: 44px; min-width: 90px;
@@ -108,41 +162,6 @@
       opacity: 0; transition: transform .35s cubic-bezier(.34,1.56,.64,1), opacity .35s; z-index: 99;
     }
     #kds-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-
-    /* ── Armado de platillo (KDS en preparación) ── */
-    .armado-wrap {
-      margin-top: 8px; padding-top: 8px;
-      border-top: 1px dashed #30363D;
-      display: flex; flex-direction: column; gap: 6px;
-    }
-    .armado-badges { display: flex; flex-wrap: wrap; gap: 5px; }
-    .armado-badge {
-      display: inline-flex; align-items: center; gap: 4px;
-      padding: 3px 8px; border-radius: 6px; font-size: .72rem; font-weight: 700;
-    }
-    .armado-materia_prima { background: #7F1D1D30; color: #FCA5A5; border: 1px solid #7F1D1D60; }
-    .armado-guarnicion    { background: #14532D30; color: #86EFAC; border: 1px solid #14532D60; }
-    .armado-badge strong  { font-size: .68rem; opacity: .8; }
-    .armado-badge em      { font-size: .68rem; opacity: .65; font-style: normal; }
-    .armado-loading       { font-size: .7rem; color: #484F58; padding: 4px 0; }
-    .prep-pasos { margin-top: 6px; }
-    .prep-paso  { font-size: .72rem; color: #8B949E; padding: 2px 0; }
-    .prep-paso:before { content: '\25B8 '; color: #F59E0B; }
-
-    /* ── Timer de preparación por ítem ── */
-    .item-prep-timer { margin-top: 6px; }
-    .item-prep-bar-track { background: #21262D; border-radius: 4px; height: 5px; overflow: hidden; }
-    .item-prep-bar-fill { height: 100%; border-radius: 4px; transition: width .8s ease, background .8s; }
-    .item-prep-label { font-size: .67rem; margin-top: 3px; font-variant-numeric: tabular-nums; }
-
-    /* ── Badge minutos espera en pedido ── */
-    .espera-badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:.68rem; font-weight:700; margin-left:6px; }
-    .espera-ok   { background:#14532D30; color:#86EFAC; }
-    .espera-warn { background:#92400E30; color:#FBBF24; }
-    .espera-hot  { background:#7F1D1D30; color:#F87171; }
-
-    @keyframes kds-blink { 0%,100%{opacity:1} 50%{opacity:.4} }
-    .kds-overdue .item-prep-bar-fill { animation: kds-blink .9s ease infinite; }
   </style>
 </head>
 <body>
@@ -157,7 +176,7 @@
     <span class="counter-badge cb-azul"   id="cnt-pendiente">— pendientes</span>
     <span class="counter-badge cb-naranja" id="cnt-preparacion">— en prep.</span>
     <span id="clock"></span>
-    <a href="<?= BASE_URL ?>auth/logout" class="exit-link">Salir</a>
+    <a href="<?= BASE_URL ?>auth/logoutStaff/chef" class="exit-link">Salir</a>
   </div>
 </div>
 
@@ -179,68 +198,6 @@
 <script>
 let prevIds  = new Set();
 const BASE   = '<?= BASE_URL ?>';
-
-// ── Timers de preparación por ítem (localStorage) ──
-let prepTimers = {};
-try { prepTimers = JSON.parse(localStorage.getItem('kds_prep_timers') || '{}'); } catch {}
-function savePrepTimers() { try { localStorage.setItem('kds_prep_timers', JSON.stringify(prepTimers)); } catch {} }
-
-function prepTimerHtml(itemId, maxMin) {
-  const start = prepTimers[itemId];
-  if (!start) return '';
-  const elapsed = Math.max(0, Math.floor((Date.now() - start) / 60000));
-  const pct     = Math.min(100, Math.round((elapsed / maxMin) * 100));
-  const color   = pct < 80 ? '#10B981' : pct < 100 ? '#F59E0B' : '#EF4444';
-  const overdue = pct >= 100;
-  return `<div class="item-prep-timer${overdue ? ' kds-overdue' : ''}" data-prep-id="${itemId}" data-prep-start="${start}" data-prep-max="${maxMin}">
-    <div class="item-prep-bar-track">
-      <div class="item-prep-bar-fill" style="width:${pct}%;background:${color}"></div>
-    </div>
-    <div class="item-prep-label" style="color:${color}">${elapsed} / ${maxMin} min${overdue ? ' ⚠️ retrasado' : ''}</div>
-  </div>`;
-}
-
-// ── Caché de armado por platillo_id ──────────────
-const armadoCache   = {};
-const armadoLoading = new Set();
-
-async function fetchArmado(platilloId) {
-  if (armadoLoading.has(platilloId)) return;
-  armadoLoading.add(platilloId);
-  try {
-    const res = await fetch(`${BASE}rest-chef/armado/${platilloId}`, { credentials: 'same-origin' });
-    if (!res.ok) return;
-    armadoCache[platilloId] = await res.json();
-    // Actualizar placeholders ya renderizados en el DOM
-    document.querySelectorAll(`.armado-placeholder[data-pid="${platilloId}"]`).forEach(el => {
-      const div = document.createElement('div');
-      div.innerHTML = renderArmadoHtml(armadoCache[platilloId]);
-      el.replaceWith(...div.childNodes);
-    });
-  } catch {}
-  armadoLoading.delete(platilloId);
-}
-
-const TIPO_LABEL = { materia_prima: 'MP', guarnicion: 'G' };
-
-function renderArmadoHtml(data) {
-  if (!data) return '';
-  const badges = (data.ingredientes || []).map(i => {
-    const tipo  = i.tipo_componente || 'materia_prima';
-    const label = TIPO_LABEL[tipo] || '·';
-    const cod   = i.codigo_display ? `<strong>${i.codigo_display}</strong> ` : `<strong>${label}</strong> `;
-    const cant  = i.cantidad ? ` <em>${i.cantidad} ${i.unidad}</em>` : '';
-    return `<span class="armado-badge armado-${tipo}">${cod}${i.nombre}${cant}</span>`;
-  }).join('');
-  const pasos = (data.pasos || []).map(p =>
-    `<div class="prep-paso">${p.orden_paso}. ${p.descripcion}</div>`
-  ).join('');
-  if (!badges && !pasos) return '';
-  return `<div class="armado-wrap">
-    ${badges ? `<div class="armado-badges">${badges}</div>` : ''}
-    ${pasos  ? `<div class="prep-pasos">${pasos}</div>`      : ''}
-  </div>`;
-}
 
 // ── Sonido ────────────────────────────────────────
 const alertSound = () => {
@@ -288,6 +245,67 @@ function urgencyClass(createdAt) {
   return 'normal';
 }
 
+// ── Escape HTML ─────────────────────────────────
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+
+// ── Receta: códigos de materia prima y guarniciones ──
+// Formato esperado por item (separador ||, campos |):
+//   codigo | nombre | tipo | cantidad | unidad | notas | es_informativo
+//   tipo ∈ { materia_prima, guarnicion, bebida, otro }
+function renderReceta(raw, cantidadPlatillo, instruccionesArmado) {
+  const cant = Number(cantidadPlatillo) || 1;
+  const items = (raw || '').split('||').map(s => {
+    const [codigo, nombre, tipo, qty, unidad, notas, esInfo] = s.split('|');
+    return {
+      codigo: (codigo || '').trim(),
+      nombre: nombre || '',
+      tipo:   (tipo || 'otro').trim().toLowerCase(),
+      qty:    (Number(qty) || 0) * cant,
+      unidad: unidad || '',
+      notas:  notas || '',
+      esInfo: esInfo === '1' || esInfo === 1
+    };
+  }).filter(i => i.codigo || i.nombre);
+
+  if (!items.length && !instruccionesArmado) return '';
+
+  const materiaPrima = items.filter(i => i.tipo === 'materia_prima');
+  const guarniciones = items.filter(i => i.tipo === 'guarnicion');
+  const otros        = items.filter(i => i.tipo !== 'materia_prima' && i.tipo !== 'guarnicion');
+
+  const chip = (i, cls) => `
+    <span class="ing-chip ${cls}${i.esInfo ? ' informativo' : ''}"
+          title="${esc(i.notas || i.nombre)}">
+      ${i.codigo ? `<span class="ing-code">${esc(i.codigo)}</span>` : ''}
+      <span>${esc(i.nombre)}</span>
+      ${i.qty ? `<span class="ing-qty">${i.qty.toFixed(2)} ${esc(i.unidad)}</span>` : ''}
+      ${i.notas ? `<span class="ing-note">· ${esc(i.notas)}</span>` : ''}
+    </span>`;
+
+  const grupo = (label, icon, arr, cls, chipCls) => arr.length
+    ? `<div class="receta-group ${cls}">
+         <div class="receta-group-label">${icon} ${label} (${arr.length})</div>
+         ${arr.map(i => chip(i, chipCls)).join('')}
+       </div>` : '';
+
+  const instrHtml = instruccionesArmado
+    ? `<div class="armado-instr">🧱 <strong>Armado:</strong> ${esc(instruccionesArmado)}</div>`
+    : '';
+
+  return `
+    <div class="receta-block">
+      <div class="receta-title">🧾 Instrucciones de armado</div>
+      ${instrHtml}
+      ${grupo('Materia prima', '🥩', materiaPrima, 'receta-group-mp', 'tipo-mp')}
+      ${grupo('Guarniciones',  '🥗', guarniciones, 'receta-group-gn', 'tipo-gn')}
+      ${grupo('Otros',         '•',  otros,        'receta-group-ot', '')}
+    </div>`;
+}
+
 // ── Renderizar columna ───────────────────────────
 function renderColumna(pedidos, colId) {
   const col = document.getElementById(colId);
@@ -300,52 +318,35 @@ function renderColumna(pedidos, colId) {
     const urg = urgencyClass(ped.created_at);
     const esPrepCol = colId === 'col-preparacion';
 
-    const itemsHtml = ped.items.map(it => {
-      const cachedArmado = armadoCache[it.platillo_id];
-      const armadoHtml   = esPrepCol
-        ? (cachedArmado
-            ? renderArmadoHtml(cachedArmado)
-            : `<div class="armado-loading armado-placeholder" data-pid="${it.platillo_id}">⏳ Cargando armado…</div>`)
-        : '';
-      const timerHtml = esPrepCol && it.tiempo_preparacion_min
-        ? prepTimerHtml(it.item_id, it.tiempo_preparacion_min)
-        : '';
-      return `
+    const itemsHtml = ped.items.map(it => `
       <div class="item-row">
         <div style="flex:1">
-          <div class="item-nombre">${it.platillo_nombre}</div>
-          <div class="item-sub">×${it.cantidad}${it.tiempo_preparacion_min ? ' · ' + it.tiempo_preparacion_min + ' min est.' : ''}</div>
-          ${it.exclusiones ? `<span class="pill pill-exclu">🚫 Sin: ${it.exclusiones}</span>` : ''}
-          ${it.item_notas   ? `<span class="pill pill-nota">💬 ${it.item_notas}</span>`       : ''}
-          ${armadoHtml}
-          ${timerHtml}
+          <div class="item-nombre">
+            ${it.platillo_codigo ? `<span class="platillo-codigo">${esc(it.platillo_codigo)}</span>` : ''}
+            ${esc(it.platillo_nombre)}
+          </div>
+          <div class="item-sub">×${it.cantidad}${it.tiempo_preparacion_min ? ' · ' + it.tiempo_preparacion_min + ' min' : ''}</div>
+          ${it.exclusiones ? `<span class="pill pill-exclu">🚫 Sin: ${esc(it.exclusiones)}</span>` : ''}
+          ${it.item_notas   ? `<span class="pill pill-nota">💬 ${esc(it.item_notas)}</span>`       : ''}
+          ${renderReceta(it.ingredientes_raw, it.cantidad, it.instrucciones_armado)}
         </div>
         <div>
-          ${it.item_estado === 'pendiente'
+          ${!esPrepCol && it.item_estado === 'pendiente'
             ? `<button class="btn-action btn-prep"  onclick="marcar('${BASE}rest-chef/marcarPreparacion/${it.item_id}',this)">Prep. ▶</button>`
             : ''}
-          ${it.item_estado === 'en_preparacion'
+          ${esPrepCol && it.item_estado === 'en_preparacion'
             ? `<button class="btn-action btn-listo" onclick="marcar('${BASE}rest-chef/marcarListo/${it.item_id}',this)">Listo ✓</button>`
             : ''}
         </div>
       </div>
-      `;
-    }).join('');
+    `).join('');
 
     return `
       <div class="kds-card ${urg}${esPrepCol ? ' preparacion' : ''}">
         <div class="card-header">
           <div>
             <div class="card-folio">${ped.folio || 'Pedido'}</div>
-            <div class="card-meta">🢴 ${ped.mesa_nombre || '—'}${
-              ped.minutos_espera != null
-                ? (() => {
-                    const m = parseInt(ped.minutos_espera);
-                    const cls = m < 10 ? 'espera-ok' : m < 20 ? 'espera-warn' : 'espera-hot';
-                    return `<span class="espera-badge ${cls}">${m} min</span>`;
-                  })()
-                : ''
-            }</div>
+            <div class="card-meta">🪑 ${ped.mesa_nombre || '—'}</div>
           </div>
           <span class="timer-badge ${t.cls}" data-created="${ped.created_at}">⏱ ${t.label}</span>
         </div>
@@ -380,10 +381,6 @@ function renderQueue(items) {
   renderColumna(pendientes,  'col-pendiente');
   renderColumna(preparacion, 'col-preparacion');
 
-  // Disparar fetch de armado para platillos aún no cacheados
-  const pidsPrep = [...new Set(preparacion.flatMap(p => p.items.map(i => i.platillo_id)))];
-  pidsPrep.filter(id => id && !armadoCache[id]).forEach(fetchArmado);
-
   document.getElementById('cnt-pendiente').textContent   = pendientes.length  + ' pendientes';
   document.getElementById('cnt-preparacion').textContent = preparacion.length + ' en prep.';
 
@@ -408,50 +405,10 @@ setInterval(() => {
   });
 }, 30000);
 
-// ── Actualizar timers de preparación por ítem cada 10s ──
-setInterval(() => {
-  document.querySelectorAll('[data-prep-id]').forEach(wrap => {
-    const itemId = wrap.dataset.prepId;
-    const start  = parseInt(wrap.dataset.prepStart);
-    const maxMin = parseInt(wrap.dataset.prepMax);
-    if (!start || !maxMin) return;
-    const elapsed = Math.max(0, Math.floor((Date.now() - start) / 60000));
-    const pct     = Math.min(100, Math.round((elapsed / maxMin) * 100));
-    const color   = pct < 80 ? '#10B981' : pct < 100 ? '#F59E0B' : '#EF4444';
-    const overdue = pct >= 100;
-    const fill    = wrap.querySelector('.item-prep-bar-fill');
-    const label   = wrap.querySelector('.item-prep-label');
-    if (fill)  { fill.style.width = pct + '%'; fill.style.background = color; }
-    if (label) { label.textContent = `${elapsed} / ${maxMin} min${overdue ? ' ⚠️ retrasado' : ''}`; label.style.color = color; }
-    wrap.classList.toggle('kds-overdue', overdue);
-  });
-}, 10000);
-
 // ── Marcar item ──────────────────────────────────
-let _pollInterval = null;
-let _markInFlight = 0;
-
-function startPolling() {
-  if (!_pollInterval) _pollInterval = setInterval(loadQueue, 5000);
-}
-function stopPolling() {
-  clearInterval(_pollInterval);
-  _pollInterval = null;
-}
-
 async function marcar(url, btn) {
   const orig = btn.textContent;
   btn.disabled = true; btn.textContent = '...';
-  _markInFlight++;
-  stopPolling();
-
-  // Guardar momento de inicio de preparación en localStorage
-  if (url.includes('marcarPreparacion')) {
-    const itemId = url.split('/').pop();
-    prepTimers[itemId] = Date.now();
-    savePrepTimers();
-  }
-
   try {
     const res = await fetch(url, { method: 'POST', credentials: 'same-origin' });
     if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -459,9 +416,6 @@ async function marcar(url, btn) {
   } catch (e) {
     console.error('marcar:', e);
     btn.disabled = false; btn.textContent = orig;
-  } finally {
-    _markInFlight--;
-    if (_markInFlight === 0) startPolling();
   }
 }
 
@@ -477,7 +431,7 @@ async function loadQueue() {
 }
 
 loadQueue();
-startPolling();
+setInterval(loadQueue, 5000);
 </script>
 </body>
 </html>

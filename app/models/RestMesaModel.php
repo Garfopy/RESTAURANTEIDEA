@@ -3,9 +3,11 @@ class RestMesaModel extends BaseModel
 {
     protected string $table = 'rest_mesas';
 
-    public function getByRestaurante(int $restauranteId, bool $soloActivas = false): array
+    public function getByRestaurante(int $restauranteId, ?bool $activo = null): array
     {
-        $where = $soloActivas ? 'AND activo = 1' : '';
+        $where = '';
+        if ($activo === true)  $where = 'AND m.activo = 1';
+        if ($activo === false) $where = 'AND m.activo = 0';
         return $this->query(
             "SELECT m.*, z.nombre AS zona_nombre
              FROM rest_mesas m

@@ -54,6 +54,15 @@
     </div>
     <?php endif; ?>
 
+    <?php if (!empty($yaLogueado)): ?>
+    <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;
+                padding:12px 14px;margin-bottom:14px;font-size:.85rem;color:#1E40AF">
+      Ya estás dentro como <strong><?= htmlspecialchars($yaLogueado['nombre']) ?></strong>
+      (<?= htmlspecialchars($yaLogueado['rol_slug']) ?>).
+      <a href="<?= BASE_URL ?>auth/logout" style="color:#1E40AF;text-decoration:underline;margin-left:6px">Cerrar sesión</a>
+    </div>
+    <?php endif; ?>
+
     <?php if (!$restaurante): ?>
     <div class="flash flash-error">
       Restaurante no encontrado. Verifica la URL con tu administrador.

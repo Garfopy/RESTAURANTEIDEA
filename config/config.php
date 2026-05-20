@@ -27,6 +27,9 @@ define('BRAND_COLOR',   '#C8102E');
 // Session name
 define('SESSION_NAME',  'capirest_session');
 
+// Despliegue standalone (solo restaurante, sin SaaS multi-empresa)
+define('RESTAURANTE_STANDALONE', true);
+
 // Upload directories
 define('UPLOAD_PATH',   BASE_PATH . '/public/uploads/');
 define('UPLOAD_URL',    BASE_URL  . 'public/uploads/');

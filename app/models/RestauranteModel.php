@@ -11,6 +11,14 @@ class RestauranteModel extends BaseModel
         );
     }
 
+    public function getByEmpresa(int $empresaId): array
+    {
+        return $this->query(
+            "SELECT * FROM rest_restaurantes WHERE empresa_id = ? ORDER BY nombre",
+            [$empresaId]
+        );
+    }
+
     public function getBySlug(string $slug): ?array
     {
         return $this->queryOne(

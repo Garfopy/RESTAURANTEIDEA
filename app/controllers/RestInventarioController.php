@@ -26,7 +26,7 @@ class RestInventarioController extends BaseController
             $movRecientes = array_slice($resultado['movimientos'] ?? [], 0, 10);
         } catch (\Throwable $e) {}
 
-        $pageTitle        = 'Inventario';
+        $pageTitle        = 'Ingredientes';
         $activeMenu       = 'rest_inventario';
 
         // Obtener la empresa proveedora vinculada al restaurante
@@ -116,6 +116,8 @@ class RestInventarioController extends BaseController
         $data = [
             'restaurante_id'      => $restauranteId,
             'nombre'              => $nombre,
+            'codigo'              => $this->post('codigo') ?: null,
+            'tipo'                => $this->post('tipo') ?: null,
             'unidad_principal'    => $unidad,
             'costo_unitario'      => (float)$this->post('costo_unitario', 0),
             'stock_minimo'        => $stockMinimo,

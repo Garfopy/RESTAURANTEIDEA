@@ -30,6 +30,13 @@
 </div>
 <?php endif; ?>
 
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+  <div style="font-size:.85rem;color:#6B7280">
+    <?= count($sucursales) ?> local<?= count($sucursales) !== 1 ? 'es' : '' ?> registrado<?= count($sucursales) !== 1 ? 's' : '' ?>
+  </div>
+  <a href="<?= BASE_URL ?>restaurante/crear" class="btn btn-primary btn-sm">+ Nuevo local</a>
+</div>
+
 <!-- Info banner -->
 <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:12px;padding:14px 18px;margin-bottom:20px;
             display:flex;align-items:flex-start;gap:12px">

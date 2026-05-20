@@ -8,7 +8,7 @@ class RestauranteController extends BaseController
     public function __construct()
     {
         parent::__construct();
-        $this->requireRole(['comprador']);
+        $this->requireRole(['comprador', 'admin_restaurante']);
         $this->model = new RestauranteModel();
     }
 
@@ -16,7 +16,10 @@ class RestauranteController extends BaseController
     {
         $this->requireRestaurante();
         $compradorId         = $this->usuarioId();
-        $sucursales          = $this->model->getByComprador($compradorId);
+        $rol                 = $this->rolActual();
+        $sucursales = $rol === 'admin_restaurante'
+            ? $this->model->getByEmpresa((int)$this->empresaId())
+            : $this->model->getByComprador($compradorId);
         $restauranteActivoId = $this->restauranteId();
         $menuModel           = new RestMenuModel();
         $invModel            = new RestInventarioModel();
@@ -27,7 +30,15 @@ class RestauranteController extends BaseController
         unset($s);
 
         // CarniHub sucursales (delivery locations) available to link
-        $sucursalesCarniHub = (new SucursalModel())->getByComprador($compradorId);
+        $sucursalesCarniHub = [];
+        try {
+            $sucModel = new SucursalModel();
+            $sucursalesCarniHub = $rol === 'admin_restaurante'
+                ? $sucModel->getByEmpresa((int)$this->empresaId())
+                : $sucModel->getByComprador($compradorId);
+        } catch (\Throwable $e) {
+            error_log('[locales] sucursales lookup failed: ' . $e->getMessage());
+        }
 
         $pageTitle  = 'Mis Locales';
         $activeMenu = 'rest_locales';

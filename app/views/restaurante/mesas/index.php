@@ -8,7 +8,7 @@
 </style>
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
   <div style="font-size:.85rem;color:#6B7280">
-    <?= count($mesas) ?> mesa<?= count($mesas) !== 1 ? 's' : '' ?> registrada<?= count($mesas) !== 1 ? 's' : '' ?>
+    <?= count($mesas) ?> mesa<?= count($mesas) !== 1 ? 's' : '' ?>
   </div>
   <div style="display:flex;gap:10px">
     <button onclick="rstModal('modalZona')"
@@ -20,6 +20,27 @@
       + Mesa / Silla
     </button>
   </div>
+</div>
+
+<!-- Tabs filtro estado -->
+<div style="display:flex;gap:6px;margin-bottom:14px;border-bottom:1px solid #E5E7EB">
+  <?php
+    $tabs = [
+      'activas'   => ['Activas',   (int)($countActivas ?? 0)],
+      'inactivas' => ['Inactivas', (int)($countInactivas ?? 0)],
+      'todas'     => ['Todas',     (int)(($countActivas ?? 0) + ($countInactivas ?? 0))],
+    ];
+    $filtroActual = $filtro ?? 'activas';
+  ?>
+  <?php foreach ($tabs as $key => [$label, $cnt]): ?>
+    <a href="<?= BASE_URL ?>rest-mesa/index?estado=<?= $key ?>"
+       style="padding:8px 14px;font-size:.85rem;text-decoration:none;
+              border-bottom:2px solid <?= $filtroActual === $key ? '#111827' : 'transparent' ?>;
+              color:<?= $filtroActual === $key ? '#111827' : '#6B7280' ?>;
+              font-weight:<?= $filtroActual === $key ? '600' : '500' ?>">
+      <?= $label ?> <span style="color:#9CA3AF">(<?= $cnt ?>)</span>
+    </a>
+  <?php endforeach; ?>
 </div>
 
 <!-- Tabla mesas -->
@@ -44,9 +65,15 @@
           'reservada'  => ['badge-blue',   'Reservada'],
           'pagando'    => ['badge-amber',  'Pagando'],
         ];
-        [$badgeCls, $badgeTxt] = $estadoMap[$m['estado']] ?? ['badge-gray', $m['estado']];
+        $esInactiva = (int)($m['activo'] ?? 1) === 0;
+        if ($esInactiva) {
+          $badgeCls = 'badge-gray'; $badgeTxt = 'Inactiva';
+        } else {
+          [$badgeCls, $badgeTxt] = $estadoMap[$m['estado']] ?? ['badge-gray', $m['estado']];
+        }
+        $rowStyle = $esInactiva ? 'opacity:.55;background:#F9FAFB' : '';
       ?>
-      <tr>
+      <tr style="<?= $rowStyle ?>">
         <td style="font-weight:600"><?= htmlspecialchars($m['nombre']) ?></td>
         <td style="color:#6B7280"><?= htmlspecialchars($m['zona_nombre'] ?? '—') ?></td>
         <td style="text-align:center"><?= (int)$m['capacidad'] ?></td>
@@ -67,11 +94,21 @@
           </div>
         </td>
         <td>
-          <button onclick='editMesa(<?= htmlspecialchars(json_encode($m), ENT_QUOTES) ?>)'
-                  class="btn btn-outline btn-sm">Editar</button>
-          <a href="<?= BASE_URL ?>rest-mesa/eliminar/<?= $m['id'] ?>"
-             onclick="return confirm('¿Desactivar esta mesa?')"
-             class="btn btn-danger btn-sm" style="margin-left:6px">Quitar</a>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button onclick='editMesa(<?= htmlspecialchars(json_encode($m), ENT_QUOTES) ?>)'
+                    class="btn btn-outline btn-sm">Editar</button>
+            <?php if ($esInactiva): ?>
+              <a href="<?= BASE_URL ?>rest-mesa/activar/<?= $m['id'] ?>"
+                 class="btn btn-success btn-sm">Activar</a>
+              <a href="<?= BASE_URL ?>rest-mesa/borrar/<?= $m['id'] ?>"
+                 onclick="return confirm('⚠️ Eliminar PERMANENTEMENTE esta mesa? Esta acción no se puede deshacer.')"
+                 class="btn btn-danger btn-sm">Eliminar</a>
+            <?php else: ?>
+              <a href="<?= BASE_URL ?>rest-mesa/eliminar/<?= $m['id'] ?>"
+                 onclick="return confirm('¿Desactivar esta mesa?')"
+                 class="btn btn-danger btn-sm">Desactivar</a>
+            <?php endif; ?>
+          </div>
         </td>
       </tr>
       <?php endforeach; ?>
