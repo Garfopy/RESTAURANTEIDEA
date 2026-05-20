@@ -30,7 +30,15 @@ class RestauranteController extends BaseController
         unset($s);
 
         // CarniHub sucursales (delivery locations) available to link
-        $sucursalesCarniHub = (new SucursalModel())->getByComprador($compradorId);
+        $sucursalesCarniHub = [];
+        try {
+            $sucModel = new SucursalModel();
+            $sucursalesCarniHub = $rol === 'admin_restaurante'
+                ? $sucModel->getByEmpresa((int)$this->empresaId())
+                : $sucModel->getByComprador($compradorId);
+        } catch (\Throwable $e) {
+            error_log('[locales] sucursales lookup failed: ' . $e->getMessage());
+        }
 
         $pageTitle  = 'Mis Locales';
         $activeMenu = 'rest_locales';
