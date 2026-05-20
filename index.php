@@ -22,16 +22,33 @@ if (file_exists(ROOT_PATH . '/vendor/autoload.php')) {
 }
 
 // ── Session ───────────────────────────────────────────────────────────────────
-// Detect early if this request belongs to the staff/comensal area so we can
-// use a SEPARATE session cookie and keep the admin session independent.
+// Una cookie de sesión por ROL para que admin + chef + mesero + portero +
+// comensal puedan estar logueados simultáneamente en el mismo navegador.
 $_earlyPath     = trim($_GET['url'] ?? '', '/');
 $_earlySegments = array_values(array_filter(explode('/', $_earlyPath)));
 $_earlyCtrl     = strtolower($_earlySegments[0] ?? '');
-$_staffArea     = in_array($_earlyCtrl, [
-    'acceso', 'menu',
-    'rest-mesero', 'rest-chef', 'rest-portero', 'rest-staff', 'rest-propinas',
-], true);
-session_name($_staffArea ? SESSION_NAME . '_staff' : SESSION_NAME);
+$_earlyAction   = strtolower($_earlySegments[1] ?? '');
+
+$_roleCookies = [
+    'rest-chef'     => '_chef',
+    'rest-mesero'   => '_mesero',
+    'rest-portero'  => '_portero',
+    'rest-staff'    => '_staff',     // gestión admin de staff
+    'rest-propinas' => '_staff',
+    'menu'          => '_comensal',
+    'acceso'        => '_login',     // transitorio: solo para el form de login
+];
+$_cookieSuffix = $_roleCookies[$_earlyCtrl] ?? '';
+
+// auth/logoutStaff/{rol} destruye SOLO la cookie de ese rol
+if ($_earlyCtrl === 'auth' && $_earlyAction === 'logoutstaff') {
+    $_logoutRol = strtolower($_earlySegments[2] ?? '');
+    if (in_array($_logoutRol, ['chef', 'mesero', 'portero', 'staff', 'comensal', 'login'], true)) {
+        $_cookieSuffix = '_' . $_logoutRol;
+    }
+}
+
+session_name(SESSION_NAME . $_cookieSuffix);
 session_start();
 
 // ── Parse URL ─────────────────────────────────────────────────────────────────
@@ -180,6 +197,7 @@ $routes = [
 $publicPaths = [
     'auth/login',
     'auth/dologin',
+    'auth/logoutstaff',
     'auth/index',
     'auth/verificar',
     'auth/forgot',

@@ -176,7 +176,7 @@
     <span class="counter-badge cb-azul"   id="cnt-pendiente">— pendientes</span>
     <span class="counter-badge cb-naranja" id="cnt-preparacion">— en prep.</span>
     <span id="clock"></span>
-    <a href="<?= BASE_URL ?>auth/logout" class="exit-link">Salir</a>
+    <a href="<?= BASE_URL ?>auth/logoutStaff/chef" class="exit-link">Salir</a>
   </div>
 </div>
 

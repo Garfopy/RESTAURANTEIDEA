@@ -91,7 +91,9 @@ class StaffAccesoController extends BaseController
             $this->redirect('acceso/' . $slug);
         }
 
-        $_SESSION['usuario'] = [
+        // Cambiar a la cookie de sesión propia del rol para que admin y otros
+        // staff conserven su sesión en el mismo navegador.
+        $sessionData = [
             'id'           => $user['id'],
             'nombre'       => $user['nombre'],
             'email'        => $user['email'],
@@ -100,7 +102,13 @@ class StaffAccesoController extends BaseController
             'empresa_id'   => $user['empresa_id'] ?? null,
             'restaurante_id' => $restaurante['id'] ?? null,
         ];
-        $_SESSION['restaurante_activo_id'] = $restaurante['id'] ?? null;
+        $activeRest = $restaurante['id'] ?? null;
+
+        session_write_close();
+        session_name(SESSION_NAME . '_' . $user['rol_slug']);
+        session_start();
+        $_SESSION['usuario']               = $sessionData;
+        $_SESSION['restaurante_activo_id'] = $activeRest;
 
         $this->redirectSegunRol($user['rol_slug']);
     }
