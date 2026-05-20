@@ -5,7 +5,7 @@ class RestMesaModel extends BaseModel
 
     public function getByRestaurante(int $restauranteId, bool $soloActivas = false): array
     {
-        $where = $soloActivas ? 'AND activo = 1' : '';
+        $where = $soloActivas ? 'AND m.activo = 1' : '';
         return $this->query(
             "SELECT m.*, z.nombre AS zona_nombre
              FROM rest_mesas m
