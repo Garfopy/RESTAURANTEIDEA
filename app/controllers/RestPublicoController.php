@@ -368,6 +368,12 @@ class RestPublicoController extends BaseController
             $this->mesaModel->cambiarEstado((int)$visita['mesa_id'], 'disponible');
         }
 
+        // Actualizar estadísticas del comensal si estaba identificado
+        if (!empty($visita['comensal_id'])) {
+            $total = (float)($ticket['subtotal'] ?? 0) + (float)($ticket['propina'] ?? 0);
+            (new RestClienteModel())->registrarVisita((int)$visita['comensal_id'], $total);
+        }
+
         // Limpia cookie de visita para que el comensal no quede pegado
         setcookie('visita_' . $restaurante['id'], '', time() - 1, '/');
 
@@ -417,6 +423,12 @@ class RestPublicoController extends BaseController
             $visita = $this->visitaModel->find((int)$ticket['visita_id']);
             if ($visita && !empty($visita['mesa_id'])) {
                 $this->mesaModel->cambiarEstado((int)$visita['mesa_id'], 'disponible');
+            }
+
+            // Actualizar estadísticas del comensal si estaba identificado
+            if (!empty($visita['comensal_id'])) {
+                $total = (float)($ticket['subtotal'] ?? 0) + (float)($ticket['propina'] ?? 0);
+                (new RestClienteModel())->registrarVisita((int)$visita['comensal_id'], $total);
             }
 
             setcookie('visita_' . $restaurante['id'], '', time() - 1, '/');
