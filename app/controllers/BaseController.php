@@ -41,12 +41,7 @@ abstract class BaseController
     protected function redirectSegunRol(string $rol): void
     {
         match (true) {
-            $rol === 'repartidor'                                      => $this->redirect('repartidor/inicio'),
-            $rol === 'supervisor'                                      => $this->redirect('supervisor/dashboard'),
-            $rol === 'comprador'                                       => $this->redirect('comprador/inicio'),
-            $rol === 'admin_empresa'                                   => $this->redirect('empresa/dashboard'),
-            $rol === 'admin_restaurante'                               => $this->redirect('restaurante/dashboard'),
-            $rol === 'superadmin'                                      => $this->redirect('panel/dashboard'),
+            $rol === 'admin_restaurante', $rol === 'comprador'        => $this->redirect('restaurante/dashboard'),
             $rol === 'mesero'                                          => $this->redirect('rest-mesero/dashboard'),
             $rol === 'chef'                                            => $this->redirect('rest-chef/dashboard'),
             $rol === 'portero'                                         => $this->redirect('rest-portero/dashboard'),
@@ -228,32 +223,6 @@ abstract class BaseController
         $flash = $_SESSION['flash'] ?? null;
         unset($_SESSION['flash']);
         return $flash;
-    }
-
-    // ── Suscripción ───────────────────────────────────────────────
-
-    protected function requireSuscripcionActiva(): void
-    {
-        $empresaId = $this->empresaId();
-        if (!$empresaId) return;
-
-        $stmt = Database::getInstance()->prepare(
-            'SELECT suscripcion_estado FROM empresas WHERE id = ?'
-        );
-        $stmt->execute([$empresaId]);
-        $estado = $stmt->fetchColumn();
-
-        if ($estado !== 'activo') {
-            $this->redirect('empresa-suscripcion/suspendida');
-        }
-    }
-
-    protected function getPlanActual(): ?array
-    {
-        $empresaId = $this->empresaId();
-        if (!$empresaId) return null;
-        $model = new SuscripcionModel();
-        return $model->getByEmpresa($empresaId);
     }
 
     // ── Auditoría ─────────────────────────────────────────────────

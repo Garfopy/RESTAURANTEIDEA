@@ -303,9 +303,11 @@ sort($ingTipos);
     <!-- Tabs fuente -->
     <div class="rst-tabs" id="ingTabs">
       <button class="rst-tab active" data-tab="ext" onclick="switchTab('ext')">Proveedor externo</button>
+      <?php if (false): // pestaña "Desde CarniHub" oculta en despliegue standalone ?>
       <button class="rst-tab" data-tab="ch"  onclick="switchTab('ch')">
         <span style="color:var(--cp);font-weight:700">⚡ Desde CarniHub</span>
       </button>
+      <?php endif; ?>
     </div>
 
     <form method="POST" action="<?= BASE_URL ?>rest-inventario/guardar" id="formIng">
