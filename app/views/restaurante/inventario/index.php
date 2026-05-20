@@ -275,10 +275,17 @@
 <?php
 $ingCategorias = array_values(array_unique(array_filter(array_column($ingredientes ?? [], 'categoria'))));
 sort($ingCategorias);
+$ingTipos = array_values(array_unique(array_filter(array_column($ingredientes ?? [], 'tipo'))));
+sort($ingTipos);
 ?>
 <datalist id="dlCatIng">
   <?php foreach ($ingCategorias as $c): ?>
   <option value="<?= htmlspecialchars($c) ?>">
+  <?php endforeach; ?>
+</datalist>
+<datalist id="dlTipoIng">
+  <?php foreach ($ingTipos as $t): ?>
+  <option value="<?= htmlspecialchars($t) ?>">
   <?php endforeach; ?>
 </datalist>
 
@@ -315,6 +322,21 @@ sort($ingCategorias);
             <label class="form-label">Nombre del ingrediente *</label>
             <input type="text" name="nombre" id="ingNombre" class="form-input"
                    placeholder="Ej: Jitomate, Carne de res, Aceite" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Código
+              <span style="color:#9CA3AF;font-weight:400;font-size:.72rem">(opcional)</span>
+            </label>
+            <input type="text" name="codigo" id="ingCodigo" class="form-input"
+                   placeholder="Ej: ING-001, SKU123">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Tipo
+              <span style="color:#9CA3AF;font-weight:400;font-size:.72rem">— elige o escribe nuevo</span>
+            </label>
+            <input type="text" name="tipo" id="ingTipo" class="form-input"
+                   list="dlTipoIng"
+                   placeholder="Ej: carne, lácteo, verdura, otro">
           </div>
           <div class="form-group">
             <label class="form-label">Categoría
@@ -517,6 +539,16 @@ sort($ingCategorias);
             <input type="text" name="nombre" id="modifEditNombre" class="form-input" required>
           </div>
           <div class="form-group">
+            <label class="form-label">Código</label>
+            <input type="text" name="codigo" id="modifEditCodigo" class="form-input"
+                   placeholder="Ej: ING-001">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Tipo</label>
+            <input type="text" name="tipo" id="modifEditTipo" class="form-input" list="dlTipoIng"
+                   placeholder="Ej: carne, lácteo">
+          </div>
+          <div class="form-group">
             <label class="form-label">Categoría</label>
             <input type="text" name="categoria" id="modifEditCategoria" class="form-input" list="dlCatIng">
           </div>
@@ -609,6 +641,8 @@ function seleccionarCarniHub(id, nombre) {
 function resetIngForm() {
   document.getElementById('ingId').value = '';
   document.getElementById('ingNombre').value = '';
+  document.getElementById('ingCodigo').value = '';
+  document.getElementById('ingTipo').value = '';
   document.getElementById('ingCategoria').value = '';
   document.getElementById('ingCosto').value = '0';
   document.getElementById('ingMinimo').value = '0';
@@ -657,6 +691,8 @@ function abrirModificar(ing) {
   document.getElementById('modifEditCarnihub').value = ing.proveedor_carnihub ? '1' : '0';
   document.getElementById('modifEditCarnihubId').value = ing.carnihub_producto_id || '';
   document.getElementById('modifEditNombre').value = ing.nombre;
+  document.getElementById('modifEditCodigo').value = ing.codigo || '';
+  document.getElementById('modifEditTipo').value = ing.tipo || '';
   document.getElementById('modifEditCategoria').value = ing.categoria || '';
   const uSel = document.getElementById('modifEditUnidad');
   let found = false;

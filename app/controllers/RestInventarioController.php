@@ -87,6 +87,8 @@ class RestInventarioController extends BaseController
         $data = [
             'restaurante_id'      => $restauranteId,
             'nombre'              => $nombre,
+            'codigo'              => $this->post('codigo') ?: null,
+            'tipo'                => $this->post('tipo') ?: null,
             'unidad_principal'    => $unidad,
             'costo_unitario'      => (float)$this->post('costo_unitario', 0),
             'stock_minimo'        => $stockMinimo,
