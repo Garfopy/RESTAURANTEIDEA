@@ -225,6 +225,17 @@
     </svg>
     Mesa: <strong><?= htmlspecialchars($mesa['nombre']) ?></strong>
   </div>
+  <?php if (!empty($meseroAtiende)): ?>
+  <div style="display:inline-flex;align-items:center;gap:6px;margin-top:8px;
+              background:rgba(201,164,48,.22);border:1px solid rgba(201,164,48,.4);border-radius:10px;padding:6px 14px;font-size:.82rem;color:#fff">
+    👋 Te atiende: <strong><?= htmlspecialchars($meseroAtiende) ?></strong>
+  </div>
+  <?php else: ?>
+  <div style="display:inline-flex;align-items:center;gap:5px;margin-top:8px;
+              background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:10px;padding:5px 12px;font-size:.78rem;color:rgba(255,255,255,.75)">
+    🙌 Pronto te atendemos
+  </div>
+  <?php endif; ?>
   <div style="margin-top:10px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
     <button id="btnLlamarMesero" onclick="llamarMesero()"
             style="padding:8px 18px;background:rgba(255,255,255,.18);border:1.5px solid rgba(255,255,255,.35);
@@ -232,10 +243,15 @@
       🔔 Llamar mesero
     </button>
     <?php if ($visitaId): ?>
+    <button id="btnPedirCuenta" onclick="pedirCuenta()"
+            style="padding:8px 18px;background:rgba(239,68,68,.25);border:1.5px solid rgba(239,68,68,.5);
+                   color:#fff;border-radius:20px;font-size:.82rem;font-weight:600;cursor:pointer;backdrop-filter:blur(8px);box-shadow:0 2px 8px rgba(0,0,0,.15)">
+      🧾 Pedir la cuenta
+    </button>
     <a href="<?= BASE_URL ?>menu/<?= htmlspecialchars($restaurante['slug']) ?>/pagar/<?= $visitaId ?>"
        style="padding:8px 18px;background:rgba(255,255,255,.18);border:1.5px solid rgba(255,255,255,.35);
               color:#fff;border-radius:20px;font-size:.82rem;font-weight:600;backdrop-filter:blur(8px);box-shadow:0 2px 8px rgba(0,0,0,.15)">
-      🧾 Ver mi cuenta
+      💳 Ver mi cuenta
     </a>
     <?php endif; ?>
   </div>
@@ -244,6 +260,12 @@
   <div id="statusTracker" style="margin-top:14px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:12px;
                                   padding:10px 16px;font-size:.82rem;display:none;color:#fff;backdrop-filter:blur(8px)">
     <div id="statusContent">Verificando estado del pedido…</div>
+    <div id="statusBar" style="display:none;margin-top:8px">
+      <div style="background:rgba(255,255,255,.15);border-radius:4px;height:4px;overflow:hidden">
+        <div id="statusBarFill" style="height:100%;border-radius:4px;background:#c9a430;transition:width 1s ease"></div>
+      </div>
+      <div id="statusBarLabel" style="font-size:.72rem;color:rgba(255,255,255,.6);margin-top:4px;text-align:right"></div>
+    </div>
   </div>
   <?php endif; ?>
   </div><!-- /pub-hero-content -->
@@ -640,11 +662,20 @@ function toast(msg) {
 <?php if ($mesa): ?>
 function llamarMesero() {
   const btn=document.getElementById('btnLlamarMesero'); btn.disabled=true; btn.textContent='🔔 Avisando…';
-  fetch(`${BASE_URL}menu/${REST_SLUG}/llamarMesero`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:`mesa_qr=${encodeURIComponent(MESA_QR)}&visita_id=${VID}`})
+  fetch(`${BASE_URL}menu/${REST_SLUG}/llamarMesero`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:`mesa_qr=${encodeURIComponent(MESA_QR)}&visita_id=${VID}&tipo=mesero`})
     .then(r=>r.json())
     .then(d=>{btn.textContent=d.ok?'✅ Mesero avisado':'❌ Error';setTimeout(()=>{btn.textContent='🔔 Llamar mesero';btn.disabled=false;},4000);})
     .catch(()=>{btn.textContent='🔔 Llamar mesero';btn.disabled=false;});
 }
+<?php if ($visitaId): ?>
+function pedirCuenta() {
+  const btn=document.getElementById('btnPedirCuenta'); btn.disabled=true; btn.textContent='💳 Avisando…';
+  fetch(`${BASE_URL}menu/${REST_SLUG}/llamarMesero`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:`mesa_qr=${encodeURIComponent(MESA_QR)}&visita_id=${VID}&tipo=cuenta`})
+    .then(r=>r.json())
+    .then(d=>{btn.textContent=d.ok?'✅ Mesero avisado':'❌ Error';setTimeout(()=>{btn.textContent='🧾 Pedir la cuenta';btn.disabled=false;},4000);})
+    .catch(()=>{btn.textContent='🧾 Pedir la cuenta';btn.disabled=false;});
+}
+<?php endif; ?>
 <?php endif; ?>
 
 // ── Polling estado del pedido ─────────────────────────────────────────────────
@@ -652,6 +683,7 @@ function llamarMesero() {
 const LABELS={pendiente:'⏳ Esperando que la cocina tome tu pedido',en_preparacion:'👨‍🍳 Tu pedido está en preparación',listo:'✅ ¡Listo! El mesero lo llevará pronto',entregado:'🍽️ Pedido entregado. ¡Buen provecho!'};
 const COLORS={pendiente:'#F59E0B',en_preparacion:'#3B82F6',listo:'#10B981',entregado:'#6B7280'};
 let prevState={};
+let prepInicio = null; // momento en que el pedido pasó a en_preparacion
 function pollEstado(){
   fetch(`${BASE_URL}menu/${REST_SLUG}/estadoPedido/${VID}`)
     .then(r=>r.json()).then(d=>{
@@ -660,7 +692,24 @@ function pollEstado(){
       d.pedidos.forEach(p=>{ if(p.estado!=='cancelado'){const pi=pri.indexOf(p.estado),gi=pri.indexOf(eg);if(pi<gi)eg=p.estado;} });
       const tr=document.getElementById('statusTracker'),ct=document.getElementById('statusContent');
       let html=`<span style="color:${COLORS[eg]??'#c9a430'};font-weight:600">${LABELS[eg]??eg}</span>`;
-      if(d.tiempo_min>0&&eg==='en_preparacion')html+=` <span style="color:rgba(255,255,255,.55)">⏱️ ~${d.tiempo_min} min</span>`;
+
+      // Barra de progreso para en_preparacion
+      const barDiv=document.getElementById('statusBar');
+      const barFill=document.getElementById('statusBarFill');
+      const barLabel=document.getElementById('statusBarLabel');
+      if(eg==='en_preparacion' && d.tiempo_min>0){
+        if(!prepInicio) prepInicio=Date.now();
+        const totalMs=d.tiempo_min*60000;
+        const pct=Math.min(100,Math.round(((Date.now()-prepInicio)/totalMs)*100));
+        const restMin=Math.max(0,Math.ceil((totalMs-(Date.now()-prepInicio))/60000));
+        barFill.style.width=pct+'%';
+        barLabel.textContent=restMin>0?`~${restMin} min restantes`:'¡Casi listo!';
+        barDiv.style.display='block';
+      } else {
+        if(eg!=='en_preparacion') prepInicio=null;
+        if(barDiv) barDiv.style.display='none';
+      }
+
       ct.innerHTML=html; tr.style.display='block';
       const bm=document.getElementById('btnPedirMismo');
       if(bm&&d.pedidos.some(p=>p.estado==='entregado')){bm._pedidos=d.pedidos;bm.style.display='block';}

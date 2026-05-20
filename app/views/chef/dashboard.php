@@ -127,7 +127,22 @@
     .armado-loading       { font-size: .7rem; color: #484F58; padding: 4px 0; }
     .prep-pasos { margin-top: 6px; }
     .prep-paso  { font-size: .72rem; color: #8B949E; padding: 2px 0; }
-    .prep-paso:before { content: '▸ '; color: #F59E0B; }
+    .prep-paso:before { content: '\25B8 '; color: #F59E0B; }
+
+    /* ── Timer de preparación por ítem ── */
+    .item-prep-timer { margin-top: 6px; }
+    .item-prep-bar-track { background: #21262D; border-radius: 4px; height: 5px; overflow: hidden; }
+    .item-prep-bar-fill { height: 100%; border-radius: 4px; transition: width .8s ease, background .8s; }
+    .item-prep-label { font-size: .67rem; margin-top: 3px; font-variant-numeric: tabular-nums; }
+
+    /* ── Badge minutos espera en pedido ── */
+    .espera-badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:.68rem; font-weight:700; margin-left:6px; }
+    .espera-ok   { background:#14532D30; color:#86EFAC; }
+    .espera-warn { background:#92400E30; color:#FBBF24; }
+    .espera-hot  { background:#7F1D1D30; color:#F87171; }
+
+    @keyframes kds-blink { 0%,100%{opacity:1} 50%{opacity:.4} }
+    .kds-overdue .item-prep-bar-fill { animation: kds-blink .9s ease infinite; }
   </style>
 </head>
 <body>
@@ -164,6 +179,26 @@
 <script>
 let prevIds  = new Set();
 const BASE   = '<?= BASE_URL ?>';
+
+// ── Timers de preparación por ítem (localStorage) ──
+let prepTimers = {};
+try { prepTimers = JSON.parse(localStorage.getItem('kds_prep_timers') || '{}'); } catch {}
+function savePrepTimers() { try { localStorage.setItem('kds_prep_timers', JSON.stringify(prepTimers)); } catch {} }
+
+function prepTimerHtml(itemId, maxMin) {
+  const start = prepTimers[itemId];
+  if (!start) return '';
+  const elapsed = Math.max(0, Math.floor((Date.now() - start) / 60000));
+  const pct     = Math.min(100, Math.round((elapsed / maxMin) * 100));
+  const color   = pct < 80 ? '#10B981' : pct < 100 ? '#F59E0B' : '#EF4444';
+  const overdue = pct >= 100;
+  return `<div class="item-prep-timer${overdue ? ' kds-overdue' : ''}" data-prep-id="${itemId}" data-prep-start="${start}" data-prep-max="${maxMin}">
+    <div class="item-prep-bar-track">
+      <div class="item-prep-bar-fill" style="width:${pct}%;background:${color}"></div>
+    </div>
+    <div class="item-prep-label" style="color:${color}">${elapsed} / ${maxMin} min${overdue ? ' ⚠️ retrasado' : ''}</div>
+  </div>`;
+}
 
 // ── Caché de armado por platillo_id ──────────────
 const armadoCache   = {};
@@ -272,14 +307,18 @@ function renderColumna(pedidos, colId) {
             ? renderArmadoHtml(cachedArmado)
             : `<div class="armado-loading armado-placeholder" data-pid="${it.platillo_id}">⏳ Cargando armado…</div>`)
         : '';
+      const timerHtml = esPrepCol && it.tiempo_preparacion_min
+        ? prepTimerHtml(it.item_id, it.tiempo_preparacion_min)
+        : '';
       return `
       <div class="item-row">
         <div style="flex:1">
           <div class="item-nombre">${it.platillo_nombre}</div>
-          <div class="item-sub">×${it.cantidad}${it.tiempo_preparacion_min ? ' · ' + it.tiempo_preparacion_min + ' min' : ''}</div>
+          <div class="item-sub">×${it.cantidad}${it.tiempo_preparacion_min ? ' · ' + it.tiempo_preparacion_min + ' min est.' : ''}</div>
           ${it.exclusiones ? `<span class="pill pill-exclu">🚫 Sin: ${it.exclusiones}</span>` : ''}
           ${it.item_notas   ? `<span class="pill pill-nota">💬 ${it.item_notas}</span>`       : ''}
           ${armadoHtml}
+          ${timerHtml}
         </div>
         <div>
           ${it.item_estado === 'pendiente'
@@ -298,7 +337,15 @@ function renderColumna(pedidos, colId) {
         <div class="card-header">
           <div>
             <div class="card-folio">${ped.folio || 'Pedido'}</div>
-            <div class="card-meta">🪑 ${ped.mesa_nombre || '—'}</div>
+            <div class="card-meta">🢴 ${ped.mesa_nombre || '—'}${
+              ped.minutos_espera != null
+                ? (() => {
+                    const m = parseInt(ped.minutos_espera);
+                    const cls = m < 10 ? 'espera-ok' : m < 20 ? 'espera-warn' : 'espera-hot';
+                    return `<span class="espera-badge ${cls}">${m} min</span>`;
+                  })()
+                : ''
+            }</div>
           </div>
           <span class="timer-badge ${t.cls}" data-created="${ped.created_at}">⏱ ${t.label}</span>
         </div>
@@ -361,6 +408,25 @@ setInterval(() => {
   });
 }, 30000);
 
+// ── Actualizar timers de preparación por ítem cada 10s ──
+setInterval(() => {
+  document.querySelectorAll('[data-prep-id]').forEach(wrap => {
+    const itemId = wrap.dataset.prepId;
+    const start  = parseInt(wrap.dataset.prepStart);
+    const maxMin = parseInt(wrap.dataset.prepMax);
+    if (!start || !maxMin) return;
+    const elapsed = Math.max(0, Math.floor((Date.now() - start) / 60000));
+    const pct     = Math.min(100, Math.round((elapsed / maxMin) * 100));
+    const color   = pct < 80 ? '#10B981' : pct < 100 ? '#F59E0B' : '#EF4444';
+    const overdue = pct >= 100;
+    const fill    = wrap.querySelector('.item-prep-bar-fill');
+    const label   = wrap.querySelector('.item-prep-label');
+    if (fill)  { fill.style.width = pct + '%'; fill.style.background = color; }
+    if (label) { label.textContent = `${elapsed} / ${maxMin} min${overdue ? ' ⚠️ retrasado' : ''}`; label.style.color = color; }
+    wrap.classList.toggle('kds-overdue', overdue);
+  });
+}, 10000);
+
 // ── Marcar item ──────────────────────────────────
 let _pollInterval = null;
 let _markInFlight = 0;
@@ -378,6 +444,14 @@ async function marcar(url, btn) {
   btn.disabled = true; btn.textContent = '...';
   _markInFlight++;
   stopPolling();
+
+  // Guardar momento de inicio de preparación en localStorage
+  if (url.includes('marcarPreparacion')) {
+    const itemId = url.split('/').pop();
+    prepTimers[itemId] = Date.now();
+    savePrepTimers();
+  }
+
   try {
     const res = await fetch(url, { method: 'POST', credentials: 'same-origin' });
     if (!res.ok) throw new Error('HTTP ' + res.status);

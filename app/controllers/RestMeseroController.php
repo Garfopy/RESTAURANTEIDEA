@@ -148,6 +148,7 @@ class RestMeseroController extends BaseController
         $db   = Database::getInstance();
         $stmt = $db->prepare(
             "SELECT a.id, a.tipo, a.created_at,
+                    a.mesa_id,
                     m.nombre AS mesa_nombre
              FROM rest_alertas a
              LEFT JOIN rest_mesas m ON m.id = a.mesa_id
@@ -238,6 +239,38 @@ class RestMeseroController extends BaseController
         unset($ped);
 
         $this->json(['ok' => true, 'listos' => $pedidos, 'mis_zonas' => $misZonas]);
+    }
+
+    // POST /rest-mesero/tomarZona  — reclama todos los pedidos 'listo' en las zonas del mesero
+    public function tomarZona(?string $p = null): void
+    {
+        $db            = Database::getInstance();
+        $meseroId      = $this->usuarioId();
+        $restauranteId = $this->restauranteId();
+
+        $stmtZ = $db->prepare(
+            "SELECT zona_id FROM rest_mesero_turno
+             WHERE restaurante_id = ? AND usuario_id = ? AND turno_fecha = CURDATE() AND activo = 1"
+        );
+        $stmtZ->execute([$restauranteId, $meseroId]);
+        $misZonas = array_column($stmtZ->fetchAll(PDO::FETCH_ASSOC), 'zona_id');
+
+        if (empty($misZonas)) {
+            $this->json(['ok' => false, 'msg' => 'Sin zonas asignadas hoy', 'count' => 0]);
+            return;
+        }
+
+        $placeholders = implode(',', array_fill(0, count($misZonas), '?'));
+        $stmt = $db->prepare(
+            "UPDATE rest_pedidos p
+             LEFT JOIN rest_mesas m ON m.id = p.mesa_id
+             SET p.estado = 'reclamado', p.mesero_id = ?, p.reclamado_por = ?, p.reclamado_at = NOW()
+             WHERE p.restaurante_id = ? AND p.estado = 'listo'
+               AND m.zona_id IN ($placeholders)"
+        );
+        $stmt->execute(array_merge([$meseroId, $meseroId, $restauranteId], $misZonas));
+
+        $this->json(['ok' => true, 'count' => $stmt->rowCount()]);
     }
 
     // GET /rest-mesero/reservasHoy  — reservaciones de hoy en las zonas del mesero

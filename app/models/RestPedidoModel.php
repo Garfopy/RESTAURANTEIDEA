@@ -88,6 +88,7 @@ class RestPedidoModel extends BaseModel
     {
         return $this->query(
             "SELECT p.id, p.folio, p.created_at, p.notas AS pedido_notas,
+                    TIMESTAMPDIFF(MINUTE, p.created_at, NOW()) AS minutos_espera,
                     m.nombre AS mesa_nombre,
                     pi.id AS item_id, pi.platillo_id, pi.cantidad, pi.notas AS item_notas, pi.estado AS item_estado,
                     pi.exclusiones,

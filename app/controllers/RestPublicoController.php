@@ -79,6 +79,23 @@ class RestPublicoController extends BaseController
             $mesa = (new RestMesaModel())->getByQr($mesaQr);
         }
 
+        // Resolver mesero que atiende la mesa según zona y turno del día
+        $meseroAtiende = null;
+        if ($mesa && !empty($mesa['zona_id'])) {
+            try {
+                $stmtM = Database::getInstance()->prepare(
+                    "SELECT u.nombre FROM rest_mesero_turno mt
+                     JOIN usuarios u ON u.id = mt.usuario_id
+                     WHERE mt.restaurante_id = ? AND mt.zona_id = ?
+                       AND mt.turno_fecha = CURDATE() AND mt.activo = 1
+                     LIMIT 1"
+                );
+                $stmtM->execute([(int)$restaurante['id'], (int)$mesa['zona_id']]);
+                $rowM = $stmtM->fetch(PDO::FETCH_ASSOC);
+                $meseroAtiende = $rowM ? $rowM['nombre'] : null;
+            } catch (\Throwable $e) {}
+        }
+
         // Recuperar visita previa de cookie (para agregar más pedidos a la misma visita)
         $cookieName = 'visita_' . $restaurante['id'];
         $visitaId   = (int)($_COOKIE[$cookieName] ?? 0);
@@ -92,7 +109,7 @@ class RestPublicoController extends BaseController
         }
 
         $pageTitle = $restaurante['nombre'];
-        $this->render('publico/menu/index', compact('restaurante','categorias','platillos','recetaIngredientes','mesa','visitaId','pageTitle'));
+        $this->render('publico/menu/index', compact('restaurante','categorias','platillos','recetaIngredientes','mesa','visitaId','meseroAtiende','pageTitle'));
     }
 
     public function ordenar(?string $slug = null): void
@@ -484,13 +501,15 @@ class RestPublicoController extends BaseController
         $mesaQr   = $this->post('mesa_qr');
         $visitaId = (int)$this->post('visita_id', 0);
         $mesa     = $mesaQr ? $this->mesaModel->getByQr($mesaQr) : null;
+        $tipo     = $this->post('tipo', 'mesero');
+        $tipo     = in_array($tipo, ['mesero','cuenta'], true) ? $tipo : 'mesero';
 
         $db = Database::getInstance();
         $db->prepare(
             'INSERT INTO rest_alertas (restaurante_id, tipo, mesa_id, visita_id) VALUES (?,?,?,?)'
         )->execute([
             (int)$restaurante['id'],
-            'mesero',
+            $tipo,
             $mesa ? (int)$mesa['id'] : null,
             $visitaId ?: null,
         ]);

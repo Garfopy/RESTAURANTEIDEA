@@ -89,6 +89,31 @@
       background: #F59E0B; color: #fff; font-size: .65rem; font-weight: 700;
       padding: 1px 6px; border-radius: 10px; display: none;
     }
+    .cuenta-badge {
+      position: absolute; top: 8px; left: 8px;
+      background: #EF4444; color: #fff; font-size: .65rem; font-weight: 700;
+      padding: 1px 6px; border-radius: 10px; display: none;
+      z-index: 2;
+    }
+
+    /* ── Panel cuentas pendientes ── */
+    #cuentasBanner {
+      margin: 12px 16px 0;
+      background: #FEF2F2; border: 1.5px solid #FCA5A5; border-radius: 14px; padding: 14px;
+      animation: slideIn .3s ease;
+    }
+    #cuentasBanner.hidden { display: none; }
+
+    /* ── Botón flotante Tomar mis listos ── */
+    #btnTomarZona {
+      position: fixed; bottom: 24px; right: 20px;
+      background: #2563EB; color: #fff; border: none; border-radius: 50px;
+      padding: 14px 22px; font-size: .88rem; font-weight: 700; cursor: pointer;
+      box-shadow: 0 4px 20px rgba(37,99,235,.45); display: none;
+      transition: transform .15s, filter .15s; z-index: 40;
+    }
+    #btnTomarZona:hover { filter: brightness(1.1); transform: translateY(-2px); }
+    #btnTomarZona:active { transform: scale(.96); }
 
     /* ── Botones ── */
     .btn-sm {
@@ -139,6 +164,14 @@
   </div>
 </div>
 
+<!-- Cuentas pendientes (alertas tipo=cuenta) -->
+<div id="cuentasBanner" class="hidden">
+  <div style="font-weight:700;color:#991B1B;font-size:.88rem;margin-bottom:10px;display:flex;align-items:center;gap:6px">
+    💳 Cuentas pendientes <span id="cnt-cuentas-text"></span>
+  </div>
+  <div id="cuentasList"></div>
+</div>
+
 <!-- Alertas de comensales -->
 <div id="alertasBanner" class="hidden">
   <div style="font-weight:700;color:#92400E;font-size:.88rem;margin-bottom:10px;display:flex;align-items:center;gap:6px">
@@ -181,6 +214,7 @@
        onclick="abrirMesa(<?= (int)$m['id'] ?>, '<?= htmlspecialchars(addslashes($m['nombre'])) ?>', '<?= htmlspecialchars($m['estado']) ?>')"
        id="mesa-card-<?= (int)$m['id'] ?>">
     <div id="badge-pedidos-<?= (int)$m['id'] ?>" class="pedidos-badge"></div>
+    <div id="badge-cuenta-<?= (int)$m['id'] ?>" class="cuenta-badge">💳</div>
     <?php if ($m['es_mi_zona']): ?>
       <div style="position:absolute;top:6px;left:6px;font-size:.6rem;background:#DBEAFE;color:#1D4ED8;padding:1px 5px;border-radius:6px;font-weight:700">MI ZONA</div>
     <?php endif; ?>
@@ -217,6 +251,8 @@
   <div style="font-size:.82rem;color:#9CA3AF">Cargando...</div>
 </div>
 
+<button id="btnTomarZona" onclick="tomarZona(this)">⚡ Tomar mis listos <span id="cnt-tomar">0</span></button>
+
 <div id="m-toast"></div>
 
 <script>
@@ -246,33 +282,64 @@ function pollAlertas() {
     .then(r => r.json())
     .then(d => {
       if (!d.ok) return;
-      const cnt = d.alertas.length;
+
+      const cuentas = d.alertas.filter(a => a.tipo === 'cuenta');
+      const meseros = d.alertas.filter(a => a.tipo !== 'cuenta');
+      const cntTotal = d.alertas.length;
 
       // Topbar badge
       const badge = document.getElementById('badge-alertas');
-      badge.textContent = cnt;
-      badge.className   = 'badge-cnt ' + (cnt > 0 ? 'bc-rojo' : 'bc-gris');
+      badge.textContent = cntTotal;
+      badge.className   = 'badge-cnt ' + (cntTotal > 0 ? 'bc-rojo' : 'bc-gris');
 
+      if (cntTotal > prevAlertasCount && prevAlertasCount > 0) vibrar();
+      prevAlertasCount = cntTotal;
+
+      // ── Panel cuentas pendientes (prioridad alta) ──
+      const cuentaBanner = document.getElementById('cuentasBanner');
+      if (cuentas.length) {
+        document.getElementById('cnt-cuentas-text').textContent = `(${cuentas.length})`;
+        document.getElementById('cuentasList').innerHTML = cuentas.map(a =>
+          `<div class="alerta-row" style="border-color:#FEE2E2">
+            <span style="font-size:.85rem;color:#991B1B">
+              <strong>💳 Pide la cuenta</strong>
+              ${a.mesa_nombre ? ' · Mesa <strong>' + a.mesa_nombre + '</strong>' : ''}
+            </span>
+            <button class="btn-sm" style="background:#EF4444;color:#fff" onclick="atenderAlerta(${a.id},this)">Atendido ✓</button>
+          </div>`
+        ).join('');
+        cuentaBanner.classList.remove('hidden');
+      } else {
+        cuentaBanner.classList.add('hidden');
+      }
+
+      // ── Panel alertas mesero ──
       const banner = document.getElementById('alertasBanner');
-      if (!cnt) { banner.classList.add('hidden'); prevAlertasCount = 0; return; }
+      if (!meseros.length) {
+        banner.classList.add('hidden');
+      } else {
+        document.getElementById('cnt-alertas-text').textContent = `(${meseros.length})`;
+        document.getElementById('alertasList').innerHTML = meseros.map(a =>
+          `<div class="alerta-row">
+            <span style="font-size:.85rem;color:#78350F">
+              <strong>${TIPO_LABEL[a.tipo] ?? a.tipo}</strong>
+              ${a.mesa_nombre ? ' · Mesa <strong>' + a.mesa_nombre + '</strong>' : ''}
+            </span>
+            <button class="btn-sm btn-atender" onclick="atenderAlerta(${a.id},this)">Atendido ✓</button>
+          </div>`
+        ).join('');
+        banner.classList.remove('hidden');
+      }
 
-      if (cnt > prevAlertasCount && prevAlertasCount > 0) vibrar();
-      prevAlertasCount = cnt;
-
-      document.getElementById('cnt-alertas-text').textContent = `(${cnt})`;
-      let html = '';
-      d.alertas.forEach(a => {
-        const label = TIPO_LABEL[a.tipo] ?? a.tipo;
-        html += `<div class="alerta-row">
-          <span style="font-size:.85rem;color:#78350F">
-            <strong>${label}</strong>
-            ${a.mesa_nombre ? ' · Mesa <strong>' + a.mesa_nombre + '</strong>' : ''}
-          </span>
-          <button class="btn-sm btn-atender" onclick="atenderAlerta(${a.id},this)">Atendido ✓</button>
-        </div>`;
+      // ── Badge 💳 en tarjeta de mesa ──
+      // Limpiar badges anteriores
+      document.querySelectorAll('.cuenta-badge').forEach(el => el.style.display = 'none');
+      // Mesa con alerta de cuenta activa
+      const mesasConCuenta = new Set(cuentas.map(a => a.mesa_id).filter(Boolean));
+      mesasConCuenta.forEach(mesaId => {
+        const el = document.getElementById('badge-cuenta-' + mesaId);
+        if (el) el.style.display = '';
       });
-      document.getElementById('alertasList').innerHTML = html;
-      banner.classList.remove('hidden');
     })
     .catch(() => {});
 }
@@ -384,6 +451,10 @@ function pollListos() {
       }
 
       banner.classList.remove('hidden');
+
+      // Actualizar botón flotante: pedidos 'listo' de mis zonas sin reclamar
+      const sinReclamar = misMesas.filter(p => p.estado === 'listo' && !p.es_mi_reclamo && !p.reclamado_otro).length;
+      _actualizarBtnTomar(sinReclamar);
     })
     .catch(() => {});
 }
@@ -512,6 +583,37 @@ pollListos();
 cargarReservasHoy();
 setInterval(pollAlertas, 5000);
 setInterval(pollListos,  5000);
+
+// ── Botón flotante: Tomar mis listos ────────────────────────────────────────
+// El contador se alimenta desde pollListos() — pedidos 'listo' en mis zonas no reclamados
+function _actualizarBtnTomar(count) {
+  const btn = document.getElementById('btnTomarZona');
+  const cnt = document.getElementById('cnt-tomar');
+  if (!btn) return;
+  if (count > 0) {
+    cnt.textContent = count;
+    btn.style.display = 'block';
+  } else {
+    btn.style.display = 'none';
+  }
+}
+
+function tomarZona(btn) {
+  const orig = btn.innerHTML;
+  btn.disabled = true; btn.textContent = '⏳ Tomando...';
+  fetch(BASE + 'rest-mesero/tomarZona', { method: 'POST' })
+    .then(r => r.json())
+    .then(d => {
+      btn.disabled = false; btn.innerHTML = orig;
+      if (d.ok) {
+        toast(`✅ ${d.count > 0 ? d.count + ' pedido(s) reclamados' : 'Ya estaban reclamados'}`);
+        pollListos();
+      } else {
+        toast('⚠️ ' + (d.msg || 'Error'));
+      }
+    })
+    .catch(() => { btn.disabled = false; btn.innerHTML = orig; toast('⚠️ Sin conexión'); });
+}
 </script>
 </body>
 </html>
