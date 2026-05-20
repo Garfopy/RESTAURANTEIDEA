@@ -85,7 +85,7 @@
     </div>
 
     <?php if (($ticket['estado'] ?? '') === 'pagado'): ?>
-    <!-- Ya pagado -->
+    <!-- Ya pagado — QR de salida -->
     <div style="background:#DCFCE7;border-radius:12px;padding:16px;text-align:center;margin-top:8px">
       <div style="font-size:2rem;margin-bottom:4px">✅</div>
       <div style="font-weight:700;color:#166534;font-size:1rem">¡Cuenta pagada!</div>
@@ -93,6 +93,36 @@
         <?= htmlspecialchars(ucfirst($ticket['metodo_pago'] ?? '')) ?>
       </div>
     </div>
+    <?php if (!empty($visita['qr_code']) && empty($visita['salida_at'])): ?>
+    <div style="margin-top:16px;text-align:center">
+      <div style="font-size:.82rem;color:#374151;font-weight:600;margin-bottom:10px">
+        🚪 Muestra este código al portero al salir
+      </div>
+      <div id="qr-salida" style="display:inline-block;padding:10px;background:#fff;border-radius:10px;border:1px solid #D1FAE5"></div>
+      <div style="font-size:.72rem;color:#6B7280;margin-top:8px">El portero escaneará tu código con su dispositivo</div>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script>
+    new QRCode(document.getElementById('qr-salida'), {
+      text: '<?= addslashes($visita['qr_code']) ?>',
+      width: 180, height: 180,
+      colorDark: '#111827', colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.M
+    });
+    const _QR_TOKEN = '<?= addslashes($visita['qr_code']) ?>';
+    const _BASE_URL = '<?= BASE_URL ?>';
+    const _salida_timer = setInterval(async () => {
+      try {
+        const resp = await fetch(_BASE_URL + 'menu/checkSalida?qr=' + encodeURIComponent(_QR_TOKEN));
+        const data = await resp.json();
+        if (data.ok && data.salida && data.redirect) {
+          clearInterval(_salida_timer);
+          window.location.href = data.redirect;
+        }
+      } catch(e) {}
+    }, 3000);
+    </script>
+    <?php endif; ?>
 
     <?php else: ?>
     <!-- Selector método de pago -->
