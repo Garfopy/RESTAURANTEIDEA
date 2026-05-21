@@ -5,15 +5,27 @@ class RestReservaModel extends BaseModel
 
     public function getByRestaurante(int $restauranteId, int $page = 1, ?string $estado = null): array
     {
-        $where = $estado ? "AND r.estado = '" . addslashes($estado) . "'" : '';
-        $sql = "SELECT r.*, m.nombre AS mesa_nombre,
+        $allowed = ['pendiente', 'confirmada', 'cancelada', 'completada'];
+        $params  = [$restauranteId];
+
+        if ($estado && in_array($estado, $allowed, true)) {
+            $where    = 'AND r.estado = ?';
+            $params[] = $estado;
+        } else {
+            $where = '';
+        }
+
+        $sql = "SELECT r.id, r.restaurante_id, r.mesa_id, r.comensal_id, r.mesero_id,
+                       r.nombre, r.telefono, r.email, r.fecha, r.hora, r.personas,
+                       r.estado, r.origen, r.notas, r.created_at, r.updated_at,
+                       m.nombre AS mesa_nombre,
                        u.nombre AS mesero_nombre
                 FROM rest_reservaciones r
                 LEFT JOIN rest_mesas m ON m.id = r.mesa_id
                 LEFT JOIN usuarios u   ON u.id = r.mesero_id
                 WHERE r.restaurante_id = ? $where
                 ORDER BY r.fecha DESC, r.hora DESC";
-        return $this->paginate($sql, [$restauranteId], $page);
+        return $this->paginate($sql, $params, $page);
     }
 
     public function getProximas(int $restauranteId, int $dias = 7): array
