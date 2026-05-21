@@ -163,67 +163,59 @@ class RestInventarioController extends BaseController
         if (!$this->isPost()) $this->redirect('rest-inventario/index');
         $restauranteId = $this->restauranteId();
 
-        try {
-            $id             = (int)$this->post('id');
-            $esCarnihub     = (int)(bool)$this->post('proveedor_carnihub', 0);
-            $carnihubProdId = $esCarnihub ? ((int)$this->post('carnihub_producto_id') ?: null) : null;
+        $id              = (int)$this->post('id');
+        $esCarnihub      = (int)(bool)$this->post('proveedor_carnihub', 0);
+        $carnihubProdId  = $esCarnihub ? ((int)$this->post('carnihub_producto_id') ?: null) : null;
 
-            // Si el producto viene de CarniHub, intentar resolver nombre/unidad
-            // desde la BD local; si no existe, usar lo que envió el formulario.
-            if ($esCarnihub && $carnihubProdId) {
-                $db   = Database::getInstance();
-                $stmt = $db->prepare("SELECT * FROM productos WHERE id = ?");
-                $stmt->execute([$carnihubProdId]);
-                $prod = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
-
-                $nombre = trim((string)($prod['nombre'] ?? $this->post('carnihub_producto_nombre', $this->post('nombre', ''))));
-                $unidad = trim((string)($prod['presentacion'] ?? $this->post('carnihub_producto_unidad', $this->post('unidad_principal', 'kg'))));
-                if ($unidad === '') $unidad = 'kg';
-            } else {
-                $nombre = trim($this->post('nombre', ''));
-                $unidad = $this->post('unidad_principal', 'kg');
-            }
-
-            $stockMinimo = $esCarnihub
-                ? (float)$this->post('stock_minimo_ch', 0)
-                : (float)$this->post('stock_minimo', 0);
-            $stockInicial = $esCarnihub
-                ? (float)$this->post('stock_inicial_ch', 0)
-                : (float)$this->post('stock_inicial', 0);
-
-            $data = [
-                'restaurante_id'       => $restauranteId,
-                'nombre'               => $nombre,
-                'codigo'               => $this->post('codigo') ?: null,
-                'tipo'                 => $this->post('tipo') ?: null,
-                'unidad_principal'     => $unidad,
-                'costo_unitario'       => (float)$this->post('costo_unitario', 0),
-                'stock_minimo'         => $stockMinimo,
-                'categoria'            => $this->post('categoria') ?: null,
-                'proveedor_carnihub'   => $esCarnihub,
-                'carnihub_producto_id' => $carnihubProdId,
-                'proveedor_nombre'     => !$esCarnihub ? ($this->post('proveedor_nombre') ?: null) : null,
-            ];
-
-            if ($id) {
-                $this->model->update($id, array_diff_key($data, ['restaurante_id' => '']));
-            } else {
-                $ingId = $this->model->insert($data);
-                if ($stockInicial > 0) {
-                    $this->model->ajustarStock(
-                        $ingId, $stockInicial, 'entrada',
-                        'Stock inicial', null, $restauranteId, $this->usuarioId()
-                    );
-                }
-            }
-
-            $this->flash('success', 'Ingrediente guardado.');
-            $this->redirect('rest-inventario/index');
-        } catch (\Throwable $e) {
-            error_log('[RestInventarioController::guardar] ' . $e->getMessage());
-            $this->flash('error', 'No se pudo guardar el ingrediente. Revisa los datos e inténtalo de nuevo.');
-            $this->redirect('rest-inventario/index');
+        // Si viene de CarniHub, usar datos del producto
+        if ($esCarnihub && $carnihubProdId) {
+            $db   = Database::getInstance();
+            $stmt = $db->prepare("SELECT * FROM productos WHERE id = ?");
+            $stmt->execute([$carnihubProdId]);
+            $prod   = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+            $nombre = $prod['nombre'] ?? $this->post('nombre', '');
+            $unidad = $prod['presentacion'] ?? 'kg';
+        } else {
+            $nombre = trim($this->post('nombre', ''));
+            $unidad = $this->post('unidad_principal', 'kg');
         }
+
+        $stockMinimo = $esCarnihub
+            ? (float)$this->post('stock_minimo_ch', 0)
+            : (float)$this->post('stock_minimo', 0);
+        $stockInicial = $esCarnihub
+            ? (float)$this->post('stock_inicial_ch', 0)
+            : (float)$this->post('stock_inicial', 0);
+
+        $data = [
+            'restaurante_id'      => $restauranteId,
+            'nombre'              => $nombre,
+            'codigo'              => $this->post('codigo') ?: null,
+            'tipo'                => $this->post('tipo') ?: null,
+            'unidad_principal'    => $unidad,
+            'costo_unitario'      => (float)$this->post('costo_unitario', 0),
+            'stock_minimo'        => $stockMinimo,
+            'categoria'           => $this->post('categoria') ?: null,
+            'proveedor_carnihub'  => $esCarnihub,
+            'carnihub_producto_id'=> $carnihubProdId,
+            'proveedor_nombre'    => !$esCarnihub ? ($this->post('proveedor_nombre') ?: null) : null,
+        ];
+
+        if ($id) {
+            $this->model->update($id, array_diff_key($data, ['restaurante_id' => '']));
+        } else {
+            $ingId = $this->model->insert($data);
+            // Registrar stock inicial si > 0
+            if ($stockInicial > 0) {
+                $this->model->ajustarStock(
+                    $ingId, $stockInicial, 'entrada',
+                    'Stock inicial', null, $restauranteId, $this->usuarioId()
+                );
+            }
+        }
+
+        $this->flash('success', 'Ingrediente guardado.');
+        $this->redirect('rest-inventario/index');
     }
 
     public function movimiento(?string $p = null): void

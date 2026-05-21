@@ -347,8 +347,6 @@ sort($ingCategorias);
       <input type="hidden" name="id" id="ingId" value="">
       <input type="hidden" name="proveedor_carnihub" id="ingEsCarniHub" value="0">
       <input type="hidden" name="carnihub_producto_id" id="ingCarniHubId" value="">
-      <input type="hidden" name="carnihub_producto_nombre" id="ingCarniHubNombre" value="">
-      <input type="hidden" name="carnihub_producto_unidad" id="ingCarniHubUnidad" value="">
 
       <!-- Panel externo -->
       <div class="rst-tab-panel active" id="panelExt">
@@ -568,8 +566,6 @@ sort($ingCategorias);
         <input type="hidden" name="id" id="modifEditId">
         <input type="hidden" name="proveedor_carnihub" id="modifEditCarnihub" value="0">
         <input type="hidden" name="carnihub_producto_id" id="modifEditCarnihubId" value="">
-        <input type="hidden" name="carnihub_producto_nombre" id="modifEditCarnihubNombre" value="">
-        <input type="hidden" name="carnihub_producto_unidad" id="modifEditCarnihubUnidad" value="">
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
           <div class="form-group" style="grid-column:span 2;margin-bottom:0">
@@ -725,10 +721,7 @@ function switchTab(tab) {
 }
 
 function seleccionarCarniHub(id, nombre) {
-  const row = document.querySelector(`.ch-prod-row[data-id="${id}"]`);
   document.getElementById('ingCarniHubId').value = id;
-  document.getElementById('ingCarniHubNombre').value = nombre;
-  document.getElementById('ingCarniHubUnidad').value = row?.querySelector('div > div:last-child')?.textContent.trim() || '';
   document.getElementById('ingNombreCh').value   = nombre;
   document.getElementById('chNombreWrap').style.display = 'block';
   document.querySelectorAll('.ch-prod-row').forEach(r => r.style.background = '');
@@ -806,8 +799,6 @@ function abrirModificar(ing) {
   document.getElementById('modifEditId').value = ing.id;
   document.getElementById('modifEditCarnihub').value = ing.proveedor_carnihub ? '1' : '0';
   document.getElementById('modifEditCarnihubId').value = ing.carnihub_producto_id || '';
-  document.getElementById('modifEditCarnihubNombre').value = '';
-  document.getElementById('modifEditCarnihubUnidad').value = '';
   document.getElementById('modifEditNombre').value = ing.nombre;
   document.getElementById('modifEditCategoria').value = ing.categoria || '';
   const uSel = document.getElementById('modifEditUnidad');
@@ -895,10 +886,7 @@ function switchModifProv(tipo) {
 }
 
 function seleccionarCarniHubEdit(id, nombre) {
-  const row = document.querySelector(`.modif-ch-prod-row[data-id="${id}"]`);
   document.getElementById('modifEditCarnihubId').value = id;
-  document.getElementById('modifEditCarnihubNombre').value = nombre;
-  document.getElementById('modifEditCarnihubUnidad').value = row?.querySelector('div > div:last-child')?.textContent.trim() || '';
   document.querySelectorAll('.modif-ch-prod-row').forEach(r => { r.style.background=''; r.classList.remove('ch-sel'); });
   const row = document.querySelector(`.modif-ch-prod-row[data-id="${id}"]`);
   if (row) { row.style.background = 'var(--cp-light, #FAF5FF)'; row.classList.add('ch-sel'); }
@@ -962,12 +950,9 @@ function autoDetectarCarniHub(nombreIng) {
   if (exactRow) {
     const id = exactRow.dataset.id;
     const nombre = exactRow.dataset.display || exactRow.dataset.nombre || '';
-    const unidad = exactRow.querySelector('div > div:last-child')?.textContent.trim() || '';
     exactRow.style.background = 'var(--cp-light, #FAF5FF)';
     exactRow.classList.add('ch-sel');
     document.getElementById('modifEditCarnihubId').value = id;
-    document.getElementById('modifEditCarnihubNombre').value = nombre;
-    document.getElementById('modifEditCarnihubUnidad').value = unidad;
     document.getElementById('modifChSelNombre').textContent = nombre;
     if (selWrap) selWrap.style.display = 'block';
     const buscar = document.getElementById('modifChBuscar');
