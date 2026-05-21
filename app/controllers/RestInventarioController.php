@@ -68,7 +68,12 @@ class RestInventarioController extends BaseController
                 }
             } catch (\Throwable $e) {}
         } else {
-            // Instalación integrada: leer catálogo de la BD local
+            // Instalación integrada: leer catálogo de la BD local.
+            // IMPORTANTE: traemos SIEMPRE todos los productos activos (no
+            // sólo los de la empresa proveedora asignada al restaurante),
+            // para que la lista del modal y el match-exacto contemplen
+            // cualquier producto disponible en CarniHub. Si hay empresa
+            // preferida, la ordenamos primero.
             try {
                 if (!isset($db)) $db = Database::getInstance();
                 if ($empresaProveedorId) {
@@ -76,9 +81,9 @@ class RestInventarioController extends BaseController
                         "SELECT p.id, p.nombre, p.presentacion AS unidad, e.razon_social AS empresa_nombre
                          FROM productos p
                          LEFT JOIN empresas e ON e.id = p.empresa_id
-                         WHERE p.activo = 1 AND p.empresa_id = ?
-                         ORDER BY p.nombre
-                         LIMIT 300"
+                         WHERE p.activo = 1
+                         ORDER BY (p.empresa_id = ?) DESC, e.razon_social, p.nombre
+                         LIMIT 2000"
                     );
                     $stmt->execute([$empresaProveedorId]);
                 } else {
@@ -88,7 +93,7 @@ class RestInventarioController extends BaseController
                          LEFT JOIN empresas e ON e.id = p.empresa_id
                          WHERE p.activo = 1
                          ORDER BY e.razon_social, p.nombre
-                         LIMIT 300"
+                         LIMIT 2000"
                     );
                 }
                 $productosCarnihub = $stmt->fetchAll(PDO::FETCH_ASSOC);

@@ -926,10 +926,17 @@ function autoDetectarCarniHub(nombreIng) {
   const rows = document.querySelectorAll('.modif-ch-prod-row');
   const noMatchBox = document.getElementById('modifChNoMatch');
   const selWrap    = document.getElementById('modifChSelWrap');
-  if (!rows.length) return;
 
   const needle = normalizarNombre(nombreIng);
   if (!needle) return;
+
+  // Si NO hay productos cargados en el panel CarniHub, igual mostramos
+  // el aviso amarillo para que el usuario sepa que no hay coincidencia.
+  if (!rows.length) {
+    if (selWrap) selWrap.style.display = 'none';
+    if (noMatchBox) noMatchBox.style.display = 'block';
+    return;
+  }
 
   let exactRow = null;
   rows.forEach(row => {
