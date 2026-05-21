@@ -6,21 +6,37 @@
 -- `unidad_principal` (en `rest_ingredientes`).
 --
 -- Ejemplos:
---   "Mezcal Sol 2 Oz."          → nombre="Mezcal Sol",          presentacion="2 Oz."
---   "Merengues 3 Pzs."          → nombre="Merengues",           presentacion="3 Pzs."
---   "Fruta Cristalizada 150 Gr."→ nombre="Fruta Cristalizada",  presentacion="150 Gr."
---   "Percheron Mezcal Sol 65 Ml."→ nombre="Percheron Mezcal Sol",presentacion="65 Ml."
---   "Palanquetas 1 Pza."        → nombre="Palanquetas",         presentacion="1 Pza."
---   "Tortillas de maíz 4 pzas"  → nombre="Tortillas de maíz",   presentacion="4 pzas"
+--   "Mezcal Sol 2 Oz."           → nombre="Mezcal Sol",           presentacion="2 Oz."
+--   "Merengues 3 Pzs."           → nombre="Merengues",            presentacion="3 Pzs."
+--   "Fruta Cristalizada 150 Gr." → nombre="Fruta Cristalizada",   presentacion="150 Gr."
+--   "Percheron Mezcal Sol 65 Ml."→ nombre="Percheron Mezcal Sol", presentacion="65 Ml."
+--   "Palanquetas 1 Pza."         → nombre="Palanquetas",          presentacion="1 Pza."
+--   "Tortillas de maíz 4 pzas"   → nombre="Tortillas de maíz",    presentacion="4 pzas"
 --
 -- IDEMPOTENTE: detecta sólo nombres cuyo sufijo aún coincide
 -- con el patrón. Re-ejecutarlo no hace cambios adicionales.
+--
+-- ┌─────────────────────────────────────────────────────────┐
+-- │  INSTRUCCIONES DE EJECUCIÓN                             │
+-- │                                                         │
+-- │  idactivo_carnihubdb  → ejecutar el BLOQUE COMPLETO     │
+-- │                         (secciones 1 y 2)               │
+-- │                                                         │
+-- │  idactivo_capirest    → ejecutar SOLO la SECCIÓN 2      │
+-- │                         (el bloque UPDATE rest_...      │
+-- │                          que está al final)             │
+-- │                                                         │
+-- │  La tabla `productos` NO existe en Capirest,            │
+-- │  solo en idactivo_carnihubdb.                           │
+-- └─────────────────────────────────────────────────────────┘
 -- ============================================================
 
--- ── 1) PRODUCTOS (catálogo CarniHub) ─────────────────────────
--- Patrón: termina con "<digitos> <unidad>" donde unidad ∈
---   Pzs. / Pza. / Pzas. / Pzs / Pza / Pzas / pzas / Oz. / Oz / Gr. / Gr / Ml. / Ml
--- Tomamos los últimos 2 tokens separados por espacio.
+
+-- ══════════════════════════════════════════════════════════════
+-- SECCIÓN 1 — Solo en idactivo_carnihubdb
+-- Patrón: termina con "<dígitos> <unidad>" donde unidad ∈
+--   Pzs. / Pza. / Pzas. / pzas / Oz. / Oz / Gr. / Gr / Ml. / Ml
+-- ══════════════════════════════════════════════════════════════
 UPDATE productos
    SET presentacion = TRIM(SUBSTRING_INDEX(nombre, ' ', -2)),
        nombre       = TRIM(SUBSTRING(
@@ -31,10 +47,11 @@ UPDATE productos
                           ))
  WHERE nombre REGEXP ' [0-9]+ (Pzs|Pza|Pzas|pzas|Oz|Gr|Ml)[.]?$';
 
--- ── 2) REST_INGREDIENTES (inventario del restaurante) ────────
--- Misma lógica: el sufijo pasa a `unidad_principal`.
--- (La unidad anterior solía ser "pieza"/"kg"; la sustituimos
--- por la presentación específica del producto cuando exista).
+
+-- ══════════════════════════════════════════════════════════════
+-- SECCIÓN 2 — En idactivo_carnihubdb  Y  en idactivo_capirest
+-- (pegar solo esta parte cuando estés en Capirest)
+-- ══════════════════════════════════════════════════════════════
 UPDATE rest_ingredientes
    SET unidad_principal = TRIM(SUBSTRING_INDEX(nombre, ' ', -2)),
        nombre           = TRIM(SUBSTRING(
@@ -45,13 +62,12 @@ UPDATE rest_ingredientes
                               ))
  WHERE nombre REGEXP ' [0-9]+ (Pzs|Pza|Pzas|pzas|Oz|Gr|Ml)[.]?$';
 
--- ── 3) Verificación rápida (opcional, sólo SELECT) ───────────
--- Después de correr la migración puedes inspeccionar:
+
+-- ── Verificación (opcional) ───────────────────────────────────
+-- Debe devolver 0 filas después de ejecutar:
 --   SELECT id, nombre, presentacion FROM productos
 --     WHERE nombre REGEXP ' [0-9]+ (Pzs|Pza|Pzas|pzas|Oz|Gr|Ml)[.]?$';
---   (debe regresar 0 filas — ya no hay sufijos pendientes)
 --
 --   SELECT id, nombre, unidad_principal FROM rest_ingredientes
 --     WHERE nombre REGEXP ' [0-9]+ (Pzs|Pza|Pzas|pzas|Oz|Gr|Ml)[.]?$';
---   (idem)
 -- ── Fin ──────────────────────────────────────────────────────
