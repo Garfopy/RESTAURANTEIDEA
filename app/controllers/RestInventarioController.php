@@ -51,21 +51,38 @@ class RestInventarioController extends BaseController
         // Productos CarniHub disponibles para vincular a ingredientes
         $productosCarnihub = [];
         if (defined('RESTAURANTE_STANDALONE') && RESTAURANTE_STANDALONE) {
-            // Standalone: obtener catálogo vía API de CarniHub
+            // Standalone: obtener catálogo vía API de CarniHub.
+            // Iteramos por páginas para evitar el cap por petición que
+            // pueda imponer el servidor remoto (típicamente 100/200).
             try {
-                $apiService = new CarniHubApiService();
-                $result     = $apiService->buscarProducto($restauranteId, '', '', 1, 5000);
-                if ($result['success'] && !empty($result['data']['productos'])) {
-                    $grupNombre = $empresaProveedorNombre ?? 'CarniHub';
-                    foreach ($result['data']['productos'] as $prod) {
+                $apiService  = new CarniHubApiService();
+                $grupNombre  = $empresaProveedorNombre ?? 'CarniHub';
+                $page        = 1;
+                $maxPaginas  = 50;            // safety net (hasta ~5000 productos)
+                $perPage     = 100;            // tamaño que el servidor suele aceptar
+                $vistos      = [];             // dedup por id
+                while ($page <= $maxPaginas) {
+                    $result = $apiService->buscarProducto($restauranteId, '', '', $page, $perPage);
+                    if (empty($result['success']) || empty($result['data']['productos'])) break;
+                    $lote = $result['data']['productos'];
+                    foreach ($lote as $prod) {
+                        $pid = (int)($prod['id'] ?? 0);
+                        if ($pid <= 0 || isset($vistos[$pid])) continue;
+                        $vistos[$pid] = true;
                         $productosCarnihub[] = [
-                            'id'             => $prod['id'],
-                            'nombre'         => $prod['nombre'],
+                            'id'             => $pid,
+                            'nombre'         => $prod['nombre'] ?? '',
                             'unidad'         => $prod['presentacion'] ?? '',
                             'empresa_nombre' => $grupNombre,
                         ];
                     }
+                    if (count($lote) < $perPage) break; // última página
+                    $page++;
                 }
+                // Orden alfabético por nombre (case-insensitive)
+                usort($productosCarnihub, function($a, $b){
+                    return strcasecmp($a['nombre'] ?? '', $b['nombre'] ?? '');
+                });
             } catch (\Throwable $e) {}
         } else {
             // Instalación integrada: leer catálogo de la BD local.

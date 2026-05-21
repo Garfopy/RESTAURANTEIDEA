@@ -111,7 +111,7 @@ class CarniHubApiService
             return $this->errorResponse('No hay configuración de CarniHub para este restaurante');
         }
 
-        $params = ['q' => trim($query), 'page' => max(1, $page), 'limit' => min(max($limit, 1), 100)];
+        $params = ['q' => trim($query), 'page' => max(1, $page), 'limit' => min(max($limit, 1), 5000)];
         if ($categoria !== '') {
             $params['categoria'] = $categoria;
         }
