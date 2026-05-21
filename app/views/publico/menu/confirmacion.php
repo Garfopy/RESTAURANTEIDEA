@@ -36,8 +36,8 @@ if (isset($ticket)) {
 $waTexto .= "━━━━━━━━━━━━━━━━━━━\n¡Gracias por tu visita! 🙏";
 $visitaQr  = $visita['qr_code'] ?? '';
 $scanUrl   = $visitaQr ? BASE_URL . 'menu/scanPortero?qr=' . urlencode($visitaQr) : '';
-$qrImgUrl  = $scanUrl
-    ? 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' . urlencode($scanUrl)
+$qrImgUrl  = $visitaQr
+    ? 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' . urlencode($visitaQr)
     : '';
 ?>
 <!DOCTYPE html>

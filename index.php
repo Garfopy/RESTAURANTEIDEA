@@ -36,8 +36,6 @@ $_roleCookies = [
     'rest-chef'     => '_chef',
     'rest-mesero'   => '_mesero',
     'rest-portero'  => '_portero',
-    'rest-staff'    => '_staff',
-    'rest-propinas' => '_staff',
     'menu'          => '_comensal',
     'acceso'        => '_login',
 ];
