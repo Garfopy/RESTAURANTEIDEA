@@ -88,9 +88,17 @@ class RestInventarioController extends BaseController
                         'http_code'    => $result['http_code'] ?? null,
                         'lote_count'   => is_array($lote) ? count($lote) : 0,
                         'top_keys'     => array_slice(array_keys($result), 0, 12),
+                        'data_keys'    => is_array($result['data'] ?? null) ? array_slice(array_keys($result['data']), 0, 20) : null,
                         'total'        => $metaSrc['total'] ?? $metaSrc['total_records'] ?? null,
                         'last_page'    => $metaSrc['last_page'] ?? $metaSrc['total_pages'] ?? null,
                         'per_page'     => $metaSrc['per_page'] ?? null,
+                        'current_page' => $metaSrc['current_page'] ?? null,
+                        'next_cursor'  => $metaSrc['next_cursor'] ?? $metaSrc['next_page_url'] ?? null,
+                        'first3_ids'   => array_column(array_slice(is_array($lote) ? $lote : [], 0, 3), 'id'),
+                        'first3_names' => array_column(array_slice(is_array($lote) ? $lote : [], 0, 3), 'nombre'),
+                        'raw_data_sample' => is_array($result['data'] ?? null) && !is_array($result['data'][0] ?? null)
+                            ? array_slice($result['data'], 0, 3, true)  // dict, no lista
+                            : null,
                         'error'        => $result['error'] ?? null,
                     ];
                     if (empty($result['success']) || empty($lote)) break;
