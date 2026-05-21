@@ -661,6 +661,11 @@ sort($ingCategorias);
                  font-size:.8rem;color:#5B21B6;font-weight:600">
               ✓ <span id="modifChSelNombre">—</span>
             </div>
+            <div id="modifChNoMatch" style="display:none;margin-top:8px;padding:8px 10px;
+                 background:#FEF3C7;border:1px solid #FDE68A;border-radius:8px;
+                 font-size:.8rem;color:#92400E;font-weight:600">
+              ⚠️ No hay coincidencia exacta para este ingrediente en CarniHub. Búscalo y selecciónalo manualmente.
+            </div>
             <?php else: ?>
             <div style="font-size:.83rem;color:#9CA3AF;text-align:center;padding:12px 0">
               No hay productos CarniHub disponibles.
@@ -863,6 +868,8 @@ function switchModifProv(tipo) {
     document.getElementById('modifEditCarnihubId').value = '';
     const selWrap = document.getElementById('modifChSelWrap');
     if (selWrap) selWrap.style.display = 'none';
+    const noMatchBox = document.getElementById('modifChNoMatch');
+    if (noMatchBox) noMatchBox.style.display = 'none';
     document.querySelectorAll('.modif-ch-prod-row').forEach(r => { r.style.background=''; r.classList.remove('ch-sel'); });
     const buscar = document.getElementById('modifChBuscar');
     if (buscar) { buscar.value = ''; filtrarChEdit(''); }
@@ -885,6 +892,8 @@ function seleccionarCarniHubEdit(id, nombre) {
   if (row) { row.style.background = 'var(--cp-light, #FAF5FF)'; row.classList.add('ch-sel'); }
   document.getElementById('modifChSelNombre').textContent = nombre;
   document.getElementById('modifChSelWrap').style.display = 'block';
+  const noMatchBox = document.getElementById('modifChNoMatch');
+  if (noMatchBox) noMatchBox.style.display = 'none';
 }
 
 function filtrarChEdit(q) {
@@ -908,57 +917,47 @@ function _ngramas(s, n) {
   return out;
 }
 
+// Auto-detección con MATCH EXACTO únicamente.
+// Solo selecciona un producto de CarniHub si su nombre normalizado
+// (sin acentos, sin signos, en minúsculas) coincide EXACTAMENTE con
+// el nombre normalizado del ingrediente. Evita falsos positivos por
+// similitud (p.ej. "Tamales Oaxaqueños" ≠ "Mole Oaxaqueño").
 function autoDetectarCarniHub(nombreIng) {
   const rows = document.querySelectorAll('.modif-ch-prod-row');
+  const noMatchBox = document.getElementById('modifChNoMatch');
+  const selWrap    = document.getElementById('modifChSelWrap');
   if (!rows.length) return;
 
   const needle = normalizarNombre(nombreIng);
   if (!needle) return;
 
-  const palabras = needle.split(' ').filter(p => p.length >= 3);
-  const trigramasNeedle = _ngramas(needle.replace(/\s+/g, ''), 3);
-
-  let mejorRow = null;
-  let mejorScore = 0;
-
+  let exactRow = null;
   rows.forEach(row => {
-    const haystack = normalizarNombre(row.dataset.nombre);
-    let score = 0;
-    // 1) coincidencia por palabras completas (peso fuerte)
-    palabras.forEach(p => { if (haystack.includes(p)) score += 2; });
-    // 2) bonus si el haystack empieza igual a la primera palabra
-    if (palabras.length && haystack.startsWith(palabras[0])) score += 1;
-    // 3) coincidencia por trigramas (fuzzy, peso ligero)
-    const trigramasHay = _ngramas(haystack.replace(/\s+/g, ''), 3);
-    let comunes = 0;
-    trigramasNeedle.forEach(t => { if (trigramasHay.has(t)) comunes++; });
-    if (trigramasNeedle.size > 0) score += comunes / trigramasNeedle.size;
-    if (score > mejorScore) { mejorScore = score; mejorRow = row; }
+    if (normalizarNombre(row.dataset.nombre) === needle) exactRow = row;
   });
 
-  const buscar = document.getElementById('modifChBuscar');
+  // Limpiar selección/avisos previos
+  document.querySelectorAll('.modif-ch-prod-row').forEach(r => { r.style.background=''; r.classList.remove('ch-sel'); });
+  if (noMatchBox) noMatchBox.style.display = 'none';
 
-  // Si hay match razonable, pre-seleccionar el producto
-  // Umbral: al menos 1 palabra completa (score>=2) o trigram score alto (>=0.5)
-  if (mejorRow && mejorScore >= 0.5) {
-    const id = mejorRow.dataset.id;
-    const nombre = mejorRow.dataset.display || mejorRow.dataset.nombre || '';
-    document.querySelectorAll('.modif-ch-prod-row').forEach(r => { r.style.background=''; r.classList.remove('ch-sel'); });
-    mejorRow.style.background = 'var(--cp-light, #FAF5FF)';
-    mejorRow.classList.add('ch-sel');
+  if (exactRow) {
+    const id = exactRow.dataset.id;
+    const nombre = exactRow.dataset.display || exactRow.dataset.nombre || '';
+    exactRow.style.background = 'var(--cp-light, #FAF5FF)';
+    exactRow.classList.add('ch-sel');
     document.getElementById('modifEditCarnihubId').value = id;
     document.getElementById('modifChSelNombre').textContent = nombre;
-    document.getElementById('modifChSelWrap').style.display = 'block';
-    // Limpiar buscador para ver el match resaltado dentro de la lista completa
+    if (selWrap) selWrap.style.display = 'block';
+    const buscar = document.getElementById('modifChBuscar');
     if (buscar) { buscar.value = ''; filtrarChEdit(''); }
     setTimeout(() => {
-      try { mejorRow.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch(e){}
+      try { exactRow.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch(e){}
     }, 80);
-  } else if (buscar) {
-    // Sin match: pre-llenar el buscador con el nombre del ingrediente
-    // para facilitar la búsqueda manual
-    buscar.value = nombreIng || '';
-    filtrarChEdit(buscar.value);
+  } else {
+    // Sin coincidencia exacta: limpiar selección y mostrar aviso visible.
+    document.getElementById('modifEditCarnihubId').value = '';
+    if (selWrap) selWrap.style.display = 'none';
+    if (noMatchBox) noMatchBox.style.display = 'block';
   }
 }
 
