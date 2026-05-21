@@ -818,6 +818,9 @@ function abrirModificar(ing) {
       document.getElementById('modifChSelNombre').textContent = nombre;
       document.getElementById('modifChSelWrap').style.display = 'block';
     }
+  } else if (!ing.carnihub_producto_id) {
+    // Auto-detectar coincidencia en CarniHub por nombre del ingrediente
+    autoDetectarCarniHub(ing.nombre);
   }
   document.getElementById('modifEditUnidadWarn').style.display = 'none';
 
@@ -874,6 +877,52 @@ function filtrarChEdit(q) {
   document.querySelectorAll('.modif-ch-prod-row').forEach(row => {
     row.style.display = (!q || row.dataset.nombre.includes(q)) ? '' : 'none';
   });
+}
+
+function normalizarNombre(str) {
+  return (str || '').toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // quitar acentos
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ').trim();
+}
+
+function autoDetectarCarniHub(nombreIng) {
+  const rows = document.querySelectorAll('.modif-ch-prod-row');
+  if (!rows.length) return;
+
+  const needle = normalizarNombre(nombreIng);
+  const palabras = needle.split(' ').filter(p => p.length > 2);
+  if (!palabras.length) return;
+
+  let mejorRow = null;
+  let mejorScore = 0;
+
+  rows.forEach(row => {
+    const haystack = normalizarNombre(row.dataset.nombre);
+    let score = 0;
+    palabras.forEach(p => { if (haystack.includes(p)) score++; });
+    // bonus si el haystack empieza igual
+    if (haystack.startsWith(palabras[0])) score += 0.5;
+    if (score > mejorScore) { mejorScore = score; mejorRow = row; }
+  });
+
+  // Solo pre-seleccionar si hay coincidencia en al menos 1 palabra clave
+  if (mejorRow && mejorScore >= 1) {
+    const id = mejorRow.dataset.id;
+    const nombre = mejorRow.querySelector('div > div:first-child')?.textContent.trim() || '';
+    const buscar = document.getElementById('modifChBuscar');
+    if (buscar) {
+      buscar.value = nombre;
+      filtrarChEdit(nombre);
+    }
+    document.querySelectorAll('.modif-ch-prod-row').forEach(r => { r.style.background=''; r.classList.remove('ch-sel'); });
+    mejorRow.style.background = 'var(--cp-light, #FAF5FF)';
+    mejorRow.classList.add('ch-sel');
+    document.getElementById('modifEditCarnihubId').value = id;
+    document.getElementById('modifChSelNombre').textContent = nombre;
+    document.getElementById('modifChSelWrap').style.display = 'block';
+    setTimeout(() => mejorRow.scrollIntoView({ block: 'nearest' }), 50);
+  }
 }
 
 document.querySelectorAll('.mtipo-lbl').forEach(lbl => {

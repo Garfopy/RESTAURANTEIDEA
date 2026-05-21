@@ -159,7 +159,6 @@
   <div class="topbar-right">
     <span id="badge-alertas" class="badge-cnt bc-gris" title="Alertas">—</span>
     <span id="badge-listos"  class="badge-cnt bc-gris" title="Listos">—</span>
-    <a href="<?= BASE_URL ?>rest-pedido/nuevo" class="btn-top btn-primario">+ Pedido</a>
     <a href="<?= BASE_URL ?>auth/logoutStaff/mesero" class="exit-link">Salir</a>
   </div>
 </div>
