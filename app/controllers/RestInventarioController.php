@@ -54,7 +54,7 @@ class RestInventarioController extends BaseController
             // Standalone: obtener catálogo vía API de CarniHub
             try {
                 $apiService = new CarniHubApiService();
-                $result     = $apiService->buscarProducto($restauranteId, '', '', 1, 100);
+                $result     = $apiService->buscarProducto($restauranteId, '', '', 1, 5000);
                 if ($result['success'] && !empty($result['data']['productos'])) {
                     $grupNombre = $empresaProveedorNombre ?? 'CarniHub';
                     foreach ($result['data']['productos'] as $prod) {
@@ -82,8 +82,7 @@ class RestInventarioController extends BaseController
                          FROM productos p
                          LEFT JOIN empresas e ON e.id = p.empresa_id
                          WHERE p.activo = 1
-                         ORDER BY (p.empresa_id = ?) DESC, e.razon_social, p.nombre
-                         LIMIT 2000"
+                         ORDER BY (p.empresa_id = ?) DESC, p.nombre ASC, p.id ASC"
                     );
                     $stmt->execute([$empresaProveedorId]);
                 } else {
@@ -92,8 +91,7 @@ class RestInventarioController extends BaseController
                          FROM productos p
                          LEFT JOIN empresas e ON e.id = p.empresa_id
                          WHERE p.activo = 1
-                         ORDER BY e.razon_social, p.nombre
-                         LIMIT 2000"
+                         ORDER BY p.nombre ASC, p.id ASC"
                     );
                 }
                 $productosCarnihub = $stmt->fetchAll(PDO::FETCH_ASSOC);
