@@ -53,69 +53,56 @@ class RestInventarioController extends BaseController
         $carnihubDebug     = [];   // Diagnóstico: ?debug_carnihub=1 lo muestra
         if (defined('RESTAURANTE_STANDALONE') && RESTAURANTE_STANDALONE) {
             // Standalone: obtener catálogo vía API de CarniHub.
-            // ⚠ El endpoint /productos del servidor remoto tiene un bug:
-            //   - Siempre devuelve máximo 100 productos (alfabéticos)
-            //   - Ignora ?page= y ?per_page= (siempre regresa los mismos 100)
-            //   - SÍ respeta ?categoria=
-            // Workaround: iteramos por categoría conocida + 1 llamada base
-            // para combinar todo el catálogo.
+            // ⚠ El endpoint /productos del servidor remoto tiene un bug
+            // serio: ignora ?page=, ?per_page= y ?categoria=. SIEMPRE
+            // devuelve los primeros 100 productos en orden alfabético.
+            // Workaround final: iteramos por letra usando ?q=<letra>
+            // para que el filtro por nombre devuelva subconjuntos
+            // distintos. Combinamos todo y deduplicamos por id.
             try {
                 $apiService  = new CarniHubApiService();
                 $grupNombre  = $empresaProveedorNombre ?? 'CarniHub';
                 $vistos      = [];
                 $perPage     = 100;
-                // Categorías conocidas del catálogo CarniHub. Si llega una
-                // categoría nueva, basta con sumarla aquí.
-                $categorias  = [
-                    '',           // base (primeros 100 alfabéticos)
-                    'Res','Cerdo','Pollo','Pescados','Mariscos','Embutidos','Lácteos',
-                    'Verduras','Frutas','Abarrotes','Especias','Bebidas','Guarniciones',
-                    'Postres','Platillos','Mixtos','Otros',
+                // Letras a probar: cubren prácticamente todos los nombres
+                // de productos en español + dígitos para variantes con números.
+                $consultas   = [
+                    '',  // base sin filtro
+                    'a','b','c','d','e','f','g','h','i','j','k','l','m',
+                    'n','o','p','q','r','s','t','u','v','w','x','y','z',
+                    'á','é','í','ó','ú','ñ','0','1','2','3','4','5','6','7','8','9',
                 ];
-                foreach ($categorias as $cat) {
-                    // Loop interno por páginas (por si alguna categoría supera 100)
-                    $page = 1;
-                    $maxPag = 20;
-                    while ($page <= $maxPag) {
-                        $result = $apiService->buscarProducto($restauranteId, '', $cat, $page, $perPage);
-                        // Detectar lote en cualquier shape
-                        $lote = [];
-                        if (!empty($result['productos']) && is_array($result['productos'])) {
-                            $lote = $result['productos'];
-                        } elseif (!empty($result['data']['productos']) && is_array($result['data']['productos'])) {
-                            $lote = $result['data']['productos'];
-                        } elseif (!empty($result['data']) && is_array($result['data']) && array_is_list($result['data'])) {
-                            $lote = $result['data'];
-                        }
-                        $carnihubDebug[] = [
-                            'categoria'  => $cat ?: '(base)',
-                            'page'       => $page,
-                            'success'    => $result['success'] ?? false,
-                            'lote_count' => count($lote),
-                        ];
-                        if (empty($result['success']) || empty($lote)) break;
-                        $antes = count($productosCarnihub);
-                        foreach ($lote as $prod) {
-                            $pid = (int)($prod['id'] ?? 0);
-                            if ($pid <= 0 || isset($vistos[$pid])) continue;
-                            $vistos[$pid] = true;
-                            $productosCarnihub[] = [
-                                'id'             => $pid,
-                                'nombre'         => $prod['nombre'] ?? '',
-                                'unidad'         => $prod['presentacion'] ?? '',
-                                'empresa_nombre' => $grupNombre,
-                            ];
-                        }
-                        $nuevos = count($productosCarnihub) - $antes;
-                        // Si no agrega nada nuevo, no tiene sentido pedir más páginas
-                        if ($nuevos === 0) break;
-                        // Si vino menos del cap, ya es la última página de esta categoría
-                        if (count($lote) < $perPage) break;
-                        $page++;
+                foreach ($consultas as $q) {
+                    $result = $apiService->buscarProducto($restauranteId, $q, '', 1, $perPage);
+                    $lote = [];
+                    if (!empty($result['productos']) && is_array($result['productos'])) {
+                        $lote = $result['productos'];
+                    } elseif (!empty($result['data']['productos']) && is_array($result['data']['productos'])) {
+                        $lote = $result['data']['productos'];
+                    } elseif (!empty($result['data']) && is_array($result['data']) && array_is_list($result['data'])) {
+                        $lote = $result['data'];
                     }
+                    $antes = count($productosCarnihub);
+                    foreach ($lote as $prod) {
+                        $pid = (int)($prod['id'] ?? 0);
+                        if ($pid <= 0 || isset($vistos[$pid])) continue;
+                        $vistos[$pid] = true;
+                        $productosCarnihub[] = [
+                            'id'             => $pid,
+                            'nombre'         => $prod['nombre'] ?? '',
+                            'unidad'         => $prod['presentacion'] ?? '',
+                            'empresa_nombre' => $grupNombre,
+                        ];
+                    }
+                    $nuevos = count($productosCarnihub) - $antes;
+                    $carnihubDebug[] = [
+                        'q'          => $q ?: '(base)',
+                        'lote_count' => count($lote),
+                        'nuevos'     => $nuevos,
+                        'acumulado'  => count($productosCarnihub),
+                    ];
                 }
                 $carnihubDebug[] = ['TOTAL_UNICOS' => count($productosCarnihub)];
-                // Orden alfabético
                 usort($productosCarnihub, function($a, $b){
                     return strcasecmp($a['nombre'] ?? '', $b['nombre'] ?? '');
                 });
