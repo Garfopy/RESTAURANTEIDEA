@@ -164,10 +164,10 @@ class CarniHubApiService
         // Actualizar última sincronización si fue exitoso
         if ($result['success']) {
             try {
-                Database::getInstance()->query(
-                    "UPDATE carnihub_api_config SET ultima_sincronizacion = NOW() WHERE restaurante_id = ?",
-                    [$restauranteId]
+                $upd = Database::getInstance()->prepare(
+                    "UPDATE carnihub_api_config SET ultima_sincronizacion = NOW() WHERE restaurante_id = ?"
                 );
+                $upd->execute([$restauranteId]);
             } catch (\Throwable) { /* silencioso */ }
         }
 
@@ -189,13 +189,14 @@ class CarniHubApiService
         }
 
         try {
-            $row = Database::getInstance()->query(
+            $stmt = Database::getInstance()->prepare(
                 "SELECT carnihub_url, api_key, carnihub_empresa_id, nombre_distribuidor
                    FROM carnihub_api_config
                   WHERE restaurante_id = ? AND activo = 1
-                  LIMIT 1",
-                [$restauranteId]
-            )->fetch(\PDO::FETCH_ASSOC);
+                  LIMIT 1"
+            );
+            $stmt->execute([$restauranteId]);
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
         } catch (\Throwable $e) {
             error_log('[CarniHubApiService::getConfig] ' . $e->getMessage());
             $row = false;
