@@ -111,7 +111,15 @@ class CarniHubApiService
             return $this->errorResponse('No hay configuración de CarniHub para este restaurante');
         }
 
-        $params = ['q' => trim($query), 'page' => max(1, $page), 'limit' => min(max($limit, 1), 5000)];
+        // Enviamos tanto `limit` como `per_page` porque distintas
+        // versiones del API remoto aceptan uno u otro.
+        $effLimit = min(max($limit, 1), 5000);
+        $params = [
+            'q'        => trim($query),
+            'page'     => max(1, $page),
+            'limit'    => $effLimit,
+            'per_page' => $effLimit,
+        ];
         if ($categoria !== '') {
             $params['categoria'] = $categoria;
         }

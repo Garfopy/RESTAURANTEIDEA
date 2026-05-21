@@ -59,12 +59,13 @@ class RestInventarioController extends BaseController
                 $grupNombre  = $empresaProveedorNombre ?? 'CarniHub';
                 $page        = 1;
                 $maxPaginas  = 50;            // safety net (hasta ~5000 productos)
-                $perPage     = 100;            // tamaño que el servidor suele aceptar
+                $perPage     = 200;            // pedimos 200 por página; el server cappea si excede
                 $vistos      = [];             // dedup por id
                 while ($page <= $maxPaginas) {
                     $result = $apiService->buscarProducto($restauranteId, '', '', $page, $perPage);
                     if (empty($result['success']) || empty($result['data']['productos'])) break;
                     $lote = $result['data']['productos'];
+                    $antesDeAgregar = count($productosCarnihub);
                     foreach ($lote as $prod) {
                         $pid = (int)($prod['id'] ?? 0);
                         if ($pid <= 0 || isset($vistos[$pid])) continue;
@@ -76,7 +77,11 @@ class RestInventarioController extends BaseController
                             'empresa_nombre' => $grupNombre,
                         ];
                     }
-                    if (count($lote) < $perPage) break; // última página
+                    $agregadosNuevos = count($productosCarnihub) - $antesDeAgregar;
+                    // Si esta página no agregó nada nuevo (server ignoró ?page=) o
+                    // el lote vino más chico que el page-size: ya no hay más.
+                    if ($agregadosNuevos === 0) break;
+                    if (count($lote) < $perPage) break;
                     $page++;
                 }
                 // Orden alfabético por nombre (case-insensitive)
