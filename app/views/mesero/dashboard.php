@@ -493,11 +493,19 @@ function marcarEntregado(pedidoId, btn) {
     .then(r => r.json())
     .then(d => {
       if (d.ok) {
-        const card = document.getElementById('listo-' + pedidoId);
+        const card = document.getElementById('modal-pedido-' + pedidoId)
+                  || document.getElementById('listo-' + pedidoId);
         if (card) {
           card.style.opacity = '0';
           card.style.transition = 'opacity .3s';
-          setTimeout(() => { card.remove(); pollListos(); }, 300);
+          setTimeout(() => {
+            card.remove();
+            pollListos();
+            const cont = document.getElementById('modal-pedidos');
+            if (cont && !cont.querySelector('[id^="modal-pedido-"]')) {
+              cont.innerHTML = '<div style="text-align:center;padding:20px;color:#9CA3AF">Sin pedidos activos en esta mesa.</div>';
+            }
+          }, 300);
         } else {
           pollListos();
         }
@@ -538,7 +546,7 @@ function abrirMesa(mesaId, nombre, estado) {
             <span style="font-size:.72rem;font-weight:600;padding:2px 8px;border-radius:10px;background:${ESTADO_COLOR[it.estado]||'#F3F4F6'};color:${ESTADO_TEXT[it.estado]||'#374151'}">${ESTADO_LABEL[it.estado]||it.estado}</span>
           </div>`
         ).join('');
-        return `<div style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:10px;padding:12px;margin-bottom:10px">
+        return `<div id="modal-pedido-${p.id}" style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:10px;padding:12px;margin-bottom:10px">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
             <span style="font-weight:700;font-size:.88rem">${p.folio}</span>
             <span style="font-size:.72rem;font-weight:600;padding:2px 10px;border-radius:10px;background:${col};color:${txt}">${ESTADO_LABEL[p.estado]||p.estado}</span>
