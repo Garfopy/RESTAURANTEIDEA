@@ -50,6 +50,7 @@ class RestInventarioController extends BaseController
 
         // Productos CarniHub disponibles para vincular a ingredientes
         $productosCarnihub = [];
+        $carnihubDebug     = [];   // Diagnóstico: ?debug_carnihub=1 lo muestra
         if (defined('RESTAURANTE_STANDALONE') && RESTAURANTE_STANDALONE) {
             // Standalone: obtener catálogo vía API de CarniHub.
             // Iteramos por páginas para evitar el cap por petición que
@@ -59,12 +60,40 @@ class RestInventarioController extends BaseController
                 $grupNombre  = $empresaProveedorNombre ?? 'CarniHub';
                 $page        = 1;
                 $maxPaginas  = 50;            // safety net (hasta ~5000 productos)
-                $perPage     = 200;            // pedimos 200 por página; el server cappea si excede
+                $perPage     = 500;            // pedimos 500 por página; el server cappea si excede
                 $vistos      = [];             // dedup por id
                 while ($page <= $maxPaginas) {
                     $result = $apiService->buscarProducto($restauranteId, '', '', $page, $perPage);
-                    if (empty($result['success']) || empty($result['data']['productos'])) break;
-                    $lote = $result['data']['productos'];
+                    // Tolerar varias formas de respuesta:
+                    //   $result['productos']           ← API plana
+                    //   $result['data']['productos']   ← API envuelta
+                    //   $result['data']                ← lista directa
+                    $lote = [];
+                    if (!empty($result['productos']) && is_array($result['productos'])) {
+                        $lote = $result['productos'];
+                        $metaSrc = $result;
+                    } elseif (!empty($result['data']) && is_array($result['data'])) {
+                        if (isset($result['data']['productos']) && is_array($result['data']['productos'])) {
+                            $lote = $result['data']['productos'];
+                            $metaSrc = $result['data'];
+                        } elseif (array_is_list($result['data'])) {
+                            $lote = $result['data'];
+                            $metaSrc = $result;
+                        } else { $metaSrc = $result['data']; }
+                    } else { $metaSrc = $result; }
+                    // Snapshot diagnóstico
+                    $carnihubDebug[] = [
+                        'page'         => $page,
+                        'success'      => $result['success'] ?? false,
+                        'http_code'    => $result['http_code'] ?? null,
+                        'lote_count'   => is_array($lote) ? count($lote) : 0,
+                        'top_keys'     => array_slice(array_keys($result), 0, 12),
+                        'total'        => $metaSrc['total'] ?? $metaSrc['total_records'] ?? null,
+                        'last_page'    => $metaSrc['last_page'] ?? $metaSrc['total_pages'] ?? null,
+                        'per_page'     => $metaSrc['per_page'] ?? null,
+                        'error'        => $result['error'] ?? null,
+                    ];
+                    if (empty($result['success']) || empty($lote)) break;
                     $antesDeAgregar = count($productosCarnihub);
                     foreach ($lote as $prod) {
                         $pid = (int)($prod['id'] ?? 0);
@@ -88,7 +117,9 @@ class RestInventarioController extends BaseController
                 usort($productosCarnihub, function($a, $b){
                     return strcasecmp($a['nombre'] ?? '', $b['nombre'] ?? '');
                 });
-            } catch (\Throwable $e) {}
+            } catch (\Throwable $e) {
+                $carnihubDebug[] = ['exception' => $e->getMessage()];
+            }
         } else {
             // Instalación integrada: leer catálogo de la BD local.
             // IMPORTANTE: traemos SIEMPRE todos los productos activos (no
@@ -121,6 +152,16 @@ class RestInventarioController extends BaseController
         }
 
         $inactivos = $this->model->getInactivos($restauranteId);
+
+        // Diagnóstico opcional: agregar ?debug_carnihub=1 a la URL
+        if (!empty($_GET['debug_carnihub'])) {
+            header('Content-Type: text/plain; charset=utf-8');
+            echo "=== Diagnóstico CarniHub (modo " . ((defined('RESTAURANTE_STANDALONE') && RESTAURANTE_STANDALONE) ? 'STANDALONE' : 'INTEGRADO') . ") ===\n";
+            echo "Productos cargados al modal: " . count($productosCarnihub) . "\n\n";
+            echo "Páginas pedidas al API:\n";
+            echo json_encode($carnihubDebug, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) . "\n";
+            return;
+        }
 
         $this->render('restaurante/inventario/index', compact(
             'ingredientes','alertas','productosCarnihub','empresaProveedorId','empresaProveedorNombre',
