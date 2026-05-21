@@ -48,33 +48,52 @@ class RestInventarioController extends BaseController
             }
         } catch (\Throwable $e) {}
 
-        // Productos CarniHub disponibles — solo de la empresa vinculada al restaurante
-        // Si no hay empresa vinculada, muestra todos (comportamiento retrocompatible)
+        // Productos CarniHub disponibles para vincular a ingredientes
         $productosCarnihub = [];
-        try {
-            if (!isset($db)) $db = Database::getInstance();
-            if ($empresaProveedorId) {
-                $stmt = $db->prepare(
-                    "SELECT p.id, p.nombre, p.presentacion AS unidad, e.razon_social AS empresa_nombre
-                     FROM productos p
-                     LEFT JOIN empresas e ON e.id = p.empresa_id
-                     WHERE p.activo = 1 AND p.empresa_id = ?
-                     ORDER BY p.nombre
-                     LIMIT 300"
-                );
-                $stmt->execute([$empresaProveedorId]);
-            } else {
-                $stmt = $db->query(
-                    "SELECT p.id, p.nombre, p.presentacion AS unidad, e.razon_social AS empresa_nombre
-                     FROM productos p
-                     LEFT JOIN empresas e ON e.id = p.empresa_id
-                     WHERE p.activo = 1
-                     ORDER BY e.razon_social, p.nombre
-                     LIMIT 300"
-                );
-            }
-            $productosCarnihub = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        } catch (\Throwable $e) {}
+        if (defined('RESTAURANTE_STANDALONE') && RESTAURANTE_STANDALONE) {
+            // Standalone: obtener catálogo vía API de CarniHub
+            try {
+                $apiService = new CarniHubApiService();
+                $result     = $apiService->buscarProducto($restauranteId, '', '', 1, 100);
+                if ($result['success'] && !empty($result['data']['productos'])) {
+                    $grupNombre = $empresaProveedorNombre ?? 'CarniHub';
+                    foreach ($result['data']['productos'] as $prod) {
+                        $productosCarnihub[] = [
+                            'id'             => $prod['id'],
+                            'nombre'         => $prod['nombre'],
+                            'unidad'         => $prod['presentacion'] ?? '',
+                            'empresa_nombre' => $grupNombre,
+                        ];
+                    }
+                }
+            } catch (\Throwable $e) {}
+        } else {
+            // Instalación integrada: leer catálogo de la BD local
+            try {
+                if (!isset($db)) $db = Database::getInstance();
+                if ($empresaProveedorId) {
+                    $stmt = $db->prepare(
+                        "SELECT p.id, p.nombre, p.presentacion AS unidad, e.razon_social AS empresa_nombre
+                         FROM productos p
+                         LEFT JOIN empresas e ON e.id = p.empresa_id
+                         WHERE p.activo = 1 AND p.empresa_id = ?
+                         ORDER BY p.nombre
+                         LIMIT 300"
+                    );
+                    $stmt->execute([$empresaProveedorId]);
+                } else {
+                    $stmt = $db->query(
+                        "SELECT p.id, p.nombre, p.presentacion AS unidad, e.razon_social AS empresa_nombre
+                         FROM productos p
+                         LEFT JOIN empresas e ON e.id = p.empresa_id
+                         WHERE p.activo = 1
+                         ORDER BY e.razon_social, p.nombre
+                         LIMIT 300"
+                    );
+                }
+                $productosCarnihub = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            } catch (\Throwable $e) {}
+        }
 
         $inactivos = $this->model->getInactivos($restauranteId);
 

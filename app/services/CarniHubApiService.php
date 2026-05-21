@@ -104,14 +104,14 @@ class CarniHubApiService
      * @param  int    $page           Página (default 1)
      * @return array  ['success'=>bool, 'productos'=>array, 'total'=>int] | ['success'=>false, 'error'=>str]
      */
-    public function buscarProducto(int $restauranteId, string $query, string $categoria = '', int $page = 1): array
+    public function buscarProducto(int $restauranteId, string $query, string $categoria = '', int $page = 1, int $limit = 20): array
     {
         $config = $this->getConfig($restauranteId);
         if ($config === null) {
             return $this->errorResponse('No hay configuración de CarniHub para este restaurante');
         }
 
-        $params = ['q' => trim($query), 'page' => max(1, $page), 'per_page' => 20];
+        $params = ['q' => trim($query), 'page' => max(1, $page), 'limit' => min(max($limit, 1), 100)];
         if ($categoria !== '') {
             $params['categoria'] = $categoria;
         }
