@@ -641,6 +641,7 @@ sort($ingCategorias);
               <div class="modif-ch-prod-row"
                    data-id="<?= $pc['id'] ?>"
                    data-nombre="<?= htmlspecialchars(strtolower($pc['nombre']), ENT_QUOTES) ?>"
+                   data-display="<?= htmlspecialchars($pc['nombre'], ENT_QUOTES) ?>"
                    style="padding:8px 12px;border-bottom:1px solid #F3F4F6;display:flex;
                           justify-content:space-between;align-items:center;cursor:pointer;transition:.1s"
                    onmouseover="if(!this.classList.contains('ch-sel'))this.style.background='#FAF5FF'"
@@ -770,6 +771,7 @@ function calcCostos() {
 
 // ── Modal Modificar ──────────────────────────────────────────
 let modifIng = null;
+let modifIngNombreActual = '';
 
 function abrirModificar(ing) {
   modifIng = ing;
@@ -820,8 +822,11 @@ function abrirModificar(ing) {
     }
   } else if (!ing.carnihub_producto_id) {
     // Auto-detectar coincidencia en CarniHub por nombre del ingrediente
+    // (siempre, aunque el proveedor actual sea externo: queda listo si toggle a CH)
     autoDetectarCarniHub(ing.nombre);
   }
+  // Guardar nombre para re-aplicar al toggle a CH
+  modifIngNombreActual = ing.nombre || '';
   document.getElementById('modifEditUnidadWarn').style.display = 'none';
 
   switchModifTab('mov');
@@ -838,6 +843,7 @@ function switchModifTab(tab) {
 
 function switchModifProv(tipo) {
   const isExt = tipo === 'ext';
+  const yaTeniaCh = document.getElementById('modifEditCarnihub').value === '1';
   document.getElementById('modifEditCarnihub').value = isExt ? '0' : '1';
   document.getElementById('modifEditProvPanelExt').style.display = isExt ? '' : 'none';
   document.getElementById('modifEditProvPanelCh').style.display  = isExt ? 'none' : '';
@@ -860,6 +866,15 @@ function switchModifProv(tipo) {
     document.querySelectorAll('.modif-ch-prod-row').forEach(r => { r.style.background=''; r.classList.remove('ch-sel'); });
     const buscar = document.getElementById('modifChBuscar');
     if (buscar) { buscar.value = ''; filtrarChEdit(''); }
+  } else if (!yaTeniaCh && !document.getElementById('modifEditCarnihubId').value && modifIngNombreActual) {
+    // Usuario está cambiando a CarniHub manualmente y aún no hay producto seleccionado
+    autoDetectarCarniHub(modifIngNombreActual);
+  } else if (!isExt) {
+    // Ya había selección previa: hacer scroll al producto resaltado
+    const sel = document.querySelector('.modif-ch-prod-row.ch-sel');
+    if (sel) setTimeout(() => {
+      try { sel.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch(e){}
+    }, 80);
   }
 }
 
@@ -886,13 +901,22 @@ function normalizarNombre(str) {
     .replace(/\s+/g, ' ').trim();
 }
 
+// Genera n-gramas (sub-cadenas) de tamaño n a partir de un string
+function _ngramas(s, n) {
+  const out = new Set();
+  for (let i = 0; i + n <= s.length; i++) out.add(s.substr(i, n));
+  return out;
+}
+
 function autoDetectarCarniHub(nombreIng) {
   const rows = document.querySelectorAll('.modif-ch-prod-row');
   if (!rows.length) return;
 
   const needle = normalizarNombre(nombreIng);
-  const palabras = needle.split(' ').filter(p => p.length > 2);
-  if (!palabras.length) return;
+  if (!needle) return;
+
+  const palabras = needle.split(' ').filter(p => p.length >= 3);
+  const trigramasNeedle = _ngramas(needle.replace(/\s+/g, ''), 3);
 
   let mejorRow = null;
   let mejorScore = 0;
@@ -900,28 +924,41 @@ function autoDetectarCarniHub(nombreIng) {
   rows.forEach(row => {
     const haystack = normalizarNombre(row.dataset.nombre);
     let score = 0;
-    palabras.forEach(p => { if (haystack.includes(p)) score++; });
-    // bonus si el haystack empieza igual
-    if (haystack.startsWith(palabras[0])) score += 0.5;
+    // 1) coincidencia por palabras completas (peso fuerte)
+    palabras.forEach(p => { if (haystack.includes(p)) score += 2; });
+    // 2) bonus si el haystack empieza igual a la primera palabra
+    if (palabras.length && haystack.startsWith(palabras[0])) score += 1;
+    // 3) coincidencia por trigramas (fuzzy, peso ligero)
+    const trigramasHay = _ngramas(haystack.replace(/\s+/g, ''), 3);
+    let comunes = 0;
+    trigramasNeedle.forEach(t => { if (trigramasHay.has(t)) comunes++; });
+    if (trigramasNeedle.size > 0) score += comunes / trigramasNeedle.size;
     if (score > mejorScore) { mejorScore = score; mejorRow = row; }
   });
 
-  // Solo pre-seleccionar si hay coincidencia en al menos 1 palabra clave
-  if (mejorRow && mejorScore >= 1) {
+  const buscar = document.getElementById('modifChBuscar');
+
+  // Si hay match razonable, pre-seleccionar el producto
+  // Umbral: al menos 1 palabra completa (score>=2) o trigram score alto (>=0.5)
+  if (mejorRow && mejorScore >= 0.5) {
     const id = mejorRow.dataset.id;
-    const nombre = mejorRow.querySelector('div > div:first-child')?.textContent.trim() || '';
-    const buscar = document.getElementById('modifChBuscar');
-    if (buscar) {
-      buscar.value = nombre;
-      filtrarChEdit(nombre);
-    }
+    const nombre = mejorRow.dataset.display || mejorRow.dataset.nombre || '';
     document.querySelectorAll('.modif-ch-prod-row').forEach(r => { r.style.background=''; r.classList.remove('ch-sel'); });
     mejorRow.style.background = 'var(--cp-light, #FAF5FF)';
     mejorRow.classList.add('ch-sel');
     document.getElementById('modifEditCarnihubId').value = id;
     document.getElementById('modifChSelNombre').textContent = nombre;
     document.getElementById('modifChSelWrap').style.display = 'block';
-    setTimeout(() => mejorRow.scrollIntoView({ block: 'nearest' }), 50);
+    // Limpiar buscador para ver el match resaltado dentro de la lista completa
+    if (buscar) { buscar.value = ''; filtrarChEdit(''); }
+    setTimeout(() => {
+      try { mejorRow.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch(e){}
+    }, 80);
+  } else if (buscar) {
+    // Sin match: pre-llenar el buscador con el nombre del ingrediente
+    // para facilitar la búsqueda manual
+    buscar.value = nombreIng || '';
+    filtrarChEdit(buscar.value);
   }
 }
 
