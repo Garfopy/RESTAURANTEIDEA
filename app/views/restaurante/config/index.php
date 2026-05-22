@@ -1,7 +1,7 @@
 <?php ob_start(); ?>
 <div>
   <div class="rst-card">
-    <form method="POST" action="<?= BASE_URL ?>rest-config/guardar" enctype="multipart/form-data">
+    <form method="POST" action="<?= BASE_URL ?>rest-config/guardar" enctype="multipart/form-data" accept-charset="UTF-8">
 
       <!-- Información general -->
       <div style="font-weight:700;font-size:.95rem;color:#111827;margin-bottom:16px;
@@ -17,7 +17,7 @@
       </div>
       <div class="form-group">
         <label class="form-label">Descripción</label>
-        <textarea name="descripcion" class="form-textarea" rows="3"><?= htmlspecialchars($restaurante['descripcion'] ?? '') ?></textarea>
+        <textarea name="descripcion" class="form-textarea" rows="3"><?= htmlspecialchars($restaurante['descripcion'] ?? '', ENT_QUOTES, 'UTF-8') ?></textarea>
       </div>
 
       <div class="form-group">

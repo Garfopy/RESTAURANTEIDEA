@@ -5,6 +5,31 @@ class RestConfigController extends BaseController
 {
     private RestauranteModel $model;
 
+    /**
+     * Normaliza texto de formularios para evitar mojibake (ej. QuerÃ©taro)
+     * y guardar siempre UTF-8 válido.
+     */
+    private function normalizeUtf8Input(?string $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        if (!mb_check_encoding($value, 'UTF-8')) {
+            $value = mb_convert_encoding($value, 'UTF-8', 'Windows-1252,ISO-8859-1,UTF-8');
+        }
+
+        // Repara texto ya mojibakeado por doble conversión de encoding.
+        if (preg_match('/Ã.|Â.|â./u', $value)) {
+            $fixed = @iconv('UTF-8', 'ISO-8859-1//IGNORE', $value);
+            if ($fixed !== false && mb_check_encoding($fixed, 'UTF-8')) {
+                $value = $fixed;
+            }
+        }
+
+        return $value;
+    }
+
     public function __construct()
     {
         parent::__construct();
@@ -39,11 +64,16 @@ class RestConfigController extends BaseController
         if (!$this->isPost()) $this->redirect('rest-config/index');
         $restauranteId = $this->restauranteId();
 
+        $nombre      = trim((string)$this->normalizeUtf8Input($this->post('nombre', '')));
+        $descripcion = $this->normalizeUtf8Input($this->post('descripcion'));
+        $telefono    = $this->normalizeUtf8Input($this->post('telefono'));
+        $direccion   = $this->normalizeUtf8Input($this->post('direccion'));
+
         $base = [
-            'nombre'          => trim($this->post('nombre', '')),
-            'descripcion'     => $this->post('descripcion'),
-            'telefono'        => $this->post('telefono'),
-            'direccion'       => $this->post('direccion'),
+            'nombre'          => $nombre,
+            'descripcion'     => $descripcion,
+            'telefono'        => $telefono,
+            'direccion'       => $direccion,
             'color_primario'  => $this->post('color_primario', '#C8102E'),
             'color_secundario'=> $this->post('color_secundario', '#1f2937'),
             'horario_apertura'=> $this->post('horario_apertura') ?: null,
