@@ -117,7 +117,17 @@ class RestConfigController extends BaseController
             }
         }
 
-        $this->model->update($restauranteId, $base);
+        try {
+            $this->model->update($restauranteId, $base);
+        } catch (PDOException $e) {
+            $msg = $e->getMessage();
+            if (isset($base['imagen_banner']) && stripos($msg, "Unknown column 'imagen_banner'") !== false) {
+                unset($base['imagen_banner']);
+                $this->model->update($restauranteId, $base);
+            } else {
+                throw $e;
+            }
+        }
 
         // Migration-026 fields (may not exist on older installs — skip silently)
         try {
