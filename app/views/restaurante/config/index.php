@@ -116,11 +116,12 @@
         var sc = document.createElement('script');
         sc.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
         sc.onload = function() {
-          // Fix iconos por defecto de Leaflet (se rompen al cargar el JS dinámicamente)
-          L.Icon.Default.mergeOptions({
-            iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-            iconUrl:       'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-            shadowUrl:     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png'
+          var markerIcon = L.divIcon({
+            className: 'rst-map-pin',
+            html: '<div style="width:22px;height:22px;border-radius:50% 50% 50% 0;background:var(--cp);transform:rotate(-45deg);box-shadow:0 2px 8px rgba(0,0,0,.25);border:2px solid #fff;position:relative"><div style="position:absolute;inset:6px;background:#fff;border-radius:50%"></div></div>',
+            iconSize: [22, 22],
+            iconAnchor: [11, 22],
+            popupAnchor: [0, -18]
           });
           var el  = document.getElementById('rstMap');
           var dir = el.dataset.direccion;
@@ -133,7 +134,7 @@
                 var map = L.map(el).setView([lat, lng], 16);
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
                   { attribution: '© OpenStreetMap', maxZoom: 19 }).addTo(map);
-                L.marker([lat, lng]).addTo(map).bindPopup(dir).openPopup();
+                L.marker([lat, lng], { icon: markerIcon }).addTo(map).bindPopup(dir).openPopup();
                 document.getElementById('coordLat').textContent = lat.toFixed(6);
                 document.getElementById('coordLng').textContent = lng.toFixed(6);
                 document.getElementById('inpLat').value = lat.toFixed(6);
