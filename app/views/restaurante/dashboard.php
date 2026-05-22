@@ -83,13 +83,14 @@ $totalPasos  = count($pasos);
 <?php endif; ?>
 
 <!-- KPI Cards -->
-<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px">
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:24px">
   <?php
   $cards = [
     ['label'=>'Ingresos del mes', 'val'=>'$'.number_format($kpis['ingresos'],2), 'color'=>'#10B981'],
     ['label'=>'Gastos del mes',   'val'=>'$'.number_format($kpis['gastos'],2),   'color'=>'#EF4444'],
     ['label'=>'Utilidad neta',    'val'=>'$'.number_format($kpis['utilidad'],2),  'color'=>'#6366F1'],
     ['label'=>'Margen',           'val'=>$kpis['margen'].'%',                    'color'=>'#F59E0B'],
+    ['label'=>'Ticket promedio',  'val'=>'$'.number_format($kpis['ticketPromedio'],2), 'color'=>'#0F766E'],
   ];
   foreach ($cards as $c): ?>
   <div style="background:#fff;border-radius:12px;padding:20px;border:1px solid #E5E7EB">

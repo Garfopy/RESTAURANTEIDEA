@@ -37,6 +37,8 @@ class RestFinanzasModel extends BaseModel
             $params
         )['c'];
 
+        $ticketPromedio = $totalTickets > 0 ? round($ingresos / $totalTickets, 2) : 0.0;
+
         $pendiente = (float) $this->queryOne(
             "SELECT COALESCE(SUM(total),0) AS v FROM rest_tickets
              WHERE restaurante_id=? AND estado='pendiente' AND DATE(created_at) BETWEEN ? AND ?",
@@ -46,7 +48,7 @@ class RestFinanzasModel extends BaseModel
         $utilidad  = $ingresos - $gastos - $retiros;
         $margen    = $ingresos > 0 ? round(($utilidad / $ingresos) * 100, 2) : 0;
 
-        return compact('ingresos','gastos','retiros','propinas','utilidad','margen','totalTickets','pendiente');
+        return compact('ingresos','gastos','retiros','propinas','utilidad','margen','totalTickets','ticketPromedio','pendiente');
     }
 
     public function ingresosVsEgresosGrafica(int $restauranteId, string $desde, string $hasta): array
