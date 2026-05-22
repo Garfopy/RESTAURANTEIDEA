@@ -31,6 +31,21 @@
 .menu-card-actions { display:flex;gap:4px;align-items:center;flex-wrap:wrap; }
 .menu-card-actions a { font-size:.72rem;text-decoration:none;padding:3px 8px;border-radius:6px;
   transition:background .1s; }
+.menu-action-menu { position:relative; }
+.menu-action-toggle {
+  font-size:.74rem;font-weight:700;padding:5px 10px;border-radius:8px;
+  border:1px solid #BFDBFE;background:#EFF6FF;color:#1D4ED8;cursor:pointer;
+}
+.menu-action-dropdown {
+  display:none;position:absolute;right:0;top:calc(100% + 6px);z-index:20;
+  min-width:128px;background:#fff;border:1px solid #E5E7EB;border-radius:10px;
+  box-shadow:0 10px 24px rgba(0,0,0,.12);padding:6px;
+}
+.menu-action-menu.open .menu-action-dropdown { display:block; }
+.menu-action-dropdown a {
+  display:block;padding:7px 10px;border-radius:7px;font-size:.75rem;
+  text-decoration:none;margin:2px 0;
+}
 </style>
 
 <?php
@@ -152,17 +167,25 @@ $restauranteId = $_SESSION['restaurante_activo_id'] ?? 0;
       <div class="menu-card-footer">
         <span class="menu-card-price">$<?= number_format((float)$p['precio'],2) ?></span>
         <div class="menu-card-actions">
-          <a href="<?= BASE_URL ?>rest-menu/form/<?= $p['id'] ?>"
-             style="background:#EFF6FF;color:#1D4ED8">Editar</a>
-          <a href="<?= BASE_URL ?>rest-menu/detalle/<?= $p['id'] ?>"
-             style="background:#F0FDF4;color:#16A34A">Ver costos</a>
-          <a href="<?= BASE_URL ?>rest-menu/toggleDisponible/<?= $p['id'] ?>"
-             style="background:#F9FAFB;color:#6B7280">
-            <?= $p['disponible'] ? 'Pausar' : 'Activar' ?>
-          </a>
-          <a href="<?= BASE_URL ?>rest-menu/eliminar/<?= $p['id'] ?>"
-             onclick="return confirm('¿Desactivar este platillo?')"
-             style="background:#FEF2F2;color:#EF4444">Quitar</a>
+         <div class="menu-action-menu" id="menuActions<?= (int)$p['id'] ?>">
+          <button type="button" class="menu-action-toggle"
+                onclick="toggleMenuActions(event,'menuActions<?= (int)$p['id'] ?>')">
+            Editar
+          </button>
+          <div class="menu-action-dropdown">
+            <a href="<?= BASE_URL ?>rest-menu/form/<?= $p['id'] ?>"
+              style="background:#EFF6FF;color:#1D4ED8">Editar</a>
+            <a href="<?= BASE_URL ?>rest-menu/detalle/<?= $p['id'] ?>"
+              style="background:#F0FDF4;color:#16A34A">Ver costos</a>
+            <a href="<?= BASE_URL ?>rest-menu/toggleDisponible/<?= $p['id'] ?>"
+              style="background:#F9FAFB;color:#6B7280">
+             <?= $p['disponible'] ? 'Pausar' : 'Activar' ?>
+            </a>
+            <a href="<?= BASE_URL ?>rest-menu/eliminar/<?= $p['id'] ?>"
+              onclick="return confirm('¿Desactivar este platillo?')"
+              style="background:#FEF2F2;color:#EF4444">Quitar</a>
+          </div>
+         </div>
         </div>
       </div>
     </div>
@@ -239,8 +262,27 @@ function validarCat() {
   }
   return true;
 }
+
+function closeMenuActions() {
+  document.querySelectorAll('.menu-action-menu.open').forEach(el => el.classList.remove('open'));
+}
+
+function toggleMenuActions(event, id) {
+  event.stopPropagation();
+  const box = document.getElementById(id);
+  if (!box) return;
+  const willOpen = !box.classList.contains('open');
+  closeMenuActions();
+  if (willOpen) box.classList.add('open');
+}
+
+document.addEventListener('click', () => closeMenuActions());
+
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') cerrarModalCat();
+  if (e.key === 'Escape') {
+    closeMenuActions();
+    cerrarModalCat();
+  }
 });
 </script>
 <?php
