@@ -11,15 +11,23 @@
     :root {
       --cp:       <?= htmlspecialchars($restaurante['color_primario']  ?? '#C8102E') ?>;
       --cs:       <?= htmlspecialchars($restaurante['color_secundario'] ?? '#1f2937') ?>;
-      --gold:     #c9a430;
-      --gold-dim: rgba(201,164,48,.12);
-      --gold-hi:  rgba(201,164,48,.22);
+      --gold:     var(--cp);
+      --gold-dim: color-mix(in srgb, var(--cp) 12%, white);
+      --gold-hi:  color-mix(in srgb, var(--cp) 24%, white);
       --bg:       #F7F6F2;
       --card:     #FFFFFF;
       --line:     rgba(0,0,0,.07);
       --text-main:#1C1C2E;
       --text-muted:#6B7280;
       --radius-card: 16px;
+    }
+
+    /* Evita recorte circular del logo en encabezado con banner */
+    .pub-hero .pub-hero-logo {
+      border-radius: 14px;
+      object-fit: contain;
+      background: rgba(255,255,255,.16);
+      padding: 6px;
     }
 
     /* ── Reset ──────────────────────────────────── */
@@ -50,7 +58,7 @@
     }
     .mn-section-icon { font-size:1.5rem; line-height:1; }
     .mn-section-text { flex:1; }
-    .mn-section-text h2 { margin:0; font-family:'Playfair Display',Georgia,serif; font-size:1.1rem; font-weight:700; color:var(--text-main); line-height:1.2; }
+    .mn-section-text h2 { margin:0; font-family:'Inter',system-ui,sans-serif; font-size:1.1rem; font-weight:700; color:var(--text-main); line-height:1.2; }
     .mn-section-text span { font-size:.72rem; color:var(--text-muted); font-weight:500; }
     .mn-section-divider { height:1px; background:linear-gradient(90deg,var(--gold) 0%,transparent 70%); margin:0 16px 0; opacity:.35; }
 
@@ -68,20 +76,20 @@
       position:relative;
     }
     .mn-card:last-child { border-bottom:none; }
-    .mn-card:hover { background:#FFFDF5; }
-    .mn-card:active { background:var(--gold-dim); }
+    .mn-card:hover { background:color-mix(in srgb, var(--cp) 8%, white); }
+    .mn-card:active { background:color-mix(in srgb, var(--cp) 14%, white); }
 
     /* Lado izquierdo: texto */
     .mn-card-body { flex:1; display:flex; flex-direction:column; justify-content:center; gap:4px; padding-right:14px; min-width:0; }
     .mn-card-name { font-size:.97rem; font-weight:700; color:var(--text-main); line-height:1.3; }
     .mn-card-desc { font-size:.78rem; color:var(--text-muted); line-height:1.5; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; margin-top:2px; }
     .mn-card-chips { display:flex; flex-wrap:wrap; gap:4px; margin-top:5px; }
-    .mn-chip { font-size:.62rem; font-weight:600; padding:2px 8px; border-radius:99px; border:1px solid rgba(201,164,48,.3); color:rgba(140,104,4,.95); background:rgba(201,164,48,.1); white-space:nowrap; }
-    .mn-chip-more { font-size:.62rem; color:var(--text-muted); align-self:center; }
+    .mn-chip { font-size:.62rem; font-weight:600; padding:2px 8px; border-radius:99px; border:1px solid color-mix(in srgb, var(--cp) 35%, white); color:color-mix(in srgb, var(--cp) 78%, #111827); background:color-mix(in srgb, var(--cp) 12%, white); white-space:nowrap; }
+    .mn-chip-more { font-size:.62rem; color:color-mix(in srgb, var(--cp) 60%, #6B7280); align-self:center; }
     .mn-card-price { font-size:.9rem; font-weight:800; color:var(--text-main); margin-top:6px; }
 
     /* Lado derecho: imagen + botón + */
-    .mn-card-thumb { position:relative; flex-shrink:0; width:90px; height:90px; border-radius:12px; overflow:hidden; background:linear-gradient(135deg,#F5F3EE,#EDE8DC); align-self:center; }
+    .mn-card-thumb { position:relative; flex-shrink:0; width:90px; height:90px; border-radius:12px; overflow:hidden; background:linear-gradient(135deg,color-mix(in srgb, var(--cp) 8%, white),color-mix(in srgb, var(--cp) 18%, white)); align-self:center; }
     .mn-card-thumb img { width:100%; height:100%; object-fit:cover; }
     .mn-card-emoji { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:2.2rem; }
     .mn-add-circle {
@@ -130,7 +138,7 @@
     .mn-sheet-hdr { padding:16px 20px 4px; position:relative; }
     .mn-sheet-close { position:absolute; top:12px; right:16px; background:rgba(0,0,0,.07); border:none; width:30px; height:30px; border-radius:50%; color:var(--text-main); font-size:1rem; line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background .15s; }
     .mn-sheet-close:hover { background:rgba(0,0,0,.12); }
-    .mn-sheet-title { font-family:'Playfair Display',Georgia,serif; font-size:1.25rem; font-weight:700; color:var(--text-main); margin:0 0 4px; padding-right:38px; }
+    .mn-sheet-title { font-family:'Inter',system-ui,sans-serif; font-size:1.25rem; font-weight:700; color:var(--text-main); margin:0 0 4px; padding-right:38px; }
     .mn-sheet-sub { font-size:.83rem; color:var(--text-muted); margin:0 0 0; }
     .mn-sec { padding:0 20px 16px; }
     .mn-sec-lbl { font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:var(--gold); margin-bottom:10px; margin-top:16px; }
@@ -205,8 +213,8 @@
 <div class="<?= $heroClass ?>" <?= $heroStyle ?>>
   <div class="pub-hero-content">
     <?php if ($restaurante['logo']): ?>
-    <img src="<?= BASE_URL . htmlspecialchars($restaurante['logo']) ?>" alt=""
-         class="pub-hero-logo <?= $hasBanner ? '' : 'pub-hero-logo--contain' ?>">
+        <img src="<?= BASE_URL . htmlspecialchars($restaurante['logo']) ?>" alt=""
+          class="pub-hero-logo pub-hero-logo--contain">
     <?php endif; ?>
     <h1 style="font-family:'Playfair Display',Georgia,serif;font-size:1.85rem;font-weight:800;margin:0 0 6px;color:#fff;text-shadow:0 2px 16px rgba(0,0,0,.4);letter-spacing:-.01em">
       <?= htmlspecialchars($restaurante['nombre']) ?>
