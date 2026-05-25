@@ -121,7 +121,7 @@ class RestauranteController extends BaseController
         $topVendidos   = $menuModel->getTopVendidos($restauranteId, 5);
         $menosVendidos = $menuModel->getMenosVendidos($restauranteId, 5);
 
-        $linkStaff  = BASE_URL . 'acceso/' . $restaurante['slug'];
+        $linkStaff  = BASE_URL . 'acceso/' . $restaurante['slug'] . '?modo=staff';
         $linkMenu   = BASE_URL . 'menu/'   . $restaurante['slug'];
         $flash      = $this->getFlash();
         $pageTitle  = 'Dashboard — ' . $restaurante['nombre'];
@@ -178,7 +178,7 @@ class RestauranteController extends BaseController
         $this->requireRestaurante();
         $restauranteId = $this->restauranteId();
         $restaurante   = $this->model->find($restauranteId);
-        $linkStaff     = BASE_URL . 'acceso/' . $restaurante['slug'];
+        $linkStaff     = BASE_URL . 'acceso/' . $restaurante['slug'] . '?modo=staff';
         $linkMenu      = BASE_URL . 'menu/'   . $restaurante['slug'];
         $pageTitle     = '¡Restaurante creado!';
         $activeMenu    = 'rest_dashboard';
