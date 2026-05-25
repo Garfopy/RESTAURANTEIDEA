@@ -919,6 +919,22 @@ class RestPublicoController extends BaseController
             return;
         }
 
+        // Validar teléfono: exactamente 10 dígitos
+        $telefonoDigitos = preg_replace('/\D/', '', $telefono);
+        if (strlen($telefonoDigitos) !== 10) {
+            $this->flash('error', 'El teléfono debe contener exactamente 10 dígitos.');
+            $this->redirect('menu/' . $slug . '/reservar');
+            return;
+        }
+        $telefono = $telefonoDigitos;
+
+        // Validar email obligatorio y bien formado
+        if (!$email || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $this->flash('error', 'Ingresa un correo electrónico válido.');
+            $this->redirect('menu/' . $slug . '/reservar');
+            return;
+        }
+
         // Validar mesa: capacidad suficiente, pertenece al restaurante, sin conflicto
         $reservaModel = new RestReservaModel();
         $db = Database::getInstance();
@@ -982,17 +998,27 @@ class RestPublicoController extends BaseController
         // Confirmación al comensal (si dio email)
         if ($email && $newId) {
             try {
-                $cancelUrl = BASE_URL . 'menu/' . $slug . '/cancelarReserva/' . $newId;
-                $ok = (new EmailService())->enviarConfirmacionReserva(
-                    $email,
-                    $restaurante,
-                    ['nombre' => $nombre, 'fecha' => $fecha, 'hora' => $hora,
-                     'personas' => $personas, 'mesa_nombre' => $mesa['nombre']],
-                    $cancelUrl
-                );
-                if ($ok) $reservaModel->marcarConfirmacionEnviada((int)$newId);
+                $emailSvc = new EmailService();
+                if (!$emailSvc->isConfigured()) {
+                    error_log("[Reserva #$newId] SMTP no configurado — no se envía confirmación a $email");
+                } else {
+                    $cancelUrl = BASE_URL . 'menu/' . $slug . '/cancelarReserva/' . $newId;
+                    $ok = $emailSvc->enviarConfirmacionReserva(
+                        $email,
+                        $restaurante,
+                        ['nombre' => $nombre, 'fecha' => $fecha, 'hora' => $hora,
+                         'personas' => $personas, 'mesa_nombre' => $mesa['nombre']],
+                        $cancelUrl
+                    );
+                    if ($ok) {
+                        $reservaModel->marcarConfirmacionEnviada((int)$newId);
+                        error_log("[Reserva #$newId] Confirmación enviada a $email");
+                    } else {
+                        error_log("[Reserva #$newId] FALLO al enviar confirmación a $email (revisa logs SMTP)");
+                    }
+                }
             } catch (\Throwable $e) {
-                error_log('[Reserva] Error enviando confirmación: ' . $e->getMessage());
+                error_log("[Reserva #$newId] Excepción enviando confirmación a $email: " . $e->getMessage());
             }
         }
 

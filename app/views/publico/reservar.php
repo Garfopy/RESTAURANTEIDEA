@@ -162,10 +162,14 @@ $flashType = $flash['type']    ?? 'info';
       <input type="text" name="nombre" placeholder="Tu nombre completo" required autocomplete="name">
 
       <label>Teléfono <span class="required-star">*</span></label>
-      <input type="tel" name="telefono" placeholder="10 dígitos" required autocomplete="tel">
+      <input type="tel" name="telefono" id="fTel" placeholder="10 dígitos" required
+             inputmode="numeric" pattern="\d{10}" maxlength="10" minlength="10"
+             title="Debe contener exactamente 10 dígitos numéricos" autocomplete="tel">
 
       <label>Correo electrónico <span class="required-star">*</span></label>
-      <input type="email" name="email" placeholder="tu@email.com" required autocomplete="email">
+      <input type="email" name="email" id="fEmail" placeholder="tu@email.com" required
+             pattern="[^\s@]+@[^\s@]+\.[^\s@]+"
+             title="Ingresa un correo válido (ej: tu@email.com)" autocomplete="email">
       <div style="font-size:.72rem;color:#6B7280;margin-top:-10px;margin-bottom:14px">
         Te enviaremos la confirmación y un recordatorio el día antes.
       </div>
@@ -303,6 +307,12 @@ $flashType = $flash['type']    ?? 'info';
       e.preventDefault();
       alert('Por favor selecciona una mesa.');
     }
+  });
+
+  // Teléfono: solo dígitos, máx 10
+  const fTel = document.getElementById('fTel');
+  fTel.addEventListener('input', () => {
+    fTel.value = fTel.value.replace(/\D/g, '').slice(0, 10);
   });
 })();
 </script>
