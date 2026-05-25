@@ -260,19 +260,6 @@
               <option value="<?= $u ?>" <?= ($ing['unidad'] ?? '') === $u ? 'selected' : '' ?>><?= $u ?></option>
               <?php endforeach; ?>
             </select>
-            <select name="tipo_componente[]" class="form-select" title="Tipo KDS" style="font-size:.78rem">
-              <?php foreach (['materia_prima'=>'🔴 MP','guarnicion'=>'🟢 G'] as $val=>$lbl): ?>
-              <option value="<?= $val ?>" <?= ($ing['tipo_componente'] ?? 'materia_prima') === $val ? 'selected' : '' ?>><?= $lbl ?></option>
-              <?php endforeach; ?>
-            </select>
-            <input type="text" name="codigo_display[]" class="form-input" maxlength="10"
-                   placeholder="G1, MP2…" title="Código KDS (ej: G1, MP2, SA1)"
-                   style="font-size:.78rem;text-transform:uppercase"
-                   value="<?= htmlspecialchars($ing['codigo_display'] ?? '') ?>">
-            <input type="number" name="precio_extra[]" class="form-input" step="0.01" min="0"
-                   placeholder="$ extra" title="Precio extra (0 = incluida, >0 muestra botón +Extra en el menú)"
-                   style="font-size:.78rem;width:72px"
-                   value="<?= (float)($ing['precio_extra'] ?? 0) ?>">
             <label style="display:flex;align-items:center;gap:4px;font-size:.75rem;color:#6B7280;cursor:pointer;white-space:nowrap" title="No descuenta stock, solo aparece en la info del cliente">
               <input type="checkbox" name="es_informativo[]" value="<?= (int)$ing['ingrediente_id'] ?>"
                      <?= ($ing['es_informativo'] ?? 0) ? 'checked' : '' ?> style="cursor:pointer">
@@ -351,7 +338,7 @@
   .wpane{display:none;animation:fadeIn .25s ease both}
   .wpane.active{display:block}
   @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-  .ing-row{display:grid;grid-template-columns:2fr 80px 80px 125px 58px auto auto;gap:6px;margin-bottom:8px;align-items:start}
+  .ing-row{display:grid;grid-template-columns:2fr 80px 80px auto auto;gap:6px;margin-bottom:8px;align-items:start}
   .ing-picker-wrap{position:relative}
   .ing-dd{display:none;position:absolute;top:calc(100% + 2px);left:0;right:0;
           z-index:200;background:#fff;border:1.5px solid #E5E7EB;border-radius:10px;
@@ -623,15 +610,6 @@ function addIngrediente() {
       <option value="L">L</option><option value="ml">ml</option>
       <option value="pza">pza</option><option value="caja">caja</option><option value="bolsa">bolsa</option>
     </select>
-    <select name="tipo_componente[]" class="form-select" title="Tipo KDS" style="font-size:.78rem">
-      <option value="materia_prima">🔴 MP</option>
-      <option value="guarnicion">🟢 G</option>
-    </select>
-    <input type="text" name="codigo_display[]" class="form-input" maxlength="10"
-           placeholder="G1…" title="Código KDS" style="font-size:.78rem;text-transform:uppercase">
-    <input type="number" name="precio_extra[]" class="form-input" step="0.01" min="0"
-           placeholder="$ extra" title="Precio extra (0 = incluida, >0 muestra botón +Extra en el menú)"
-           style="font-size:.78rem;width:72px" value="0">
     <label style="display:flex;align-items:center;gap:4px;font-size:.75rem;color:#6B7280;cursor:pointer;white-space:nowrap;padding-top:8px"
            title="No descuenta stock, solo aparece en info del cliente">
       <input type="checkbox" name="es_informativo[]" value="_new" style="cursor:pointer">
