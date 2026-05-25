@@ -31,7 +31,7 @@ class RestStaffController extends BaseController
         $staff = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         $restaurante = $this->restModel->find($restauranteId);
-        $linkAcceso  = BASE_URL . 'acceso/' . $restaurante['slug'];
+        $linkAcceso  = BASE_URL . 'acceso/' . $restaurante['slug'] . '?modo=staff';
         $flash       = $this->getFlash();
         $pageTitle   = 'Gestión de Staff';
         $activeMenu  = 'rest_staff';
