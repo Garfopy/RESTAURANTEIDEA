@@ -11,13 +11,13 @@
   display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-bottom:28px;
 }
 .menu-card {
-  background:#fff;border:1.5px solid #E5E7EB;border-radius:14px;overflow:hidden;
+  background:#fff;border:1.5px solid #E5E7EB;border-radius:14px;
   transition:box-shadow .15s,border-color .15s;
 }
 .menu-card:hover { box-shadow:0 4px 16px rgba(0,0,0,.08);border-color:#D1D5DB; }
 .menu-card-img {
   height:90px;background:#F9FAFB;display:flex;align-items:center;justify-content:center;
-  font-size:2rem;overflow:hidden;
+  font-size:2rem;overflow:hidden;border-top-left-radius:12px;border-top-right-radius:12px;
 }
 .menu-card-img img { width:100%;height:100%;object-fit:cover; }
 .menu-card-body { padding:12px; }

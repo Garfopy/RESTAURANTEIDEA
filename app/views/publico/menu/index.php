@@ -358,12 +358,24 @@ $catNombres = array_column($categorias, 'nombre', 'id');
     $more  = (!$esSinIng && !empty($ings)) ? max(0, count($ings) - count($chips)) : 0;
     $icon  = $catIconos[$cid] ?? '🍽';
     $desc  = trim($p['descripcion'] ?? '');
+    $alerg = array_filter(array_map('trim', explode(',', $p['alergenos'] ?? '')));
   ?>
   <div class="mn-card" data-cat="<?= $cid ?>" onclick="abrirModal(<?= $pId ?>)">
     <div class="mn-card-body">
       <div class="mn-card-name"><?= htmlspecialchars($p['nombre']) ?></div>
       <?php if ($desc !== ''): ?>
       <div class="mn-card-desc"><?= htmlspecialchars($desc) ?></div>
+      <?php endif; ?>
+      <?php if (!empty($alerg)): ?>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;margin:4px 0 6px">
+        <?php foreach ($alerg as $a): ?>
+        <span title="Contiene <?= htmlspecialchars($a) ?>"
+              style="font-size:.62rem;font-weight:700;background:#FEF3C7;color:#92400E;
+                     border:1px solid #FDE68A;border-radius:6px;padding:1px 6px">
+          ⚠ <?= htmlspecialchars($a) ?>
+        </span>
+        <?php endforeach; ?>
+      </div>
       <?php endif; ?>
       <?php if (!empty($chips)): ?>
       <div class="mn-card-chips">
@@ -421,6 +433,10 @@ $catNombres = array_column($categorias, 'nombre', 'id');
       <div class="mn-sheet-title" id="sheetTitle">—</div>
       <div class="mn-sheet-sub"   id="sheetSub">—</div>
     </div>
+    <div class="mn-sec" id="infoAlergSec" style="display:none">
+      <div class="mn-sec-lbl">Información del platillo</div>
+      <div id="infoAlergBox" style="display:flex;flex-direction:column;gap:8px;font-size:.82rem;color:#374151"></div>
+    </div>
     <div class="mn-sec" id="guarSec" style="display:none">
       <div class="mn-sec-lbl">Guarniciones incluidas</div>
       <div id="guarList"></div>
@@ -465,6 +481,8 @@ const MENU = <?= json_encode(array_combine(
           'precio' => (float)$p['precio'],
           'imagen' => $p['imagen'] ?? '',
           'cat_id' => (int)($p['categoria_id'] ?? 0),
+          'alergenos' => array_values(array_filter(array_map('trim', explode(',', $p['alergenos'] ?? '')))),
+          'contiene'  => trim($p['contiene'] ?? ''),
           'ings'   => array_values(array_filter(
               $recetaIngredientes[(int)$p['id']] ?? [],
               fn($r) => ($r['tipo_componente'] ?? null) !== 'materia_prima'
@@ -518,6 +536,21 @@ function abrirModal(id) {
   const gSec  = document.getElementById('guarSec');
   const gList = document.getElementById('guarList');
   const mostrarIng = !CAT_SIN_ING.has(d.cat_id);
+
+  // Info: alérgenos + contiene
+  const infoSec = document.getElementById('infoAlergSec');
+  const infoBox = document.getElementById('infoAlergBox');
+  let infoHtml = '';
+  if (d.alergenos && d.alergenos.length) {
+    infoHtml += '<div><strong style="color:#92400E">⚠️ Alérgenos:</strong> '
+      + d.alergenos.map(a => `<span style="display:inline-block;background:#FEF3C7;color:#92400E;border:1px solid #FDE68A;border-radius:6px;padding:1px 7px;font-size:.74rem;font-weight:700;margin:2px 3px 0 0">${esc(a)}</span>`).join('')
+      + '</div>';
+  }
+  if (d.contiene) {
+    infoHtml += `<div><strong style="color:#374151">Contiene:</strong> <span style="color:#6B7280">${esc(d.contiene)}</span></div>`;
+  }
+  if (infoHtml) { infoBox.innerHTML = infoHtml; infoSec.style.display = ''; }
+  else { infoSec.style.display = 'none'; }
   if (mostrarIng && d.ings && d.ings.length) {
     gSec.style.display = '';
     gList.innerHTML = d.ings.map(ing => guarRow(ing)).join('');

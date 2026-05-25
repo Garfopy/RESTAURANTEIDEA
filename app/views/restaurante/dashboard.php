@@ -85,17 +85,23 @@ $totalPasos  = count($pasos);
 <!-- KPI Cards -->
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:24px">
   <?php
+  $gastosTotales = (float)($kpis['gastos'] ?? 0) + (float)($kpis['retiros'] ?? 0);
   $cards = [
     ['label'=>'Ingresos del mes', 'val'=>'$'.number_format($kpis['ingresos'],2), 'color'=>'#10B981'],
-    ['label'=>'Gastos del mes',   'val'=>'$'.number_format($kpis['gastos'],2),   'color'=>'#EF4444'],
+    ['label'=>'Gastos del mes',   'val'=>'$'.number_format($gastosTotales,2),   'color'=>'#EF4444',
+     'hint'=>'Incluye $'.number_format($kpis['gastos'] ?? 0, 2).' en gastos y $'.number_format($kpis['retiros'] ?? 0, 2).' en retiros.'],
     ['label'=>'Utilidad neta',    'val'=>'$'.number_format($kpis['utilidad'],2),  'color'=>'#6366F1'],
     ['label'=>'Margen',           'val'=>$kpis['margen'].'%',                    'color'=>'#F59E0B'],
     ['label'=>'Ticket promedio',  'val'=>'$'.number_format($kpis['ticketPromedio'],2), 'color'=>'#0F766E'],
   ];
   foreach ($cards as $c): ?>
-  <div style="background:#fff;border-radius:12px;padding:20px;border:1px solid #E5E7EB">
+  <div style="background:#fff;border-radius:12px;padding:20px;border:1px solid #E5E7EB"
+       <?= !empty($c['hint']) ? 'title="'.htmlspecialchars($c['hint']).'"' : '' ?>>
     <div style="font-size:.8rem;color:#6B7280;margin-bottom:6px"><?= $c['label'] ?></div>
     <div style="font-size:1.5rem;font-weight:700;color:<?= $c['color'] ?>"><?= htmlspecialchars($c['val']) ?></div>
+    <?php if (!empty($c['hint'])): ?>
+    <div style="font-size:.68rem;color:#9CA3AF;margin-top:4px">Incluye gastos + retiros</div>
+    <?php endif; ?>
   </div>
   <?php endforeach; ?>
 </div>

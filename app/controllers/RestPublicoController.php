@@ -56,12 +56,11 @@ class RestPublicoController extends BaseController
             return;
         }
 
-        // Si el restaurante exige login del comensal, redirigir al portal staff
-        // (la columna puede no existir si migration 026 aún no se aplica → default 0)
-        $requiereLogin = (int)($restaurante['requiere_login_comensal'] ?? 0);
-        if ($requiereLogin) {
-            $this->redirect('acceso/' . $restaurante['slug']);
-        }
+        // El menú público SIEMPRE es visible (visual). El login del comensal
+        // (`requiere_login_comensal`) sólo se exige al ORDENAR, no al mirar el menú.
+        // Pasamos la bandera a la vista para que decida si mostrar formulario o
+        // redirigir al checkout/login al hacer click en "Ordenar".
+        $requiereLoginComensal = (int)($restaurante['requiere_login_comensal'] ?? 0);
 
         $categorias = $this->menuModel->getCategorias((int)$restaurante['id'], true);
         $platillos  = $this->menuModel->getPlatillosDisponibles((int)$restaurante['id']);
@@ -137,7 +136,7 @@ class RestPublicoController extends BaseController
         }
 
         $pageTitle = $restaurante['nombre'];
-        $this->render('publico/menu/index', compact('restaurante','categorias','platillos','recetaIngredientes','mesa','visitaId','meseroAtiende','pageTitle'));
+        $this->render('publico/menu/index', compact('restaurante','categorias','platillos','recetaIngredientes','mesa','visitaId','meseroAtiende','pageTitle','requiereLoginComensal'));
     }
 
     public function ordenar(?string $slug = null): void
@@ -148,6 +147,14 @@ class RestPublicoController extends BaseController
         if (!$restaurante) { http_response_code(404); exit; }
 
         $restauranteId = (int)$restaurante['id'];
+
+        // Si el restaurante exige login del comensal y no hay cookie, mandar a /acceso
+        $requiereLoginComensal = (int)($restaurante['requiere_login_comensal'] ?? 0);
+        if ($requiereLoginComensal && empty($_COOKIE['comensal_' . $restauranteId])) {
+            $this->redirect('acceso/' . $restaurante['slug']);
+            return;
+        }
+
         $mesaQr        = $this->post('mesa_qr');
         $mesa          = $mesaQr ? (new RestMesaModel())->getByQr($mesaQr) : null;
         $visitaId      = $this->post('visita_id') ?: null;

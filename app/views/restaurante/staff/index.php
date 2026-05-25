@@ -59,7 +59,6 @@
         <th>Rol</th>
         <th>Código</th>
         <th>Estado</th>
-        <th>Login</th>
         <th>Acciones</th>
       </tr>
     </thead>
@@ -81,13 +80,6 @@
           </span>
         </td>
         <td>
-          <a href="<?= BASE_URL ?>acceso/<?= htmlspecialchars($restaurante['slug'] ?? '') ?>"
-             target="_blank"
-             style="font-size:.78rem;color:var(--cp);font-weight:500">
-            /acceso/<?= htmlspecialchars($restaurante['slug'] ?? '') ?> ↗
-          </a>
-        </td>
-        <td>
           <?php if ($s['staff_activo']): ?>
           <a href="<?= BASE_URL ?>rest-staff/desactivar/<?= $s['id'] ?>"
              onclick="return confirm('¿Desactivar a <?= htmlspecialchars($s['nombre'], ENT_QUOTES) ?>?')"
@@ -98,7 +90,7 @@
       <?php endforeach; ?>
       <?php if (empty($staff)): ?>
       <tr>
-        <td colspan="7">
+        <td colspan="6">
           <div class="empty-state">
             <svg width="40" height="40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
             <div style="font-size:.95rem;font-weight:600;color:#374151;margin-bottom:4px">Sin staff registrado</div>

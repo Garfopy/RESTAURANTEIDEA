@@ -91,12 +91,20 @@
 
         <!-- Info para el cliente -->
         <div style="border:1.5px solid #E0E7FF;border-radius:12px;padding:16px;margin-top:8px;background:#F5F3FF">
-          <div style="font-weight:700;color:#4C1D95;font-size:.9rem;margin-bottom:12px">
+          <div style="font-weight:700;color:#4C1D95;font-size:.9rem;margin-bottom:4px">
             🏷 Información para el cliente
+          </div>
+          <div style="font-size:.78rem;color:#6D28D9;margin-bottom:14px;line-height:1.45">
+            Lo que captures aquí se muestra al comensal en el menú público:
+            los <strong>alérgenos</strong> aparecen como badges amarillos sobre el platillo,
+            y <strong>«Contiene»</strong> se muestra al abrir el detalle del platillo.
+            Sirve para que el cliente decida con confianza si lo puede comer.
           </div>
 
           <div class="form-group" style="margin-bottom:10px">
-            <label class="form-label" style="font-size:.82rem">Alérgenos</label>
+            <label class="form-label" style="font-size:.82rem">Alérgenos
+              <span style="font-weight:400;color:#9CA3AF">— clic para marcar/desmarcar</span>
+            </label>
             <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">
               <?php
               $alergenosActivos = array_map('trim', explode(',', $platillo['alergenos'] ?? ''));
@@ -117,15 +125,15 @@
               </label>
               <?php endforeach; ?>
             </div>
-            <div style="font-size:.73rem;color:#6B7280;margin-top:4px">Selecciona los que apliquen — se mostrarán al cliente como advertencia</div>
+            <div style="font-size:.73rem;color:#6B7280;margin-top:4px">Aparecen como badges amarillos «⚠ Gluten», «⚠ Lactosa», etc. en la tarjeta del platillo.</div>
           </div>
 
-          <div class="form-group" style="margin-bottom:0">
-            <label class="form-label" style="font-size:.82rem">Contiene (ingredientes no medibles)</label>
+          <div class="form-group" style="margin-bottom:10px">
+            <label class="form-label" style="font-size:.82rem">Contiene <span style="font-weight:400;color:#9CA3AF">(ingredientes no medibles)</span></label>
             <input type="text" name="contiene" class="form-input"
                    placeholder="Ej: pimienta negra, cilantro, chile de árbol, comino"
                    value="<?= htmlspecialchars($platillo['contiene'] ?? '') ?>">
-            <div style="font-size:.73rem;color:#6B7280;margin-top:4px">Escríbe aquí condimentos y especias que no se miden con báscula pero el cliente debe saber</div>
+            <div style="font-size:.73rem;color:#6B7280;margin-top:4px">Se muestra dentro del modal del platillo, en la sección «Información del platillo». Útil para especias y condimentos que no entran en la receta.</div>
           </div>
 
           <div class="form-group" style="margin-bottom:0">
