@@ -242,7 +242,7 @@ $flashType = $flash['type']    ?? 'info';
 
   function renderMesas(mesas, personas) {
     if (mesas.length === 0) {
-      clearMesas('No hay mesas disponibles para esa fecha/hora con capacidad para ' + personas + ' personas. Prueba con otro horario.', 'empty');
+      clearMesas('No hay mesas disponibles para esa fecha/hora con capacidad para ' + personas + ' personas.<br><br><span style="font-size:.78rem">Reservamos cada mesa con un margen de 2 horas antes y después para garantizar tu visita. Prueba con otro horario o ajusta el número de personas.</span>', 'empty');
       return;
     }
     cont.className = '';

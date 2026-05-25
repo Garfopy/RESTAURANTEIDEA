@@ -39,7 +39,7 @@
   </table>
 </div>
 
-<div id="modalCorte" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:999;align-items:center;justify-content:center;overflow-y:auto;padding:20px 0">
+<div id="modalCorte" class="rst-modal-backdrop" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:999;align-items:center;justify-content:center;overflow-y:auto;padding:20px 0">
   <div style="background:#fff;border-radius:16px;padding:28px;width:440px;max-width:95vw;max-height:90vh;overflow-y:auto;margin:auto">
     <h3 style="font-weight:700;margin-bottom:18px">Corte de Caja</h3>
     <form method="POST" action="<?= BASE_URL ?>rest-finanzas/guardarCorte">
