@@ -11,15 +11,24 @@ class StaffAccesoController extends BaseController
         $this->restModel = new RestauranteModel();
     }
 
-    // GET /acceso/{slug}
+    // GET /acceso/{slug}  — formulario comensal (nombre + email)
     public function index(?string $slug = null): void
     {
         $restaurante = $slug ? $this->restModel->getBySlug($slug) : null;
         $flash       = $this->getFlash();
-        $pageTitle   = 'Acceso — ' . ($restaurante['nombre'] ?? 'CarniHub');
-        $yaLogueado  = null;
+        $pageTitle   = ($restaurante['nombre'] ?? 'CarniHub') . ' — Identificación';
         $returnParam = trim($this->get('return', ''));
-        $this->render('staff/login', compact('restaurante', 'flash', 'pageTitle', 'slug', 'yaLogueado', 'returnParam'));
+        $this->render('staff/login', compact('restaurante', 'flash', 'pageTitle', 'slug', 'returnParam'));
+    }
+
+    // GET /acceso/{slug}/staff  — formulario staff (email + contraseña)
+    public function staff(?string $slug = null): void
+    {
+        $restaurante = $slug ? $this->restModel->getBySlug($slug) : null;
+        $flash       = $this->getFlash();
+        $pageTitle   = 'Acceso Staff — ' . ($restaurante['nombre'] ?? 'CarniHub');
+        $yaLogueado  = null;
+        $this->render('staff/login_staff', compact('restaurante', 'flash', 'pageTitle', 'slug', 'yaLogueado'));
     }
 
     // POST /acceso/{slug}

@@ -63,7 +63,7 @@ $param    = $segments[2] ?? null;
 // Rutas públicas con slug en URL: /menu/{slug}, /menu/{slug}/ordenar, /menu/{slug}/pagar/{visitaId}, /acceso/{slug}
 // Convención esperada por los controllers: param = "slug" o "slug/visitaId" (concat de segmentos restantes)
 if (in_array($ctrlSlug, ['menu', 'acceso'], true)) {
-    $knownActions = ['index','ordenar','pagar','confirmarPago','confirmacion','login',
+    $knownActions = ['index','ordenar','pagar','confirmarPago','confirmacion','login','staff',
                      'llamarMesero','cancelarPedido','estadoPedido','actualizarPropina','generarTicket',
                      'paypalCrear','paypalRetorno','paypalCancelar','entrarComensal',
                      'scanPortero','registrarSalidaPublica','checkSalida','gracias','stripeIntent',

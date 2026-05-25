@@ -71,7 +71,7 @@
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <code style="flex:1;background:#fff;border-radius:8px;padding:8px 12px;font-size:.85rem;
                    color:#111827;border:1px solid color-mix(in srgb,var(--cp) 20%,white)">
-        <?= BASE_URL ?>acceso/<?= htmlspecialchars($restaurante['slug'] ?? '') ?>?modo=staff
+        <?= BASE_URL ?>acceso/<?= htmlspecialchars($restaurante['slug'] ?? '') ?>/staff
       </code>
       <button onclick="copiarURL()" class="btn btn-primary btn-sm" id="btnCopiar">Copiar</button>
     </div>
