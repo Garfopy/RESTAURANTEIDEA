@@ -74,7 +74,7 @@
     <?php if ($modo === 'cliente'): ?>
     <!-- ============== FORMULARIO COMENSAL ============== -->
     <p style="font-size:.82rem;color:#6B7280;margin-bottom:18px;line-height:1.5">
-      Ingresa tu nombre para identificarte. Así guardamos tu historial y pedidos.
+      Identifícate para ordenar. Usamos tu correo para guardar tu historial y reconocerte la próxima vez.
     </p>
     <form method="POST" action="<?= BASE_URL ?>acceso/<?= htmlspecialchars($slug ?? '') ?>/entrarComensal" autocomplete="on">
       <div class="form-group">
@@ -83,9 +83,9 @@
                required autocomplete="name" style="font-size:1rem">
       </div>
       <div class="form-group" style="margin-bottom:20px">
-        <label class="form-label">Teléfono <span style="color:#9CA3AF;font-weight:400">(opcional)</span></label>
-        <input type="tel" name="telefono" class="form-input" placeholder="Ej: 4421234567"
-               autocomplete="tel">
+        <label class="form-label">Correo electrónico *</label>
+        <input type="email" name="email" class="form-input" placeholder="tucorreo@ejemplo.com"
+               required autocomplete="email" style="font-size:1rem">
       </div>
       <button type="submit" class="btn btn-primary btn-lg"
               style="width:100%;justify-content:center;border-radius:10px">
@@ -94,7 +94,7 @@
       </button>
     </form>
     <div style="margin-top:14px;padding:10px 12px;background:#F9FAFB;border-radius:8px;font-size:.75rem;color:#9CA3AF;line-height:1.4">
-      Tu información se guarda solo en este restaurante y solo se usa para tu historial de pedidos.
+      No usamos contraseña. Tu correo y nombre solo se guardan en este restaurante para tu historial de pedidos.
     </div>
     <a class="access-switch" href="<?= BASE_URL ?>acceso/<?= htmlspecialchars($slug ?? '') ?>?modo=staff">
       🔑 ¿Eres <strong>staff</strong> del restaurante? Entra aquí

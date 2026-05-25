@@ -34,20 +34,24 @@ class StaffAccesoController extends BaseController
         $restaurante = $slug ? $this->restModel->getBySlug($slug) : null;
         if (!$restaurante) { $this->redirect('acceso/' . $slug); }
 
-        $nombre   = trim($this->post('nombre', ''));
-        $telefono = trim($this->post('telefono', '')) ?: null;
-        if (!$nombre) {
-            $this->flash('error', 'Ingresa tu nombre para continuar.');
+        $nombre = trim($this->post('nombre', ''));
+        $email  = mb_strtolower(trim($this->post('email', '')));
+        if (!$nombre || !$email) {
+            $this->flash('error', 'Ingresa tu nombre y correo para continuar.');
+            $this->redirect('acceso/' . $slug);
+        }
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $this->flash('error', 'Por favor ingresa un correo válido.');
             $this->redirect('acceso/' . $slug);
         }
 
         $clienteModel = new RestClienteModel();
-        $comensalId   = $clienteModel->buscarOCrear((int)$restaurante['id'], $nombre, $telefono, null);
+        $comensalId   = $clienteModel->buscarOCrear((int)$restaurante['id'], $nombre, null, $email);
 
         setcookie(
             'comensal_' . $restaurante['id'],
-            json_encode(['id' => $comensalId, 'nombre' => $nombre]),
-            time() + 4 * 3600, '/'
+            json_encode(['id' => $comensalId, 'nombre' => $nombre, 'email' => $email]),
+            time() + 30 * 24 * 3600, '/'
         );
 
         $this->redirect('menu/' . $slug);

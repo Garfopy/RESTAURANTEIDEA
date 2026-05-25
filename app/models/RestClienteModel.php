@@ -11,7 +11,23 @@ class RestClienteModel extends BaseModel
 
     public function buscarOCrear(int $restauranteId, ?string $nombre, ?string $telefono, ?string $email): int
     {
-        if ($telefono) {
+        $email = $email ? mb_strtolower(trim($email)) : null;
+
+        if ($email) {
+            $existing = $this->queryOne(
+                "SELECT id, nombre FROM rest_comensales WHERE restaurante_id = ? AND email = ?",
+                [$restauranteId, $email]
+            );
+            if ($existing) {
+                if ($nombre && trim($nombre) !== '' && $nombre !== $existing['nombre']) {
+                    $this->execute(
+                        "UPDATE rest_comensales SET nombre = ? WHERE id = ?",
+                        [$nombre, (int)$existing['id']]
+                    );
+                }
+                return (int) $existing['id'];
+            }
+        } elseif ($telefono) {
             $existing = $this->queryOne(
                 "SELECT id FROM rest_comensales WHERE restaurante_id = ? AND telefono = ?",
                 [$restauranteId, $telefono]

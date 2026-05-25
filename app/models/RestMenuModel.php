@@ -151,4 +151,53 @@ class RestMenuModel extends BaseModel
         $platillo['ingredientes'] = $receta ? $this->getIngredientesReceta($receta['id']) : [];
         return $platillo;
     }
+
+    // ── Estadísticas de ventas ────────────────────────────────────
+
+    /**
+     * Platillos más vendidos del restaurante (último año, ignora ítems cancelados).
+     * Devuelve nombre, precio actual, unidades vendidas y revenue.
+     */
+    public function getTopVendidos(int $restauranteId, int $limit = 5): array
+    {
+        $limit = max(1, min(20, $limit));
+        return $this->query(
+            "SELECT p.id, p.nombre, p.precio,
+                    SUM(pi.cantidad)         AS unidades_vendidas,
+                    SUM(pi.subtotal)         AS revenue
+             FROM rest_pedido_items pi
+             JOIN rest_pedidos ped ON ped.id = pi.pedido_id
+             JOIN rest_platillos p ON p.id = pi.platillo_id
+             WHERE ped.restaurante_id = ?
+               AND pi.estado <> 'cancelado'
+               AND ped.created_at >= DATE_SUB(NOW(), INTERVAL 365 DAY)
+             GROUP BY p.id, p.nombre, p.precio
+             ORDER BY unidades_vendidas DESC
+             LIMIT $limit",
+            [$restauranteId]
+        );
+    }
+
+    /**
+     * Platillos menos vendidos entre los que SÍ están activos en menú,
+     * incluye los que no se han vendido nunca (LEFT JOIN).
+     */
+    public function getMenosVendidos(int $restauranteId, int $limit = 5): array
+    {
+        $limit = max(1, min(20, $limit));
+        return $this->query(
+            "SELECT p.id, p.nombre, p.precio,
+                    COALESCE(SUM(CASE WHEN pi.estado <> 'cancelado' THEN pi.cantidad ELSE 0 END), 0) AS unidades_vendidas
+             FROM rest_platillos p
+             LEFT JOIN rest_pedido_items pi ON pi.platillo_id = p.id
+             LEFT JOIN rest_pedidos ped ON ped.id = pi.pedido_id
+                  AND ped.created_at >= DATE_SUB(NOW(), INTERVAL 365 DAY)
+                  AND ped.restaurante_id = p.restaurante_id
+             WHERE p.restaurante_id = ? AND p.activo = 1
+             GROUP BY p.id, p.nombre, p.precio
+             ORDER BY unidades_vendidas ASC, p.nombre ASC
+             LIMIT $limit",
+            [$restauranteId]
+        );
+    }
 }

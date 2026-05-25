@@ -117,6 +117,10 @@ class RestauranteController extends BaseController
         $reservas   = new RestReservaModel();
         $proximas   = $reservas->getProximas($restauranteId, 3);
 
+        $menuModel     = new RestMenuModel();
+        $topVendidos   = $menuModel->getTopVendidos($restauranteId, 5);
+        $menosVendidos = $menuModel->getMenosVendidos($restauranteId, 5);
+
         $linkStaff  = BASE_URL . 'acceso/' . $restaurante['slug'];
         $linkMenu   = BASE_URL . 'menu/'   . $restaurante['slug'];
         $flash      = $this->getFlash();
@@ -124,6 +128,7 @@ class RestauranteController extends BaseController
         $activeMenu = 'rest_dashboard';
         $this->render('restaurante/dashboard', compact(
             'restaurante','kpis','activos','alertas','proximas',
+            'topVendidos','menosVendidos',
             'linkStaff','linkMenu','flash','pageTitle','activeMenu'
         ));
     }

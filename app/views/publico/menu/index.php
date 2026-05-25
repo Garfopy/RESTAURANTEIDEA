@@ -225,6 +225,15 @@
     </p>
     <?php endif; ?>
 
+  <?php if (!empty($comensal['nombre'])): ?>
+  <div style="margin-top:12px;display:inline-flex;align-items:center;gap:8px;
+              background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);
+              backdrop-filter:blur(8px);border-radius:999px;padding:7px 16px;
+              font-size:.85rem;color:#fff;font-weight:600">
+    👋 Hola, <?= htmlspecialchars($comensal['nombre']) ?>
+  </div>
+  <?php endif; ?>
+
   <?php if ($mesa): ?>
   <div style="display:flex;flex-direction:column;align-items:center;gap:8px;width:100%;margin-top:14px">
     <div style="display:inline-flex;align-items:center;gap:6px;

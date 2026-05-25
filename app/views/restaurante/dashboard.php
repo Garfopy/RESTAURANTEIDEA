@@ -131,18 +131,86 @@ $totalPasos  = count($pasos);
   </div>
 </div>
 
+<!-- Productos: más / menos vendidos -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px">
+  <div style="background:#fff;border-radius:12px;padding:20px;border:1px solid #E5E7EB">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div style="font-weight:700;color:#111827">🔥 Más vendidos</div>
+      <span style="font-size:.7rem;color:#9CA3AF">últimos 365 días</span>
+    </div>
+    <?php if (empty($topVendidos)): ?>
+    <p style="color:#9CA3AF;font-size:.875rem;margin:0">Aún no hay ventas registradas.</p>
+    <?php else: ?>
+    <?php foreach ($topVendidos as $i => $p): ?>
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;
+                border-bottom:1px solid #F3F4F6;font-size:.88rem;gap:10px">
+      <div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1">
+        <span style="display:inline-flex;align-items:center;justify-content:center;
+                     width:24px;height:24px;border-radius:8px;
+                     background:<?= $i===0?'#FEF3C7':'#F3F4F6' ?>;
+                     color:<?= $i===0?'#92400E':'#6B7280' ?>;
+                     font-weight:800;font-size:.72rem"><?= $i+1 ?></span>
+        <span style="color:#111827;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><?= htmlspecialchars($p['nombre']) ?></span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;white-space:nowrap">
+        <span style="color:#10B981;font-weight:700">$<?= number_format((float)$p['precio'],2) ?></span>
+        <span style="font-size:.72rem;color:#6B7280;background:#F3F4F6;border-radius:99px;padding:2px 8px;font-weight:600">
+          <?= (int)$p['unidades_vendidas'] ?> vend.
+        </span>
+      </div>
+    </div>
+    <?php endforeach; ?>
+    <?php endif; ?>
+  </div>
+
+  <div style="background:#fff;border-radius:12px;padding:20px;border:1px solid #E5E7EB">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div style="font-weight:700;color:#111827">📉 Menos vendidos</div>
+      <span style="font-size:.7rem;color:#9CA3AF">candidatos a oferta</span>
+    </div>
+    <?php if (empty($menosVendidos)): ?>
+    <p style="color:#9CA3AF;font-size:.875rem;margin:0">Sin platillos activos.</p>
+    <?php else: ?>
+    <?php foreach ($menosVendidos as $p): ?>
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;
+                border-bottom:1px solid #F3F4F6;font-size:.88rem;gap:10px">
+      <div style="display:flex;align-items:center;gap:8px;min-width:0;flex:1">
+        <span style="color:#374151;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><?= htmlspecialchars($p['nombre']) ?></span>
+        <?php if ((int)$p['unidades_vendidas'] === 0): ?>
+        <span style="font-size:.65rem;color:#92400E;background:#FEF3C7;border:1px solid #FCD34D;border-radius:99px;padding:1px 7px;font-weight:700">sin ventas</span>
+        <?php endif; ?>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;white-space:nowrap">
+        <span style="color:#EF4444;font-weight:700">$<?= number_format((float)$p['precio'],2) ?></span>
+        <span style="font-size:.72rem;color:#6B7280;background:#F3F4F6;border-radius:99px;padding:2px 8px;font-weight:600">
+          <?= (int)$p['unidades_vendidas'] ?> vend.
+        </span>
+      </div>
+    </div>
+    <?php endforeach; ?>
+    <?php endif; ?>
+  </div>
+</div>
+
 <!-- Acceso rápido propinas -->
-<div style="margin-top:20px;background:#fff;border-radius:12px;padding:20px;border:1px solid #E5E7EB;
-            display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
-  <div>
-    <div style="font-weight:700;color:#111827">💰 Propinas del día</div>
-    <div style="font-size:.82rem;color:#6B7280;margin-top:2px">
-      Consulta y registra las propinas de cada mesero para entregar al final del turno.
+<div style="margin-top:20px;background:linear-gradient(135deg,#10B981 0%,#059669 100%);
+            border-radius:14px;padding:22px 24px;color:#fff;
+            display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;
+            box-shadow:0 6px 18px rgba(16,185,129,.25)">
+  <div style="display:flex;align-items:center;gap:14px">
+    <div style="width:48px;height:48px;border-radius:12px;background:rgba(255,255,255,.18);
+                display:flex;align-items:center;justify-content:center;font-size:1.6rem">💰</div>
+    <div>
+      <div style="font-weight:800;font-size:1.05rem">Propinas del día</div>
+      <div style="font-size:.85rem;color:rgba(255,255,255,.9);margin-top:2px">
+        Consulta y registra las propinas de cada mesero para entregar al final del turno.
+      </div>
     </div>
   </div>
   <a href="<?= BASE_URL ?>rest-propinas/index"
-     style="padding:9px 20px;border-radius:10px;background:#10B981;color:#fff;
-            font-weight:700;font-size:.87rem;text-decoration:none;white-space:nowrap">
+     style="padding:11px 22px;border-radius:10px;background:#fff;color:#059669;
+            font-weight:800;font-size:.9rem;text-decoration:none;white-space:nowrap;
+            box-shadow:0 2px 8px rgba(0,0,0,.12)">
     Ver propinas →
   </a>
 </div>

@@ -135,8 +135,22 @@ class RestPublicoController extends BaseController
             }
         }
 
+        // Comensal logueado (cookie no-httpOnly por simplicidad — el id se valida server-side al ordenar)
+        $comensal = null;
+        $comensalCookie = $_COOKIE['comensal_' . $restaurante['id']] ?? null;
+        if ($comensalCookie) {
+            $decoded = json_decode($comensalCookie, true);
+            if (is_array($decoded) && !empty($decoded['id'])) {
+                $comensal = [
+                    'id'     => (int)$decoded['id'],
+                    'nombre' => $decoded['nombre'] ?? '',
+                    'email'  => $decoded['email']  ?? '',
+                ];
+            }
+        }
+
         $pageTitle = $restaurante['nombre'];
-        $this->render('publico/menu/index', compact('restaurante','categorias','platillos','recetaIngredientes','mesa','visitaId','meseroAtiende','pageTitle','requiereLoginComensal'));
+        $this->render('publico/menu/index', compact('restaurante','categorias','platillos','recetaIngredientes','mesa','visitaId','meseroAtiende','pageTitle','requiereLoginComensal','comensal'));
     }
 
     public function ordenar(?string $slug = null): void
@@ -168,11 +182,22 @@ class RestPublicoController extends BaseController
             }
         }
 
+        // Comensal logueado (opcional)
+        $comensalId = null;
+        $comensalCookie = $_COOKIE['comensal_' . $restauranteId] ?? null;
+        if ($comensalCookie) {
+            $decoded = json_decode($comensalCookie, true);
+            if (is_array($decoded) && !empty($decoded['id'])) {
+                $comensalId = (int)$decoded['id'];
+            }
+        }
+
         // Crear visita si no existe
         if (!$visitaId) {
             $visitaId = $this->visitaModel->crear(
                 $restauranteId,
-                $mesa ? (int)$mesa['id'] : null
+                $mesa ? (int)$mesa['id'] : null,
+                $comensalId
             );
             // Guardar en cookie por 4 horas
             $cookieName = 'visita_' . $restauranteId;
