@@ -53,36 +53,23 @@ class RestInventarioController extends BaseController
         $carnihubDebug     = [];   // Diagnóstico: ?debug_carnihub=1 lo muestra
         if (defined('RESTAURANTE_STANDALONE') && RESTAURANTE_STANDALONE) {
             // Standalone: obtener catálogo vía API de CarniHub.
-            // ⚠ El endpoint /productos del servidor remoto tiene un bug
-            // serio: ignora ?page=, ?per_page= y ?categoria=. SIEMPRE
-            // devuelve los primeros 100 productos en orden alfabético.
-            // Workaround final: iteramos por letra usando ?q=<letra>
-            // para que el filtro por nombre devuelva subconjuntos
-            // distintos. Combinamos todo y deduplicamos por id.
+            // Estrategia: primero intentamos paginación normal (page=1..N).
+            // Si el servidor remoto ignora paginación (bug histórico) y devuelve
+            // siempre los mismos productos, completamos con búsqueda por letra.
             try {
                 $apiService  = new CarniHubApiService();
                 $grupNombre  = $empresaProveedorNombre ?? 'CarniHub';
                 $vistos      = [];
                 $perPage     = 100;
-                // Letras a probar: cubren prácticamente todos los nombres
-                // de productos en español + dígitos para variantes con números.
-                $consultas   = [
-                    '',  // base sin filtro
-                    'a','b','c','d','e','f','g','h','i','j','k','l','m',
-                    'n','o','p','q','r','s','t','u','v','w','x','y','z',
-                    'á','é','í','ó','ú','ñ','0','1','2','3','4','5','6','7','8','9',
-                ];
-                foreach ($consultas as $q) {
-                    $result = $apiService->buscarProducto($restauranteId, $q, '', 1, $perPage);
-                    $lote = [];
-                    if (!empty($result['productos']) && is_array($result['productos'])) {
-                        $lote = $result['productos'];
-                    } elseif (!empty($result['data']['productos']) && is_array($result['data']['productos'])) {
-                        $lote = $result['data']['productos'];
-                    } elseif (!empty($result['data']) && is_array($result['data']) && array_is_list($result['data'])) {
-                        $lote = $result['data'];
-                    }
-                    $antes = count($productosCarnihub);
+
+                $extraerLote = function($result) {
+                    if (!empty($result['productos']) && is_array($result['productos'])) return $result['productos'];
+                    if (!empty($result['data']['productos']) && is_array($result['data']['productos'])) return $result['data']['productos'];
+                    if (!empty($result['data']) && is_array($result['data']) && array_is_list($result['data'])) return $result['data'];
+                    return [];
+                };
+                $acumular = function(array $lote) use (&$productosCarnihub, &$vistos, $grupNombre) {
+                    $nuevos = 0;
                     foreach ($lote as $prod) {
                         $pid = (int)($prod['id'] ?? 0);
                         if ($pid <= 0 || isset($vistos[$pid])) continue;
@@ -93,21 +80,54 @@ class RestInventarioController extends BaseController
                             'unidad'         => $prod['presentacion'] ?? '',
                             'empresa_nombre' => $grupNombre,
                         ];
+                        $nuevos++;
                     }
-                    $nuevos = count($productosCarnihub) - $antes;
+                    return $nuevos;
+                };
+
+                // 1) Paginación normal: hasta 20 páginas o hasta que no haya nuevos
+                for ($page = 1; $page <= 20; $page++) {
+                    $result = $apiService->buscarProducto($restauranteId, '', '', $page, $perPage);
+                    if (isset($result['success']) && $result['success'] === false) {
+                        $carnihubDebug[] = ['page' => $page, 'api_error' => $result['error'] ?? 'unknown'];
+                        error_log('[RestInventario CarniHub API] ' . ($result['error'] ?? 'sin detalle'));
+                        break;
+                    }
+                    $lote   = $extraerLote($result);
+                    $antes  = count($productosCarnihub);
+                    $nuevos = $acumular($lote);
                     $carnihubDebug[] = [
-                        'q'          => $q ?: '(base)',
-                        'lote_count' => count($lote),
-                        'nuevos'     => $nuevos,
-                        'acumulado'  => count($productosCarnihub),
+                        'page' => $page, 'lote_count' => count($lote),
+                        'nuevos' => $nuevos, 'acumulado' => count($productosCarnihub),
                     ];
+                    if (empty($lote) || $nuevos === 0) break;
                 }
+
+                // 2) Fallback por letra si la paginación no entregó suficiente variedad
+                if (count($productosCarnihub) < $perPage) {
+                    $consultas = [
+                        'a','b','c','d','e','f','g','h','i','j','k','l','m',
+                        'n','o','p','q','r','s','t','u','v','w','x','y','z',
+                        'á','é','í','ó','ú','ñ','0','1','2','3','4','5','6','7','8','9',
+                    ];
+                    foreach ($consultas as $q) {
+                        $result = $apiService->buscarProducto($restauranteId, $q, '', 1, $perPage);
+                        $lote   = $extraerLote($result);
+                        $nuevos = $acumular($lote);
+                        $carnihubDebug[] = [
+                            'q' => $q, 'lote_count' => count($lote),
+                            'nuevos' => $nuevos, 'acumulado' => count($productosCarnihub),
+                        ];
+                    }
+                }
+
                 $carnihubDebug[] = ['TOTAL_UNICOS' => count($productosCarnihub)];
                 usort($productosCarnihub, function($a, $b){
                     return strcasecmp($a['nombre'] ?? '', $b['nombre'] ?? '');
                 });
             } catch (\Throwable $e) {
                 $carnihubDebug[] = ['exception' => $e->getMessage()];
+                error_log('[RestInventario CarniHub] ' . $e->getMessage());
             }
         } else {
             // Instalación integrada: leer catálogo de la BD local.

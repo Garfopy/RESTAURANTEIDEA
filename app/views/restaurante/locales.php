@@ -24,11 +24,7 @@
 .vinculo-select:focus { border-color:var(--cp); }
 </style>
 
-<?php if (!empty($flash)): ?>
-<div class="flash flash-<?= $flash['type'] === 'success' ? 'success' : 'error' ?>" style="margin-bottom:16px">
-  <?= htmlspecialchars($flash['message']) ?>
-</div>
-<?php endif; ?>
+<?php /* flash rendered by layout */ ?>
 
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
   <div style="font-size:.85rem;color:#6B7280">

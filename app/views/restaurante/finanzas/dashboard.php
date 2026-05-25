@@ -71,12 +71,20 @@
 <div style="display:grid;grid-template-columns:1fr 2fr;gap:20px">
   <div style="background:#fff;border-radius:12px;border:1px solid #E5E7EB;padding:20px">
     <div style="font-weight:600;margin-bottom:14px">Métodos de Pago</div>
+    <?php if (!empty($metodos)): ?>
+    <div style="position:relative;height:180px;margin-bottom:12px">
+      <canvas id="chartMetodosPago"></canvas>
+    </div>
+    <?php endif; ?>
     <?php foreach ($metodos as $mp): ?>
     <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #F3F4F6;font-size:.85rem">
       <span style="color:#374151"><?= htmlspecialchars($mp['metodo_pago'] ?? 'efectivo') ?></span>
       <span style="font-weight:600">$<?= number_format((float)$mp['total'],2) ?> <span style="color:#9CA3AF">(<?= $mp['cantidad'] ?>)</span></span>
     </div>
     <?php endforeach; ?>
+    <?php if (empty($metodos)): ?>
+    <p style="color:#9CA3AF;font-size:.85rem">Sin pagos registrados en el período.</p>
+    <?php endif; ?>
   </div>
 
   <div style="background:#fff;border-radius:12px;border:1px solid #E5E7EB;padding:20px">
@@ -113,6 +121,38 @@
     },
     options: { responsive: true, plugins: { legend: { position: 'top' } }, scales: { y: { beginAtZero: true } } }
   });
+
+  // Gráfica de métodos de pago (doughnut)
+  const mpCanvas = document.getElementById('chartMetodosPago');
+  const mpData   = <?= json_encode(array_map(fn($m) => [
+                       'label' => $m['metodo_pago'] ?? 'efectivo',
+                       'total' => (float)$m['total'],
+                   ], $metodos)) ?>;
+  if (mpCanvas && mpData.length) {
+    const palette = ['#6366F1','#10B981','#F59E0B','#EF4444','#0EA5E9','#8B5CF6','#EC4899'];
+    new Chart(mpCanvas, {
+      type: 'doughnut',
+      data: {
+        labels: mpData.map(m => m.label),
+        datasets: [{
+          data: mpData.map(m => m.total),
+          backgroundColor: mpData.map((_, i) => palette[i % palette.length]),
+          borderWidth: 2,
+          borderColor: '#fff',
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
+          tooltip: { callbacks: {
+            label: ctx => ctx.label + ': $' + ctx.parsed.toLocaleString('es-MX', {minimumFractionDigits:2, maximumFractionDigits:2})
+          }}
+        }
+      }
+    });
+  }
 })();
 </script>
 <?php

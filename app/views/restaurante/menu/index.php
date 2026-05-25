@@ -86,12 +86,6 @@ $restauranteId = $_SESSION['restaurante_activo_id'] ?? 0;
   </a>
 </div>
 
-<?php if (!empty($flash)): ?>
-<div class="flash flash-<?= $flash['type'] === 'success' ? 'success' : 'error' ?>" style="margin-bottom:16px">
-  <?= htmlspecialchars($flash['message']) ?>
-</div>
-<?php endif; ?>
-
 <?php if (empty($categorias)): ?>
 <div style="background:#FEF3C7;border:1px solid #FCD34D;border-radius:10px;padding:16px;margin-bottom:16px;font-size:.875rem;color:#92400E">
   <strong>Sin categorías.</strong> Crea al menos una categoría antes de agregar platillos.
@@ -170,7 +164,7 @@ $restauranteId = $_SESSION['restaurante_activo_id'] ?? 0;
          <div class="menu-action-menu" id="menuActions<?= (int)$p['id'] ?>">
           <button type="button" class="menu-action-toggle"
                 onclick="toggleMenuActions(event,'menuActions<?= (int)$p['id'] ?>')">
-            Editar
+            Opciones ▾
           </button>
           <div class="menu-action-dropdown">
             <a href="<?= BASE_URL ?>rest-menu/form/<?= $p['id'] ?>"

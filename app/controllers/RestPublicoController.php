@@ -26,10 +26,34 @@ class RestPublicoController extends BaseController
     // /menu/{slug}  o  /menu/{slug}?mesa={qr_codigo}
     public function index(?string $slug = null): void
     {
-        $restaurante = $this->restModel->getBySlug($slug ?? '');
+        $slug = trim((string)($slug ?? ''));
+
+        // Si no viene slug y hay un staff/admin logueado con restaurante activo,
+        // redirigir al menú público de ese restaurante para evitar el 404.
+        if ($slug === '' && isset($_SESSION['usuario']) && !empty($_SESSION['restaurante_activo_id'])) {
+            $activo = $this->restModel->find((int)$_SESSION['restaurante_activo_id']);
+            if ($activo && !empty($activo['slug'])) {
+                $this->redirect('menu/' . $activo['slug']);
+                return;
+            }
+        }
+
+        $restaurante = $slug !== '' ? $this->restModel->getBySlug($slug) : null;
         if (!$restaurante) {
             http_response_code(404);
-            die('<h1>Restaurante no encontrado</h1>');
+            echo '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">';
+            echo '<title>Restaurante no encontrado</title>';
+            echo '<style>body{font-family:Inter,system-ui,sans-serif;background:#F9FAFB;color:#111827;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:24px}';
+            echo '.box{max-width:420px;text-align:center;background:#fff;border:1px solid #E5E7EB;border-radius:14px;padding:32px 28px;box-shadow:0 10px 30px rgba(0,0,0,.06)}';
+            echo 'h1{font-size:1.25rem;margin:0 0 8px}p{color:#6B7280;font-size:.92rem;margin:0 0 18px}';
+            echo 'a{display:inline-block;background:#1D4ED8;color:#fff;text-decoration:none;padding:9px 18px;border-radius:8px;font-weight:600;font-size:.88rem}</style>';
+            echo '</head><body><div class="box">';
+            echo '<div style="font-size:2.4rem;margin-bottom:8px">🍽️</div>';
+            echo '<h1>Restaurante no encontrado</h1>';
+            echo '<p>La dirección que ingresaste no corresponde a un restaurante activo. Verifica el enlace o regresa al inicio.</p>';
+            echo '<a href="' . BASE_URL . '">Ir al inicio</a>';
+            echo '</div></body></html>';
+            return;
         }
 
         // Si el restaurante exige login del comensal, redirigir al portal staff

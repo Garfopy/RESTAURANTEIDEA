@@ -143,7 +143,19 @@ $_isMesero = in_array($_rol, ['mesero', 'comprador'], true);            // opera
   </nav>
 
   <div class="rst-sidebar-footer">
-    Potenciado por <strong>CarniHub</strong>
+    <a href="<?= BASE_URL ?>auth/logout"
+       style="display:flex;align-items:center;justify-content:center;gap:6px;
+              padding:8px 12px;margin-bottom:10px;border-radius:8px;
+              background:#FEE2E2;color:#991B1B;text-decoration:none;
+              font-size:.82rem;font-weight:600;transition:background .15s"
+       onmouseover="this.style.background='#FECACA'"
+       onmouseout="this.style.background='#FEE2E2'">
+      <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+      Cerrar sesión
+    </a>
+    <div style="text-align:center;font-size:.7rem;color:#9CA3AF">
+      Potenciado por <strong>CarniHub</strong>
+    </div>
   </div>
 </aside>
 
@@ -162,7 +174,8 @@ $_isMesero = in_array($_rol, ['mesero', 'comprador'], true);            // opera
       </div>
     </div>
     <div style="display:flex;align-items:center;gap:14px">
-      <a href="<?= BASE_URL ?>menu/<?= htmlspecialchars($restaurante['slug'] ?? '') ?>"
+      <?php if (!empty($restaurante['slug'])): ?>
+      <a href="<?= BASE_URL ?>menu/<?= htmlspecialchars($restaurante['slug']) ?>"
          target="_blank"
          style="font-size:.8rem;color:var(--cp);font-weight:600;text-decoration:none;
                 display:flex;align-items:center;gap:4px">
@@ -170,6 +183,7 @@ $_isMesero = in_array($_rol, ['mesero', 'comprador'], true);            // opera
         Ver menú
       </a>
       <span style="width:1px;height:16px;background:#E5E7EB"></span>
+      <?php endif; ?>
       <span style="font-size:.82rem;color:#6B7280">
         <?= htmlspecialchars($usuario['nombre'] ?? '') ?>
       </span>
@@ -178,7 +192,9 @@ $_isMesero = in_array($_rol, ['mesero', 'comprador'], true);            // opera
 
   <div class="rst-page page-content">
     <?php if (!empty($flash)): ?>
-    <div class="flash flash-<?= $flash['type'] === 'success' ? 'success' : 'error' ?>">
+    <div class="flash flash-<?= $flash['type'] === 'success' ? 'success' : 'error' ?>"
+         data-flash="<?= htmlspecialchars(md5(($flash['type'] ?? '') . '|' . ($flash['message'] ?? ''))) ?>"
+         onclick="this.remove()">
       <?= htmlspecialchars($flash['message']) ?>
     </div>
     <?php endif; ?>
@@ -201,6 +217,17 @@ document.addEventListener('click', e => {
 // Teleport modal backdrops to <body> so position:fixed works correctly
 // (page-content animation creates a containing block that clips fixed children)
 document.querySelectorAll('.rst-modal-backdrop').forEach(m => document.body.appendChild(m));
+
+// Flash: dedupe duplicates + auto-remove after fade-out animation
+(function(){
+  const seen = new Set();
+  document.querySelectorAll('.flash[data-flash]').forEach(el => {
+    const k = el.dataset.flash;
+    if (seen.has(k)) { el.remove(); return; }
+    seen.add(k);
+    setTimeout(() => el.remove(), 5000);
+  });
+})();
 </script>
 </body>
 </html>
