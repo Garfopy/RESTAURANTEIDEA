@@ -5,7 +5,16 @@ class RestClienteModel extends BaseModel
 
     public function getByRestaurante(int $restauranteId, int $page = 1): array
     {
-        $sql = "SELECT * FROM rest_comensales WHERE restaurante_id = ? ORDER BY ultima_visita DESC";
+        $sql = "SELECT c.*,
+                       COALESCE(COUNT(DISTINCT v.id), 0)   AS num_visitas,
+                       COALESCE(SUM(t.total), 0)           AS gasto_total,
+                       MAX(v.created_at)                   AS ultima_visita_real
+                FROM rest_comensales c
+                LEFT JOIN rest_visitas v ON v.comensal_id = c.id
+                LEFT JOIN rest_tickets t ON t.visita_id   = v.id
+                WHERE c.restaurante_id = ?
+                GROUP BY c.id
+                ORDER BY ultima_visita_real DESC, c.id DESC";
         return $this->paginate($sql, [$restauranteId], $page);
     }
 
