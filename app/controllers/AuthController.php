@@ -209,7 +209,7 @@ class AuthController extends BaseController
         }
         session_destroy();
 
-        $target = $restSlug ? ('acceso/' . $restSlug) : '';
+        $target = $restSlug ? ('acceso/' . $restSlug . '/staff') : '';
         header('Location: ' . BASE_URL . $target);
         exit;
     }
