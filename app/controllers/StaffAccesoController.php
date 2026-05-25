@@ -52,9 +52,9 @@ class StaffAccesoController extends BaseController
             time() + 30 * 24 * 3600, '/'
         );
 
-        // Si venía con ?return= (ej. desde QR de mesa), redirigir allí
-        $return = trim($this->get('return', ''));
-        if ($return && preg_match('#^menu/[a-zA-Z0-9_-]+(\?mesa=[a-zA-Z0-9]+)?$#', $return)) {
+        // Redirigir a la URL de origen (preservada como hidden field para no perderla en POST)
+        $return = trim($this->post('return_url', ''));
+        if ($return && str_starts_with($return, 'menu/')) {
             $this->redirect($return);
             return;
         }

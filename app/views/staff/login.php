@@ -77,7 +77,10 @@
     <p style="font-size:.82rem;color:#6B7280;margin-bottom:18px;line-height:1.5">
       Identifícate para ordenar. Usamos tu correo para guardar tu historial y reconocerte la próxima vez.
     </p>
-    <form method="POST" action="<?= BASE_URL ?>acceso/<?= htmlspecialchars($slug ?? '') ?>/entrarComensal<?= $returnParam ? '?return=' . urlencode($returnParam) : '' ?>" autocomplete="on">
+    <form method="POST" action="<?= BASE_URL ?>acceso/<?= htmlspecialchars($slug ?? '') ?>/entrarComensal" autocomplete="on">
+      <?php if ($returnParam): ?>
+      <input type="hidden" name="return_url" value="<?= htmlspecialchars($returnParam) ?>">
+      <?php endif; ?>
       <div class="form-group">
         <label class="form-label">Tu nombre *</label>
         <input type="text" name="nombre" class="form-input" placeholder="Ej: María López"
