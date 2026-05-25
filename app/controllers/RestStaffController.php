@@ -119,6 +119,16 @@ class RestStaffController extends BaseController
         $this->redirect('rest-staff/index');
     }
 
+    public function activar(?string $id = null): void
+    {
+        $db  = Database::getInstance();
+        $uid = (int)$id;
+        $db->prepare("UPDATE rest_staff SET activo = 1 WHERE usuario_id = ?")->execute([$uid]);
+        $db->prepare("UPDATE usuarios   SET activo = 1 WHERE id         = ?")->execute([$uid]);
+        $this->flash('success', 'Staff reactivado.');
+        $this->redirect('rest-staff/index');
+    }
+
     // GET /rest-staff/turno  — asignación de zonas por turno (hoy)
     public function turno(?string $p = null): void
     {

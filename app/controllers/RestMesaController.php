@@ -67,6 +67,13 @@ class RestMesaController extends BaseController
 
     public function eliminar(?string $id = null): void
     {
+        $mesa = $this->model->find((int)$id);
+        $estado = strtolower((string)($mesa['estado'] ?? 'disponible'));
+        if (in_array($estado, ['ocupada','pagando','reservada'], true)) {
+            $this->flash('error', 'No se puede desactivar una mesa con un proceso en curso (' . $estado . ').');
+            $this->redirect('rest-mesa/index');
+            return;
+        }
         $this->model->update((int)$id, ['activo' => 0]);
         $this->flash('success', 'Mesa desactivada.');
         $this->redirect('rest-mesa/index');

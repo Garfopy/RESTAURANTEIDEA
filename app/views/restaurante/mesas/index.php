@@ -104,9 +104,16 @@
                  onclick="return confirm('⚠️ Eliminar PERMANENTEMENTE esta mesa? Esta acción no se puede deshacer.')"
                  class="btn btn-danger btn-sm">Eliminar</a>
             <?php else: ?>
-              <a href="<?= BASE_URL ?>rest-mesa/eliminar/<?= $m['id'] ?>"
-                 onclick="return confirm('¿Desactivar esta mesa?')"
-                 class="btn btn-danger btn-sm">Desactivar</a>
+              <?php $estadoMesa = strtolower((string)($m['estado'] ?? 'disponible')); $bloqueada = in_array($estadoMesa, ['ocupada','pagando','reservada'], true); ?>
+              <?php if ($bloqueada): ?>
+                <button type="button" disabled
+                        title="No se puede desactivar: mesa <?= htmlspecialchars($estadoMesa) ?>"
+                        class="btn btn-danger btn-sm" style="opacity:.45;cursor:not-allowed">Desactivar</button>
+              <?php else: ?>
+                <a href="<?= BASE_URL ?>rest-mesa/eliminar/<?= $m['id'] ?>"
+                   onclick="return confirm('¿Desactivar esta mesa?')"
+                   class="btn btn-danger btn-sm">Desactivar</a>
+              <?php endif; ?>
             <?php endif; ?>
           </div>
         </td>

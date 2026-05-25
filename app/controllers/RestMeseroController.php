@@ -113,12 +113,24 @@ class RestMeseroController extends BaseController
             return;
         }
 
+        // Verificar que no haya ítems aún por preparar/pendientes (chef todavía trabajando)
+        $pend = $db->prepare(
+            "SELECT COUNT(*) FROM rest_pedido_items
+             WHERE pedido_id = ? AND estado IN ('pendiente','en_preparacion')"
+        );
+        $pend->execute([$pid]);
+        if ((int)$pend->fetchColumn() > 0) {
+            $this->json(['ok' => false, 'msg' => 'Aún hay platillos sin marcar listos por el chef']);
+            return;
+        }
+
         $db->prepare(
             "UPDATE rest_pedidos SET estado='entregado', mesero_id = ? WHERE id = ? AND restaurante_id = ?"
         )->execute([$meseroId, $pid, $this->restauranteId()]);
 
         $db->prepare(
-            "UPDATE rest_pedido_items SET estado='entregado' WHERE pedido_id = ?"
+            "UPDATE rest_pedido_items SET estado='entregado'
+             WHERE pedido_id = ? AND estado IN ('listo','reclamado')"
         )->execute([$pid]);
 
         // Propagar mesero_id al ticket si aún no tiene

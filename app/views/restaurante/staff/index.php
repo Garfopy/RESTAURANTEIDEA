@@ -84,6 +84,10 @@
           <a href="<?= BASE_URL ?>rest-staff/desactivar/<?= $s['id'] ?>"
              onclick="return confirm('¿Desactivar a <?= htmlspecialchars($s['nombre'], ENT_QUOTES) ?>?')"
              class="btn btn-danger btn-sm">Desactivar</a>
+          <?php else: ?>
+          <a href="<?= BASE_URL ?>rest-staff/activar/<?= $s['id'] ?>"
+             onclick="return confirm('¿Reactivar a <?= htmlspecialchars($s['nombre'], ENT_QUOTES) ?>?')"
+             class="btn btn-success btn-sm">Activar</a>
           <?php endif; ?>
         </td>
       </tr>

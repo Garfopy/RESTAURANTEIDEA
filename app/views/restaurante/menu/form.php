@@ -24,7 +24,7 @@
   </div>
 
   <div class="rst-card" style="padding:28px;margin-bottom:0">
-    <form method="POST" action="<?= BASE_URL ?>rest-menu/guardar" id="formPlatillo">
+    <form method="POST" action="<?= BASE_URL ?>rest-menu/guardar" id="formPlatillo" enctype="multipart/form-data">
       <input type="hidden" name="id" value="<?= (int)($platillo['id'] ?? 0) ?>">
 
       <!-- ── Paso 1: Información básica ── -->
@@ -39,6 +39,40 @@
           <input type="text" name="nombre" id="inpNombre" required
                  class="form-input" placeholder="Ej: Tacos al pastor"
                  value="<?= htmlspecialchars($platillo['nombre'] ?? '') ?>">
+        </div>
+
+        <!-- Imagen del platillo -->
+        <div class="form-group">
+          <label class="form-label">📸 Foto del platillo
+            <span style="color:#9CA3AF;font-weight:400">(JPG/PNG, máx 3MB)</span>
+          </label>
+          <div style="display:flex;gap:14px;align-items:flex-start">
+            <div id="imgPreviewBox"
+                 style="width:110px;height:110px;border-radius:12px;border:2px dashed #D1D5DB;
+                        display:flex;align-items:center;justify-content:center;font-size:2rem;
+                        background:#F9FAFB;color:#9CA3AF;overflow:hidden;flex-shrink:0">
+              <?php if (!empty($platillo['imagen'])): ?>
+              <img id="imgPreview" src="<?= BASE_URL . htmlspecialchars($platillo['imagen']) ?>"
+                   style="width:100%;height:100%;object-fit:cover">
+              <?php else: ?>
+              <img id="imgPreview" src="" style="display:none;width:100%;height:100%;object-fit:cover">
+              <span id="imgPlaceholder">🍽</span>
+              <?php endif; ?>
+            </div>
+            <div style="flex:1">
+              <input type="file" name="imagen" id="inpImg" accept="image/jpeg,image/png,image/webp"
+                     onchange="previewImg(this)"
+                     style="font-size:.85rem;width:100%;padding:8px;border:1px dashed #D1D5DB;border-radius:8px;background:#fff;cursor:pointer">
+              <div style="font-size:.74rem;color:#6B7280;margin-top:6px;line-height:1.4">
+                La foto reemplaza al emoji 🍽 en la tarjeta del menú y se ve en grande al abrir el detalle.
+              </div>
+              <?php if (!empty($platillo['imagen'])): ?>
+              <label style="display:inline-flex;align-items:center;gap:5px;margin-top:8px;font-size:.78rem;color:#DC2626;cursor:pointer">
+                <input type="checkbox" name="quitar_imagen" value="1"> Quitar imagen actual
+              </label>
+              <?php endif; ?>
+            </div>
+          </div>
         </div>
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
@@ -611,6 +645,27 @@ function addIngrediente() {
 
 // Calcular costos de filas pre-cargadas al cargar la página
 document.querySelectorAll('#ingredientes-lista .ing-row').forEach(row => calcRowCosto(row));
+
+function previewImg(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  if (file.size > 3 * 1024 * 1024) {
+    alert('La imagen excede 3MB. Elige una más pequeña.');
+    input.value = '';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = document.getElementById('imgPreview');
+    const ph  = document.getElementById('imgPlaceholder');
+    img.src = e.target.result;
+    img.style.display = 'block';
+    if (ph) ph.style.display = 'none';
+    const box = document.getElementById('imgPreviewBox');
+    if (box) box.style.borderStyle = 'solid';
+  };
+  reader.readAsDataURL(file);
+}
 </script>
 <?php
 $content = ob_get_clean();

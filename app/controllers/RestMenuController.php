@@ -60,12 +60,18 @@ class RestMenuController extends BaseController
             'ingrediente_directo_id' => $this->post('ingrediente_directo_id') ?: null,
         ];
 
+        // Imagen del platillo (subida)
+        $imagenPath = $this->procesarImagenPlatillo($restauranteId, $id);
+        if ($imagenPath !== null) {
+            $data['imagen'] = $imagenPath ?: null;
+        }
+
         if ($id) {
             try {
                 $this->model->update($id, array_diff_key($data, ['restaurante_id' => '']));
             } catch (\PDOException $e) {
-                // Fallback: si la columna ingrediente_directo_id aún no existe (migración pendiente)
-                $safeData = array_diff_key($data, ['restaurante_id' => '', 'ingrediente_directo_id' => '']);
+                // Fallback: si las columnas ingrediente_directo_id o imagen aún no existen (migración pendiente)
+                $safeData = array_diff_key($data, ['restaurante_id' => '', 'ingrediente_directo_id' => '', 'imagen' => '']);
                 $this->model->update($id, $safeData);
             }
             $platilloId = $id;
@@ -73,8 +79,7 @@ class RestMenuController extends BaseController
             try {
                 $platilloId = $this->model->insert($data);
             } catch (\PDOException $e) {
-                // Fallback: si la columna ingrediente_directo_id aún no existe (migración pendiente)
-                $safeData = array_diff_key($data, ['ingrediente_directo_id' => '']);
+                $safeData = array_diff_key($data, ['ingrediente_directo_id' => '', 'imagen' => '']);
                 $platilloId = $this->model->insert($safeData);
             }
         }
@@ -192,5 +197,36 @@ class RestMenuController extends BaseController
         }
         $this->flash('success', 'Categoría guardada.');
         $this->redirect('rest-menu/index');
+    }
+
+    /**
+     * Procesa upload de imagen de platillo.
+     * Returns: ruta nueva (string), '' si se solicitó quitar imagen, null si no hay cambio.
+     */
+    private function procesarImagenPlatillo(int $restauranteId, int $platilloId): ?string
+    {
+        if ($this->post('quitar_imagen') == '1') {
+            return '';
+        }
+        if (empty($_FILES['imagen']) || ($_FILES['imagen']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+            return null;
+        }
+        if ($_FILES['imagen']['error'] !== UPLOAD_ERR_OK) {
+            return null;
+        }
+        if ($_FILES['imagen']['size'] > 3 * 1024 * 1024) {
+            return null;
+        }
+        $allowed = ['jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp'];
+        $ext = strtolower(pathinfo($_FILES['imagen']['name'], PATHINFO_EXTENSION));
+        if (!isset($allowed[$ext])) return null;
+
+        $filename = 'platillo_' . $restauranteId . '_' . ($platilloId ?: 'new') . '_' . time() . '.' . $ext;
+        $dest     = ROOT_PATH . '/public/uploads/platillos/' . $filename;
+        @mkdir(dirname($dest), 0755, true);
+        if (move_uploaded_file($_FILES['imagen']['tmp_name'], $dest)) {
+            return 'public/uploads/platillos/' . $filename;
+        }
+        return null;
     }
 }

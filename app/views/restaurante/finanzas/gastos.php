@@ -1,8 +1,8 @@
 <?php ob_start(); ?>
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
   <div></div>
-  <button onclick="document.getElementById('modalGasto').style.display='flex'"
-    style="padding:8px 16px;background:var(--color-primary);color:#fff;border:none;border-radius:8px;font-size:.85rem;font-weight:500;cursor:pointer">
+  <button onclick="document.getElementById('modalGasto').classList.add('open')"
+    class="btn btn-primary btn-sm">
     + Registrar Gasto
   </button>
 </div>
@@ -35,21 +35,21 @@
   </table>
 </div>
 
-<!-- Modal gasto -->
-<div id="modalGasto" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:999;align-items:center;justify-content:center">
-  <div style="background:#fff;border-radius:16px;padding:28px;width:440px;max-width:95vw">
-    <h3 style="font-weight:700;margin-bottom:18px">Registrar Gasto</h3>
+<div id="modalGasto" class="rst-modal-backdrop">
+  <div class="rst-modal rst-modal-sm">
+    <div class="rst-modal-header">
+      <div class="rst-modal-title">Registrar Gasto</div>
+      <button class="rst-modal-close" onclick="document.getElementById('modalGasto').classList.remove('open')">✕</button>
+    </div>
     <form method="POST" action="<?= BASE_URL ?>rest-finanzas/guardarGasto">
-      <div style="margin-bottom:12px">
-        <label style="font-size:.85rem;font-weight:500">Descripción *</label>
-        <input type="text" name="descripcion" required
-          style="width:100%;padding:8px 12px;border:1px solid #D1D5DB;border-radius:8px;margin-top:4px;font-size:.9rem">
+      <div class="form-group">
+        <label class="form-label">Descripción *</label>
+        <input type="text" name="descripcion" class="form-input" required>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
-        <div>
-          <label style="font-size:.85rem;font-weight:500">Categoría</label>
-          <select name="categoria"
-            style="width:100%;padding:8px 12px;border:1px solid #D1D5DB;border-radius:8px;margin-top:4px;font-size:.9rem">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group">
+          <label class="form-label">Categoría</label>
+          <select name="categoria" class="form-input">
             <option value="personal">Personal</option>
             <option value="suministros">Suministros</option>
             <option value="mantenimiento">Mantenimiento</option>
@@ -59,26 +59,27 @@
             <option value="otros">Otros</option>
           </select>
         </div>
-        <div>
-          <label style="font-size:.85rem;font-weight:500">Monto *</label>
-          <input type="number" name="monto" step="0.01" min="0" required
-            style="width:100%;padding:8px 12px;border:1px solid #D1D5DB;border-radius:8px;margin-top:4px;font-size:.9rem">
+        <div class="form-group">
+          <label class="form-label">Monto *</label>
+          <input type="number" name="monto" step="0.01" min="0" class="form-input" required>
         </div>
       </div>
-      <div style="margin-bottom:18px">
-        <label style="font-size:.85rem;font-weight:500">Fecha</label>
-        <input type="date" name="fecha" value="<?= date('Y-m-d') ?>"
-          style="width:100%;padding:8px 12px;border:1px solid #D1D5DB;border-radius:8px;margin-top:4px;font-size:.9rem">
+      <div class="form-group">
+        <label class="form-label">Fecha</label>
+        <input type="date" name="fecha" value="<?= date('Y-m-d') ?>" class="form-input">
       </div>
-      <div style="display:flex;gap:10px;justify-content:flex-end">
-        <button type="button" onclick="document.getElementById('modalGasto').style.display='none'"
-          style="padding:8px 16px;border:1px solid #D1D5DB;border-radius:8px;font-size:.875rem;cursor:pointer;background:#fff">Cancelar</button>
-        <button type="submit"
-          style="padding:8px 20px;background:var(--color-primary);color:#fff;border:none;border-radius:8px;font-size:.875rem;font-weight:500;cursor:pointer">Guardar</button>
+      <div class="rst-modal-footer">
+        <button type="button" onclick="document.getElementById('modalGasto').classList.remove('open')" class="btn btn-outline">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Guardar</button>
       </div>
     </form>
   </div>
 </div>
+<script>
+document.querySelectorAll('.rst-modal-backdrop').forEach(bd => {
+  bd.addEventListener('click', e => { if (e.target === bd) bd.classList.remove('open'); });
+});
+</script>
 <?php
 $content = ob_get_clean();
 require ROOT_PATH . '/app/views/restaurante/layouts/main.php';
