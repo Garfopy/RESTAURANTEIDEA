@@ -145,6 +145,74 @@ class RestReservaModel extends BaseModel
         return $ocupadas >= $totalMesas;
     }
 
+    /**
+     * Mesas activas del restaurante con capacidad >= $personas
+     * y sin conflicto (±2h) con otra reservación pendiente/confirmada
+     * en la fecha/hora indicada. Ordenadas por capacidad asc para
+     * sugerir la mesa más ajustada al grupo.
+     */
+    public function mesasDisponiblesParaCapacidad(
+        int $restauranteId,
+        string $fecha,
+        string $hora,
+        int $personas
+    ): array {
+        return $this->query(
+            "SELECT m.id, m.nombre, m.capacidad, z.nombre AS zona_nombre
+             FROM rest_mesas m
+             LEFT JOIN rest_zonas z ON z.id = m.zona_id
+             WHERE m.restaurante_id = ?
+               AND m.activo = 1
+               AND m.capacidad >= ?
+               AND NOT EXISTS (
+                 SELECT 1 FROM rest_reservaciones r
+                 WHERE r.mesa_id = m.id
+                   AND r.fecha   = ?
+                   AND r.estado IN ('pendiente','confirmada')
+                   AND ABS(TIME_TO_SEC(TIMEDIFF(r.hora, ?))) < 7200
+               )
+             ORDER BY m.capacidad ASC, m.nombre ASC",
+            [$restauranteId, $personas, $fecha, $hora]
+        );
+    }
+
+    /**
+     * Reservaciones confirmadas/pendientes para mañana cuyo recordatorio
+     * aún no ha sido enviado. Usado por el cron de recordatorios 24h.
+     */
+    public function getParaRecordatorio(): array
+    {
+        return $this->query(
+            "SELECT r.*, rest.nombre AS rest_nombre, rest.slug AS rest_slug,
+                    rest.telefono AS rest_telefono, rest.direccion AS rest_direccion,
+                    rest.color_primario, m.nombre AS mesa_nombre
+             FROM rest_reservaciones r
+             JOIN rest_restaurantes rest ON rest.id = r.restaurante_id
+             LEFT JOIN rest_mesas m      ON m.id   = r.mesa_id
+             WHERE r.fecha = DATE_ADD(CURDATE(), INTERVAL 1 DAY)
+               AND r.estado IN ('pendiente','confirmada')
+               AND r.recordatorio_enviado = 0
+               AND r.email IS NOT NULL AND r.email <> ''",
+            []
+        );
+    }
+
+    public function marcarConfirmacionEnviada(int $id): void
+    {
+        $this->execute(
+            "UPDATE rest_reservaciones SET confirmacion_enviada = 1 WHERE id = ?",
+            [$id]
+        );
+    }
+
+    public function marcarRecordatorioEnviado(int $id): void
+    {
+        $this->execute(
+            "UPDATE rest_reservaciones SET recordatorio_enviado = 1 WHERE id = ?",
+            [$id]
+        );
+    }
+
     public function asignar(int $id, ?int $mesaId, ?int $meseroId): void
     {
         $this->execute(

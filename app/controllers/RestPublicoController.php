@@ -906,64 +906,55 @@ class RestPublicoController extends BaseController
 
         $nombre   = trim($this->post('nombre', ''));
         $telefono = trim($this->post('telefono', ''));
+        $email    = trim($this->post('email', '')) ?: null;
         $fecha    = $this->post('fecha');
         $hora     = $this->post('hora');
         $personas = max(1, (int)$this->post('personas', 2));
         $notas    = $this->post('notas') ?: null;
+        $mesaId   = (int)$this->post('mesa_id', 0);
 
-        // Validación básica
-        if (!$nombre || !$telefono || !$fecha || !$hora) {
-            $this->flash('error', 'Por favor completa nombre, teléfono, fecha y hora.');
+        if (!$nombre || !$telefono || !$fecha || !$hora || !$mesaId) {
+            $this->flash('error', 'Por favor completa todos los campos y selecciona una mesa.');
             $this->redirect('menu/' . $slug . '/reservar');
             return;
         }
 
-        // Verificar que queden mesas disponibles esa fecha/hora
+        // Validar mesa: capacidad suficiente, pertenece al restaurante, sin conflicto
         $reservaModel = new RestReservaModel();
-        if ($reservaModel->estaLleno((int)$restaurante['id'], $fecha, $hora)) {
-            $this->flash('error', 'Lo sentimos, no hay disponibilidad para ese horario. Elige otra fecha u hora.');
+        $db = Database::getInstance();
+        $stmtMesa = $db->prepare(
+            "SELECT id, nombre, capacidad FROM rest_mesas
+             WHERE id = ? AND restaurante_id = ? AND activo = 1 LIMIT 1"
+        );
+        $stmtMesa->execute([$mesaId, (int)$restaurante['id']]);
+        $mesa = $stmtMesa->fetch(PDO::FETCH_ASSOC);
+
+        if (!$mesa) {
+            $this->flash('error', 'La mesa seleccionada no está disponible. Elige otra.');
+            $this->redirect('menu/' . $slug . '/reservar');
+            return;
+        }
+        if ((int)$mesa['capacidad'] < $personas) {
+            $this->flash('error', 'La mesa seleccionada no tiene capacidad para ' . $personas . ' personas.');
+            $this->redirect('menu/' . $slug . '/reservar');
+            return;
+        }
+        if ($reservaModel->hayConflicto($mesaId, $fecha, $hora)) {
+            $this->flash('error', 'Esa mesa ya está reservada en ese horario. Elige otra.');
             $this->redirect('menu/' . $slug . '/reservar');
             return;
         }
 
-        $reservaModel->insert([
-            'restaurante_id' => (int)$restaurante['id'],
-            'mesa_id'        => null,
-            'mesero_id'      => null,
-            'nombre'         => $nombre,
-            'telefono'       => $telefono,
-            'email'          => $this->post('email') ?: null,
-            'fecha'          => $fecha,
-            'hora'           => $hora,
-            'personas'       => $personas,
-            'notas'          => $notas,
-            'estado'         => 'pendiente',
-            'origen'         => 'comensal',
-        ]);
-
-        // Notificar al restaurante por email (silencioso si falla)
-        try {
-            $admin = $this->restModel->getAdminEmail((int)$restaurante['id']);
-            if ($admin && !empty($admin['email'])) {
-                (new EmailService())->enviarNuevaReserva(
-                    $admin['email'],
-                    $admin['nombre'],
-                    $restaurante,
-                    ['nombre' => $nombre, 'telefono' => $telefono, 'fecha' => $fecha,
-                     'hora' => $hora, 'personas' => $personas, 'notas' => $notas ?? '']
-                );
-            }
-        } catch (\Throwable $e) {
-            error_log('[Reserva] Error enviando email notificación: ' . $e->getMessage());
-        }
+        // Auto-asignar mesero según zona/turno
+        $meseroId = $reservaModel->meseroAsignadoPorMesa($mesaId, (int)$restaurante['id']);
 
         $newId = $reservaModel->insert([
             'restaurante_id' => (int)$restaurante['id'],
-            'mesa_id'        => null,
-            'mesero_id'      => null,
+            'mesa_id'        => $mesaId,
+            'mesero_id'      => $meseroId,
             'nombre'         => $nombre,
             'telefono'       => $telefono,
-            'email'          => $this->post('email') ?: null,
+            'email'          => $email,
             'fecha'          => $fecha,
             'hora'           => $hora,
             'personas'       => $personas,
@@ -972,7 +963,7 @@ class RestPublicoController extends BaseController
             'origen'         => 'comensal',
         ]);
 
-        // Notificar al restaurante por email (silencioso si falla)
+        // Notificar al restaurante (silencioso si falla)
         try {
             $admin = $this->restModel->getAdminEmail((int)$restaurante['id']);
             if ($admin && !empty($admin['email'])) {
@@ -985,10 +976,48 @@ class RestPublicoController extends BaseController
                 );
             }
         } catch (\Throwable $e) {
-            error_log('[Reserva] Error enviando email notificación: ' . $e->getMessage());
+            error_log('[Reserva] Error enviando email al restaurante: ' . $e->getMessage());
+        }
+
+        // Confirmación al comensal (si dio email)
+        if ($email && $newId) {
+            try {
+                $cancelUrl = BASE_URL . 'menu/' . $slug . '/cancelarReserva/' . $newId;
+                $ok = (new EmailService())->enviarConfirmacionReserva(
+                    $email,
+                    $restaurante,
+                    ['nombre' => $nombre, 'fecha' => $fecha, 'hora' => $hora,
+                     'personas' => $personas, 'mesa_nombre' => $mesa['nombre']],
+                    $cancelUrl
+                );
+                if ($ok) $reservaModel->marcarConfirmacionEnviada((int)$newId);
+            } catch (\Throwable $e) {
+                error_log('[Reserva] Error enviando confirmación: ' . $e->getMessage());
+            }
         }
 
         $this->redirect('menu/' . $slug . '/reservar?ok=1&ref=' . $newId);
+    }
+
+    // GET /menu/{slug}/mesasDisponibles?fecha=YYYY-MM-DD&hora=HH:MM&personas=N
+    public function mesasDisponibles(?string $param = null): void
+    {
+        $slug        = explode('/', $param ?? '')[0];
+        $restaurante = $this->restModel->getBySlug($slug);
+        if (!$restaurante) { $this->json(['ok' => false, 'mesas' => []], 404); return; }
+
+        $fecha    = (string)$this->get('fecha', '');
+        $hora     = (string)$this->get('hora', '');
+        $personas = max(1, (int)$this->get('personas', 2));
+
+        if (!$fecha || !$hora) { $this->json(['ok' => false, 'mesas' => []]); return; }
+        if (strlen($hora) === 5) $hora .= ':00';
+
+        $reservaModel = new RestReservaModel();
+        $mesas = $reservaModel->mesasDisponiblesParaCapacidad(
+            (int)$restaurante['id'], $fecha, $hora, $personas
+        );
+        $this->json(['ok' => true, 'mesas' => $mesas]);
     }
 
     // GET  /menu/{slug}/cancelarReserva/{id}

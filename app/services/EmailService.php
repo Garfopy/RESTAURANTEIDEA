@@ -366,6 +366,160 @@ class EmailService
     }
 
     /**
+     * Confirmación al comensal de que su reservación fue registrada.
+     * Incluye datos de la mesa asignada y link de cancelación.
+     */
+    public function enviarConfirmacionReserva(
+        string $destEmail,
+        array $restaurante,
+        array $reserva,
+        string $cancelUrl
+    ): bool {
+        if (!$this->configured || !$destEmail) return false;
+
+        $restNombre = htmlspecialchars($restaurante['nombre'] ?? '');
+        $color      = htmlspecialchars($restaurante['color_primario'] ?? '#C8102E');
+        $direccion  = htmlspecialchars($restaurante['direccion'] ?? '');
+        $telRest    = htmlspecialchars($restaurante['telefono'] ?? '');
+        $nombre     = htmlspecialchars($reserva['nombre'] ?? '');
+        $fecha      = $reserva['fecha'] ?? '';
+        $hora       = substr($reserva['hora'] ?? '', 0, 5);
+        $personas   = (int)($reserva['personas'] ?? 1);
+        $mesa       = htmlspecialchars($reserva['mesa_nombre'] ?? 'Por asignar');
+        $cancelUrl  = htmlspecialchars($cancelUrl);
+
+        try {
+            $mail = $this->nuevoMailer();
+            $mail->addAddress($destEmail, $nombre);
+            $mail->isHTML(true);
+            $mail->CharSet = 'UTF-8';
+            $mail->Subject = "✅ Reservación confirmada — $restNombre";
+
+            $mail->Body = '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#F3F4F6;font-family:Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#F3F4F6;padding:24px 0;">
+<tr><td align="center">
+<table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08);">
+  <tr><td style="background:' . $color . ';padding:28px 30px;">
+    <p style="margin:0;color:rgba(255,255,255,.8);font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;">' . $restNombre . '</p>
+    <h1 style="margin:6px 0 0;color:#fff;font-size:1.35rem;font-weight:700;">✅ Tu reservación está confirmada</h1>
+  </td></tr>
+  <tr><td style="padding:28px 30px;">
+    <p style="margin:0 0 18px;color:#374151;font-size:.95rem;">Hola <strong>' . $nombre . '</strong>, ¡te esperamos!</p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #E5E7EB;border-radius:8px;font-size:.88rem;border-collapse:collapse;">
+      <tr><td style="color:#6B7280;padding:10px 14px;width:38%">Fecha</td><td style="padding:10px 14px;font-weight:700">' . date('d/m/Y', strtotime($fecha)) . '</td></tr>
+      <tr style="background:#F9FAFB"><td style="color:#6B7280;padding:10px 14px">Hora</td><td style="padding:10px 14px;font-weight:700">' . $hora . '</td></tr>
+      <tr><td style="color:#6B7280;padding:10px 14px">Personas</td><td style="padding:10px 14px">' . $personas . '</td></tr>
+      <tr style="background:#F9FAFB"><td style="color:#6B7280;padding:10px 14px">Mesa</td><td style="padding:10px 14px;font-weight:700">' . $mesa . '</td></tr>
+      ' . ($direccion ? '<tr><td style="color:#6B7280;padding:10px 14px">Dirección</td><td style="padding:10px 14px">' . $direccion . '</td></tr>' : '') . '
+      ' . ($telRest   ? '<tr style="background:#F9FAFB"><td style="color:#6B7280;padding:10px 14px">Teléfono</td><td style="padding:10px 14px">' . $telRest . '</td></tr>' : '') . '
+    </table>
+    <p style="margin:24px 0 0;color:#6B7280;font-size:.82rem;text-align:center;">
+      ¿No podrás asistir? <a href="' . $cancelUrl . '" style="color:' . $color . ';font-weight:600">Cancela tu reservación aquí</a>
+    </p>
+  </td></tr>
+  <tr><td style="background:#F9FAFB;padding:16px 30px;text-align:center;border-top:1px solid #E5E7EB;">
+    <p style="margin:0;color:#9CA3AF;font-size:.72rem;">© ' . date('Y') . ' CarniHub</p>
+  </td></tr>
+</table>
+</td></tr></table>
+</body></html>';
+
+            $mail->AltBody = "Tu reservación en $restNombre está confirmada.\n"
+                . "Fecha: " . date('d/m/Y', strtotime($fecha)) . "  Hora: $hora\n"
+                . "Personas: $personas  Mesa: $mesa\n"
+                . ($direccion ? "Dirección: $direccion\n" : '')
+                . "\nCancelar: $cancelUrl";
+
+            $mail->send();
+            error_log("[EmailService] Confirmación reserva enviada a: $destEmail");
+            return true;
+        } catch (\Exception $e) {
+            error_log("[EmailService] Error enviarConfirmacionReserva a $destEmail: {$mail->ErrorInfo}");
+            return false;
+        }
+    }
+
+    /**
+     * Recordatorio 24h antes de la reservación. Disparado por cron.
+     */
+    public function enviarRecordatorioReserva(
+        string $destEmail,
+        array $restaurante,
+        array $reserva,
+        string $cancelUrl
+    ): bool {
+        if (!$this->configured || !$destEmail) return false;
+
+        $restNombre = htmlspecialchars($restaurante['nombre'] ?? '');
+        $color      = htmlspecialchars($restaurante['color_primario'] ?? '#C8102E');
+        $nombre     = htmlspecialchars($reserva['nombre'] ?? '');
+        $hora       = substr($reserva['hora'] ?? '', 0, 5);
+        $personas   = (int)($reserva['personas'] ?? 1);
+        $mesa       = htmlspecialchars($reserva['mesa_nombre'] ?? 'Por asignar');
+        $cancelUrl  = htmlspecialchars($cancelUrl);
+
+        try {
+            $mail = $this->nuevoMailer();
+            $mail->addAddress($destEmail, $nombre);
+            $mail->isHTML(true);
+            $mail->CharSet = 'UTF-8';
+            $mail->Subject = "⏰ Mañana te esperamos — $restNombre";
+
+            $mail->Body = '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#F3F4F6;font-family:Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#F3F4F6;padding:24px 0;"><tr><td align="center">
+<table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08);">
+  <tr><td style="background:' . $color . ';padding:28px 30px;">
+    <p style="margin:0;color:rgba(255,255,255,.8);font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;">' . $restNombre . '</p>
+    <h1 style="margin:6px 0 0;color:#fff;font-size:1.35rem;font-weight:700;">⏰ Recordatorio: mañana tienes reservación</h1>
+  </td></tr>
+  <tr><td style="padding:28px 30px;">
+    <p style="margin:0 0 18px;color:#374151;font-size:.95rem;">Hola <strong>' . $nombre . '</strong>, te recordamos tu reservación para mañana.</p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #E5E7EB;border-radius:8px;font-size:.88rem;border-collapse:collapse;">
+      <tr><td style="color:#6B7280;padding:10px 14px;width:38%">Hora</td><td style="padding:10px 14px;font-weight:700">' . $hora . '</td></tr>
+      <tr style="background:#F9FAFB"><td style="color:#6B7280;padding:10px 14px">Personas</td><td style="padding:10px 14px">' . $personas . '</td></tr>
+      <tr><td style="color:#6B7280;padding:10px 14px">Mesa</td><td style="padding:10px 14px;font-weight:700">' . $mesa . '</td></tr>
+    </table>
+    <p style="margin:24px 0 0;color:#6B7280;font-size:.82rem;text-align:center;">
+      ¿Imprevisto? <a href="' . $cancelUrl . '" style="color:' . $color . ';font-weight:600">Cancela tu reservación aquí</a>
+    </p>
+  </td></tr>
+</table>
+</td></tr></table></body></html>';
+
+            $mail->AltBody = "Recordatorio: mañana tienes reservación en $restNombre.\n"
+                . "Hora: $hora  Personas: $personas  Mesa: $mesa\n"
+                . "\nCancelar: $cancelUrl";
+
+            $mail->send();
+            error_log("[EmailService] Recordatorio reserva enviado a: $destEmail");
+            return true;
+        } catch (\Exception $e) {
+            error_log("[EmailService] Error enviarRecordatorioReserva a $destEmail: {$mail->ErrorInfo}");
+            return false;
+        }
+    }
+
+    /** Construye un PHPMailer SMTP con la configuración cacheada. */
+    private function nuevoMailer(): PHPMailer
+    {
+        $mail = new PHPMailer(true);
+        $mail->isSMTP();
+        $mail->Host        = $this->smtpHost;
+        $mail->SMTPAuth    = true;
+        $mail->Username    = $this->smtpUsername;
+        $mail->Password    = $this->smtpPassword;
+        $mail->Port        = (int)$this->smtpPort;
+        $mail->Timeout     = 10;
+        $mail->SMTPOptions = ['ssl' => ['verify_peer' => false, 'verify_peer_name' => false, 'allow_self_signed' => true]];
+        if ($this->smtpEncryption === 'tls')     $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+        elseif ($this->smtpEncryption === 'ssl') $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
+        $mail->setFrom($this->smtpFromEmail, $this->smtpFromName);
+        return $mail;
+    }
+
+    /**
      * Verifica si el servicio de email está configurado correctamente
      *
      * @return bool True si está configurado
