@@ -135,7 +135,7 @@ class RestPublicoController extends BaseController
             }
         }
 
-        // Comensal logueado (cookie no-httpOnly por simplicidad — el id se valida server-side al ordenar)
+        // Comensal logueado
         $comensal = null;
         $comensalCookie = $_COOKIE['comensal_' . $restaurante['id']] ?? null;
         if ($comensalCookie) {
@@ -149,15 +149,23 @@ class RestPublicoController extends BaseController
             }
         }
 
-        // Lógica del modo:
-        //   requiere_login_comensal = 0 → menú VISUAL (solo catálogo, no se ordena)
-        //   requiere_login_comensal = 1 → menú INTERACTIVO (login obligatorio para ordenar)
-        // Si el modo es interactivo y aún no hay comensal logueado, redirigir a /acceso.
-        if ($requiereLoginComensal && !$comensal) {
-            $this->redirect('acceso/' . $restaurante['slug']);
+        // ── Lógica de modo (ordenar o solo ver) ──────────────────────────────
+        // El menú público en URL directa (/menu/{slug}) es SIEMPRE visual (solo lectura).
+        // El ordering SOLO es posible cuando el cliente llegó vía QR de mesa (?mesa=…).
+        //
+        //   Sin ?mesa  → visual siempre (no se puede ordenar, independiente del toggle)
+        //   Con ?mesa  + toggle OFF → puede ordenar sin necesidad de login
+        //   Con ?mesa  + toggle ON  → debe identificarse (email) antes de poder ordenar
+        $tieneMesa = ($mesa !== null);
+
+        if ($tieneMesa && $requiereLoginComensal && !$comensal) {
+            // Preservar el QR en la URL de retorno para volver al modo interactivo tras login
+            $returnUrl = 'menu/' . $restaurante['slug'] . '?mesa=' . urlencode($mesaQr ?? '');
+            $this->redirect('acceso/' . $restaurante['slug'] . '?return=' . urlencode($returnUrl));
             return;
         }
-        $puedeOrdenar = (bool)$requiereLoginComensal && (bool)$comensal;
+
+        $puedeOrdenar = $tieneMesa && (!$requiereLoginComensal || (bool)$comensal);
 
         $pageTitle = $restaurante['nombre'];
         $this->render('publico/menu/index', compact('restaurante','categorias','platillos','recetaIngredientes','mesa','visitaId','meseroAtiende','pageTitle','requiereLoginComensal','comensal','puedeOrdenar'));
@@ -172,21 +180,22 @@ class RestPublicoController extends BaseController
 
         $restauranteId = (int)$restaurante['id'];
 
-        // Si el restaurante está en modo VISUAL (toggle OFF) no se permite ordenar.
-        $requiereLoginComensal = (int)($restaurante['requiere_login_comensal'] ?? 0);
-        if (!$requiereLoginComensal) {
-            $this->flash('error', 'Este menú es solo informativo. Pide al staff que active los pedidos en línea.');
-            $this->redirect('menu/' . $restaurante['slug']);
-            return;
-        }
-        // En modo INTERACTIVO se exige login del comensal antes de ordenar.
-        if (empty($_COOKIE['comensal_' . $restauranteId])) {
-            $this->redirect('acceso/' . $restaurante['slug']);
+        $mesaQr        = $this->post('mesa_qr');
+        $mesa          = $mesaQr ? (new RestMesaModel())->getByQr($mesaQr) : null;
+
+        // Sin mesa → menú visual, no acepta pedidos
+        if (!$mesa) {
+            $this->redirect('menu/' . $slug);
             return;
         }
 
-        $mesaQr        = $this->post('mesa_qr');
-        $mesa          = $mesaQr ? (new RestMesaModel())->getByQr($mesaQr) : null;
+        $requiereLoginComensal = (int)($restaurante['requiere_login_comensal'] ?? 0);
+        // Con mesa + toggle ON → comensal debe estar identificado
+        if ($requiereLoginComensal && empty($_COOKIE['comensal_' . $restauranteId])) {
+            $returnUrl = 'menu/' . $restaurante['slug'] . '?mesa=' . urlencode($mesaQr);
+            $this->redirect('acceso/' . $restaurante['slug'] . '?return=' . urlencode($returnUrl));
+            return;
+        }
         $visitaId      = $this->post('visita_id') ?: null;
 
         // Validar que la visita pertenezca a este restaurante

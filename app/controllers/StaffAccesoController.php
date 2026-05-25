@@ -14,14 +14,12 @@ class StaffAccesoController extends BaseController
     // GET /acceso/{slug}
     public function index(?string $slug = null): void
     {
-        // Siempre mostrar la pantalla de login. Con cookies de sesión por rol
-        // ya no tiene sentido detectar "ya logueado" aquí: cada rol vive en su
-        // propia cookie y esta pantalla usa la cookie _login (transitoria).
         $restaurante = $slug ? $this->restModel->getBySlug($slug) : null;
         $flash       = $this->getFlash();
-        $pageTitle   = 'Acceso Staff — ' . ($restaurante['nombre'] ?? 'CarniHub');
+        $pageTitle   = 'Acceso — ' . ($restaurante['nombre'] ?? 'CarniHub');
         $yaLogueado  = null;
-        $this->render('staff/login', compact('restaurante', 'flash', 'pageTitle', 'slug', 'yaLogueado'));
+        $returnParam = trim($this->get('return', ''));
+        $this->render('staff/login', compact('restaurante', 'flash', 'pageTitle', 'slug', 'yaLogueado', 'returnParam'));
     }
 
     // POST /acceso/{slug}
@@ -53,6 +51,13 @@ class StaffAccesoController extends BaseController
             json_encode(['id' => $comensalId, 'nombre' => $nombre, 'email' => $email]),
             time() + 30 * 24 * 3600, '/'
         );
+
+        // Si venía con ?return= (ej. desde QR de mesa), redirigir allí
+        $return = trim($this->get('return', ''));
+        if ($return && preg_match('#^menu/[a-zA-Z0-9_-]+(\?mesa=[a-zA-Z0-9]+)?$#', $return)) {
+            $this->redirect($return);
+            return;
+        }
 
         $this->redirect('menu/' . $slug);
     }

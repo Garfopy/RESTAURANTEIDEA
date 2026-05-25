@@ -234,12 +234,12 @@
   </div>
   <?php endif; ?>
 
-  <?php if (!$puedeOrdenar): ?>
+  <?php if (!$mesa): ?>
   <div style="margin-top:12px;display:inline-flex;align-items:center;gap:8px;
               background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.25);
               backdrop-filter:blur(8px);border-radius:999px;padding:7px 16px;
               font-size:.82rem;color:#fff;font-weight:600">
-    👁 Menú informativo — los pedidos se toman directamente con el staff
+    👁 Menú informativo — escanea el QR de tu mesa para ordenar
   </div>
   <?php endif; ?>
 

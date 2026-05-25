@@ -24,6 +24,7 @@
 <?php
   $requiereComensal = (int)($restaurante['requiere_login_comensal'] ?? 0);
   $modo = ($_GET['modo'] ?? '') === 'staff' ? 'staff' : ($requiereComensal ? 'cliente' : 'staff');
+  $returnParam = $returnParam ?? '';
 ?>
 <div class="staff-login-wrap">
   <div class="staff-login-card">
@@ -76,7 +77,7 @@
     <p style="font-size:.82rem;color:#6B7280;margin-bottom:18px;line-height:1.5">
       Identifícate para ordenar. Usamos tu correo para guardar tu historial y reconocerte la próxima vez.
     </p>
-    <form method="POST" action="<?= BASE_URL ?>acceso/<?= htmlspecialchars($slug ?? '') ?>/entrarComensal" autocomplete="on">
+    <form method="POST" action="<?= BASE_URL ?>acceso/<?= htmlspecialchars($slug ?? '') ?>/entrarComensal<?= $returnParam ? '?return=' . urlencode($returnParam) : '' ?>" autocomplete="on">
       <div class="form-group">
         <label class="form-label">Tu nombre *</label>
         <input type="text" name="nombre" class="form-input" placeholder="Ej: María López"
@@ -96,9 +97,6 @@
     <div style="margin-top:14px;padding:10px 12px;background:#F9FAFB;border-radius:8px;font-size:.75rem;color:#9CA3AF;line-height:1.4">
       No usamos contraseña. Tu correo y nombre solo se guardan en este restaurante para tu historial de pedidos.
     </div>
-    <a class="access-switch" href="<?= BASE_URL ?>acceso/<?= htmlspecialchars($slug ?? '') ?>?modo=staff">
-      🔑 ¿Eres <strong>staff</strong> del restaurante? Entra aquí
-    </a>
 
     <?php else: ?>
     <!-- ============== FORMULARIO STAFF ============== -->
