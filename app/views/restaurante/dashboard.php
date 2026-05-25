@@ -1,34 +1,4 @@
 <?php ob_start(); ?>
-<!-- Links rápidos del restaurante -->
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
-  <!-- Staff login -->
-  <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:12px;padding:16px 18px">
-    <div style="font-weight:700;color:#065F46;font-size:.88rem;margin-bottom:6px">🔑 Portal del equipo</div>
-    <div style="font-family:monospace;font-size:.78rem;color:#374151;word-break:break-all;margin-bottom:10px">
-      <?= htmlspecialchars($linkStaff ?? '') ?>
-    </div>
-    <div style="display:flex;gap:8px">
-      <button onclick="navegarCopiar('<?= htmlspecialchars(addslashes($linkStaff ?? ''), ENT_QUOTES) ?>',this)"
-              class="btn btn-sm btn-outline" style="border-color:#10B981;color:#10B981;font-size:.75rem">Copiar</button>
-      <a href="<?= htmlspecialchars($linkStaff ?? '') ?>" target="_blank"
-         class="btn btn-sm" style="background:#10B981;color:#fff;font-size:.75rem">Abrir ↗</a>
-    </div>
-  </div>
-  <!-- Menú público -->
-  <div style="background:#FFF7ED;border:1px solid #FED7AA;border-radius:12px;padding:16px 18px">
-    <div style="font-weight:700;color:#92400E;font-size:.88rem;margin-bottom:6px">📱 Menú público (clientes)</div>
-    <div style="font-family:monospace;font-size:.78rem;color:#374151;word-break:break-all;margin-bottom:10px">
-      <?= htmlspecialchars($linkMenu ?? '') ?>
-    </div>
-    <div style="display:flex;gap:8px">
-      <button onclick="navegarCopiar('<?= htmlspecialchars(addslashes($linkMenu ?? ''), ENT_QUOTES) ?>',this)"
-              class="btn btn-sm btn-outline" style="border-color:#F59E0B;color:#F59E0B;font-size:.75rem">Copiar</button>
-      <a href="<?= htmlspecialchars($linkMenu ?? '') ?>" target="_blank"
-         class="btn btn-sm" style="background:#F59E0B;color:#fff;font-size:.75rem">Ver menú ↗</a>
-    </div>
-  </div>
-</div>
-
 <?php
 // Onboarding banner — checklist primera vez
 $pasos = [

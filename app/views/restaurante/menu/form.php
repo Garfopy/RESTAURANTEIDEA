@@ -64,7 +64,8 @@
                      onchange="previewImg(this)"
                      style="font-size:.85rem;width:100%;padding:8px;border:1px dashed #D1D5DB;border-radius:8px;background:#fff;cursor:pointer">
               <div style="font-size:.74rem;color:#6B7280;margin-top:6px;line-height:1.4">
-                La foto reemplaza al emoji 🍽 en la tarjeta del menú y se ve en grande al abrir el detalle.
+                La foto reemplaza al emoji 🍽 en la tarjeta del menú y se ve en grande al abrir el detalle.<br>
+                <strong>Recomendado:</strong> imagen cuadrada de <strong>800×800 px</strong> (1:1). Las imágenes muy rectangulares se recortarán para entrar al espacio.
               </div>
               <?php if (!empty($platillo['imagen'])): ?>
               <label style="display:inline-flex;align-items:center;gap:5px;margin-top:8px;font-size:.78rem;color:#DC2626;cursor:pointer">

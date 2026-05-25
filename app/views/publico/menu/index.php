@@ -89,9 +89,9 @@
     .mn-card-price { font-size:.9rem; font-weight:800; color:var(--text-main); margin-top:6px; }
 
     /* Lado derecho: imagen + botón + */
-    .mn-card-thumb { position:relative; flex-shrink:0; width:90px; height:90px; border-radius:12px; overflow:hidden; background:linear-gradient(135deg,color-mix(in srgb, var(--cp) 8%, white),color-mix(in srgb, var(--cp) 18%, white)); align-self:center; }
+    .mn-card-thumb { position:relative; flex-shrink:0; width:140px; height:140px; border-radius:12px; overflow:hidden; background:linear-gradient(135deg,color-mix(in srgb, var(--cp) 8%, white),color-mix(in srgb, var(--cp) 18%, white)); align-self:center; }
     .mn-card-thumb img { width:100%; height:100%; object-fit:cover; }
-    .mn-card-emoji { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:2.2rem; }
+    .mn-card-emoji { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:3rem; }
     .mn-add-circle {
       position:absolute; bottom:-1px; right:-1px;
       width:30px; height:30px; border-radius:50%;
@@ -132,8 +132,8 @@
     .mn-drag { width:40px; height:4px; background:rgba(0,0,0,.12); border-radius:99px; margin:10px auto 0; }
 
     /* Imagen del sheet */
-    .mn-sheet-img { width:100%; height:180px; object-fit:cover; display:block; }
-    .mn-sheet-img-placeholder { width:100%; height:140px; display:flex; align-items:center; justify-content:center; font-size:3.5rem; background:linear-gradient(135deg,#F5F3EE 0%,#EDE8DC 100%); }
+    .mn-sheet-img { width:100%; height:300px; object-fit:cover; display:block; }
+    .mn-sheet-img-placeholder { width:100%; height:240px; display:flex; align-items:center; justify-content:center; font-size:4.5rem; background:linear-gradient(135deg,#F5F3EE 0%,#EDE8DC 100%); }
 
     .mn-sheet-hdr { padding:16px 20px 4px; position:relative; }
     .mn-sheet-close { position:absolute; top:12px; right:16px; background:rgba(0,0,0,.07); border:none; width:30px; height:30px; border-radius:50%; color:var(--text-main); font-size:1rem; line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background .15s; }
@@ -565,23 +565,13 @@ function abrirModal(id) {
 
 function guarRow(ing) {
   const pid = ing.ingrediente_id;
-  const px  = parseFloat(ing.precio_extra ?? 0);
-  const extraHtml = px > 0 ? `
-    <button class="mn-extra-btn" type="button"
-            onclick="toggleExtra(event,${pid},'${esc(ing.ingrediente_nombre)}',${px})">
-      +Extra $${px % 1===0 ? px.toFixed(0) : px.toFixed(2)}
-    </button>
-    <div class="mn-xcnt" id="xc_${pid}">
-      <button type="button" onclick="cambiarExtra(event,${pid},-1)">−</button>
-      <span id="xv_${pid}">1</span>
-      <button type="button" onclick="cambiarExtra(event,${pid},1)">+</button>
-    </div>` : '';
   return `<div class="mn-guar-row" id="gr_${pid}">
     <div class="mn-guar-tog" onclick="toggleExcl(${pid},'${esc(ing.ingrediente_nombre)}')">
       <div class="mn-tog-icon incl" id="gi_${pid}">✓</div>
       <span>${esc(ing.ingrediente_nombre)}</span>
       <span style="font-size:.7rem;color:var(--text-muted);margin-left:auto;padding-left:6px">${ing.cantidad} ${ing.unidad}</span>
-    </div>${extraHtml}</div>`;
+    </div>
+  </div>`;
 }
 
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }

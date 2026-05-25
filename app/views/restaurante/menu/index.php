@@ -16,8 +16,8 @@
 }
 .menu-card:hover { box-shadow:0 4px 16px rgba(0,0,0,.08);border-color:#D1D5DB; }
 .menu-card-img {
-  height:90px;background:#F9FAFB;display:flex;align-items:center;justify-content:center;
-  font-size:2rem;overflow:hidden;border-top-left-radius:12px;border-top-right-radius:12px;
+  height:170px;background:#F9FAFB;display:flex;align-items:center;justify-content:center;
+  font-size:2.4rem;overflow:hidden;border-top-left-radius:12px;border-top-right-radius:12px;
 }
 .menu-card-img img { width:100%;height:100%;object-fit:cover; }
 .menu-card-body { padding:12px; }
@@ -51,29 +51,6 @@
 <?php
 $restauranteId = $_SESSION['restaurante_activo_id'] ?? 0;
 ?>
-
-<?php if (!empty($sucursales) && count($sucursales) > 1): ?>
-<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap">
-  <span style="font-size:.78rem;color:#6B7280;font-weight:600">Sucursal:</span>
-  <?php foreach ($sucursales as $s): ?>
-  <?php $activo = ((int)$s['id'] === (int)$restauranteId); ?>
-  <?php if ($activo): ?>
-  <span style="padding:5px 14px;border-radius:99px;font-size:.82rem;font-weight:700;
-               background:var(--cp);color:#fff;border:2px solid var(--cp)">
-    <?= htmlspecialchars($s['nombre']) ?>
-  </span>
-  <?php else: ?>
-  <a href="<?= BASE_URL ?>restaurante/activar/<?= (int)$s['id'] ?>?redirect=rest-menu/index"
-     style="padding:5px 14px;border-radius:99px;font-size:.82rem;font-weight:600;
-            background:#fff;color:#374151;border:2px solid #E5E7EB;text-decoration:none;transition:.15s"
-     onmouseover="this.style.borderColor='var(--cp)';this.style.color='var(--cp)'"
-     onmouseout="this.style.borderColor='#E5E7EB';this.style.color='#374151'">
-    <?= htmlspecialchars($s['nombre']) ?>
-  </a>
-  <?php endif; ?>
-  <?php endforeach; ?>
-</div>
-<?php endif; ?>
 
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
   <div style="display:flex;gap:10px">
