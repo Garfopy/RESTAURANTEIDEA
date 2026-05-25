@@ -234,6 +234,15 @@
   </div>
   <?php endif; ?>
 
+  <?php if (!$puedeOrdenar): ?>
+  <div style="margin-top:12px;display:inline-flex;align-items:center;gap:8px;
+              background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.25);
+              backdrop-filter:blur(8px);border-radius:999px;padding:7px 16px;
+              font-size:.82rem;color:#fff;font-weight:600">
+    👁 Menú informativo — los pedidos se toman directamente con el staff
+  </div>
+  <?php endif; ?>
+
   <?php if ($mesa): ?>
   <div style="display:flex;flex-direction:column;align-items:center;gap:8px;width:100%;margin-top:14px">
     <div style="display:inline-flex;align-items:center;gap:6px;
@@ -402,7 +411,9 @@ $catNombres = array_column($categorias, 'nombre', 'id');
       <?php else: ?>
       <div class="mn-card-emoji"><?= $icon ?></div>
       <?php endif; ?>
+      <?php if ($puedeOrdenar): ?>
       <button type="button" class="mn-add-circle" onclick="abrirModal(<?= $pId ?>);event.stopPropagation()">+</button>
+      <?php endif; ?>
     </div>
   </div>
   <?php endforeach; ?>
@@ -412,6 +423,7 @@ $catNombres = array_column($categorias, 'nombre', 'id');
 <?php endif; ?>
 
 <!-- Carrito flotante -->
+<?php if ($puedeOrdenar): ?>
 <div class="pub-cart-bar" id="carritoBar">
   <div>
     <div class="pub-cart-info-label" id="carritoItems">0 items</div>
@@ -429,6 +441,7 @@ $catNombres = array_column($categorias, 'nombre', 'id');
     <button onclick="submitPedido()" class="pub-cart-btn">Ordenar →</button>
   </div>
 </div>
+<?php endif; ?>
 
 <div class="mn-footer">Potenciado por <strong>CarniHub</strong></div>
 
@@ -460,7 +473,13 @@ $catNombres = array_column($categorias, 'nombre', 'id');
         <span id="sheetQty">1</span>
         <button type="button" onclick="cambiarQty(1)">+</button>
       </div>
+      <?php if ($puedeOrdenar): ?>
       <button type="button" class="mn-add-btn" id="addBtn" onclick="confirmarModal()">Agregar · $0</button>
+      <?php else: ?>
+      <button type="button" class="mn-add-btn" disabled
+              style="opacity:.55;cursor:not-allowed"
+              title="Este menú es solo informativo">Solo vista</button>
+      <?php endif; ?>
     </div>
   </div>
 </div>

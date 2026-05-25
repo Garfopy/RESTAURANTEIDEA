@@ -149,8 +149,18 @@ class RestPublicoController extends BaseController
             }
         }
 
+        // Lógica del modo:
+        //   requiere_login_comensal = 0 → menú VISUAL (solo catálogo, no se ordena)
+        //   requiere_login_comensal = 1 → menú INTERACTIVO (login obligatorio para ordenar)
+        // Si el modo es interactivo y aún no hay comensal logueado, redirigir a /acceso.
+        if ($requiereLoginComensal && !$comensal) {
+            $this->redirect('acceso/' . $restaurante['slug']);
+            return;
+        }
+        $puedeOrdenar = (bool)$requiereLoginComensal && (bool)$comensal;
+
         $pageTitle = $restaurante['nombre'];
-        $this->render('publico/menu/index', compact('restaurante','categorias','platillos','recetaIngredientes','mesa','visitaId','meseroAtiende','pageTitle','requiereLoginComensal','comensal'));
+        $this->render('publico/menu/index', compact('restaurante','categorias','platillos','recetaIngredientes','mesa','visitaId','meseroAtiende','pageTitle','requiereLoginComensal','comensal','puedeOrdenar'));
     }
 
     public function ordenar(?string $slug = null): void
@@ -162,9 +172,15 @@ class RestPublicoController extends BaseController
 
         $restauranteId = (int)$restaurante['id'];
 
-        // Si el restaurante exige login del comensal y no hay cookie, mandar a /acceso
+        // Si el restaurante está en modo VISUAL (toggle OFF) no se permite ordenar.
         $requiereLoginComensal = (int)($restaurante['requiere_login_comensal'] ?? 0);
-        if ($requiereLoginComensal && empty($_COOKIE['comensal_' . $restauranteId])) {
+        if (!$requiereLoginComensal) {
+            $this->flash('error', 'Este menú es solo informativo. Pide al staff que active los pedidos en línea.');
+            $this->redirect('menu/' . $restaurante['slug']);
+            return;
+        }
+        // En modo INTERACTIVO se exige login del comensal antes de ordenar.
+        if (empty($_COOKIE['comensal_' . $restauranteId])) {
             $this->redirect('acceso/' . $restaurante['slug']);
             return;
         }
