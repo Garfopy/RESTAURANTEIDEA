@@ -402,14 +402,13 @@ function buildListoCard(p) {
     </div>`;
   }
 
-  // Disponible — primero Reclamar, luego Entregar
+  // Disponible — entregar directo
   return `<div class="listo-card" id="listo-${p.id}">
     <div style="flex:1">
       <div style="font-weight:700;font-size:.9rem;color:#111827">${p.folio} · Mesa ${p.mesa_nombre || '—'}</div>
       ${itemsText ? `<div style="font-size:.78rem;color:#6B7280;margin-top:3px">${itemsText}</div>` : ''}
     </div>
     <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end">
-      <button class="btn-sm" style="background:#3B82F6;color:#fff" onclick="reclamar(${p.id},this)">Reclamar ▶</button>
       <button class="btn-sm btn-entregar" onclick="marcarEntregado(${p.id},this)">Entregado ✓</button>
     </div>
   </div>`;
@@ -468,22 +467,6 @@ function pollListos() {
       _actualizarBtnTomar(sinReclamar);
     })
     .catch(() => {});
-}
-
-function reclamar(pedidoId, btn) {
-  btn.disabled = true; btn.textContent = '...';
-  fetch(`${BASE}rest-mesero/reclamar/${pedidoId}`, { method: 'POST' })
-    .then(r => r.json())
-    .then(d => {
-      if (d.ok) {
-        toast('✅ Pedido reclamado — ve a entregarlo');
-        pollListos();
-      } else {
-        btn.disabled = false; btn.textContent = 'Reclamar ▶';
-        toast('⚠️ ' + (d.msg || 'No se pudo reclamar'));
-      }
-    })
-    .catch(() => { btn.disabled = false; btn.textContent = 'Reclamar ▶'; });
 }
 
 function marcarEntregado(pedidoId, btn) {

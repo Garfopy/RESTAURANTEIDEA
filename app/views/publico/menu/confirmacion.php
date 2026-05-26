@@ -149,7 +149,7 @@ $qrImgUrl  = $visitaQr
         </div>
         <div style="display:flex;align-items:center;gap:6px">
           <span class="badge badge-<?= htmlspecialchars($it['estado']) ?>" id="item-badge-<?= (int)$it['id'] ?>"><?= htmlspecialchars($it['estado']) ?></span>
-          <?php if ($it['estado'] === 'pendiente'): ?>
+          <?php if ($it['estado'] === 'pendiente' && $p['estado'] !== 'cancelado'): ?>
           <button class="btn-cancel" id="cancel-<?= (int)$it['id'] ?>" onclick="cancelarPedido(<?= (int)$p['id'] ?>)">Cancelar</button>
           <?php endif; ?>
         </div>
@@ -179,16 +179,17 @@ $qrImgUrl  = $visitaQr
     <div style="font-size:.82rem;font-weight:700;color:#166534;margin-bottom:12px">
       Muestra este QR al salir, por favor
     </div>
-    <img src="<?= $qrImgUrl ?>" alt="QR de salida"
+    <img src="<?= $qrImgUrl ?>" alt="QR de salida" id="qr-portero-img"
          style="width:200px;height:200px;display:block;margin:0 auto 12px;border-radius:8px">
+    <div style="margin:0 auto 10px;font-family:monospace;font-size:1rem;font-weight:700;letter-spacing:.1em;color:#111827;background:#fff;border:1px dashed #86EFAC;border-radius:8px;padding:8px 14px;display:inline-block"><?= htmlspecialchars(strtoupper(substr($visitaQr ?? '', 0, 8))) ?></div>
     <div style="font-size:.72rem;color:#9CA3AF;margin-bottom:12px">
-      El portero o mesero verificará tu pago al escanearlo
+      Si el QR no funciona, muestra este código al portero
     </div>
-    <a href="<?= $qrImgUrl ?>" target="_blank" rel="noopener"
+    <button type="button" onclick="descargarQR()"
        style="display:inline-block;padding:8px 18px;background:#DCFCE7;color:#166534;
-              border-radius:8px;font-size:.78rem;font-weight:700;text-decoration:none">
+              border:none;border-radius:8px;font-size:.78rem;font-weight:700;cursor:pointer">
       ⬇️ Guardar QR
-    </a>
+    </button>
   </div>
   <?php endif; ?>
 
@@ -353,18 +354,44 @@ function actualizarBtnPagar(ticketEstado, qrCode) {
     }
     // Inyectar QR dinámicamente si no existe aún
     if (qrCode && !document.getElementById('qr-portero-section')) {
-      const scanUrl = `${BASE_URL}menu/scanPortero?qr=${encodeURIComponent(qrCode)}`;
-      const qrUrl   = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(scanUrl)}`;
+      const qrUrl   = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(qrCode)}`;
+      const shortCode = qrCode.substring(0, 8).toUpperCase();
       const qrDiv = document.createElement('div');
       qrDiv.id = 'qr-portero-section';
       qrDiv.style.cssText = 'text-align:center;background:#F0FDF4;border:1.5px solid #86EFAC;border-radius:14px;padding:20px;margin-bottom:10px';
       qrDiv.innerHTML = `<div style="font-size:1.5rem;margin-bottom:6px">📱</div>
         <div style="font-size:.82rem;font-weight:700;color:#166534;margin-bottom:12px">Muestra este QR al salir, por favor</div>
-        <img src="${qrUrl}" style="width:200px;height:200px;display:block;margin:0 auto 12px;border-radius:8px" alt="QR de salida">
-        <div style="font-size:.72rem;color:#9CA3AF;margin-bottom:12px">El portero o mesero verificará tu pago al escanearlo</div>
-        <a href="${qrUrl}" target="_blank" rel="noopener" style="display:inline-block;padding:8px 18px;background:#DCFCE7;color:#166534;border-radius:8px;font-size:.78rem;font-weight:700;text-decoration:none">⬇️ Guardar QR</a>`;
+        <img src="${qrUrl}" id="qr-portero-img" style="width:200px;height:200px;display:block;margin:0 auto 12px;border-radius:8px" alt="QR de salida">
+        <div style="margin:0 auto 10px;font-family:monospace;font-size:1rem;font-weight:700;letter-spacing:.1em;color:#111827;background:#fff;border:1px dashed #86EFAC;border-radius:8px;padding:8px 14px;display:inline-block">${shortCode}</div>
+        <div style="font-size:.72rem;color:#9CA3AF;margin-bottom:12px">Si el QR no funciona, muestra este código al portero</div>
+        <button type="button" onclick="descargarQR()" style="display:inline-block;padding:8px 18px;background:#DCFCE7;color:#166534;border:none;border-radius:8px;font-size:.78rem;font-weight:700;cursor:pointer">⬇️ Guardar QR</button>`;
       wrap.after(qrDiv);
     }
+  }
+}
+
+// ── Descargar QR como imagen ───────────────────────
+async function descargarQR() {
+  const img = document.getElementById('qr-portero-img');
+  if (!img) return;
+  try {
+    const resp = await fetch(img.src, { mode: 'cors' });
+    const blob = await resp.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url;
+    a.download = 'qr-salida.png';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (e) {
+    const a = document.createElement('a');
+    a.href = img.src;
+    a.download = 'qr-salida.png';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
   }
 }
 
@@ -450,8 +477,9 @@ if (cuentaPagada) clearInterval(pollTimer);
 // ── Cancelar pedido ────────────────────────────────
 function cancelarPedido(pedidoId) {
   if (!confirm('¿Cancelar este pedido?')) return;
-  const btn = document.getElementById('cancel-' + pedidoId);
-  if (btn) btn.disabled = true;
+  const pedidoEl = document.getElementById('pedido-' + pedidoId);
+  const cancelBtns = pedidoEl ? pedidoEl.querySelectorAll('.btn-cancel') : [];
+  cancelBtns.forEach(b => b.disabled = true);
 
   fetch(`<?= BASE_URL ?>menu/${SLUG}/cancelarPedido/${pedidoId}`, { method: 'POST' })
     .then(r => r.json())
@@ -459,13 +487,22 @@ function cancelarPedido(pedidoId) {
       if (d.ok) {
         const badge = document.getElementById('badge-' + pedidoId);
         if (badge) { badge.className = 'badge badge-cancelado'; badge.textContent = 'cancelado'; }
-        if (btn) btn.remove();
+        // Actualizar todos los items del pedido a cancelado y quitar botones
+        if (pedidoEl) {
+          pedidoEl.querySelectorAll('[id^="item-badge-"]').forEach(ib => {
+            if (ib.textContent === 'pendiente') {
+              ib.className = 'badge badge-cancelado';
+              ib.textContent = 'cancelado';
+            }
+          });
+          cancelBtns.forEach(b => b.remove());
+        }
       } else {
         alert(d.msg ?? 'No se pudo cancelar');
-        if (btn) btn.disabled = false;
+        cancelBtns.forEach(b => b.disabled = false);
       }
     })
-    .catch(() => { if (btn) btn.disabled = false; });
+    .catch(() => { cancelBtns.forEach(b => b.disabled = false); });
 }
 
 // ── Generar ticket vía AJAX ────────────────────────────

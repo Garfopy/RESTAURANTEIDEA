@@ -130,6 +130,14 @@ class RestPedidoModel extends BaseModel
         );
     }
 
+    public function cancelarItemsPendientes(int $pedidoId): void
+    {
+        $this->execute(
+            "UPDATE rest_pedido_items SET estado = 'cancelado' WHERE pedido_id = ? AND estado = 'pendiente'",
+            [$pedidoId]
+        );
+    }
+
     public function cambiarEstadoPedido(int $pedidoId, string $estado): bool
     {
         // Capturar estado actual + restaurante_id para detectar transición a 'entregado'.

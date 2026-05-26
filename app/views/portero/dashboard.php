@@ -148,17 +148,6 @@ async function registrarSalida() {
   }
 }
 
-document.getElementById('formEntrada').addEventListener('submit', async e => {
-  e.preventDefault();
-  const fd  = new FormData(e.target);
-  const res = await fetch(baseUrl + 'rest-portero/registrarEntrada', { method: 'POST', body: fd });
-  const data = await res.json();
-  const el  = document.getElementById('entradaResult');
-  el.textContent = data.ok ? '✅ Entrada registrada. QR: ' + (data.qr_code || '') : '❌ Error';
-  el.style.display = 'block';
-  e.target.reset();
-});
-
 // Cámara QR
 let scanning = false;
 let stream   = null;

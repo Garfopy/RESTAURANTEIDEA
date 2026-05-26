@@ -639,6 +639,7 @@ class RestPublicoController extends BaseController
         }
 
         $this->pedidoModel->cambiarEstadoPedido($pedidoId, 'cancelado');
+        $this->pedidoModel->cancelarItemsPendientes($pedidoId);
         $this->visitaModel->actualizarTotales((int)$pedido['visita_id']);
 
         echo json_encode(['ok' => true]);
