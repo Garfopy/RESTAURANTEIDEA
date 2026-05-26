@@ -23,8 +23,8 @@ class RestVisitaModel extends BaseModel
              JOIN rest_restaurantes r ON r.id = v.restaurante_id
              LEFT JOIN rest_mesas m ON m.id = v.mesa_id
              LEFT JOIN rest_comensales c ON c.id = v.comensal_id
-             WHERE v.qr_code = ?",
-            [$qrCode]
+             WHERE v.qr_code LIKE CONCAT(?, '%')",
+            [strtolower($qrCode)]
         );
     }
 

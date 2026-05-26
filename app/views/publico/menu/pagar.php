@@ -99,7 +99,8 @@
         🚪 Muestra este código al portero al salir
       </div>
       <div id="qr-salida" style="display:inline-block;padding:10px;background:#fff;border-radius:10px;border:1px solid #D1FAE5"></div>
-      <div style="font-size:.72rem;color:#6B7280;margin-top:8px">El portero escaneará tu código con su dispositivo</div>
+      <div style="margin-top:10px;font-family:monospace;font-size:.95rem;font-weight:700;letter-spacing:.08em;color:#111827;background:#F3F4F6;border-radius:8px;padding:8px 14px;display:inline-block"><?= htmlspecialchars(strtoupper(substr($visita['qr_code'], 0, 8))) ?></div>
+      <div style="font-size:.72rem;color:#6B7280;margin-top:6px">Si el QR no funciona, muestra este código al portero</div>
     </div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script>

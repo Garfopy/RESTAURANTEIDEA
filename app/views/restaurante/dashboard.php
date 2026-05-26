@@ -192,28 +192,6 @@ $totalPasos  = count($pasos);
   </div>
 </div>
 
-<!-- Acceso rápido propinas -->
-<div style="margin-top:20px;background:linear-gradient(135deg,#10B981 0%,#059669 100%);
-            border-radius:14px;padding:22px 24px;color:#fff;
-            display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;
-            box-shadow:0 6px 18px rgba(16,185,129,.25)">
-  <div style="display:flex;align-items:center;gap:14px">
-    <div style="width:48px;height:48px;border-radius:12px;background:rgba(255,255,255,.18);
-                display:flex;align-items:center;justify-content:center;font-size:1.6rem">💰</div>
-    <div>
-      <div style="font-weight:800;font-size:1.05rem">Propinas del día</div>
-      <div style="font-size:.85rem;color:rgba(255,255,255,.9);margin-top:2px">
-        Consulta y registra las propinas de cada mesero para entregar al final del turno.
-      </div>
-    </div>
-  </div>
-  <a href="<?= BASE_URL ?>rest-propinas/index"
-     style="padding:11px 22px;border-radius:10px;background:#fff;color:#059669;
-            font-weight:800;font-size:.9rem;text-decoration:none;white-space:nowrap;
-            box-shadow:0 2px 8px rgba(0,0,0,.12)">
-    Ver propinas →
-  </a>
-</div>
 <script>
 function navegarCopiar(url, btn) {
   navigator.clipboard.writeText(url).then(() => {

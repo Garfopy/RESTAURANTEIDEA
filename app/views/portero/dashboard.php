@@ -47,25 +47,6 @@
     </button>
   </div>
 
-  <!-- Registrar entrada -->
-  <div style="background:#1F2937;border-radius:16px;padding:24px">
-    <div style="font-weight:600;margin-bottom:14px">Registrar entrada</div>
-    <form id="formEntrada">
-      <div style="margin-bottom:10px">
-        <input type="text" name="nombre" placeholder="Nombre del comensal (opcional)"
-          style="width:100%;padding:10px 12px;border:1px solid #374151;border-radius:8px;background:#111827;color:#F9FAFB;font-size:.9rem">
-      </div>
-      <div style="margin-bottom:10px">
-        <input type="tel" name="telefono" placeholder="Teléfono (opcional)"
-          style="width:100%;padding:10px 12px;border:1px solid #374151;border-radius:8px;background:#111827;color:#F9FAFB;font-size:.9rem">
-      </div>
-      <button type="submit"
-        style="width:100%;padding:10px;background:#10B981;color:#fff;border:none;border-radius:8px;font-size:.9rem;font-weight:600;cursor:pointer">
-        Registrar entrada ▶
-      </button>
-    </form>
-    <div id="entradaResult" style="margin-top:10px;font-size:.875rem;color:#6EE7B7;display:none"></div>
-  </div>
 </div>
 
 <script src="<?= BASE_URL ?>public/js/jsQR.min.js"></script>
