@@ -102,7 +102,7 @@ class RestReservaModel extends BaseModel
         $sql  = "SELECT COUNT(*) FROM rest_reservaciones
                  WHERE mesa_id = ? AND fecha = ?
                    AND estado IN ('pendiente','confirmada')
-                   AND ABS(TIME_TO_SEC(TIMEDIFF(hora, ?))) < 7200";
+                   AND TIME_TO_SEC(TIMEDIFF(?, hora)) BETWEEN -7200 AND 9000";
         $params = [$mesaId, $fecha, $hora];
         if ($excludeId) {
             $sql    .= " AND id != ?";
