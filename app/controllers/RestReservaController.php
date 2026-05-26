@@ -21,7 +21,6 @@ class RestReservaController extends BaseController
         $fecha_hasta   = $this->get('fecha_hasta', '');
         $page          = (int)$this->get('page', 1);
         $resultado     = $this->model->getByRestaurante($restauranteId, $page, $estado ?: null, $fecha_desde ?: null, $fecha_hasta ?: null);
-        $proximas      = $this->model->getProximas($restauranteId);
 
         // Mesas activas para el select del modal
         $stmtM = $db->prepare(
@@ -35,7 +34,7 @@ class RestReservaController extends BaseController
         $pageTitle  = 'Reservaciones';
         $activeMenu = 'rest_reservas';
         $this->render('restaurante/reservas/index',
-            array_merge($resultado, compact('proximas','mesas','flash','pageTitle','activeMenu','estado','fecha_desde','fecha_hasta')));
+            array_merge($resultado, compact('mesas','flash','pageTitle','activeMenu','estado','fecha_desde','fecha_hasta')));
     }
 
     public function guardar(?string $p = null): void

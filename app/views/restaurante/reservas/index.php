@@ -98,21 +98,6 @@ function filtroRapido(periodo) {
 }
 </script>
 
-<!-- ── Banner próximas (7 días) ─────────────────────────── -->
-<?php if (!empty($proximas)): ?>
-<div style="background:#DBEAFE;border:1px solid #93C5FD;border-radius:12px;padding:16px;margin-bottom:16px;font-size:.875rem">
-  <div style="font-weight:600;color:#1E40AF;margin-bottom:8px">Próximas (7 días)</div>
-  <?php foreach ($proximas as $r): ?>
-  <div style="padding:4px 0;color:#1E3A8A">
-    <?= date('d/m H:i', strtotime($r['fecha'].' '.$r['hora'])) ?> —
-    <strong><?= htmlspecialchars($r['nombre']) ?></strong> (<?= $r['personas'] ?> personas)
-    <?= $r['mesa_nombre'] ? '· '.htmlspecialchars($r['mesa_nombre']) : '' ?>
-    <span style="font-size:.7rem;background:#FEF3C7;color:#92400E;padding:1px 6px;border-radius:99px;margin-left:4px">QR</span>
-  </div>
-  <?php endforeach; ?>
-</div>
-<?php endif; ?>
-
 <!-- ══ Solicitudes del comensal (vía QR) ════════════════════ -->
 <div>
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
