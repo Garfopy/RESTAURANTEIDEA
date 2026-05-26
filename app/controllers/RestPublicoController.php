@@ -992,7 +992,7 @@ class RestPublicoController extends BaseController
             'hora'           => $hora,
             'personas'       => $personas,
             'notas'          => $notas,
-            'estado'         => 'pendiente',
+            'estado'         => 'confirmada',
             'origen'         => 'comensal',
         ]);
 
