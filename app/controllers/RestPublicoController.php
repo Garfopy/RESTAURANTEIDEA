@@ -189,6 +189,22 @@ class RestPublicoController extends BaseController
             return;
         }
 
+        // Resolver mesero asignado a la zona de esta mesa hoy
+        $meseroId = null;
+        if (!empty($mesa['zona_id'])) {
+            try {
+                $stmtM = Database::getInstance()->prepare(
+                    "SELECT usuario_id FROM rest_mesero_turno
+                     WHERE restaurante_id = ? AND zona_id = ?
+                       AND turno_fecha = CURDATE() AND activo = 1
+                     LIMIT 1"
+                );
+                $stmtM->execute([$restauranteId, (int)$mesa['zona_id']]);
+                $rowM = $stmtM->fetch(PDO::FETCH_ASSOC);
+                $meseroId = $rowM ? (int)$rowM['usuario_id'] : null;
+            } catch (\Throwable $e) {}
+        }
+
         $requiereLoginComensal = (int)($restaurante['requiere_login_comensal'] ?? 0);
         // Con mesa + toggle ON → comensal debe estar identificado
         if ($requiereLoginComensal && empty($_COOKIE['comensal_' . $restauranteId])) {
@@ -299,7 +315,7 @@ class RestPublicoController extends BaseController
             'restaurante_id' => $restauranteId,
             'mesa_id'        => $mesa ? (int)$mesa['id'] : null,
             'visita_id'      => $visitaId,
-            'mesero_id'      => null,
+            'mesero_id'      => $meseroId,
         ], $items);
 
         // Stock se descuenta cuando la cocina marca el ítem como "en_preparacion"
