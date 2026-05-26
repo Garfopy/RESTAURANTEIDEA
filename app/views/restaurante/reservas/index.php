@@ -32,6 +32,72 @@ $_badge = function(string $estado): string {
   <?php endif; ?>
 </div>
 
+<!-- ── Filtro de fechas ─────────────────────────────────────── -->
+<form method="GET" action="<?= BASE_URL ?>rest-reserva/index" style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:12px;padding:16px;margin-bottom:16px">
+  <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:end">
+    <div style="flex:1;min-width:140px">
+      <label style="display:block;font-size:.75rem;font-weight:600;color:#6B7280;margin-bottom:4px">Desde</label>
+      <input type="date" name="fecha_desde" value="<?= htmlspecialchars($fecha_desde ?? '') ?>"
+        style="width:100%;padding:8px 10px;border:1px solid #D1D5DB;border-radius:6px;font-size:.875rem">
+    </div>
+    <div style="flex:1;min-width:140px">
+      <label style="display:block;font-size:.75rem;font-weight:600;color:#6B7280;margin-bottom:4px">Hasta</label>
+      <input type="date" name="fecha_hasta" value="<?= htmlspecialchars($fecha_hasta ?? '') ?>"
+        style="width:100%;padding:8px 10px;border:1px solid #D1D5DB;border-radius:6px;font-size:.875rem">
+    </div>
+    <button type="submit"
+      style="padding:8px 16px;background:#C8102E;color:#fff;border:none;border-radius:6px;font-size:.875rem;font-weight:600;cursor:pointer">
+      Filtrar
+    </button>
+    <?php if (!empty($fecha_desde) || !empty($fecha_hasta)): ?>
+    <a href="<?= BASE_URL ?>rest-reserva/index"
+      style="padding:8px 16px;background:#fff;color:#374151;border:1px solid #D1D5DB;border-radius:6px;font-size:.875rem;text-decoration:none">
+      Limpiar
+    </a>
+    <?php endif; ?>
+  </div>
+  <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+    <button type="button" onclick="filtroRapido('hoy')"
+      style="padding:6px 12px;background:#fff;color:#374151;border:1px solid #D1D5DB;border-radius:6px;font-size:.75rem;font-weight:500;cursor:pointer">
+      📅 Hoy
+    </button>
+    <button type="button" onclick="filtroRapido('semana')"
+      style="padding:6px 12px;background:#fff;color:#374151;border:1px solid #D1D5DB;border-radius:6px;font-size:.75rem;font-weight:500;cursor:pointer">
+      📆 Esta semana
+    </button>
+    <button type="button" onclick="filtroRapido('mes')"
+      style="padding:6px 12px;background:#fff;color:#374151;border:1px solid #D1D5DB;border-radius:6px;font-size:.75rem;font-weight:500;cursor:pointer">
+      🗓️ Este mes
+    </button>
+  </div>
+</form>
+
+<script>
+function filtroRapido(periodo) {
+  const hoy = new Date();
+  const formatFecha = d => d.toISOString().split('T')[0];
+  let desde, hasta;
+
+  if (periodo === 'hoy') {
+    desde = hasta = formatFecha(hoy);
+  } else if (periodo === 'semana') {
+    const inicioSemana = new Date(hoy);
+    inicioSemana.setDate(hoy.getDate() - hoy.getDay()); // Domingo
+    const finSemana = new Date(inicioSemana);
+    finSemana.setDate(inicioSemana.getDate() + 6); // Sábado
+    desde = formatFecha(inicioSemana);
+    hasta = formatFecha(finSemana);
+  } else if (periodo === 'mes') {
+    desde = formatFecha(new Date(hoy.getFullYear(), hoy.getMonth(), 1));
+    hasta = formatFecha(new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0));
+  }
+
+  document.querySelector('[name="fecha_desde"]').value = desde;
+  document.querySelector('[name="fecha_hasta"]').value = hasta;
+  document.querySelector('form').submit();
+}
+</script>
+
 <!-- ── Banner próximas (7 días) ─────────────────────────── -->
 <?php if (!empty($proximas)): ?>
 <div style="background:#DBEAFE;border:1px solid #93C5FD;border-radius:12px;padding:16px;margin-bottom:16px;font-size:.875rem">

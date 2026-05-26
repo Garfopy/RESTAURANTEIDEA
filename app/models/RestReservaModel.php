@@ -3,17 +3,28 @@ class RestReservaModel extends BaseModel
 {
     protected string $table = 'rest_reservaciones';
 
-    public function getByRestaurante(int $restauranteId, int $page = 1, ?string $estado = null): array
+    public function getByRestaurante(int $restauranteId, int $page = 1, ?string $estado = null, ?string $fechaDesde = null, ?string $fechaHasta = null): array
     {
         $allowed = ['pendiente', 'confirmada', 'cancelada', 'completada'];
         $params  = [$restauranteId];
+        $where   = [];
 
         if ($estado && in_array($estado, $allowed, true)) {
-            $where    = 'AND r.estado = ?';
+            $where[]  = 'r.estado = ?';
             $params[] = $estado;
-        } else {
-            $where = '';
         }
+
+        if ($fechaDesde) {
+            $where[]  = 'r.fecha >= ?';
+            $params[] = $fechaDesde;
+        }
+
+        if ($fechaHasta) {
+            $where[]  = 'r.fecha <= ?';
+            $params[] = $fechaHasta;
+        }
+
+        $whereClause = $where ? 'AND ' . implode(' AND ', $where) : '';
 
         $sql = "SELECT r.id, r.restaurante_id, r.mesa_id, r.comensal_id, r.mesero_id,
                        r.nombre, r.telefono, r.email, r.fecha, r.hora, r.personas,
@@ -23,7 +34,7 @@ class RestReservaModel extends BaseModel
                 FROM rest_reservaciones r
                 LEFT JOIN rest_mesas m ON m.id = r.mesa_id
                 LEFT JOIN usuarios u   ON u.id = r.mesero_id
-                WHERE r.restaurante_id = ? $where
+                WHERE r.restaurante_id = ? $whereClause
                 ORDER BY r.fecha DESC, r.hora DESC";
         return $this->paginate($sql, $params, $page);
     }
