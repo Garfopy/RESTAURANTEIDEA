@@ -130,10 +130,10 @@ class RestPedidoModel extends BaseModel
         );
     }
 
-    public function cancelarItemsPendientes(int $pedidoId): void
+    public function cancelarItemsActivos(int $pedidoId): void
     {
         $this->execute(
-            "UPDATE rest_pedido_items SET estado = 'cancelado' WHERE pedido_id = ? AND estado = 'pendiente'",
+            "UPDATE rest_pedido_items SET estado = 'cancelado' WHERE pedido_id = ? AND estado IN ('pendiente', 'en_preparacion')",
             [$pedidoId]
         );
     }
