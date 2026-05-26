@@ -634,8 +634,8 @@ class RestPublicoController extends BaseController
         if (!$pedido || (int)$pedido['restaurante_id'] !== (int)$restaurante['id']) {
             echo json_encode(['ok'=>false,'msg'=>'Pedido no encontrado']); exit;
         }
-        if ($pedido['estado'] !== 'pendiente') {
-            echo json_encode(['ok'=>false,'msg'=>'Solo puedes cancelar pedidos pendientes']); exit;
+        if (!in_array($pedido['estado'], ['pendiente', 'en_preparacion', 'listo'])) {
+            echo json_encode(['ok'=>false,'msg'=>'Este pedido ya no se puede cancelar']); exit;
         }
 
         $this->pedidoModel->cambiarEstadoPedido($pedidoId, 'cancelado');

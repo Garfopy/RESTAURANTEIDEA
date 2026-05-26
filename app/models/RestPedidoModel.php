@@ -124,7 +124,9 @@ class RestPedidoModel extends BaseModel
              JOIN rest_pedido_items pi ON pi.pedido_id = p.id
              JOIN rest_platillos pl ON pl.id = pi.platillo_id
              LEFT JOIN rest_mesas m ON m.id = p.mesa_id
-             WHERE p.restaurante_id = ? AND pi.estado IN ('pendiente','en_preparacion')
+             WHERE p.restaurante_id = ?
+               AND p.estado NOT IN ('cancelado', 'entregado')
+               AND pi.estado IN ('pendiente','en_preparacion')
              ORDER BY p.created_at ASC, pi.id ASC",
             [$restauranteId]
         );
@@ -133,7 +135,7 @@ class RestPedidoModel extends BaseModel
     public function cancelarItemsActivos(int $pedidoId): void
     {
         $this->execute(
-            "UPDATE rest_pedido_items SET estado = 'cancelado' WHERE pedido_id = ? AND estado IN ('pendiente', 'en_preparacion')",
+            "UPDATE rest_pedido_items SET estado = 'cancelado' WHERE pedido_id = ? AND estado IN ('pendiente', 'en_preparacion', 'listo')",
             [$pedidoId]
         );
     }
