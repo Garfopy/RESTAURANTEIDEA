@@ -25,7 +25,7 @@ class RestClienteController extends BaseController
 
     public function detalle(?string $id = null): void
     {
-        $comensal = $this->model->find((int)$id);
+        $comensal = $this->model->getDetalle((int)$id);
         if (!$comensal) { $this->flash('error', 'Comensal no encontrado.'); $this->redirect('rest-cliente/index'); }
         $historial = $this->model->getHistorialVisitas((int)$id);
         $flash     = $this->getFlash();

@@ -51,6 +51,22 @@ class RestClienteModel extends BaseModel
         return (int) $this->db->lastInsertId();
     }
 
+    public function getDetalle(int $comensalId): ?array
+    {
+        return $this->queryOne(
+            "SELECT c.*,
+                    COALESCE(COUNT(DISTINCT v.id), 0) AS total_visitas,
+                    COALESCE(SUM(t.total), 0)         AS total_gastado,
+                    MAX(v.created_at)                 AS ultima_visita
+             FROM rest_comensales c
+             LEFT JOIN rest_visitas v ON v.comensal_id = c.id
+             LEFT JOIN rest_tickets t ON t.visita_id   = v.id
+             WHERE c.id = ?
+             GROUP BY c.id",
+            [$comensalId]
+        );
+    }
+
     public function registrarVisita(int $comensalId, float $gasto): void
     {
         $this->execute(
