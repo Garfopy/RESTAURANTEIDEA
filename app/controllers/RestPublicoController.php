@@ -581,7 +581,7 @@ class RestPublicoController extends BaseController
                         ],
                         'quantity' => 1,
                     ]],
-                    'success_url' => BASE_URL . 'menu/stripeRetorno/' . $realSlug . '/' . $ticketId . '?session_id={CHECKOUT_SESSION_ID}',
+                    'success_url' => BASE_URL . 'menu/stripeRetorno/' . $realSlug . '/' . $ticketId . '?cs={CHECKOUT_SESSION_ID}',
                     'cancel_url'  => BASE_URL . 'menu/' . $realSlug . '/pagar/' . $ticket['visita_id'],
                     'metadata'    => [
                         'ticket_id' => (string)$ticketId,
@@ -947,13 +947,13 @@ class RestPublicoController extends BaseController
         exit;
     }
 
-    // GET /menu/stripeRetorno/{slug}/{ticketId}?session_id={CHECKOUT_SESSION_ID}
+    // GET /menu/stripeRetorno/{slug}/{ticketId}?cs={CHECKOUT_SESSION_ID}
     public function stripeRetorno(?string $slug = null): void
     {
         $parts     = explode('/', $slug ?? '');
         $realSlug  = $parts[0] ?? '';
         $ticketId  = (int)($parts[1] ?? 0);
-        $sessionId = trim($this->get('session_id', ''));
+        $sessionId = trim($this->get('cs', '') ?: $this->get('session_id', ''));
 
         $restaurante = $this->restModel->getBySlug($realSlug);
         $ticket      = $this->ticketModel->find($ticketId);
