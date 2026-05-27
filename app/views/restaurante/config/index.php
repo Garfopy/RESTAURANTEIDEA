@@ -566,6 +566,7 @@
 </div>
 
 <script>
+const BASE = '<?= BASE_URL ?>';
 // ── CarniHub: método de pago + tarjeta guardada ──────────────────────────────
 function chOnMetodoChange(val) {
   document.getElementById('chTransfPanel').style.display     = val === 'transferencia' ? 'block' : 'none';
