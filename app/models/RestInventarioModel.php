@@ -130,6 +130,39 @@ class RestInventarioModel extends BaseModel
                 $usuarioId
             );
         }
+
+        // ── Platillos SIN receta (bebidas, dulces, postres) ─────────────────
+        // Para platillos que no tienen receta (B*, DP*) pero existen como
+        // rest_ingredientes con el mismo codigo, descuenta 1 unidad por pieza pedida.
+        $sinReceta = $this->query(
+            "SELECT pi.cantidad AS cantidad_pedida,
+                    i.id        AS ingrediente_id,
+                    i.nombre    AS ingrediente_nombre,
+                    i.unidad_principal
+             FROM rest_pedido_items pi
+             JOIN rest_platillos pl ON pl.id = pi.platillo_id
+             JOIN rest_ingredientes i
+                  ON i.restaurante_id = ?
+                 AND TRIM(i.codigo) = TRIM(COALESCE(pl.codigo, ''))
+                 AND i.activo = 1
+             LEFT JOIN rest_recetas rec ON rec.platillo_id = pl.id
+             WHERE pi.pedido_id = ?
+               AND rec.id IS NULL
+               AND COALESCE(pl.codigo, '') != ''",
+            [$restauranteId, $pedidoId]
+        );
+
+        foreach ($sinReceta as $item) {
+            $this->ajustarStock(
+                (int) $item['ingrediente_id'],
+                -(float) $item['cantidad_pedida'],
+                'salida',
+                'Consumo pedido restaurante',
+                'rest_pedido:' . $pedidoId,
+                $restauranteId,
+                $usuarioId
+            );
+        }
     }
 
     public function getMovimientos(int $restauranteId, int $page = 1): array

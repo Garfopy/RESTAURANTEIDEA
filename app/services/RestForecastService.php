@@ -64,10 +64,11 @@ class RestForecastService
     }
 
     /**
-     * Consumo promedio diario = consumo_total / días_con_actividad
+     * Consumo promedio diario = consumo_total / ventana
      *
-     * Fórmula exacta del requerimiento:
-     *   consumo_promedio_diario = consumo_total / días
+     * Dividimos entre el período completo (no solo días con actividad)
+     * para evitar CPD inflado cuando solo hay 1-2 días con registros.
+     * Ejemplo: 50 L en 1 día de los últimos 7 → CPD = 50/7 ≈ 7.14  (no 50).
      */
     public function calcularConsumoPromedioDiario(
         int $ingredienteId,
@@ -76,8 +77,7 @@ class RestForecastService
     ): float {
         $total = $this->consumoTotal($ingredienteId, $restauranteId, $ventana);
         if ($total <= 0) return 0.0;
-        $dias = $this->diasConActividad($ingredienteId, $restauranteId, $ventana);
-        return $total / $dias;
+        return $total / max(1, $ventana);
     }
 
     /**
@@ -131,12 +131,14 @@ class RestForecastService
      * Cantidad óptima a pedir para cubrir el lead time + buffer de cobertura.
      * cantidad = (cpd * (leadTime + diasCobertura)) - stockActual
      * Retorna 0 si el stock ya es suficiente.
+     *
+     * $diasCobertura reducido a 3 (buffer razonable: leadTime + 3 días extra).
      */
     public function calcularCantidadPedir(
         float $consumoPromedioDiario,
         int   $leadTimeDias,
         float $stockActual,
-        int   $diasCobertura = 7
+        int   $diasCobertura = 3
     ): float {
         if ($consumoPromedioDiario <= 0) return 0.0;
         $necesario = $consumoPromedioDiario * ($leadTimeDias + $diasCobertura);

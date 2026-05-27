@@ -30,12 +30,15 @@ class CarniHubApiService
     /**
      * Crear un pedido B2B en CarniHub.
      *
-     * @param  int   $restauranteId  ID del restaurante en CapiRest
-     * @param  array $items          [['producto_id'=>int, 'cantidad'=>float, 'precio_unit'=>float], ...]
-     * @param  string $notas         Notas opcionales para el pedido
+     * @param  int    $restauranteId  ID del restaurante en CapiRest
+     * @param  array  $items          [['producto_id'=>int, 'cantidad'=>float, 'precio_unit'=>float], ...]
+     * @param  string $notas          Notas opcionales para el pedido
+     * @param  array  $compradorInfo  Datos del comprador/restaurante para la dirección de entrega:
+     *                                ['comprador_nombre', 'comprador_direccion', 'comprador_telefono',
+     *                                 'comprador_lat', 'comprador_lng']
      * @return array  ['success'=>bool, 'pedido_id'=>int, 'folio'=>str, ...] | ['success'=>false, 'error'=>str]
      */
-    public function crearPedido(int $restauranteId, array $items, string $notas = ''): array
+    public function crearPedido(int $restauranteId, array $items, string $notas = '', array $compradorInfo = []): array
     {
         $config = $this->getConfig($restauranteId);
         if ($config === null) {
@@ -55,6 +58,23 @@ class CarniHubApiService
             $payload['notas'] = substr($notas, 0, 500);
         }
 
+        // Dirección de entrega del restaurante (comprador)
+        if (!empty($compradorInfo['comprador_nombre'])) {
+            $payload['comprador_nombre'] = substr((string)$compradorInfo['comprador_nombre'], 0, 200);
+        }
+        if (!empty($compradorInfo['comprador_direccion'])) {
+            $payload['comprador_direccion'] = substr((string)$compradorInfo['comprador_direccion'], 0, 500);
+        }
+        if (!empty($compradorInfo['comprador_telefono'])) {
+            $payload['comprador_telefono'] = substr((string)$compradorInfo['comprador_telefono'], 0, 30);
+        }
+        if (isset($compradorInfo['comprador_lat']) && $compradorInfo['comprador_lat'] !== null) {
+            $payload['comprador_lat'] = (float)$compradorInfo['comprador_lat'];
+        }
+        if (isset($compradorInfo['comprador_lng']) && $compradorInfo['comprador_lng'] !== null) {
+            $payload['comprador_lng'] = (float)$compradorInfo['comprador_lng'];
+        }
+
         foreach ($items as $item) {
             $productoId = (int)($item['producto_id'] ?? 0);
             $cantidad   = (float)($item['cantidad']   ?? 0);
@@ -72,6 +92,34 @@ class CarniHubApiService
         }
 
         return $this->request('POST', '/pedidos', $config, $payload);
+    }
+
+    /**
+     * Cancelar un pedido en CarniHub (si aún no fue aprobado/procesado).
+     *
+     * @param  int $restauranteId       ID del restaurante en CapiRest
+     * @param  int $pedidoCarnihubId    ID del pedido en CarniHub
+     * @return array  ['success'=>bool, ...] | ['success'=>false, 'error'=>str]
+     */
+    public function cancelarPedido(int $restauranteId, int $pedidoCarnihubId): array
+    {
+        $config = $this->getConfig($restauranteId);
+        if ($config === null) {
+            return $this->errorResponse('No hay configuración de CarniHub para este restaurante');
+        }
+
+        if ($pedidoCarnihubId <= 0) {
+            return $this->errorResponse('ID de pedido inválido');
+        }
+
+        // Intentar primero con DELETE, fallback a POST /cancelar
+        $result = $this->request('DELETE', '/pedidos/' . $pedidoCarnihubId, $config);
+        if (!($result['success'] ?? false) && ($result['http_code'] ?? 0) === 405) {
+            // Algunos servidores usan POST /cancelar en lugar de DELETE
+            $result = $this->request('POST', '/pedidos/' . $pedidoCarnihubId . '/cancelar', $config, []);
+        }
+
+        return $result;
     }
 
     /**
@@ -262,6 +310,8 @@ class CarniHubApiService
             $json = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
             curl_setopt($ch, CURLOPT_POST, true);
             curl_setopt($ch, CURLOPT_POSTFIELDS, $json);
+        } elseif ($method === 'DELETE') {
+            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'DELETE');
         }
 
         $rawBody   = curl_exec($ch);

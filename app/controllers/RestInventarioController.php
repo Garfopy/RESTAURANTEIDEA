@@ -349,10 +349,12 @@ class RestInventarioController extends BaseController
         $forzar         = (bool)$this->get('forzar', 0);
         $db = \Database::getInstance();
 
-        // ¿Ya se generó un pedido sugerido en las últimas 12 horas?
+        // Cooldown 12h: incluir pedidos ya convertidos (enviados a CarniHub) para evitar duplicados
         $stCheck = $db->prepare(
             "SELECT MAX(created_at) FROM rest_pedidos_sugeridos
-             WHERE restaurante_id = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 12 HOUR)"
+             WHERE restaurante_id = ?
+               AND estado IN ('sugerido','aprobado','convertido')
+               AND created_at >= DATE_SUB(NOW(), INTERVAL 12 HOUR)"
         );
         $stCheck->execute([$restauranteId]);
         $ultimoPedidoAt = $stCheck->fetchColumn() ?: null;
@@ -426,19 +428,37 @@ class RestInventarioController extends BaseController
     }
 
     /**
-     * Crea pedidos reales en CarniHub para los grupos de empresa dados.
-     * Reutilizable desde proyecciones() (auto) y generarPedidoAutomatico() (manual).
+     * Crea pedidos Y los envía inmediatamente a CarniHub (flujo 100 % automático).
+     * Si la llamada a la API falla, el pedido queda en 'sugerido' para reintento manual.
      *
      * @param int   $restauranteId
      * @param array $grupos  resultado de RestForecastService::agruparPorEmpresa()
-     * @return array pedidos creados [{pedido_id, folio, empresa, total, items}]
+     * @return array pedidos creados [{pedido_sugerido_id, folio, empresa, total, enviado, items, carnihub_error?}]
      */
     private function _autoGenerarPedidos(int $restauranteId, array $grupos): array
     {
         require_once ROOT_PATH . '/app/models/RestPedidoSugeridoModel.php';
+        require_once ROOT_PATH . '/app/services/CarniHubApiService.php';
         $pedidoModel = new RestPedidoSugeridoModel();
+        $apiService  = new CarniHubApiService();
         $compradorId = $this->usuarioId();
-        $creados     = [];
+
+        // Datos del restaurante para la dirección de entrega en CarniHub
+        $db    = \Database::getInstance();
+        $stRest = $db->prepare(
+            "SELECT nombre, direccion, telefono, lat, lng FROM rest_restaurantes WHERE id = ? LIMIT 1"
+        );
+        $stRest->execute([$restauranteId]);
+        $restData = $stRest->fetch(\PDO::FETCH_ASSOC) ?: [];
+        $compradorInfo = array_filter([
+            'comprador_nombre'    => $restData['nombre']    ?? '',
+            'comprador_direccion' => $restData['direccion'] ?? '',
+            'comprador_telefono'  => $restData['telefono']  ?? '',
+            'comprador_lat'       => $restData['lat']       ?? null,
+            'comprador_lng'       => $restData['lng']       ?? null,
+        ], fn($v) => $v !== null && $v !== '');
+
+        $creados = [];
 
         foreach ($grupos as $empresaId => $grupo) {
             $items    = [];
@@ -456,25 +476,73 @@ class RestInventarioController extends BaseController
                     'unidad'               => $ing['unidad_principal'],
                     'precio_unit_estimado' => $precio,
                     'subtotal_estimado'    => $sub,
+                    '_nombre'              => $ing['nombre'] ?? ('Ingrediente #' . $ing['id']),
                 ];
             }
 
             if (empty($items)) continue;
 
             try {
+                $notas    = 'Pedido automático · Forecast · ' . date('d/m/Y H:i');
                 $pedidoId = $pedidoModel->crear([
                     'restaurante_id'      => $restauranteId,
                     'carnihub_empresa_id' => $empresaId,
-                    'notas'               => 'Pedido automático · Forecast · ' . date('d/m/Y H:i'),
+                    'notas'               => $notas,
                     'usuario_id'          => $compradorId,
                 ], $items);
 
-                $creados[] = [
+                // ── Envío inmediato a CarniHub ──────────────────────────────
+                $apiItems = [];
+                foreach ($items as $it) {
+                    $prodId = (int)$it['carnihub_producto_id'];
+                    $cant   = (float)$it['cantidad_sugerida'];
+                    $precio = (float)$it['precio_unit_estimado'];
+                    if ($prodId > 0 && $cant > 0 && $precio > 0) {
+                        $apiItems[] = ['producto_id' => $prodId, 'cantidad' => $cant, 'precio_unit' => $precio];
+                    }
+                }
+
+                $folio         = null;
+                $chPedidoId    = 0;
+                $carnihubError = null;
+
+                if (!empty($apiItems)) {
+                    $resultado = $apiService->crearPedido($restauranteId, $apiItems, $notas, $compradorInfo);
+                    if ($resultado['success'] ?? false) {
+                        $chPedidoId = (int)($resultado['pedido_id'] ?? $resultado['id'] ?? 0);
+                        $folio      = $resultado['folio'] ?? ('CH-' . $chPedidoId);
+                        $pedidoModel->marcarConvertido($pedidoId, $chPedidoId);
+                    } else {
+                        $carnihubError = $resultado['error'] ?? 'Error desconocido';
+                        error_log('[_autoGenerarPedidos] Error API CarniHub (pedido #' . $pedidoId . '): ' . $carnihubError);
+                    }
+                } else {
+                    $carnihubError = 'Ningún item tiene producto CarniHub vinculado con precio válido';
+                }
+
+                // Items para el ticket en vista proyecciones
+                $ticketItems = array_map(fn($it) => [
+                    'nombre'   => $it['_nombre'],
+                    'cantidad' => $it['cantidad_sugerida'],
+                    'unidad'   => $it['unidad'],
+                    'precio'   => $it['precio_unit_estimado'],
+                    'subtotal' => $it['subtotal_estimado'],
+                ], $items);
+
+                $entrada = [
                     'pedido_sugerido_id' => $pedidoId,
                     'empresa'            => $grupo['empresa']['razon_social'] ?? 'CarniHub',
+                    'folio'              => $folio ?? ('LOCAL-' . $pedidoId),
                     'total'              => $subtotal,
                     'items_count'        => count($items),
+                    'enviado'            => ($folio !== null),
+                    'items'              => $ticketItems,
                 ];
+                if ($carnihubError) {
+                    $entrada['carnihub_error'] = $carnihubError;
+                }
+                $creados[] = $entrada;
+
             } catch (\Throwable $e) {
                 error_log('[_autoGenerarPedidos] Error: ' . $e->getMessage());
             }
@@ -545,7 +613,8 @@ class RestInventarioController extends BaseController
 
     /**
      * POST /rest-inventario/enviarACarnihub/{id}
-     * Envía el pedido aprobado a la API remota de CarniHub y lo marca como 'convertido'.
+     * Envía el pedido a CarniHub. Acepta estado 'aprobado' o 'sugerido'
+     * (reintento para pedidos que fallaron al enviarse automáticamente).
      */
     public function enviarACarnihub(?string $id = null): void
     {
@@ -554,6 +623,7 @@ class RestInventarioController extends BaseController
         }
 
         require_once ROOT_PATH . '/app/models/RestPedidoSugeridoModel.php';
+        require_once ROOT_PATH . '/app/services/CarniHubApiService.php';
         $pedidoModel   = new RestPedidoSugeridoModel();
         $pedidoId      = (int)$id;
         $restauranteId = $this->restauranteId();
@@ -562,9 +632,24 @@ class RestInventarioController extends BaseController
         if (!$pedido || (int)$pedido['restaurante_id'] !== $restauranteId) {
             $this->json(['ok' => false, 'error' => 'Pedido no encontrado'], 404);
         }
-        if ($pedido['estado'] !== 'aprobado') {
-            $this->json(['ok' => false, 'error' => 'El pedido debe estar aprobado antes de enviarlo (estado actual: ' . $pedido['estado'] . ')']);
+        if (!in_array($pedido['estado'], ['sugerido', 'aprobado'])) {
+            $this->json(['ok' => false, 'error' => 'No se puede enviar un pedido con estado: ' . $pedido['estado']]);
         }
+
+        // Dirección del restaurante para informar a CarniHub
+        $db     = \Database::getInstance();
+        $stRest = $db->prepare(
+            "SELECT nombre, direccion, telefono, lat, lng FROM rest_restaurantes WHERE id = ? LIMIT 1"
+        );
+        $stRest->execute([$restauranteId]);
+        $restData     = $stRest->fetch(\PDO::FETCH_ASSOC) ?: [];
+        $compradorInfo = array_filter([
+            'comprador_nombre'    => $restData['nombre']    ?? '',
+            'comprador_direccion' => $restData['direccion'] ?? '',
+            'comprador_telefono'  => $restData['telefono']  ?? '',
+            'comprador_lat'       => $restData['lat']       ?? null,
+            'comprador_lng'       => $restData['lng']       ?? null,
+        ], fn($v) => $v !== null && $v !== '');
 
         // Mapear items al formato de CarniHubApiService
         $apiItems = [];
@@ -588,7 +673,8 @@ class RestInventarioController extends BaseController
         $resultado  = $apiService->crearPedido(
             $restauranteId,
             $apiItems,
-            $pedido['notas'] ?? 'Pedido generado automáticamente por sistema de forecast'
+            $pedido['notas'] ?? 'Pedido generado automáticamente por sistema de forecast',
+            $compradorInfo
         );
 
         if (!($resultado['success'] ?? false)) {
@@ -604,6 +690,99 @@ class RestInventarioController extends BaseController
             'message'            => 'Pedido enviado a CarniHub correctamente.',
             'pedido_carnihub_id' => $pedidoExternoId,
             'folio'              => $resultado['folio'] ?? null,
+        ]);
+    }
+
+    /**
+     * POST /rest-inventario/cancelarSugerido/{id}
+     * Cancela un pedido local. Si ya fue enviado a CarniHub (estado 'convertido'),
+     * primero intenta cancelarlo en la API remota.
+     */
+    public function cancelarSugerido(?string $id = null): void
+    {
+        if (!$this->isPost()) {
+            $this->json(['ok' => false, 'error' => 'Método no permitido'], 405);
+        }
+
+        require_once ROOT_PATH . '/app/models/RestPedidoSugeridoModel.php';
+        require_once ROOT_PATH . '/app/services/CarniHubApiService.php';
+        $pedidoModel   = new RestPedidoSugeridoModel();
+        $pedidoId      = (int)$id;
+        $restauranteId = $this->restauranteId();
+
+        $pedido = $pedidoModel->find($pedidoId);
+        if (!$pedido || (int)$pedido['restaurante_id'] !== $restauranteId) {
+            $this->json(['ok' => false, 'error' => 'Pedido no encontrado'], 404);
+        }
+
+        $estado = $pedido['estado'];
+
+        if ($estado === 'cancelado') {
+            $this->json(['ok' => false, 'error' => 'Este pedido ya está cancelado']);
+        }
+
+        if (!in_array($estado, ['sugerido', 'aprobado', 'convertido'])) {
+            $this->json(['ok' => false, 'error' => 'No se puede cancelar un pedido con estado: ' . $estado]);
+        }
+
+        // Si ya fue enviado a CarniHub, intentar cancelar en la API remota primero
+        if ($estado === 'convertido') {
+            $chId = (int)($pedido['pedido_carnihub_id'] ?? 0);
+            if ($chId > 0) {
+                $apiService = new CarniHubApiService();
+                $res = $apiService->cancelarPedido($restauranteId, $chId);
+                if (!($res['success'] ?? false)) {
+                    $errMsg = $res['error'] ?? 'CarniHub rechazó la cancelación';
+                    $this->json([
+                        'ok'    => false,
+                        'error' => $errMsg . ' — El pedido puede ya estar aprobado o en proceso en CarniHub.',
+                    ]);
+                }
+            }
+        }
+
+        $pedidoModel->cambiarEstado($pedidoId, 'cancelado', $this->usuarioId());
+        $this->json(['ok' => true, 'message' => 'Pedido cancelado correctamente.']);
+    }
+
+    /**
+     * GET /rest-inventario/seguimientoPedido/{id}
+     * Consulta el estado actual del pedido en CarniHub y actualiza estado_carnihub local.
+     */
+    public function seguimientoPedido(?string $id = null): void
+    {
+        require_once ROOT_PATH . '/app/models/RestPedidoSugeridoModel.php';
+        require_once ROOT_PATH . '/app/services/CarniHubApiService.php';
+        $pedidoModel   = new RestPedidoSugeridoModel();
+        $pedidoId      = (int)$id;
+        $restauranteId = $this->restauranteId();
+
+        $pedido = $pedidoModel->find($pedidoId);
+        if (!$pedido || (int)$pedido['restaurante_id'] !== $restauranteId) {
+            $this->json(['ok' => false, 'error' => 'Pedido no encontrado'], 404);
+        }
+
+        $chId = (int)($pedido['pedido_carnihub_id'] ?? 0);
+        if ($chId <= 0) {
+            $this->json(['ok' => false, 'error' => 'Este pedido aún no fue enviado a CarniHub']);
+        }
+
+        $apiService = new CarniHubApiService();
+        $res = $apiService->consultarPedido($restauranteId, $chId);
+
+        if (!($res['success'] ?? false)) {
+            $this->json(['ok' => false, 'error' => $res['error'] ?? 'No se pudo consultar CarniHub']);
+        }
+
+        $pedidoData     = $res['pedido'] ?? $res;
+        $estadoCarnihub = $pedidoData['estado'] ?? $pedidoData['status'] ?? 'desconocido';
+
+        $pedidoModel->syncEstadoCarnihub($pedidoId, $estadoCarnihub);
+
+        $this->json([
+            'ok'              => true,
+            'estado_carnihub' => $estadoCarnihub,
+            'pedido'          => $pedidoData,
         ]);
     }
 }

@@ -24,7 +24,8 @@ class RestPedidoSugeridoModel extends BaseModel
         return $this->query(
             "SELECT ps.*,
                     COALESCE(cac.nombre_distribuidor, CONCAT('Proveedor #', ps.carnihub_empresa_id)) AS empresa_nombre,
-                    u.nombre AS usuario_nombre
+                    u.nombre AS usuario_nombre,
+                    (SELECT COUNT(*) FROM rest_pedido_sugerido_items WHERE pedido_sugerido_id = ps.id) AS items_count
              FROM rest_pedidos_sugeridos ps
              LEFT JOIN carnihub_api_config cac
                     ON cac.restaurante_id = ps.restaurante_id AND cac.activo = 1
@@ -216,5 +217,19 @@ class RestPedidoSugeridoModel extends BaseModel
             ];
         }
         return $result;
+    }
+
+    /**
+     * Actualiza el estado reportado por CarniHub y la fecha de la última sincronización.
+     * Se llama desde seguimientoPedido() en el controlador.
+     */
+    public function syncEstadoCarnihub(int $id, string $estadoCarnihub): void
+    {
+        $this->execute(
+            "UPDATE rest_pedidos_sugeridos
+             SET estado_carnihub = ?, ultima_sync_carnihub = NOW()
+             WHERE id = ?",
+            [$estadoCarnihub, $id]
+        );
     }
 }

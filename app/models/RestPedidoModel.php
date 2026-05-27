@@ -117,7 +117,16 @@ class RestPedidoModel extends BaseModel
                                 SEPARATOR '||'
                             )
                      FROM rest_recetas r
-                     JOIN rest_receta_ingredientes ri ON ri.receta_id = r.id
+                     JOIN (
+                         SELECT receta_id, ingrediente_id,
+                                COALESCE(
+                                    MIN(CASE WHEN es_informativo = 0 THEN id END),
+                                    MIN(id)
+                                ) AS best_id
+                         FROM rest_receta_ingredientes
+                         GROUP BY receta_id, ingrediente_id
+                     ) ri_dedup ON ri_dedup.receta_id = r.id
+                     JOIN rest_receta_ingredientes ri ON ri.id = ri_dedup.best_id
                      JOIN rest_ingredientes ing ON ing.id = ri.ingrediente_id
                      WHERE r.platillo_id = pi.platillo_id) AS ingredientes_raw
              FROM rest_pedidos p

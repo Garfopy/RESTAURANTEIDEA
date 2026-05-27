@@ -137,7 +137,13 @@
       </tbody>
     </table>
     <div style="padding:8px 16px;font-size:.72rem;color:#6B7280;display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px">
-      <span>El proveedor recibió este pedido con estado <strong>pendiente</strong></span>
+      <?php if ($c['enviado'] ?? false): ?>
+        <span style="color:#166534">✅ Enviado a CarniHub · Estado inicial: <strong>pendiente</strong></span>
+      <?php else: ?>
+        <span style="color:#92400E">⚠️ No se pudo enviar automáticamente: <?= htmlspecialchars($c['carnihub_error'] ?? 'Error desconocido') ?></span>
+        &nbsp;·&nbsp;
+        <a href="<?= BASE_URL ?>rest-inventario/pedidosSugeridos" style="color:#D97706">Reintentar manualmente →</a>
+      <?php endif; ?>
       <a href="<?= BASE_URL ?>rest-inventario/pedidosSugeridos" style="color:#2563EB">Ver historial &rarr;</a>
     </div>
   </div>
