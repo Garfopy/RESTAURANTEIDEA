@@ -314,7 +314,7 @@ class RestInventarioController extends BaseController
         $this->redirect('rest-inventario/index');
     }
 
-    /** Endpoint JSON â€” devuelve stocks actuales para polling en tiempo real */
+    /** Endpoint JSON — devuelve stocks actuales para polling en tiempo real */
     public function stocks(?string $p = null): void
     {
         $rows = $this->model->getByRestaurante($this->restauranteId(), true);
@@ -326,10 +326,10 @@ class RestInventarioController extends BaseController
         ], $rows));
     }
 
-    // â”€â”€ SISTEMA DE FORECAST Y PEDIDOS AUTOMÃTICOS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── SISTEMA DE FORECAST Y PEDIDOS AUTOMÁTICOS ────────────────
 
     /**
-     * Dashboard de proyecciÃ³n inteligente de inventario.
+     * Dashboard de proyección inteligente de inventario.
      */
     public function proyecciones(?string $p = null): void
     {
@@ -343,7 +343,7 @@ class RestInventarioController extends BaseController
         $criticos     = array_filter($analisis, fn($i) => $i['nivel_alerta'] === 'critico');
         $advertencias = array_filter($analisis, fn($i) => $i['nivel_alerta'] === 'advertencia');
 
-        // â”€â”€ AUTO-GENERAR PEDIDO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ── AUTO-GENERAR PEDIDO ─────────────────────────────────────────
         $comprobante    = null;
         $ultimoPedidoAt = null;
         $forzar         = (bool)$this->get('forzar', 0);
@@ -368,7 +368,7 @@ class RestInventarioController extends BaseController
         }
 
         $flash      = $this->getFlash();
-        $pageTitle  = 'ProyecciÃ³n de Inventario';
+        $pageTitle  = 'Proyección de Inventario';
         $activeMenu = 'rest_inventario';
 
         $this->render('restaurante/inventario/proyecciones', compact(
@@ -378,7 +378,7 @@ class RestInventarioController extends BaseController
     }
 
     /**
-     * Historial de pedidos generados automÃ¡ticamente por el sistema de forecast.
+     * Historial de pedidos generados automáticamente por el sistema de forecast.
      */
     public function pedidosSugeridos(?string $p = null): void
     {
@@ -398,7 +398,7 @@ class RestInventarioController extends BaseController
         }
 
         $flash      = $this->getFlash();
-        $pageTitle  = 'Historial de Pedidos AutomÃ¡ticos';
+        $pageTitle  = 'Historial de Pedidos Automáticos';
         $activeMenu = 'rest_inventario';
 
         $this->render('restaurante/inventario/pedidos_sugeridos', compact(
@@ -407,12 +407,12 @@ class RestInventarioController extends BaseController
     }
 
     /**
-     * Genera pedidos forzados vÃ­a AJAX (sin cooldown). Responde JSON.
+     * Genera pedidos forzados vía AJAX (sin cooldown). Responde JSON.
      */
     public function generarPedidoAutomatico(?string $p = null): void
     {
         if (!$this->isPost()) {
-            $this->json(['ok' => false, 'error' => 'MÃ©todo no permitido'], 405);
+            $this->json(['ok' => false, 'error' => 'Método no permitido'], 405);
         }
 
         require_once ROOT_PATH . '/app/services/RestForecastService.php';
@@ -425,7 +425,7 @@ class RestInventarioController extends BaseController
         $grupos   = $forecast->agruparPorEmpresa($analisis);
 
         if (empty($grupos)) {
-            $this->json(['ok' => false, 'error' => 'No hay ingredientes crÃ­ticos con proveedor CarniHub vinculado.']);
+            $this->json(['ok' => false, 'error' => 'No hay ingredientes críticos con proveedor CarniHub vinculado.']);
         }
 
         $creados = $this->_autoGenerarPedidos($restauranteId, $grupos);
@@ -562,7 +562,7 @@ class RestInventarioController extends BaseController
     }
 
     /**
-     * Endpoint JSON: retorna anÃ¡lisis de forecast para un ingrediente especÃ­fico.
+     * Endpoint JSON: retorna análisis de forecast para un ingrediente específico.
      */
     public function forecastJson(?string $id = null): void
     {

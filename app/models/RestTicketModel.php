@@ -86,6 +86,24 @@ class RestTicketModel extends BaseModel
         );
     }
 
+    /**
+     * Recalcula el subtotal y total del ticket sumando todos los pedidos activos
+     * de la visita. Preserva la propina ya elegida en BD.
+     * Necesario cuando el comensal agrega más pedidos después de generar el ticket.
+     */
+    public function recalcularSubtotal(int $ticketId, int $visitaId): void
+    {
+        $row = $this->queryOne(
+            "SELECT COALESCE(SUM(subtotal),0) AS s FROM rest_pedidos WHERE visita_id = ? AND estado != 'cancelado'",
+            [$visitaId]
+        );
+        $subtotal = (float)($row['s'] ?? 0);
+        $this->execute(
+            "UPDATE rest_tickets SET subtotal = ?, total = ? + propina WHERE id = ?",
+            [$subtotal, $subtotal, $ticketId]
+        );
+    }
+
     public function listar(int $restauranteId, int $page = 1): array
     {
         $sql = "SELECT t.*, m.nombre AS mesa_nombre, v.qr_code

@@ -534,9 +534,11 @@ function abrirMesa(mesaId, nombre, estado) {
             <span style="font-size:.72rem;font-weight:600;padding:2px 10px;border-radius:10px;background:${col};color:${txt}">${ESTADO_LABEL[p.estado]||p.estado}</span>
           </div>
           ${itemsHtml}
-          ${p.estado === 'listo'
+          ${(p.estado === 'listo' || (p.estado === 'reclamado' && p.es_mi_reclamo))
             ? `<button class="btn-sm btn-entregar" style="width:100%;margin-top:8px" onclick="marcarEntregado(${p.id},this)">Entregado ✓</button>`
-            : ''}
+            : (p.estado === 'reclamado' && !p.es_mi_reclamo)
+              ? `<div style="font-size:.75rem;color:#92400E;margin-top:8px;text-align:center">🚶 Reclamado por ${p.reclamado_por_nombre || 'otro mesero'}</div>`
+              : ''}
         </div>`;
       }).join('');
     })

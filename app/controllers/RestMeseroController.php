@@ -175,10 +175,13 @@ class RestMeseroController extends BaseController
     // GET /rest-mesero/pedidosMesa/{mesaId}  — pedidos activos de una mesa (para modal)
     public function pedidosMesa(?string $mesaId = null): void
     {
-        $db   = Database::getInstance();
+        $db       = Database::getInstance();
+        $meseroId = $this->usuarioId();
         $stmt = $db->prepare(
-            "SELECT p.id, p.folio, p.estado, p.created_at
+            "SELECT p.id, p.folio, p.estado, p.created_at, p.reclamado_por,
+                    u.nombre AS reclamado_por_nombre
              FROM rest_pedidos p
+             LEFT JOIN usuarios u ON u.id = p.reclamado_por
              WHERE p.mesa_id = ? AND p.restaurante_id = ?
                AND p.estado NOT IN ('entregado','cancelado')
              ORDER BY p.created_at DESC"
@@ -187,6 +190,9 @@ class RestMeseroController extends BaseController
         $pedidos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         foreach ($pedidos as &$ped) {
+            $ped['es_mi_reclamo'] = $ped['estado'] === 'reclamado'
+                && (int)$ped['reclamado_por'] === $meseroId;
+
             $stmt2 = $db->prepare(
                 "SELECT pi.id, pl.nombre AS nombre, pi.cantidad, pi.estado
                  FROM rest_pedido_items pi
@@ -273,16 +279,48 @@ class RestMeseroController extends BaseController
         }
 
         $placeholders = implode(',', array_fill(0, count($misZonas), '?'));
-        $stmt = $db->prepare(
-            "UPDATE rest_pedidos p
+
+        // Recopilar IDs de los pedidos a entregar
+        $stmtIds = $db->prepare(
+            "SELECT p.id FROM rest_pedidos p
              LEFT JOIN rest_mesas m ON m.id = p.mesa_id
-             SET p.estado = 'reclamado', p.mesero_id = ?, p.reclamado_por = ?, p.reclamado_at = NOW()
              WHERE p.restaurante_id = ? AND p.estado = 'listo'
                AND m.zona_id IN ($placeholders)"
         );
-        $stmt->execute(array_merge([$meseroId, $meseroId, $restauranteId], $misZonas));
+        $stmtIds->execute(array_merge([$restauranteId], $misZonas));
+        $pedidoIds = array_column($stmtIds->fetchAll(PDO::FETCH_ASSOC), 'id');
 
-        $this->json(['ok' => true, 'count' => $stmt->rowCount()]);
+        if (empty($pedidoIds)) {
+            $this->json(['ok' => true, 'count' => 0]);
+            return;
+        }
+
+        $idPlaceholders = implode(',', array_fill(0, count($pedidoIds), '?'));
+
+        // Marcar pedidos como entregados directamente (sin pasar por 'reclamado')
+        $db->prepare(
+            "UPDATE rest_pedidos
+             SET estado = 'entregado', mesero_id = ?, reclamado_por = ?, reclamado_at = NOW()
+             WHERE id IN ($idPlaceholders) AND restaurante_id = ?"
+        )->execute(array_merge([$meseroId, $meseroId], $pedidoIds, [$restauranteId]));
+
+        // Marcar items como entregados
+        $db->prepare(
+            "UPDATE rest_pedido_items
+             SET estado = 'entregado'
+             WHERE pedido_id IN ($idPlaceholders) AND estado IN ('listo','reclamado')"
+        )->execute($pedidoIds);
+
+        // Propagar mesero_id al ticket si aún no tiene
+        $db->prepare(
+            "UPDATE rest_tickets t
+             JOIN rest_visitas v ON v.id = t.visita_id
+             JOIN rest_pedidos p ON p.visita_id = v.id
+             SET t.mesero_id = ?
+             WHERE p.id IN ($idPlaceholders) AND t.mesero_id IS NULL"
+        )->execute(array_merge([$meseroId], $pedidoIds));
+
+        $this->json(['ok' => true, 'count' => count($pedidoIds)]);
     }
 
     // GET /rest-mesero/reservasHoy  — reservaciones de hoy en las zonas del mesero

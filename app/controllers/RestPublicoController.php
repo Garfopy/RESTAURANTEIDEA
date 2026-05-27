@@ -405,6 +405,10 @@ class RestPublicoController extends BaseController
         if (!$ticket) {
             $ticketId = $this->ticketModel->consolidar($visitaId, 0);
             $ticket   = $this->ticketModel->find($ticketId);
+        } elseif (($ticket['estado'] ?? '') === 'pendiente') {
+            // Recalcular por si el comensal agregó más pedidos después de generar el ticket
+            $this->ticketModel->recalcularSubtotal((int)$ticket['id'], $visitaId);
+            $ticket = $this->ticketModel->find((int)$ticket['id']);
         }
 
         if (!$ticket) {
@@ -451,6 +455,10 @@ class RestPublicoController extends BaseController
             $propina  = (float)$this->get('propina', 0);
             $ticketId = $this->ticketModel->consolidar($visitaId, $propina);
             $ticket   = $this->ticketModel->find($ticketId);
+        } elseif (($ticket['estado'] ?? '') === 'pendiente') {
+            // Recalcular por si el comensal agregó más pedidos después de abrir el ticket
+            $this->ticketModel->recalcularSubtotal((int)$ticket['id'], $visitaId);
+            $ticket = $this->ticketModel->find((int)$ticket['id']);
         }
 
         // Cambiar mesa a estado 'pagando'
@@ -546,14 +554,14 @@ class RestPublicoController extends BaseController
 
         if ($metodo === 'tarjeta') {
             $intentId = trim($this->post('payment_intent_id', ''));
-            $sesKey   = 'stripe_intent_' . $ticketId;
+            // Limpiar sesión antigua (ya no se usa para validar)
+            unset($_SESSION['stripe_intent_' . $ticketId]);
 
-            if (!$intentId || empty($_SESSION[$sesKey]) || $_SESSION[$sesKey] !== $intentId) {
-                $_SESSION['flash_error'] = 'Confirmación de pago inválida. Intenta de nuevo.';
+            if (!$intentId) {
+                $_SESSION['flash_error'] = 'No se recibió confirmación de pago. Intenta de nuevo.';
                 $this->redirect('menu/' . $realSlug . '/pagar/' . $ticket['visita_id']);
                 return;
             }
-            unset($_SESSION[$sesKey]);
 
             try {
                 $stripeKey = $this->getStripeKey('secret');
@@ -562,6 +570,10 @@ class RestPublicoController extends BaseController
                 $intent = \Stripe\PaymentIntent::retrieve($intentId);
                 if ($intent->status !== 'succeeded') {
                     throw new \RuntimeException('Estado Stripe: ' . $intent->status);
+                }
+                // Seguridad anti-replay: verificar que el intent pertenece a ESTE ticket
+                if ((int)($intent->metadata['ticket_id'] ?? 0) !== $ticketId) {
+                    throw new \RuntimeException('El intento de pago no corresponde a este ticket');
                 }
             } catch (\Throwable $e) {
                 $_SESSION['flash_error'] = 'El pago con tarjeta no se completó. Intenta de nuevo.';
