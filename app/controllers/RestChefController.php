@@ -101,15 +101,23 @@ class RestChefController extends BaseController
                         );
                     }
                 } else {
-                    // Sin receta → deducir por ingrediente directo (bebidas, postres, etc.)
-                    $stmtDir = $db->prepare(
-                        "SELECT ingrediente_directo_id FROM rest_platillos WHERE id = ? LIMIT 1"
+                    // Sin receta → deducir por código (bebidas, postres, etc.)
+                    // Busca el ingrediente cuyo codigo coincide con el del platillo.
+                    $stmtCod = $db->prepare(
+                        "SELECT i.id
+                         FROM rest_ingredientes i
+                         JOIN rest_platillos pl ON TRIM(pl.codigo) = TRIM(i.codigo)
+                         WHERE pl.id = ?
+                           AND i.restaurante_id = ?
+                           AND i.activo = 1
+                           AND TRIM(COALESCE(i.codigo,'')) != ''
+                         LIMIT 1"
                     );
-                    $stmtDir->execute([$platilloId]);
-                    $ingDirectoId = (int)$stmtDir->fetchColumn();
-                    if ($ingDirectoId) {
+                    $stmtCod->execute([$platilloId, $restauranteId]);
+                    $ingId = (int)$stmtCod->fetchColumn();
+                    if ($ingId) {
                         $invModel->ajustarStock(
-                            $ingDirectoId,
+                            $ingId,
                             -(float)$cantidadPlatos,
                             'salida',
                             'Preparación (pedido #' . $pedidoId . ')',
