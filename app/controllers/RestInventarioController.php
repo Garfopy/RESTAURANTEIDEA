@@ -387,12 +387,22 @@ class RestInventarioController extends BaseController
         $pedidoModel   = new RestPedidoSugeridoModel();
         $pedidos       = $pedidoModel->getByRestaurante($restauranteId);
 
+        // Stripe PK para el modal de pago en la vista
+        $stripePk = defined('STRIPE_PUBLIC_KEY') && STRIPE_PUBLIC_KEY !== '' ? STRIPE_PUBLIC_KEY : '';
+        if (empty($stripePk)) {
+            try {
+                require_once ROOT_PATH . '/app/models/ConfigModel.php';
+                $cfg      = new ConfigModel();
+                $stripePk = $cfg->get('stripe_public_key', '');
+            } catch (\Throwable $e) {}
+        }
+
         $flash      = $this->getFlash();
         $pageTitle  = 'Historial de Pedidos AutomÃ¡ticos';
         $activeMenu = 'rest_inventario';
 
         $this->render('restaurante/inventario/pedidos_sugeridos', compact(
-            'pedidos', 'flash', 'pageTitle', 'activeMenu'
+            'pedidos', 'flash', 'pageTitle', 'activeMenu', 'stripePk'
         ));
     }
 
@@ -685,12 +695,193 @@ class RestInventarioController extends BaseController
         $pedidoExternoId = (int)($resultado['pedido_id'] ?? $resultado['id'] ?? 0);
         $pedidoModel->marcarConvertido($pedidoId, $pedidoExternoId);
 
+        // ── Calcular monto total del pedido ───────────────────────────────────
+        $montoTotal = 0.0;
+        foreach ($apiItems as $item) {
+            $montoTotal += (float)$item['cantidad'] * (float)$item['precio_unit'];
+        }
+        $montoTotal = round($montoTotal, 2);
+
+        // ── Leer configuración de pago CarniHub ───────────────────────────────
+        $metodoPago          = 'transferencia';
+        $instrTransferencia  = '';
+        try {
+            $stCh = $db->prepare(
+                "SELECT metodo_pago, instrucciones_transferencia
+                 FROM carnihub_api_config WHERE restaurante_id = ? LIMIT 1"
+            );
+            $stCh->execute([$restauranteId]);
+            $chCfg            = $stCh->fetch(\PDO::FETCH_ASSOC) ?: [];
+            $metodoPago       = $chCfg['metodo_pago'] ?? 'transferencia';
+            $instrTransferencia = $chCfg['instrucciones_transferencia'] ?? '';
+        } catch (\Throwable $e) { /* columnas aún no aplicadas */ }
+
+        // ── Guardar monto y método en el pedido ───────────────────────────────
+        try {
+            $db->prepare(
+                "UPDATE rest_pedidos_sugeridos
+                 SET monto_total = ?, metodo_pago = ?, estado_pago = 'pendiente'
+                 WHERE id = ?"
+            )->execute([$montoTotal, $metodoPago, $pedidoId]);
+        } catch (\Throwable $e) { /* columnas aún no aplicadas */ }
+
+        // ── Preparar respuesta de pago según método ───────────────────────────
+        $pagoData = ['metodo' => $metodoPago, 'monto' => $montoTotal];
+
+        if ($metodoPago === 'stripe') {
+            try {
+                require_once ROOT_PATH . '/app/models/ConfigModel.php';
+                $cfg       = new ConfigModel();
+                $stripeKey = defined('STRIPE_SECRET_KEY') && STRIPE_SECRET_KEY !== ''
+                    ? STRIPE_SECRET_KEY
+                    : $cfg->get('stripe_secret_key', '');
+                if (empty($stripeKey)) throw new \RuntimeException('Stripe no configurado');
+                \Stripe\Stripe::setApiKey($stripeKey);
+                $centavos = (int)round($montoTotal * 100);
+                $intent   = \Stripe\PaymentIntent::create([
+                    'amount'   => max(1000, $centavos),
+                    'currency' => 'mxn',
+                    'metadata' => [
+                        'pedido_sugerido_id' => $pedidoId,
+                        'pedido_carnihub_id' => $pedidoExternoId,
+                        'restaurante_id'     => $restauranteId,
+                    ],
+                ]);
+                $_SESSION['stripe_pedido_intent_' . $pedidoId] = $intent->id;
+                $pagoData['clientSecret'] = $intent->client_secret;
+            } catch (\Throwable $e) {
+                error_log('[enviarACarnihub] Stripe error: ' . $e->getMessage());
+                $pagoData['error'] = 'No se pudo crear el cargo Stripe: ' . $e->getMessage();
+                $pagoData['metodo'] = 'transferencia'; // fallback
+                $pagoData['instrucciones'] = $instrTransferencia;
+            }
+        } elseif ($metodoPago === 'paypal') {
+            try {
+                $returnUrl = BASE_URL . 'rest-inventario/confirmarPagoCarnihub/' . $pedidoId . '/paypal?status=ok';
+                $cancelUrl = BASE_URL . 'rest-inventario/pedidosSugeridos';
+                require_once ROOT_PATH . '/app/services/PayPalOrdenService.php';
+                $paypal    = new PayPalOrdenService();
+                $orden     = $paypal->crearOrden($montoTotal, 'MXN', $returnUrl, $cancelUrl, 'CarnHub-' . $pedidoExternoId);
+                $pagoData['approvalUrl'] = $orden['approvalUrl'];
+                $pagoData['paypalOrderId'] = $orden['id'] ?? null;
+            } catch (\Throwable $e) {
+                error_log('[enviarACarnihub] PayPal error: ' . $e->getMessage());
+                $pagoData['error'] = 'No se pudo crear orden PayPal: ' . $e->getMessage();
+                $pagoData['metodo'] = 'transferencia';
+                $pagoData['instrucciones'] = $instrTransferencia;
+            }
+        } else {
+            // transferencia
+            $pagoData['instrucciones'] = $instrTransferencia;
+        }
+
         $this->json([
             'ok'                 => true,
             'message'            => 'Pedido enviado a CarniHub correctamente.',
             'pedido_carnihub_id' => $pedidoExternoId,
             'folio'              => $resultado['folio'] ?? null,
+            'pago'               => $pagoData,
         ]);
+    }
+
+    /**
+     * POST /rest-inventario/confirmarPagoCarnihub/{id}/{metodo}
+     * Confirma el pago de un pedido sugerido enviado a CarniHub.
+     * Llamado desde la vista al completar pago Stripe, o al ingresar referencia de transferencia.
+     * También actúa como retorno de PayPal (GET con ?status=ok).
+     */
+    public function confirmarPagoCarnihub(?string $params = null): void
+    {
+        require_once ROOT_PATH . '/app/models/RestPedidoSugeridoModel.php';
+        $parts        = explode('/', $params ?? '');
+        $pedidoId     = (int)($parts[0] ?? 0);
+        $metodo       = $parts[1] ?? 'transferencia';
+        $restauranteId = $this->restauranteId();
+
+        $pedidoModel = new RestPedidoSugeridoModel();
+        $pedido      = $pedidoModel->find($pedidoId);
+        if (!$pedido || (int)$pedido['restaurante_id'] !== $restauranteId) {
+            if ($this->isPost()) {
+                $this->json(['ok' => false, 'error' => 'Pedido no encontrado'], 404);
+            } else {
+                $this->redirect('rest-inventario/pedidosSugeridos');
+            }
+            return;
+        }
+
+        $referencia = '';
+        $errMsg     = null;
+
+        if ($metodo === 'stripe') {
+            // Verificar PaymentIntent
+            $intentId = trim((string)$this->post('payment_intent_id', ''));
+            $sesKey   = 'stripe_pedido_intent_' . $pedidoId;
+            if (!$intentId || empty($_SESSION[$sesKey]) || $_SESSION[$sesKey] !== $intentId) {
+                $this->json(['ok' => false, 'error' => 'Confirmación Stripe inválida. Intenta de nuevo.']);
+                return;
+            }
+            unset($_SESSION[$sesKey]);
+            try {
+                require_once ROOT_PATH . '/app/models/ConfigModel.php';
+                $cfg       = new ConfigModel();
+                $stripeKey = defined('STRIPE_SECRET_KEY') && STRIPE_SECRET_KEY !== ''
+                    ? STRIPE_SECRET_KEY
+                    : $cfg->get('stripe_secret_key', '');
+                \Stripe\Stripe::setApiKey($stripeKey);
+                $intent = \Stripe\PaymentIntent::retrieve($intentId);
+                if ($intent->status !== 'succeeded') throw new \RuntimeException('Estado: ' . $intent->status);
+                $referencia = $intentId;
+            } catch (\Throwable $e) {
+                $this->json(['ok' => false, 'error' => 'Pago Stripe no completado: ' . $e->getMessage()]);
+                return;
+            }
+
+        } elseif ($metodo === 'paypal') {
+            // Retorno de PayPal (puede ser GET)
+            $paypalOrderId = trim((string)($this->get('token') ?: $this->post('paypal_order_id', '')));
+            $status        = $this->get('status', '');
+            if ($status !== 'ok' || empty($paypalOrderId)) {
+                // Cancelado o inválido
+                $this->flash('error', 'Pago PayPal cancelado o no completado.');
+                $this->redirect('rest-inventario/pedidosSugeridos');
+                return;
+            }
+            try {
+                require_once ROOT_PATH . '/app/services/PayPalOrdenService.php';
+                $paypal  = new PayPalOrdenService();
+                $capture = $paypal->capturarOrden($paypalOrderId);
+                if (!$capture['success']) throw new \RuntimeException($capture['error'] ?? 'Error PayPal');
+                $referencia = $paypalOrderId;
+            } catch (\Throwable $e) {
+                $errMsg = 'PayPal no completó el pago: ' . $e->getMessage();
+                error_log('[confirmarPagoCarnihub] PayPal error: ' . $e->getMessage());
+            }
+
+        } else {
+            // transferencia — referencia manual
+            $referencia = trim((string)$this->post('referencia', ''));
+        }
+
+        // Marcar como pagado en la DB
+        $db = \Database::getInstance();
+        try {
+            $db->prepare(
+                "UPDATE rest_pedidos_sugeridos
+                 SET estado_pago     = 'pagado',
+                     pago_referencia = ?,
+                     pagado_at       = NOW()
+                 WHERE id = ?"
+            )->execute([$referencia ?: null, $pedidoId]);
+        } catch (\Throwable $e) { /* columnas aún no aplicadas */ }
+
+        if ($metodo === 'paypal' && !$this->isPost()) {
+            // Retorno GET de PayPal
+            $this->flash('success', 'Pago PayPal confirmado.');
+            $this->redirect('rest-inventario/pedidosSugeridos');
+            return;
+        }
+
+        $this->json(['ok' => true, 'message' => 'Pago registrado correctamente.', 'referencia' => $referencia]);
     }
 
     /**

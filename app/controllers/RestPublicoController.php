@@ -23,6 +23,42 @@ class RestPublicoController extends BaseController
         $this->inventarioModel = new RestInventarioModel();
     }
 
+    /**
+     * Lee una clave de Stripe desde la variable de entorno o desde global_settings.
+     * @param string $which 'public' | 'secret'
+     */
+    private function getStripeKey(string $which): string
+    {
+        $const = ($which === 'secret') ? STRIPE_SECRET_KEY : STRIPE_PUBLIC_KEY;
+        if (!empty($const)) return $const;
+        try {
+            require_once ROOT_PATH . '/app/models/ConfigModel.php';
+            $cfg = new ConfigModel();
+            return $cfg->get(($which === 'secret') ? 'stripe_secret_key' : 'stripe_public_key', '');
+        } catch (\Throwable $e) {
+            return '';
+        }
+    }
+
+    /**
+     * Obtiene los métodos de pago habilitados para comensales desde global_settings.
+     * @return string[]  e.g. ['efectivo','tarjeta','transferencia','paypal']
+     */
+    private function getMetodosPago(): array
+    {
+        $defaults = ['efectivo','tarjeta','transferencia','paypal'];
+        try {
+            require_once ROOT_PATH . '/app/models/ConfigModel.php';
+            $cfg = new ConfigModel();
+            $val = $cfg->get('metodos_pago_habilitados', '');
+            if (!empty($val)) {
+                $arr = json_decode($val, true);
+                if (is_array($arr) && !empty($arr)) return $arr;
+            }
+        } catch (\Throwable $e) {}
+        return $defaults;
+    }
+
     // /menu/{slug}  o  /menu/{slug}?mesa={qr_codigo}
     public function index(?string $slug = null): void
     {
@@ -436,13 +472,22 @@ class RestPublicoController extends BaseController
             }
         }
 
+        // Si el ticket ya fue pagado, redirigir a confirmación (evita pago duplicado)
+        if (($ticket['estado'] ?? '') === 'pagado') {
+            $this->redirect('menu/' . $realSlug . '/confirmacion/' . $visitaId . '?pagado=1');
+            return;
+        }
+
         $mesaQr    = null;
         if (!empty($visita['mesa_id'])) {
             $mesaObj = $this->mesaModel->find((int)$visita['mesa_id']);
             $mesaQr  = $mesaObj['qr_code'] ?? null;
         }
+
+        $stripePk         = $this->getStripeKey('public');
+        $metodosHabilitados = $this->getMetodosPago();
         $pageTitle = 'Pagar cuenta';
-        $this->render('publico/menu/pagar', compact('restaurante','ticket','todoItems','visita','visitaId','mesaQr','pageTitle'));
+        $this->render('publico/menu/pagar', compact('restaurante','ticket','todoItems','visita','visitaId','mesaQr','pageTitle','stripePk','metodosHabilitados'));
     }
 
     // POST /menu/{slug}/confirmarPago/{ticketId} — endpoint PÚBLICO (sin login)
@@ -459,6 +504,12 @@ class RestPublicoController extends BaseController
         if (!$restaurante || !$ticket || (int)$ticket['restaurante_id'] !== (int)$restaurante['id']) {
             http_response_code(404);
             die('<h1>Ticket no válido</h1>');
+        }
+
+        // Si ya fue pagado, redirigir a confirmación (evita cobro duplicado)
+        if (($ticket['estado'] ?? '') === 'pagado') {
+            $this->redirect('menu/' . $realSlug . '/confirmacion/' . $ticket['visita_id'] . '?pagado=1');
+            return;
         }
 
         $metodo  = $this->post('metodo_pago', 'efectivo');
@@ -505,7 +556,9 @@ class RestPublicoController extends BaseController
             unset($_SESSION[$sesKey]);
 
             try {
-                \Stripe\Stripe::setApiKey(STRIPE_SECRET_KEY);
+                $stripeKey = $this->getStripeKey('secret');
+                if (empty($stripeKey)) throw new \RuntimeException('Stripe no configurado');
+                \Stripe\Stripe::setApiKey($stripeKey);
                 $intent = \Stripe\PaymentIntent::retrieve($intentId);
                 if ($intent->status !== 'succeeded') {
                     throw new \RuntimeException('Estado Stripe: ' . $intent->status);
@@ -840,7 +893,12 @@ class RestPublicoController extends BaseController
         }
 
         try {
-            \Stripe\Stripe::setApiKey(STRIPE_SECRET_KEY);
+            $stripeKey = $this->getStripeKey('secret');
+            if (empty($stripeKey)) {
+                echo json_encode(['ok' => false, 'error' => 'Pago con tarjeta no configurado. Contacta al restaurante.']);
+                exit;
+            }
+            \Stripe\Stripe::setApiKey($stripeKey);
             $centavos = (int)round((float)($ticket['total'] ?? 0) * 100);
             $intent = \Stripe\PaymentIntent::create([
                 'amount'   => max(1000, $centavos),

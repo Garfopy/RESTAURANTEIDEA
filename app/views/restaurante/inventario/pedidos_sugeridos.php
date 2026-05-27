@@ -1,4 +1,27 @@
 ﻿<?php ob_start(); ?>
+<?php if (!empty($stripePk)): ?>
+<script src="https://js.stripe.com/v3/"></script>
+<?php endif; ?>
+
+<!-- Modal de pago a CarniHub -->
+<div id="modalPago"
+     style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.5);
+            align-items:center;justify-content:center;padding:20px">
+  <div style="background:#fff;border-radius:16px;padding:28px;width:100%;max-width:440px;
+              box-shadow:0 20px 60px rgba(0,0,0,.25)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+      <div>
+        <div style="font-weight:700;font-size:1.05rem;color:#111827">Pago a CarniHub</div>
+        <div style="font-size:.82rem;color:#6B7280;margin-top:2px">
+          Método: <strong id="modalPagoMetodo"></strong> &nbsp;|&nbsp; Total: <strong id="modalPagoMonto"></strong>
+        </div>
+      </div>
+      <button onclick="document.getElementById('modalPago').style.display='none'"
+              style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:#6B7280;line-height:1">×</button>
+    </div>
+    <div id="modalPagoContent"></div>
+  </div>
+</div>
 
 <style>
 .ph-topbar { display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px; }
@@ -78,6 +101,7 @@
           <th>Estado local</th>
           <th>Estado CarniHub</th>
           <th>Total estimado</th>
+          <th>Pago</th>
           <th>Items</th>
           <th>Generado</th>
           <th style="text-align:center">Acciones</th>
@@ -86,7 +110,7 @@
       <tbody>
         <?php if (empty($pedidos)): ?>
         <tr>
-          <td colspan="8" style="text-align:center;padding:48px 16px;color:#9CA3AF">
+          <td colspan="9" style="text-align:center;padding:48px 16px;color:#9CA3AF">
             <div style="font-size:2rem;margin-bottom:8px">🔭</div>
             <div style="font-weight:600">Sin pedidos automáticos aún</div>
             <div style="font-size:.8rem;margin-top:4px">
@@ -161,6 +185,27 @@
           <td>
             <strong style="color:#111827">$<?= number_format((float)$p['total_estimado'], 2) ?></strong>
           </td>
+          <td id="pago-badge-<?= $pid ?>">
+            <?php
+              $epago = $p['estado_pago'] ?? null;
+              if ($epago && $epago !== 'pendiente' || $epago === 'pagado'):
+                $epagoCls = ['pendiente'=>'#FEF3C7::#92400E','procesando'=>'#DBEAFE::#1E40AF',
+                             'pagado'=>'#DCFCE7::#166534','fallido'=>'#FEE2E2::#991B1B'][$epago] ?? '#F3F4F6::#374151';
+                [$bg, $fg] = explode('::', $epagoCls);
+            ?>
+            <span style="background:<?= $bg ?>;color:<?= $fg ?>;padding:3px 8px;border-radius:6px;
+                         font-size:.72rem;font-weight:700;white-space:nowrap">
+              <?= ['pendiente'=>'⏳ Pendiente','procesando'=>'🔄 Procesando','pagado'=>'✅ Pagado','fallido'=>'❌ Fallido'][$epago] ?? $epago ?>
+            </span>
+            <?php elseif ($est === 'convertido'): ?>
+            <span style="background:#FEF3C7;color:#92400E;padding:3px 8px;border-radius:6px;
+                         font-size:.72rem;font-weight:700;white-space:nowrap">
+              ⏳ Pendiente
+            </span>
+            <?php else: ?>
+            <span style="color:#D1D5DB">—</span>
+            <?php endif; ?>
+          </td>
           <td style="color:#6B7280;font-size:.8rem">
             <?= isset($p['items_count']) ? (int)$p['items_count'] . ' ings.' : '—' ?>
           </td>
@@ -193,6 +238,15 @@
               </button>
 
             <?php elseif ($est === 'convertido'): ?>
+              <?php $epago = $p['estado_pago'] ?? 'pendiente'; ?>
+              <?php if ($epago !== 'pagado'): ?>
+              <button class="btn-accion btn-reintentar"
+                      onclick="abrirModalPago(<?= $pid ?>, <?= (float)($p['total_estimado'] ?? 0) ?>, this)">
+                💳 Pagar
+              </button>
+              <?php else: ?>
+              <span style="font-size:.75rem;color:#059669;font-weight:600">✅ Pagado</span>
+              <?php endif; ?>
               <button class="btn-accion btn-actualizar"
                       id="btn-seg-<?= $pid ?>"
                       onclick="actualizarEstado(<?= $pid ?>, this)">
@@ -221,6 +275,7 @@
 
 <script>
 const BASE = '<?= BASE_URL ?>';
+let _pagoModal = { id: null, monto: null, metodo: null, data: null };
 
 function mostrarToast(msg, color) {
   const t = document.getElementById('toast-msg');
@@ -249,8 +304,14 @@ async function accionPedido(tipo, id, btn) {
     const data = await resp.json();
 
     if (data.ok) {
-      mostrarToast(data.message || 'Operación exitosa', '#059669');
-      setTimeout(() => location.reload(), 1500);
+      // Si la respuesta incluye datos de pago, abrir modal
+      if (data.pago) {
+        mostrarToast(data.message || 'Pedido enviado. Procesa el pago.', '#7C3AED');
+        _mostrarModalPago(id, data.pago);
+      } else {
+        mostrarToast(data.message || 'Operación exitosa', '#059669');
+        setTimeout(() => location.reload(), 1500);
+      }
     } else {
       mostrarToast('Error: ' + (data.error || 'Intenta de nuevo'), '#DC2626');
       btn.disabled = false;
@@ -261,6 +322,122 @@ async function accionPedido(tipo, id, btn) {
     btn.disabled = false;
     btn.textContent = orig;
   }
+}
+
+// Abrir modal de pago para un pedido ya enviado a CarniHub
+async function abrirModalPago(id, monto, btn) {
+  btn.disabled = true;
+  // Solo abrir modal con los datos del pedido (no re-enviar)
+  // Leer configuración del método de pago via AJAX o inferir
+  btn.disabled = false;
+  // Abrimos modal con "transferencia" como fallback (el user puede cancelar y pagar más tarde)
+  const pagoFallback = { metodo: 'transferencia', monto: monto, instrucciones: '' };
+  _mostrarModalPago(id, pagoFallback);
+}
+
+function _mostrarModalPago(id, pago) {
+  _pagoModal = { id, monto: pago.monto, metodo: pago.metodo, data: pago };
+  const modal   = document.getElementById('modalPago');
+  const content = document.getElementById('modalPagoContent');
+
+  document.getElementById('modalPagoMonto').textContent =
+    '$' + parseFloat(pago.monto || 0).toFixed(2);
+  document.getElementById('modalPagoMetodo').textContent =
+    { stripe: '💳 Tarjeta (Stripe)', transferencia: '📲 Transferencia', paypal: '🅿️ PayPal' }[pago.metodo] || pago.metodo;
+
+  // Contenido según método
+  if (pago.metodo === 'paypal' && pago.approvalUrl) {
+    content.innerHTML = `
+      <p style="font-size:.87rem;color:#374151;margin-bottom:16px">
+        Serás redirigido a PayPal para completar el pago.
+      </p>
+      <a href="${pago.approvalUrl}" class="btn btn-primary" style="display:block;text-align:center">
+        Pagar con PayPal →
+      </a>`;
+  } else if (pago.metodo === 'stripe' && pago.clientSecret) {
+    content.innerHTML = `
+      <div style="font-size:.85rem;font-weight:600;color:#374151;margin-bottom:8px">Datos de tarjeta</div>
+      <div id="cardElPago" style="padding:12px 14px;border:1.5px solid #E5E7EB;border-radius:10px;background:#fff"></div>
+      <div id="cardElPagoErr" style="color:#EF4444;font-size:.8rem;margin-top:6px"></div>
+      <button id="btnConfirmarStripe" onclick="confirmarPagoStripe()" class="btn btn-primary"
+              style="width:100%;margin-top:14px;justify-content:center">
+        Pagar $${parseFloat(pago.monto || 0).toFixed(2)}
+      </button>`;
+    // Montar card element
+    setTimeout(() => {
+      if (!window.Stripe) { content.innerHTML = '<p style="color:#EF4444">Stripe no disponible. Configura las claves Stripe en Configuración.</p>'; return; }
+      const stripePk = '<?= htmlspecialchars($stripePk ?? '', ENT_QUOTES) ?>';
+      if (!stripePk) { content.innerHTML = '<p style="color:#EF4444">Stripe no configurado. Agrega las claves en Configuración del restaurante.</p>'; return; }
+      const stripe   = Stripe(stripePk);
+      const elements = stripe.elements();
+      const card     = elements.create('card', { style: { base: { fontSize: '16px', color: '#111827' } } });
+      card.mount('#cardElPago');
+      card.on('change', e => document.getElementById('cardElPagoErr').textContent = e.error?.message || '');
+      window._cardElPago = card;
+      window._stripeInst = stripe;
+    }, 100);
+  } else {
+    // Transferencia u otros
+    const instrText = pago.instrucciones
+      ? `<div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;padding:14px;
+                    font-size:.84rem;white-space:pre-line;color:#065F46;font-family:monospace;margin-bottom:14px">
+             ${pago.instrucciones.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`
+      : `<p style="font-size:.84rem;color:#6B7280">El administrador debe registrar la referencia al confirmar la transferencia.</p>`;
+    content.innerHTML = instrText + `
+      <label style="display:block;font-size:.83rem;font-weight:600;color:#374151;margin-bottom:6px">Referencia / Folio de la transferencia</label>
+      <input id="inpRefTransf" type="text" class="form-input" placeholder="Ej: TRF-20240115-001" style="margin-bottom:12px">
+      <button onclick="confirmarPagoTransf()" class="btn btn-primary" style="width:100%;justify-content:center">
+        Confirmar pago
+      </button>`;
+  }
+
+  modal.style.display = 'flex';
+}
+
+async function confirmarPagoStripe() {
+  const btn = document.getElementById('btnConfirmarStripe');
+  btn.disabled = true; btn.textContent = 'Procesando…';
+  try {
+    const { paymentIntent, error } = await window._stripeInst.confirmCardPayment(
+      _pagoModal.data.clientSecret, { payment_method: { card: window._cardElPago } }
+    );
+    if (error) throw new Error(error.message);
+    if (paymentIntent.status !== 'succeeded') throw new Error('Pago no completado');
+    const body = new URLSearchParams({ payment_intent_id: paymentIntent.id });
+    const resp = await fetch(BASE + 'rest-inventario/confirmarPagoCarnihub/' + _pagoModal.id + '/stripe', {
+      method: 'POST', credentials: 'same-origin', body
+    });
+    const d = await resp.json();
+    if (!d.ok) throw new Error(d.error || 'Error al confirmar');
+    document.getElementById('modalPago').style.display = 'none';
+    mostrarToast('✅ Pago con tarjeta confirmado', '#059669');
+    _actualizarBadgePago(_pagoModal.id, 'pagado');
+  } catch(e) {
+    document.getElementById('cardElPagoErr').textContent = e.message;
+    btn.disabled = false; btn.textContent = 'Pagar $' + parseFloat(_pagoModal.monto||0).toFixed(2);
+  }
+}
+
+async function confirmarPagoTransf() {
+  const ref = document.getElementById('inpRefTransf')?.value?.trim() || '';
+  const body = new URLSearchParams({ referencia: ref });
+  try {
+    const resp = await fetch(BASE + 'rest-inventario/confirmarPagoCarnihub/' + _pagoModal.id + '/transferencia', {
+      method: 'POST', credentials: 'same-origin', body
+    });
+    const d = await resp.json();
+    if (!d.ok) throw new Error(d.error || 'Error al confirmar');
+    document.getElementById('modalPago').style.display = 'none';
+    mostrarToast('✅ Pago de transferencia registrado', '#059669');
+    _actualizarBadgePago(_pagoModal.id, 'pagado');
+  } catch(e) {
+    mostrarToast('Error: ' + e.message, '#DC2626');
+  }
+}
+
+function _actualizarBadgePago(id, estado) {
+  const cell = document.getElementById('pago-badge-' + id);
+  if (cell) cell.innerHTML = '<span style="background:#DCFCE7;color:#166534;padding:3px 8px;border-radius:6px;font-size:.72rem;font-weight:700">✅ Pagado</span>';
 }
 
 async function actualizarEstado(id, btn) {

@@ -6,7 +6,9 @@
   <title>Pagar cuenta — <?= htmlspecialchars($restaurante['nombre'] ?? '') ?></title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="<?= BASE_URL ?>public/css/restaurant.css">
+  <?php if (!empty($stripePk) && in_array('tarjeta', $metodosHabilitados ?? [])): ?>
   <script src="https://js.stripe.com/v3/"></script>
+  <?php endif; ?>
   <style>
     :root {
       --cp: <?= htmlspecialchars($restaurante['color_primario'] ?? '#C8102E') ?>;
@@ -131,22 +133,39 @@
       <div style="font-size:.85rem;font-weight:600;color:#374151;margin-bottom:8px">Método de pago</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px" id="metodoGrid">
         <?php
-        $metodos = [
+        $todosMetodos = [
           ['val'=>'efectivo',       'label'=>'Efectivo',       'icon'=>'💵'],
           ['val'=>'tarjeta',        'label'=>'Tarjeta',        'icon'=>'💳'],
           ['val'=>'transferencia',  'label'=>'Transferencia',  'icon'=>'📲'],
           ['val'=>'paypal',         'label'=>'PayPal',         'icon'=>'🅿️'],
         ];
-        foreach ($metodos as $m):
+        $habilitados   = $metodosHabilitados ?? ['efectivo','tarjeta','transferencia','paypal'];
+        $primerMetodo  = null;
+        foreach ($todosMetodos as $m):
+          if (!in_array($m['val'], $habilitados)) continue;
+          if ($primerMetodo === null) $primerMetodo = $m['val'];
+          $tarjetaOk = ($m['val'] === 'tarjeta') ? !empty($stripePk) : true;
         ?>
         <button type="button"
+                <?php if ($tarjetaOk): ?>
                 onclick="seleccionarMetodo('<?= $m['val'] ?>')"
+                <?php endif; ?>
                 data-metodo="<?= $m['val'] ?>"
                 class="metodo-btn"
-                style="padding:12px;border-radius:10px;border:2px solid #E5E7EB;background:#fff;
-                       cursor:pointer;transition:.15s;text-align:center;font-size:.85rem;font-weight:600">
+                <?php if (!$tarjetaOk): ?>
+                disabled
+                title="Pago con tarjeta no configurado"
+                <?php endif; ?>
+                style="padding:12px;border-radius:10px;border:2px solid #E5E7EB;
+                       background:<?= $tarjetaOk ? '#fff' : '#F3F4F6' ?>;
+                       cursor:<?= $tarjetaOk ? 'pointer' : 'not-allowed' ?>;
+                       opacity:<?= $tarjetaOk ? '1' : '.5' ?>;
+                       transition:.15s;text-align:center;font-size:.85rem;font-weight:600">
           <div style="font-size:1.3rem;margin-bottom:3px"><?= $m['icon'] ?></div>
           <?= $m['label'] ?>
+          <?php if (!$tarjetaOk): ?>
+          <div style="font-size:.65rem;color:#9CA3AF;font-weight:400">No disponible</div>
+          <?php endif; ?>
         </button>
         <?php endforeach; ?>
       </div>
@@ -267,15 +286,16 @@ const subtotal = <?= (float)($ticket['subtotal'] ?? 0) ?>;
 const baseTotal = <?= (float)($ticket['total'] ?? 0) ?>;
 const TICKET_ID = <?= (int)($ticket['id'] ?? 0) ?>;
 const SLUG_PAGO = '<?= htmlspecialchars($restaurante['slug'] ?? '') ?>';
-const STRIPE_PK = '<?= STRIPE_PUBLIC_KEY ?>';
+const STRIPE_PK = '<?= htmlspecialchars($stripePk ?? '', ENT_QUOTES) ?>';
 let propinaMonto = 0;
 let metodoActual = 'efectivo';
 let splitSubtotal = null;
 
 let stripeInstance = null, cardElement = null, stripeInited = false;
 
-// Inicializar
-seleccionarMetodo('efectivo');
+// Inicializar: usar el primer método habilitado
+const PRIMER_METODO = '<?= htmlspecialchars($primerMetodo ?? 'efectivo', ENT_QUOTES) ?>';
+seleccionarMetodo(PRIMER_METODO);
 actualizarTotalDisplay();
 
 // ── Propina (AJAX para exactitud) ─────────────────────────────────────────────
@@ -318,6 +338,12 @@ function seleccionarMetodo(metodo) {
 
   const wrap = document.getElementById('stripeWrap');
   if (metodo === 'tarjeta') {
+    if (!STRIPE_PK) {
+      // Tarjeta no disponible — volver a primer método habilitado
+      alert('Pago con tarjeta no disponible. Por favor elige otro método.');
+      seleccionarMetodo(PRIMER_METODO !== 'tarjeta' ? PRIMER_METODO : 'efectivo');
+      return;
+    }
     wrap.style.display = 'block';
     if (!stripeInited) {
       stripeInstance = Stripe(STRIPE_PK);
@@ -366,13 +392,14 @@ document.addEventListener('change', e => {
 
 // ── Interceptor Stripe ──────────────────────────────────────────────────────────
 document.getElementById('formPago').addEventListener('submit', async function(e) {
-  if (metodoActual !== 'tarjeta') return; // flujo normal para otros métodos
-
-  e.preventDefault();
   const btn = document.getElementById('btnPagar');
-  const errDiv = document.getElementById('cardErrors');
   btn.disabled = true;
   btn.textContent = 'Procesando…';
+
+  if (metodoActual !== 'tarjeta') return; // flujo normal (POST directo), botón ya deshabilitado
+
+  e.preventDefault();
+  const errDiv = document.getElementById('cardErrors');
   errDiv.textContent = '';
 
   try {

@@ -45,18 +45,37 @@ class RestConfigController extends BaseController
 
         // Google Maps API key from global_settings (superadmin-configured)
         $mapsApiKey = '';
+        // Payment / Stripe config from global_settings
+        $cfgPagos = [];
+        $cfgCarniHub = [];
         try {
             $db   = \Database::getInstance();
             $stmt = $db->prepare("SELECT valor FROM global_settings WHERE clave = 'google_maps_key' LIMIT 1");
             $stmt->execute();
             $row = $stmt->fetch(\PDO::FETCH_ASSOC);
             $mapsApiKey = $row['valor'] ?? '';
-        } catch (\Exception $e) { /* table may not exist */ }
+
+            // Pagos
+            $clavesPagos = ['stripe_public_key','stripe_secret_key','metodos_pago_habilitados',
+                            'notif_email_pago','notif_email_pago_destino'];
+            foreach ($clavesPagos as $clave) {
+                $s2 = $db->prepare("SELECT valor FROM global_settings WHERE clave = :c LIMIT 1");
+                $s2->execute([':c' => $clave]);
+                $r2 = $s2->fetch(\PDO::FETCH_ASSOC);
+                $cfgPagos[$clave] = $r2['valor'] ?? '';
+            }
+
+            // CarniHub API config
+            $s3 = $db->prepare("SELECT * FROM carnihub_api_config WHERE restaurante_id = :rid LIMIT 1");
+            $s3->execute([':rid' => $restauranteId]);
+            $cfgCarniHub = $s3->fetch(\PDO::FETCH_ASSOC) ?: [];
+
+        } catch (\Exception $e) { /* tables may not exist */ }
 
         $pageTitle  = 'Configuración del Restaurante';
         $activeMenu = 'rest_config';
         $this->render('restaurante/config/index',
-            compact('restaurante','flash','pageTitle','activeMenu','mapsApiKey'));
+            compact('restaurante','flash','pageTitle','activeMenu','mapsApiKey','cfgPagos','cfgCarniHub'));
     }
 
     public function guardar(?string $p = null): void
@@ -135,6 +154,57 @@ class RestConfigController extends BaseController
         } catch (PDOException $e) {
             // Columns from migration 026 not yet applied — ignore
         }
+
+        // ── Configuración de pagos (global_settings) ──────────────
+        $clavesPagos = ['stripe_public_key','stripe_secret_key','metodos_pago_habilitados',
+                        'notif_email_pago','notif_email_pago_destino'];
+        try {
+            $db = \Database::getInstance();
+            // Métodos habilitados — construir array desde checkboxes
+            $metodosPost = $this->post('metodos_pago_habilitados', []);
+            if (!is_array($metodosPost)) $metodosPost = [];
+            $metodosValidos = ['efectivo','tarjeta','transferencia','paypal'];
+            $metodosPost = array_filter($metodosPost, fn($m) => in_array($m, $metodosValidos));
+            if (empty($metodosPost)) $metodosPost = ['efectivo']; // siempre al menos efectivo
+
+            $valoresPagos = [
+                'stripe_public_key'       => trim((string)$this->post('stripe_public_key', '')),
+                'stripe_secret_key'       => trim((string)$this->post('stripe_secret_key', '')),
+                'metodos_pago_habilitados'=> json_encode(array_values($metodosPost)),
+                'notif_email_pago'        => $this->post('notif_email_pago') ? '1' : '0',
+                'notif_email_pago_destino'=> trim((string)$this->post('notif_email_pago_destino', '')),
+            ];
+
+            foreach ($valoresPagos as $clave => $valor) {
+                // No sobreescribir la secret key si se dejó vacía (para no borrar la existente)
+                if ($clave === 'stripe_secret_key' && $valor === '') continue;
+
+                $upsert = $db->prepare(
+                    "INSERT INTO global_settings (clave, valor, grupo) VALUES (:c, :v, 'pagos')
+                     ON DUPLICATE KEY UPDATE valor = :v2"
+                );
+                $upsert->execute([':c' => $clave, ':v' => $valor, ':v2' => $valor]);
+            }
+        } catch (\Exception $e) { /* global_settings may not have pagos cols yet */ }
+
+        // ── CarniHub API config ────────────────────────────────────
+        $chMetodoPago    = $this->post('ch_metodo_pago', 'transferencia');
+        $chMetodoPago    = in_array($chMetodoPago, ['stripe','paypal','transferencia'], true) ? $chMetodoPago : 'transferencia';
+        $chInstrucciones = trim((string)$this->post('ch_instrucciones_transferencia', ''));
+        try {
+            $db = \Database::getInstance();
+            $chRow = $db->prepare("SELECT id FROM carnihub_api_config WHERE restaurante_id = :rid LIMIT 1");
+            $chRow->execute([':rid' => $restauranteId]);
+            if ($chRow->fetchColumn()) {
+                $upd = $db->prepare(
+                    "UPDATE carnihub_api_config
+                     SET metodo_pago = :mp, instrucciones_transferencia = :ins
+                     WHERE restaurante_id = :rid"
+                );
+                $upd->execute([':mp' => $chMetodoPago, ':ins' => $chInstrucciones ?: null, ':rid' => $restauranteId]);
+            }
+        } catch (\Exception $e) { /* columns may not exist yet */ }
+
         $this->flash('success', 'Configuración guardada.');
         $this->redirect('rest-config/index');
     }

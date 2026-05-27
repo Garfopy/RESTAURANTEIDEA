@@ -349,6 +349,137 @@
         </div>
       </div>
 
+      <!-- ══════════════════════════════════════════════════════════
+           SECCIÓN: PAGOS DE COMENSALES
+           ═════════════════════════════════════════════════════════ -->
+      <hr style="border:none;border-top:1.5px solid #F3F4F6;margin:24px 0">
+      <div style="font-weight:700;font-size:.95rem;color:#111827;margin-bottom:16px;
+                  display:flex;align-items:center;gap:8px">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+        Métodos de pago para comensales
+      </div>
+
+      <?php
+        $metodosConfig = json_decode($cfgPagos['metodos_pago_habilitados'] ?? '["efectivo","tarjeta","transferencia","paypal"]', true) ?: ['efectivo','tarjeta','transferencia','paypal'];
+        $metodosOpts = [
+          'efectivo'       => '💵 Efectivo',
+          'tarjeta'        => '💳 Tarjeta (Stripe)',
+          'transferencia'  => '📲 Transferencia',
+          'paypal'         => '🅿️ PayPal',
+        ];
+      ?>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
+        <?php foreach ($metodosOpts as $val => $label): ?>
+        <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;
+                      border:1.5px solid #E5E7EB;border-radius:10px;cursor:pointer;
+                      background:#F9FAFB;font-size:.88rem;font-weight:500">
+          <input type="checkbox"
+                 name="metodos_pago_habilitados[]"
+                 value="<?= $val ?>"
+                 <?= in_array($val, $metodosConfig) ? 'checked' : '' ?>
+                 style="width:16px;height:16px;accent-color:#C8102E">
+          <?= $label ?>
+        </label>
+        <?php endforeach; ?>
+      </div>
+      <div style="font-size:.75rem;color:#9CA3AF;margin-bottom:20px">
+        Solo los métodos marcados aparecerán al comensal en la pantalla de pago.
+        Al menos uno debe estar habilitado.
+      </div>
+
+      <!-- Stripe keys -->
+      <div style="background:#F0F9FF;border:1.5px solid #BAE6FD;border-radius:12px;
+                  padding:16px 18px;margin-bottom:16px">
+        <div style="font-weight:600;color:#0C4A6E;font-size:.9rem;margin-bottom:12px">
+          🔑 Credenciales Stripe <span style="font-size:.75rem;font-weight:400;color:#0369A1">(para pagos con tarjeta)</span>
+        </div>
+        <div class="form-group">
+          <label class="form-label" style="font-size:.8rem">Publishable Key (pk_...)</label>
+          <input type="text" name="stripe_public_key" class="form-input"
+                 value="<?= htmlspecialchars($cfgPagos['stripe_public_key'] ?? '') ?>"
+                 placeholder="pk_live_... o pk_test_..."
+                 style="font-family:monospace;font-size:.8rem">
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label" style="font-size:.8rem">Secret Key (sk_...)</label>
+          <input type="password" name="stripe_secret_key" class="form-input"
+                 value="<?= empty($cfgPagos['stripe_secret_key'] ?? '') ? '' : '••••••••••••' ?>"
+                 placeholder="sk_live_... o sk_test_... (déjalo vacío para no cambiarla)"
+                 style="font-family:monospace;font-size:.8rem"
+                 autocomplete="new-password">
+          <div style="font-size:.72rem;color:#9CA3AF;margin-top:4px">
+            ⚠️ La Secret Key solo se muestra enmascarada. Escribe una nueva solo si deseas cambiarla.
+          </div>
+        </div>
+      </div>
+
+      <!-- Notificación email -->
+      <div style="background:#F9FAFB;border:1.5px solid #E5E7EB;border-radius:12px;
+                  padding:14px 16px;margin-bottom:20px">
+        <label style="display:flex;align-items:center;gap:12px;cursor:pointer;margin-bottom:10px">
+          <input type="checkbox" name="notif_email_pago" value="1"
+                 <?= ($cfgPagos['notif_email_pago'] ?? '0') === '1' ? 'checked' : '' ?>
+                 id="chkNotifEmail"
+                 onchange="document.getElementById('rowEmailDestino').style.display=this.checked?'block':'none'"
+                 style="width:16px;height:16px;accent-color:#C8102E">
+          <div>
+            <div style="font-weight:600;font-size:.88rem;color:#111827">📧 Recibir email cuando un comensal pague</div>
+            <div style="font-size:.75rem;color:#6B7280">Recibirás un resumen del pago al correo configurado abajo.</div>
+          </div>
+        </label>
+        <div id="rowEmailDestino" style="display:<?= ($cfgPagos['notif_email_pago'] ?? '0') === '1' ? 'block' : 'none' ?>">
+          <label class="form-label" style="font-size:.8rem">Email destino</label>
+          <input type="email" name="notif_email_pago_destino" class="form-input"
+                 value="<?= htmlspecialchars($cfgPagos['notif_email_pago_destino'] ?? '') ?>"
+                 placeholder="admin@mirestaurante.com">
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════
+           SECCIÓN: CARNIHUB — PAGO DE PEDIDOS A PROVEEDOR
+           ═════════════════════════════════════════════════════════ -->
+      <?php if (!empty($cfgCarniHub)): ?>
+      <hr style="border:none;border-top:1.5px solid #F3F4F6;margin:24px 0">
+      <div style="font-weight:700;font-size:.95rem;color:#111827;margin-bottom:16px;
+                  display:flex;align-items:center;gap:8px">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10"/></svg>
+        CarniHub — Pago de pedidos a proveedor
+      </div>
+      <div style="background:#FFF7ED;border:1.5px solid #FED7AA;border-radius:12px;
+                  padding:14px 16px;margin-bottom:14px;font-size:.8rem;color:#92400E">
+        Cuando envíes un pedido de insumos a CarniHub, el sistema usará el método configurado aquí
+        para procesar el cobro automáticamente.
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Método de pago al proveedor</label>
+        <select name="ch_metodo_pago" class="form-input"
+                onchange="document.getElementById('chTransfPanel').style.display=this.value==='transferencia'?'block':'none'">
+          <?php foreach (['stripe'=>'💳 Cargo automático con Stripe','paypal'=>'🅿️ PayPal','transferencia'=>'📲 Transferencia bancaria'] as $v => $lbl): ?>
+          <option value="<?= $v ?>" <?= ($cfgCarniHub['metodo_pago'] ?? 'transferencia') === $v ? 'selected' : '' ?>>
+            <?= $lbl ?>
+          </option>
+          <?php endforeach; ?>
+        </select>
+        <div style="font-size:.74rem;color:#9CA3AF;margin-top:4px">
+          Stripe y PayPal usan las mismas credenciales configuradas arriba en "Métodos de pago para comensales".
+        </div>
+      </div>
+
+      <div id="chTransfPanel"
+           style="display:<?= ($cfgCarniHub['metodo_pago'] ?? 'transferencia') === 'transferencia' ? 'block' : 'none' ?>;
+                  background:#F9FAFB;border:1.5px solid #E5E7EB;border-radius:10px;padding:14px;margin-bottom:16px">
+        <label class="form-label" style="font-size:.8rem">
+          Instrucciones de transferencia (proporcionadas por CarniHub)
+        </label>
+        <textarea name="ch_instrucciones_transferencia" class="form-textarea" rows="4"
+                  placeholder="Banco: BBVA&#10;CLABE: 012345678901234567&#10;Beneficiario: CarniHub S.A."><?= htmlspecialchars($cfgCarniHub['instrucciones_transferencia'] ?? '') ?></textarea>
+        <div style="font-size:.73rem;color:#9CA3AF;margin-top:4px">
+          Estas instrucciones se mostrarán al administrador al enviar un pedido de insumos.
+        </div>
+      </div>
+      <?php endif; ?>
+
       <!-- Nota footer -->
       <div style="background:#F9FAFB;border-radius:8px;padding:12px;font-size:.8rem;color:#6B7280;margin-bottom:20px">
         El footer del menú siempre mostrará: <strong>Potenciado por CarniHub</strong>
