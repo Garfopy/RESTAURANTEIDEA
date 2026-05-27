@@ -381,7 +381,12 @@ class RestPublicoController extends BaseController
             $detalle = $this->pedidoModel->getConItems((int)$ped['id']);
             $pedidos[] = array_merge($ped, ['items' => $detalle['items'] ?? []]);
         }
-        $ticket      = $this->ticketModel->getByVisita($visitaId);
+        $ticket = $this->ticketModel->getByVisita($visitaId);
+        // Recalcular si el ticket existe y no está pagado, por si se añadieron pedidos después
+        if ($ticket && ($ticket['estado'] ?? '') !== 'pagado') {
+            $this->ticketModel->recalcularSubtotal((int)$ticket['id'], $visitaId);
+            $ticket = $this->ticketModel->find((int)$ticket['id']);
+        }
         $pageTitle   = '¡Pedido recibido!';
         $this->render('publico/menu/confirmacion', compact('restaurante','visita','pedidos','ticket','pageTitle'));
     }
@@ -553,38 +558,48 @@ class RestPublicoController extends BaseController
         }
 
         if ($metodo === 'tarjeta') {
-            $intentId = trim($this->post('payment_intent_id', ''));
-            // Limpiar sesión antigua (ya no se usa para validar)
-            unset($_SESSION['stripe_intent_' . $ticketId]);
-
-            if (!$intentId) {
-                $_SESSION['flash_error'] = 'No se recibió confirmación de pago. Intenta de nuevo.';
-                $this->redirect('menu/' . $realSlug . '/pagar/' . $ticket['visita_id']);
-                return;
-            }
-
             try {
                 $stripeKey = $this->getStripeKey('secret');
                 if (empty($stripeKey)) throw new \RuntimeException('Stripe no configurado');
                 \Stripe\Stripe::setApiKey($stripeKey);
-                $intent = \Stripe\PaymentIntent::retrieve($intentId);
-                if ($intent->status !== 'succeeded') {
-                    throw new \RuntimeException('Estado Stripe: ' . $intent->status);
-                }
-                // Seguridad anti-replay: verificar que el intent pertenece a ESTE ticket
-                if ((int)($intent->metadata['ticket_id'] ?? 0) !== $ticketId) {
-                    throw new \RuntimeException('El intento de pago no corresponde a este ticket');
-                }
+
+                $total    = (float)($ticket['total'] ?? 0);
+                $centavos = (int)round($total * 100);
+
+                $session = \Stripe\Checkout\Session::create([
+                    'payment_method_types' => ['card'],
+                    'mode'                 => 'payment',
+                    'line_items'           => [[
+                        'price_data' => [
+                            'currency'     => 'mxn',
+                            'unit_amount'  => max(1000, $centavos),
+                            'product_data' => [
+                                'name' => ($restaurante['nombre'] ?? 'Cuenta') . ' — ' . ($ticket['folio'] ?? ''),
+                            ],
+                        ],
+                        'quantity' => 1,
+                    ]],
+                    'success_url' => BASE_URL . 'menu/stripeRetorno/' . $realSlug . '/' . $ticketId . '?session_id={CHECKOUT_SESSION_ID}',
+                    'cancel_url'  => BASE_URL . 'menu/' . $realSlug . '/pagar/' . $ticket['visita_id'],
+                    'metadata'    => [
+                        'ticket_id' => (string)$ticketId,
+                        'folio'     => $ticket['folio'] ?? '',
+                    ],
+                ]);
+
+                $_SESSION['stripe_checkout_' . $ticketId] = [
+                    'session_id' => $session->id,
+                    'ticket_id'  => $ticketId,
+                    'slug'       => $realSlug,
+                ];
+
+                header('Location: ' . $session->url);
+                exit;
             } catch (\Throwable $e) {
-                $_SESSION['flash_error'] = 'El pago con tarjeta no se completó. Intenta de nuevo.';
+                $_SESSION['flash_error'] = 'Error al iniciar pago con tarjeta. Elige otro método.';
                 $this->redirect('menu/' . $realSlug . '/pagar/' . $ticket['visita_id']);
                 return;
             }
-
-            $this->ticketModel->marcarPagado($ticketId, 'tarjeta', $intentId);
-            $this->visitaModel->marcarPagada((int)$ticket['visita_id']);
-            $this->redirect('menu/' . $realSlug . '/confirmacion/' . $ticket['visita_id'] . '?pagado=1');
-            return;
         }
 
         $this->ticketModel->marcarPagado($ticketId, $metodo, null);
@@ -927,6 +942,64 @@ class RestPublicoController extends BaseController
             echo json_encode(['ok' => false, 'error' => 'Error al crear pago con tarjeta']);
         }
         exit;
+    }
+
+    // GET /menu/stripeRetorno/{slug}/{ticketId}?session_id={CHECKOUT_SESSION_ID}
+    public function stripeRetorno(?string $slug = null): void
+    {
+        $parts     = explode('/', $slug ?? '');
+        $realSlug  = $parts[0] ?? '';
+        $ticketId  = (int)($parts[1] ?? 0);
+        $sessionId = trim($this->get('session_id', ''));
+
+        $restaurante = $this->restModel->getBySlug($realSlug);
+        $ticket      = $this->ticketModel->find($ticketId);
+
+        if (!$restaurante || !$ticket || !$sessionId
+            || (int)$ticket['restaurante_id'] !== (int)$restaurante['id']) {
+            $this->redirect('menu/' . $realSlug);
+            return;
+        }
+
+        // Idempotente: si ya fue pagado, redirigir directo
+        if (($ticket['estado'] ?? '') === 'pagado') {
+            $this->redirect('menu/' . $realSlug . '/confirmacion/' . $ticket['visita_id'] . '?pagado=1');
+            return;
+        }
+
+        // Verificar token de sesión anti-replay
+        $sesKey = 'stripe_checkout_' . $ticketId;
+        if (empty($_SESSION[$sesKey])
+            || $_SESSION[$sesKey]['slug']       !== $realSlug
+            || $_SESSION[$sesKey]['session_id'] !== $sessionId) {
+            $_SESSION['flash_error'] = 'Sesión de pago expirada. Intenta de nuevo.';
+            $this->redirect('menu/' . $realSlug . '/pagar/' . $ticket['visita_id']);
+            return;
+        }
+        unset($_SESSION[$sesKey]);
+
+        try {
+            $stripeKey = $this->getStripeKey('secret');
+            if (empty($stripeKey)) throw new \RuntimeException('Stripe no configurado');
+            \Stripe\Stripe::setApiKey($stripeKey);
+
+            $session = \Stripe\Checkout\Session::retrieve($sessionId);
+
+            if ($session->payment_status !== 'paid') {
+                throw new \RuntimeException('Pago no completado (estado: ' . $session->payment_status . ')');
+            }
+            if ((string)($session->metadata['ticket_id'] ?? '') !== (string)$ticketId) {
+                throw new \RuntimeException('El pago no corresponde a este ticket');
+            }
+        } catch (\Throwable $e) {
+            $_SESSION['flash_error'] = 'No se pudo verificar el pago. Contacta al restaurante.';
+            $this->redirect('menu/' . $realSlug . '/pagar/' . $ticket['visita_id']);
+            return;
+        }
+
+        $this->ticketModel->marcarPagado($ticketId, 'tarjeta', $session->payment_intent ?? null);
+        $this->visitaModel->marcarPagada((int)$ticket['visita_id']);
+        $this->redirect('menu/' . $realSlug . '/confirmacion/' . $ticket['visita_id'] . '?pagado=1');
     }
 
     // GET /menu/gracias?qr={token}

@@ -66,7 +66,7 @@ if (in_array($ctrlSlug, ['menu', 'acceso'], true)) {
     $knownActions = ['index','ordenar','pagar','confirmarPago','confirmacion','login','staff',
                      'llamarMesero','cancelarPedido','estadoPedido','actualizarPropina','generarTicket',
                      'paypalCrear','paypalRetorno','paypalCancelar','entrarComensal',
-                     'scanPortero','registrarSalidaPublica','checkSalida','gracias','stripeIntent',
+                     'scanPortero','registrarSalidaPublica','checkSalida','gracias','stripeIntent','stripeRetorno',
                      'reservar','guardarReserva','cancelarReserva','mesasDisponibles'];
     if ($action !== '' && in_array($action, $knownActions, true)) {
         // Forma /menu/{accion}/{slug}/{...} — concatenar segmentos a partir del 2

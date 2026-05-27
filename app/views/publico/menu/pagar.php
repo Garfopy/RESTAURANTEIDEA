@@ -6,9 +6,7 @@
   <title>Pagar cuenta — <?= htmlspecialchars($restaurante['nombre'] ?? '') ?></title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="<?= BASE_URL ?>public/css/restaurant.css">
-  <?php if (!empty($stripePk) && in_array('tarjeta', $metodosHabilitados ?? [])): ?>
-  <script src="https://js.stripe.com/v3/"></script>
-  <?php endif; ?>
+
   <style>
     :root {
       --cp: <?= htmlspecialchars($restaurante['color_primario'] ?? '#C8102E') ?>;
@@ -175,15 +173,6 @@
     <form method="POST" action="<?= BASE_URL ?>menu/confirmarPago/<?= htmlspecialchars($restaurante['slug'] ?? '') ?>/<?= (int)($ticket['id'] ?? 0) ?>" id="formPago">
       <input type="hidden" name="metodo_pago" id="inpMetodo" value="efectivo">
       <input type="hidden" name="propina" id="inpPropina" value="0">
-      <input type="hidden" name="payment_intent_id" id="inpIntentId" value="">
-
-      <!-- Stripe Card Element (visible sólo cuando se selecciona Tarjeta) -->
-      <div id="stripeWrap" style="display:none;margin-bottom:16px">
-        <div style="font-size:.85rem;font-weight:600;color:#374151;margin-bottom:8px">Datos de tarjeta</div>
-        <div id="cardElement"
-             style="padding:12px 14px;border:1.5px solid #E5E7EB;border-radius:10px;background:#fff"></div>
-        <div id="cardErrors" style="color:#EF4444;font-size:.8rem;margin-top:6px"></div>
-      </div>
 
       <!-- Propina selector -->
       <div style="margin-bottom:16px">
@@ -291,8 +280,6 @@ let propinaMonto = 0;
 let metodoActual = 'efectivo';
 let splitSubtotal = null;
 
-let stripeInstance = null, cardElement = null, stripeInited = false;
-
 // Inicializar: usar el primer método habilitado
 const PRIMER_METODO = '<?= htmlspecialchars($primerMetodo ?? 'efectivo', ENT_QUOTES) ?>';
 seleccionarMetodo(PRIMER_METODO);
@@ -336,29 +323,11 @@ function seleccionarMetodo(metodo) {
   const btn = document.querySelector(`.metodo-btn[data-metodo="${metodo}"]`);
   if (btn) btn.classList.add('selected');
 
-  const wrap = document.getElementById('stripeWrap');
-  if (metodo === 'tarjeta') {
-    if (!STRIPE_PK) {
-      // Tarjeta no disponible — volver a primer método habilitado
-      alert('Pago con tarjeta no disponible. Por favor elige otro método.');
-      seleccionarMetodo(PRIMER_METODO !== 'tarjeta' ? PRIMER_METODO : 'efectivo');
-      return;
-    }
-    wrap.style.display = 'block';
-    if (!stripeInited) {
-      stripeInstance = Stripe(STRIPE_PK);
-      const elements = stripeInstance.elements();
-      cardElement = elements.create('card', {
-        style: { base: { fontSize: '16px', color: '#111827', '::placeholder': { color: '#9CA3AF' } } }
-      });
-      cardElement.mount('#cardElement');
-      cardElement.on('change', e => {
-        document.getElementById('cardErrors').textContent = e.error ? e.error.message : '';
-      });
-      stripeInited = true;
-    }
-  } else {
-    wrap.style.display = 'none';
+  // Stripe Checkout: el pago se procesa en la página de Stripe, no hay Card Element
+  if (metodo === 'tarjeta' && !STRIPE_PK) {
+    alert('Pago con tarjeta no disponible. Por favor elige otro método.');
+    seleccionarMetodo(PRIMER_METODO !== 'tarjeta' ? PRIMER_METODO : 'efectivo');
+    return;
   }
 }
 
@@ -390,40 +359,11 @@ document.addEventListener('change', e => {
   actualizarTotalDisplay();
 });
 
-// ── Interceptor Stripe ──────────────────────────────────────────────────────────
-document.getElementById('formPago').addEventListener('submit', async function(e) {
+// ── Submit form (Stripe Checkout: el form hace POST normal, el servidor redirige a Stripe) ──
+document.getElementById('formPago').addEventListener('submit', function() {
   const btn = document.getElementById('btnPagar');
   btn.disabled = true;
   btn.textContent = 'Procesando…';
-
-  if (metodoActual !== 'tarjeta') return; // flujo normal (POST directo), botón ya deshabilitado
-
-  e.preventDefault();
-  const errDiv = document.getElementById('cardErrors');
-  errDiv.textContent = '';
-
-  try {
-    const res = await fetch(`<?= BASE_URL ?>menu/stripeIntent/${SLUG_PAGO}/${TICKET_ID}`, {
-      method: 'POST'
-    });
-    const data = await res.json();
-    if (!data.ok) throw new Error(data.error || 'Error al iniciar pago');
-
-    const { paymentIntent, error } = await stripeInstance.confirmCardPayment(data.clientSecret, {
-      payment_method: { card: cardElement }
-    });
-
-    if (error) throw new Error(error.message);
-    if (paymentIntent.status !== 'succeeded') throw new Error('Pago no completado');
-
-    document.getElementById('inpIntentId').value = paymentIntent.id;
-    this.submit();
-
-  } catch (err) {
-    errDiv.textContent = err.message;
-    btn.disabled = false;
-    btn.textContent = 'Confirmar pago $' + document.getElementById('totalFinal').textContent + ' →';
-  }
 });
 </script>
 </body>

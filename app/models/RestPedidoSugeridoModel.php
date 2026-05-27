@@ -232,4 +232,16 @@ class RestPedidoSugeridoModel extends BaseModel
             [$estadoCarnihub, $id]
         );
     }
+
+    /**
+     * Vincula un ID de pedido CarniHub al registro local.
+     * Útil cuando el pedido se creó directamente en CarniHub y el ID local quedó en 0.
+     */
+    public function vincularIdCarnihub(int $id, int $carnihubId): void
+    {
+        $this->execute(
+            'UPDATE rest_pedidos_sugeridos SET pedido_carnihub_id = ? WHERE id = ?',
+            [$carnihubId, $id]
+        );
+    }
 }

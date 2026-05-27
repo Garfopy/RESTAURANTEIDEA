@@ -1011,4 +1011,28 @@ class RestInventarioController extends BaseController
             'pedido'          => $pedidoData,
         ]);
     }
+
+    // POST /rest-inventario/vincularPedidoCarnihub/{id}
+    public function vincularPedidoCarnihub(?string $id = null): void
+    {
+        require_once ROOT_PATH . '/app/models/RestPedidoSugeridoModel.php';
+        $pedidoModel   = new RestPedidoSugeridoModel();
+        $pedidoId      = (int)$id;
+        $restauranteId = $this->restauranteId();
+        $carnihubId    = (int)$this->post('carnihub_id', 0);
+
+        if ($carnihubId <= 0) {
+            $this->json(['ok' => false, 'error' => 'ID de CarniHub inválido'], 400);
+            return;
+        }
+
+        $pedido = $pedidoModel->find($pedidoId);
+        if (!$pedido || (int)$pedido['restaurante_id'] !== $restauranteId) {
+            $this->json(['ok' => false, 'error' => 'Pedido no encontrado'], 404);
+            return;
+        }
+
+        $pedidoModel->vincularIdCarnihub($pedidoId, $carnihubId);
+        $this->json(['ok' => true]);
+    }
 }

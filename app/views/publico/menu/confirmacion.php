@@ -341,6 +341,7 @@ function actualizarBtnPagar(ticketEstado, qrCode) {
   if (ticketEstado === 'pagado' && !cuentaPagada) {
     cuentaPagada = true;
     clearInterval(pollTimer);
+    iniciarPollingsSalida();
     wrap.innerHTML = '<div class="link-btn" style="background:#D1FAE5;color:#065F46;cursor:default">✅ Cuenta pagada</div>';
     // Ocultar botones de flujo
     document.querySelectorAll('.link-btn-cerrar,.link-btn-mas').forEach(el => el.style.display = 'none');
@@ -474,6 +475,23 @@ pollEstado();
 const pollTimer = setInterval(pollEstado, 3000);
 if (cuentaPagada) clearInterval(pollTimer);
 
+// ── Polling de salida (cuando la cuenta está pagada, esperar que el portero escanee el QR) ──
+let _salidaTimer = null;
+function iniciarPollingsSalida() {
+  if (_salidaTimer || !QR_CODE) return;
+  _salidaTimer = setInterval(async () => {
+    try {
+      const resp = await fetch('<?= BASE_URL ?>menu/checkSalida?qr=' + encodeURIComponent(QR_CODE));
+      const data = await resp.json();
+      if (data.ok && data.salida && data.redirect) {
+        clearInterval(_salidaTimer);
+        window.location.href = data.redirect;
+      }
+    } catch(e) {}
+  }, 3000);
+}
+if (cuentaPagada) iniciarPollingsSalida();
+
 // ── Cancelar pedido ────────────────────────────────
 function cancelarPedido(pedidoId) {
   if (!confirm('¿Cancelar este pedido?')) return;
@@ -509,7 +527,6 @@ function cancelarPedido(pedidoId) {
 const REST_NOMBRE = '<?= addslashes($restaurante['nombre'] ?? '') ?>';
 const MESA_NOMBRE = '<?= addslashes($mesaNombre) ?>';
 const QR_CODE     = '<?= addslashes($visitaQr) ?>';
-const WA_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20.52 3.48A11.95 11.95 0 0012.02 0C5.4 0 .02 5.37.02 12a11.94 11.94 0 001.63 6.06L0 24l6.13-1.61A12.04 12.04 0 0012.02 24c6.62 0 11.98-5.37 11.98-12 0-3.2-1.25-6.21-3.48-8.52zM12.02 22a9.96 9.96 0 01-5.08-1.39l-.36-.22-3.74.98 1-3.65-.24-.38A9.96 9.96 0 012.02 12c0-5.52 4.49-10 10-10a9.98 9.98 0 017.07 2.93A9.93 9.93 0 0122.02 12c0 5.52-4.49 10-10 10zm5.48-7.54c-.3-.15-1.76-.87-2.03-.97-.28-.1-.48-.15-.68.15s-.78.97-.96 1.17c-.18.2-.35.22-.65.07-.3-.15-1.26-.47-2.4-1.49-.89-.8-1.49-1.78-1.66-2.08-.17-.3-.02-.46.13-.6.13-.13.3-.34.45-.51.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.07-.15-.67-1.62-.92-2.22-.24-.58-.49-.5-.68-.51h-.58c-.2 0-.52.07-.79.37s-1.04 1.02-1.04 2.48 1.06 2.88 1.21 3.08c.15.2 2.1 3.2 5.08 4.49.71.31 1.26.49 1.69.63.71.22 1.36.19 1.87.12.57-.08 1.76-.72 2.01-1.42.25-.7.25-1.3.17-1.42-.07-.12-.27-.19-.57-.34z"/></svg>`;
 
 function generarTicket() {
   const btn = document.getElementById('btn-generar-ticket');
@@ -535,23 +552,6 @@ function generarTicket() {
         </div>`
       ).join('');
 
-      // WhatsApp text
-      const lineas = (d.items || []).map(it => `  • ${it.cantidad}x ${it.nombre} ${fmt(it.subtotal)}`);
-      const waLines = [
-        `🍽️ *${REST_NOMBRE}*`,
-        d.folio     ? `📋 Folio: ${d.folio}`   : '',
-        MESA_NOMBRE ? `🪑 Mesa: ${MESA_NOMBRE}` : '',
-        '━━━━━━━━━━━━━━━━━━━',
-        lineas.join('\n'),
-        '━━━━━━━━━━━━━━━━━━━',
-        `Subtotal: ${fmt(d.subtotal)}`,
-        parseFloat(d.propina) > 0 ? `Propina:  ${fmt(d.propina)}` : '',
-        `*Total: ${fmt(d.total)}*`,
-        '━━━━━━━━━━━━━━━━━━━',
-        '¡Gracias por tu visita! 🙏',
-      ].filter(Boolean).join('\n');
-      const waUrl = 'https://wa.me/?text=' + encodeURIComponent(waLines);
-
       // QR section
       const qrCode = d.qr_code || QR_CODE;
       const qrUrl  = qrCode ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(qrCode)}` : '';
@@ -575,13 +575,6 @@ function generarTicket() {
              </a>
            </div>`
         : '';
-
-      // WhatsApp button
-      const waHtml = `<a href="${waUrl}" target="_blank" rel="noopener"
-          class="link-btn" style="background:#25D366;color:#fff;margin-bottom:10px;
-                 display:flex;align-items:center;justify-content:center;gap:8px">
-          ${WA_SVG} Compartir ticket por WhatsApp
-        </a>`;
 
       // Propina row
       const propHtml = parseFloat(d.propina) > 0
@@ -608,8 +601,7 @@ function generarTicket() {
               </div>
             </div>
           </div>
-          ${qrHtml}
-          ${waHtml}`;
+          ${qrHtml}`;
       }
 
       if (btn) btn.style.display = 'none';
