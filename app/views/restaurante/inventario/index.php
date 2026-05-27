@@ -449,7 +449,7 @@ sort($ingCategorias);
           <div class="ch-prod-row" style="padding:9px 14px;border-bottom:1px solid #F3F4F6;display:flex;justify-content:space-between;align-items:center;cursor:pointer;transition:.1s"
                data-nombre="<?= htmlspecialchars(strtolower($pc['nombre'])) ?>"
                onmouseover="this.style.background='#FAF5FF'" onmouseout="this.style.background=''"
-               onclick="seleccionarCarniHub(<?= $pc['id'] ?>, '<?= htmlspecialchars($pc['nombre'], ENT_QUOTES) ?>')">
+               onclick="seleccionarCarniHub(<?= $pc['id'] ?>, '<?= htmlspecialchars($pc['nombre'], ENT_QUOTES) ?>', '<?= htmlspecialchars($pc['unidad'] ?? 'kg', ENT_QUOTES) ?>')">
             <div>
               <div style="font-weight:600;font-size:.875rem"><?= htmlspecialchars($pc['nombre']) ?></div>
               <div style="font-size:.73rem;color:#9CA3AF"><?= htmlspecialchars($pc['unidad'] ?? '') ?></div>
@@ -720,9 +720,18 @@ function switchTab(tab) {
   document.getElementById('ingNombre').required = tab !== 'ch';
 }
 
-function seleccionarCarniHub(id, nombre) {
+function seleccionarCarniHub(id, nombre, unidad) {
   document.getElementById('ingCarniHubId').value = id;
   document.getElementById('ingNombreCh').value   = nombre;
+  // Propagar al campo nombre del panel externo para que llegue al POST
+  document.getElementById('ingNombre').value     = nombre;
+  // Propagar unidad del producto CarniHub al select de unidad
+  const selUnidad = document.getElementById('ingUnidad');
+  if (selUnidad && unidad) {
+    let opt = [...selUnidad.options].find(o => o.value === unidad);
+    if (!opt) { opt = new Option(unidad, unidad); selUnidad.appendChild(opt); }
+    selUnidad.value = unidad;
+  }
   document.getElementById('chNombreWrap').style.display = 'block';
   document.querySelectorAll('.ch-prod-row').forEach(r => r.style.background = '');
   event.currentTarget.style.background = 'var(--cp-light, #FAF5FF)';

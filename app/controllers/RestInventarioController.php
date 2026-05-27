@@ -187,14 +187,21 @@ class RestInventarioController extends BaseController
         $esCarnihub      = (int)(bool)$this->post('proveedor_carnihub', 0);
         $carnihubProdId  = $esCarnihub ? ((int)$this->post('carnihub_producto_id') ?: null) : null;
 
-        // Si viene de CarniHub, usar datos del producto
+        // Si viene de CarniHub, resolver nombre y unidad
         if ($esCarnihub && $carnihubProdId) {
-            $db   = Database::getInstance();
-            $stmt = $db->prepare("SELECT * FROM productos WHERE id = ?");
-            $stmt->execute([$carnihubProdId]);
-            $prod   = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
-            $nombre = $prod['nombre'] ?? $this->post('nombre', '');
-            $unidad = $prod['presentacion'] ?? 'kg';
+            if (!defined('RESTAURANTE_STANDALONE') || !RESTAURANTE_STANDALONE) {
+                // Instalación B2B: la tabla 'productos' existe localmente
+                $db   = Database::getInstance();
+                $stmt = $db->prepare("SELECT nombre, presentacion FROM productos WHERE id = ? AND activo = 1");
+                $stmt->execute([$carnihubProdId]);
+                $prod   = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+                $nombre = $prod['nombre'] ?? $this->post('nombre', '');
+                $unidad = $prod['presentacion'] ?? $this->post('unidad_principal', 'kg');
+            } else {
+                // Standalone: nombre y unidad vienen del formulario (JS los llena al seleccionar)
+                $nombre = trim($this->post('nombre', ''));
+                $unidad = $this->post('unidad_principal', 'kg');
+            }
         } else {
             $nombre = trim($this->post('nombre', ''));
             $unidad = $this->post('unidad_principal', 'kg');
@@ -342,12 +349,12 @@ class RestInventarioController extends BaseController
         $forzar         = (bool)$this->get('forzar', 0);
         $db = \Database::getInstance();
 
-        // Â¿Ya se generÃ³ un pedido automÃ¡tico en las Ãºltimas 12 horas?
+        // ¿Ya se generó un pedido sugerido en las últimas 12 horas?
         $stCheck = $db->prepare(
-            "SELECT MAX(created_at) FROM pedidos
-             WHERE notas LIKE ? AND created_at >= DATE_SUB(NOW(), INTERVAL 12 HOUR)"
+            "SELECT MAX(created_at) FROM rest_pedidos_sugeridos
+             WHERE restaurante_id = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 12 HOUR)"
         );
-        $stCheck->execute(['%Restaurante ID: ' . $restauranteId . '%']);
+        $stCheck->execute([$restauranteId]);
         $ultimoPedidoAt = $stCheck->fetchColumn() ?: null;
 
         if (!$ultimoPedidoAt || $forzar) {
@@ -373,19 +380,10 @@ class RestInventarioController extends BaseController
      */
     public function pedidosSugeridos(?string $p = null): void
     {
+        require_once ROOT_PATH . '/app/models/RestPedidoSugeridoModel.php';
         $restauranteId = $this->restauranteId();
-        $db   = \Database::getInstance();
-        $stmt = $db->prepare(
-            "SELECT p.id, p.folio, p.total, p.estado, p.created_at, p.notas,
-                    e.razon_social AS empresa_nombre
-             FROM pedidos p
-             LEFT JOIN empresas e ON e.id = p.empresa_id
-             WHERE p.notas LIKE ?
-             ORDER BY p.created_at DESC
-             LIMIT 60"
-        );
-        $stmt->execute(['%Restaurante ID: ' . $restauranteId . '%']);
-        $pedidos = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        $pedidoModel   = new RestPedidoSugeridoModel();
+        $pedidos       = $pedidoModel->getByRestaurante($restauranteId);
 
         $flash      = $this->getFlash();
         $pageTitle  = 'Historial de Pedidos AutomÃ¡ticos';
@@ -437,77 +435,48 @@ class RestInventarioController extends BaseController
      */
     private function _autoGenerarPedidos(int $restauranteId, array $grupos): array
     {
-        $db          = \Database::getInstance();
-        $anio        = date('Y');
+        require_once ROOT_PATH . '/app/models/RestPedidoSugeridoModel.php';
+        $pedidoModel = new RestPedidoSugeridoModel();
         $compradorId = $this->usuarioId();
         $creados     = [];
 
         foreach ($grupos as $empresaId => $grupo) {
-            $lineas   = [];
+            $items    = [];
             $subtotal = 0.0;
 
             foreach ($grupo['items'] as $ing) {
-                $precio   = (float)($ing['empresa']['precio_base'] ?? $ing['costo_unitario'] ?? 0);
-                $cant     = (float)$ing['cantidad_sugerida'];
-                $sub      = round($cant * $precio, 2);
+                $precio = (float)($ing['empresa']['precio_base'] ?? $ing['costo_unitario'] ?? 0);
+                $cant   = (float)$ing['cantidad_sugerida'];
+                $sub    = round($cant * $precio, 2);
                 $subtotal += $sub;
-                $lineas[] = [
-                    'nombre'      => $ing['nombre'],
-                    'producto_id' => (int)$ing['carnihub_producto_id'],
-                    'cantidad'    => $cant,
-                    'unidad'      => $ing['unidad_principal'],
-                    'precio_unit' => $precio,
-                    'subtotal'    => $sub,
+                $items[] = [
+                    'ingrediente_id'       => (int)$ing['id'],
+                    'carnihub_producto_id' => (int)$ing['carnihub_producto_id'],
+                    'cantidad_sugerida'    => $cant,
+                    'unidad'               => $ing['unidad_principal'],
+                    'precio_unit_estimado' => $precio,
+                    'subtotal_estimado'    => $sub,
                 ];
             }
 
-            $db->beginTransaction();
+            if (empty($items)) continue;
+
             try {
-                $st = $db->prepare(
-                    "SELECT MAX(CAST(SUBSTRING_INDEX(folio,'-',-1) AS UNSIGNED)) AS ul
-                     FROM pedidos WHERE folio LIKE ?"
-                );
-                $st->execute(["CHB-{$anio}-%"]);
-                $num   = (int)($st->fetch(\PDO::FETCH_ASSOC)['ul'] ?? 0) + 1;
-                $folio = sprintf('CHB-%s-%04d', $anio, $num);
-
-                $db->prepare(
-                    "INSERT INTO pedidos (folio, empresa_id, usuario_id, fecha_pedido, total, estado, notas)
-                     VALUES (?, ?, ?, NOW(), ?, 'pendiente', ?)"
-                )->execute([
-                    $folio,
-                    $empresaId,
-                    $compradorId,
-                    $subtotal,
-                    'Pedido automÃ¡tico Â· Forecast de inventario Â· Restaurante ID: ' . $restauranteId . ' Â· ' . date('d/m/Y H:i'),
-                ]);
-                $pedidoId = (int)$db->lastInsertId();
-
-                $stLinea = $db->prepare(
-                    "INSERT INTO pedido_detalle (pedido_id, producto_id, cantidad, precio_unitario, subtotal)
-                     VALUES (?, ?, ?, ?, ?)"
-                );
-                foreach ($lineas as $l) {
-                    $stLinea->execute([$pedidoId, $l['producto_id'], $l['cantidad'], $l['precio_unit'], $l['subtotal']]);
-                }
-
-                $db->commit();
+                $pedidoId = $pedidoModel->crear([
+                    'restaurante_id'      => $restauranteId,
+                    'carnihub_empresa_id' => $empresaId,
+                    'notas'               => 'Pedido automático · Forecast · ' . date('d/m/Y H:i'),
+                    'usuario_id'          => $compradorId,
+                ], $items);
 
                 $creados[] = [
-                    'pedido_id' => $pedidoId,
-                    'folio'     => $folio,
-                    'empresa'   => $grupo['empresa']['razon_social'],
-                    'total'     => $subtotal,
-                    'items'     => array_map(fn($l) => [
-                        'nombre'   => $l['nombre'],
-                        'cantidad' => $l['cantidad'],
-                        'unidad'   => $l['unidad'],
-                        'precio'   => $l['precio_unit'],
-                        'subtotal' => $l['subtotal'],
-                    ], $lineas),
+                    'pedido_sugerido_id' => $pedidoId,
+                    'empresa'            => $grupo['empresa']['razon_social'] ?? 'CarniHub',
+                    'total'              => $subtotal,
+                    'items_count'        => count($items),
                 ];
             } catch (\Throwable $e) {
-                $db->rollBack();
+                error_log('[_autoGenerarPedidos] Error: ' . $e->getMessage());
             }
         }
 
@@ -542,6 +511,99 @@ class RestInventarioController extends BaseController
             'dias_restantes' => $diasRestantes === INF ? null : round($diasRestantes, 1),
             'proyeccion_7d'  => $proyeccion,
             'dias_consumo'   => $movil['dias'],
+        ]);
+    }
+
+    // ── APROBACIÓN Y ENVÍO A CARNIHUB ─────────────────────────────
+
+    /**
+     * POST /rest-inventario/aprobarSugerido/{id}
+     * Cambia estado de 'sugerido' → 'aprobado'.
+     */
+    public function aprobarSugerido(?string $id = null): void
+    {
+        if (!$this->isPost()) {
+            $this->json(['ok' => false, 'error' => 'Método no permitido'], 405);
+        }
+
+        require_once ROOT_PATH . '/app/models/RestPedidoSugeridoModel.php';
+        $pedidoModel   = new RestPedidoSugeridoModel();
+        $pedidoId      = (int)$id;
+        $restauranteId = $this->restauranteId();
+
+        $pedido = $pedidoModel->find($pedidoId);
+        if (!$pedido || (int)$pedido['restaurante_id'] !== $restauranteId) {
+            $this->json(['ok' => false, 'error' => 'Pedido no encontrado'], 404);
+        }
+        if ($pedido['estado'] !== 'sugerido') {
+            $this->json(['ok' => false, 'error' => 'El pedido no está en estado sugerido (estado actual: ' . $pedido['estado'] . ')']);
+        }
+
+        $pedidoModel->cambiarEstado($pedidoId, 'aprobado', $this->usuarioId());
+        $this->json(['ok' => true, 'message' => 'Pedido aprobado. Ya puedes enviarlo a CarniHub.']);
+    }
+
+    /**
+     * POST /rest-inventario/enviarACarnihub/{id}
+     * Envía el pedido aprobado a la API remota de CarniHub y lo marca como 'convertido'.
+     */
+    public function enviarACarnihub(?string $id = null): void
+    {
+        if (!$this->isPost()) {
+            $this->json(['ok' => false, 'error' => 'Método no permitido'], 405);
+        }
+
+        require_once ROOT_PATH . '/app/models/RestPedidoSugeridoModel.php';
+        $pedidoModel   = new RestPedidoSugeridoModel();
+        $pedidoId      = (int)$id;
+        $restauranteId = $this->restauranteId();
+
+        $pedido = $pedidoModel->findConItems($pedidoId);
+        if (!$pedido || (int)$pedido['restaurante_id'] !== $restauranteId) {
+            $this->json(['ok' => false, 'error' => 'Pedido no encontrado'], 404);
+        }
+        if ($pedido['estado'] !== 'aprobado') {
+            $this->json(['ok' => false, 'error' => 'El pedido debe estar aprobado antes de enviarlo (estado actual: ' . $pedido['estado'] . ')']);
+        }
+
+        // Mapear items al formato de CarniHubApiService
+        $apiItems = [];
+        foreach ($pedido['items'] as $item) {
+            $cant   = (float)($item['cantidad_aprobada'] ?? $item['cantidad_sugerida']);
+            $precio = (float)$item['precio_unit_estimado'];
+            $prodId = (int)($item['carnihub_producto_id'] ?? 0);
+            if ($prodId <= 0 || $cant <= 0 || $precio <= 0) continue;
+            $apiItems[] = [
+                'producto_id' => $prodId,
+                'cantidad'    => $cant,
+                'precio_unit' => $precio,
+            ];
+        }
+
+        if (empty($apiItems)) {
+            $this->json(['ok' => false, 'error' => 'Ningún item tiene producto CarniHub vinculado con precio y cantidad válidos']);
+        }
+
+        $apiService = new CarniHubApiService();
+        $resultado  = $apiService->crearPedido(
+            $restauranteId,
+            $apiItems,
+            $pedido['notas'] ?? 'Pedido generado automáticamente por sistema de forecast'
+        );
+
+        if (!($resultado['success'] ?? false)) {
+            error_log('[enviarACarnihub] Error API: ' . ($resultado['error'] ?? 'desconocido'));
+            $this->json(['ok' => false, 'error' => $resultado['error'] ?? 'Error al comunicarse con CarniHub']);
+        }
+
+        $pedidoExternoId = (int)($resultado['pedido_id'] ?? $resultado['id'] ?? 0);
+        $pedidoModel->marcarConvertido($pedidoId, $pedidoExternoId);
+
+        $this->json([
+            'ok'                 => true,
+            'message'            => 'Pedido enviado a CarniHub correctamente.',
+            'pedido_carnihub_id' => $pedidoExternoId,
+            'folio'              => $resultado['folio'] ?? null,
         ]);
     }
 }

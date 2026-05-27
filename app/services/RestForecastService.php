@@ -200,7 +200,7 @@ class RestForecastService
 
         // Pre-cargar info de empresa para ingredientes con carnihub_producto_id
         $productoIds = array_filter(array_column($ingredientes, 'carnihub_producto_id'));
-        $empresaMap  = $this->_cargarEmpresasPorProducto(array_values(array_unique($productoIds)));
+        $empresaMap  = $this->_cargarEmpresasPorProducto(array_values(array_unique($productoIds)), $restauranteId);
 
         $resultado = [];
         foreach ($ingredientes as $ing) {
@@ -279,13 +279,59 @@ class RestForecastService
     // ──────────────────────────────────────────────────────────────
 
     /**
-     * Carga empresa y precio_base de una lista de productos.
+     * Carga empresa y precio_base de una lista de productos CarniHub.
+     * En modo standalone usa carnihub_api_config + rest_ingredientes
+     * (las tablas 'productos' y 'empresas' no existen en standalone).
      * Retorna [producto_id => empresa_array]
      */
-    private function _cargarEmpresasPorProducto(array $productoIds): array
+    private function _cargarEmpresasPorProducto(array $productoIds, int $restauranteId = 0): array
     {
         if (empty($productoIds)) return [];
 
+        // ── Modo standalone ───────────────────────────────────────────────────
+        if (defined('RESTAURANTE_STANDALONE') && RESTAURANTE_STANDALONE) {
+            $placeholders = implode(',', array_fill(0, count($productoIds), '?'));
+            $params       = array_values($productoIds);
+            $whereRest    = '';
+            if ($restauranteId > 0) {
+                $whereRest = ' AND i.restaurante_id = ?';
+                $params[]  = $restauranteId;
+            }
+            try {
+                $stmt = $this->db->prepare(
+                    "SELECT i.carnihub_producto_id AS producto_id,
+                            COALESCE(c.carnihub_empresa_id, 0) AS id,
+                            COALESCE(c.nombre_distribuidor, 'CarniHub') AS razon_social,
+                            NULL AS email,
+                            NULL AS telefono,
+                            i.costo_unitario AS precio_base,
+                            i.unidad_principal AS unidad
+                     FROM rest_ingredientes i
+                     LEFT JOIN carnihub_api_config c
+                            ON c.restaurante_id = i.restaurante_id AND c.activo = 1
+                     WHERE i.carnihub_producto_id IN ($placeholders){$whereRest}"
+                );
+                $stmt->execute($params);
+            } catch (\Throwable $e) {
+                error_log('[RestForecastService] _cargarEmpresasPorProducto (standalone): ' . $e->getMessage());
+                return [];
+            }
+            $mapa = [];
+            foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $row) {
+                $pid = (int)$row['producto_id'];
+                $mapa[$pid] = [
+                    'id'           => (int)$row['id'],
+                    'razon_social' => $row['razon_social'],
+                    'email'        => $row['email'],
+                    'telefono'     => $row['telefono'],
+                    'precio_base'  => (float)$row['precio_base'],
+                    'unidad'       => $row['unidad'],
+                ];
+            }
+            return $mapa;
+        }
+
+        // ── Modo B2B (plataforma completa) ────────────────────────────────────
         $placeholders = implode(',', array_fill(0, count($productoIds), '?'));
         $stmt = $this->db->prepare(
             "SELECT p.id AS producto_id, p.precio_base, p.presentacion AS unidad,

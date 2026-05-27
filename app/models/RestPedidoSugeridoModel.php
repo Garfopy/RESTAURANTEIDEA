@@ -3,8 +3,8 @@
  * RestPedidoSugeridoModel
  *
  * Gestiona los pedidos de reabastecimiento sugeridos por el sistema
- * de forecast. Al aprobar, crea un pedido real en la tabla `pedidos`
- * de CarniHub para que la empresa proveedora lo reciba.
+ * de forecast. Cuando el pedido es aprobado y enviado, el controlador
+ * llama a CarniHubApiService::crearPedido() y luego a marcarConvertido().
  */
 class RestPedidoSugeridoModel extends BaseModel
 {
@@ -22,10 +22,12 @@ class RestPedidoSugeridoModel extends BaseModel
         }
 
         return $this->query(
-            "SELECT ps.*, e.razon_social AS empresa_nombre, e.email AS empresa_email,
+            "SELECT ps.*,
+                    COALESCE(cac.nombre_distribuidor, CONCAT('Proveedor #', ps.carnihub_empresa_id)) AS empresa_nombre,
                     u.nombre AS usuario_nombre
              FROM rest_pedidos_sugeridos ps
-             JOIN empresas e ON e.id = ps.empresa_id
+             LEFT JOIN carnihub_api_config cac
+                    ON cac.restaurante_id = ps.restaurante_id AND cac.activo = 1
              LEFT JOIN usuarios u ON u.id = ps.usuario_id
              WHERE ps.restaurante_id = ? $where
              ORDER BY ps.created_at DESC",
@@ -35,14 +37,12 @@ class RestPedidoSugeridoModel extends BaseModel
 
     public function getItems(int $pedidoSugeridoId): array
     {
+        // Sin JOIN a `productos` ni `empresas` porque en modo standalone
+        // esas tablas no existen; el catálogo vive en CarniHub remoto.
         return $this->query(
-            "SELECT psi.*, i.nombre AS ingrediente_nombre, i.unidad_principal,
-                    p.nombre AS producto_nombre, p.presentacion AS producto_unidad,
-                    e.razon_social AS empresa_nombre
+            "SELECT psi.*, i.nombre AS ingrediente_nombre, i.unidad_principal
              FROM rest_pedido_sugerido_items psi
              JOIN rest_ingredientes i ON i.id = psi.ingrediente_id
-             JOIN productos p ON p.id = psi.carnihub_producto_id
-             JOIN empresas e ON e.id = (SELECT empresa_id FROM productos WHERE id = psi.carnihub_producto_id LIMIT 1)
              WHERE psi.pedido_sugerido_id = ?
              ORDER BY i.nombre",
             [$pedidoSugeridoId]
@@ -83,12 +83,12 @@ class RestPedidoSugeridoModel extends BaseModel
             $total = array_sum(array_column($items, 'subtotal_estimado'));
 
             $id = $this->insert([
-                'restaurante_id'  => $data['restaurante_id'],
-                'empresa_id'      => $data['empresa_id'],
-                'estado'          => 'sugerido',
-                'total_estimado'  => $total,
-                'notas'           => $data['notas'] ?? null,
-                'usuario_id'      => $data['usuario_id'] ?? null,
+                'restaurante_id'      => $data['restaurante_id'],
+                'carnihub_empresa_id' => $data['carnihub_empresa_id'],
+                'estado'              => 'sugerido',
+                'total_estimado'      => $total,
+                'notas'               => $data['notas'] ?? null,
+                'usuario_id'          => $data['usuario_id'] ?? null,
             ]);
 
             foreach ($items as $item) {
@@ -175,90 +175,46 @@ class RestPedidoSugeridoModel extends BaseModel
         }
     }
 
-    // ── Convertir a pedido CarniHub ───────────────────────────────
+    // ── Envío a CarniHub ──────────────────────────────────────────
 
     /**
-     * Convierte el pedido sugerido aprobado en un pedido real de CarniHub.
-     * Crea registro en tabla `pedidos` y `pedido_detalle`.
-     * Actualiza estado a 'convertido' y guarda el ID del pedido creado.
+     * Marca el pedido sugerido como convertido tras enviarlo exitosamente
+     * a la API de CarniHub. El controlador es quien llama a
+     * CarniHubApiService::crearPedido() y obtiene el $pedidoExternoId.
      *
-     * @param int $compradorId  Usuario comprador que genera el pedido
+     * @param int $id              ID del pedido sugerido
+     * @param int $pedidoExternoId ID retornado por CarniHub (0 si no lo devuelve)
      */
-    public function convertirACarnihub(int $id, int $compradorId): int
+    public function marcarConvertido(int $id, int $pedidoExternoId = 0): void
     {
-        $pedido = $this->findConItems($id);
-        if (!$pedido || $pedido['estado'] !== 'aprobado') {
-            throw new \RuntimeException('El pedido sugerido no existe o no está aprobado.');
+        $this->execute(
+            "UPDATE rest_pedidos_sugeridos
+             SET estado = 'convertido',
+                 pedido_carnihub_id = ?,
+                 aprobado_at = COALESCE(aprobado_at, NOW())
+             WHERE id = ?",
+            [$pedidoExternoId ?: null, $id]
+        );
+    }
+
+    /**
+     * Devuelve los items del pedido en el formato esperado por
+     * CarniHubApiService::crearPedido() (usa cantidad_aprobada si existe).
+     */
+    public function prepararItemsParaApi(int $pedidoId): array
+    {
+        $result = [];
+        foreach ($this->getItems($pedidoId) as $item) {
+            $cant   = (float)($item['cantidad_aprobada'] ?? $item['cantidad_sugerida']);
+            $precio = (float)$item['precio_unit_estimado'];
+            $prodId = (int)($item['carnihub_producto_id'] ?? 0);
+            if ($prodId <= 0 || $cant <= 0 || $precio <= 0) continue;
+            $result[] = [
+                'producto_id' => $prodId,
+                'cantidad'    => $cant,
+                'precio_unit' => $precio,
+            ];
         }
-        if (empty($pedido['items'])) {
-            throw new \RuntimeException('El pedido sugerido no tiene items.');
-        }
-
-        $this->db->beginTransaction();
-        try {
-            // Generar folio tipo "CHB-YYYY-NNNN"
-            $anio = date('Y');
-            $row  = $this->queryOne(
-                "SELECT MAX(CAST(SUBSTRING_INDEX(folio, '-', -1) AS UNSIGNED)) AS ultimo
-                 FROM pedidos WHERE folio LIKE ?",
-                ["CHB-{$anio}-%"]
-            );
-            $num   = (int)($row['ultimo'] ?? 0) + 1;
-            $folio = sprintf('CHB-%s-%04d', $anio, $num);
-
-            // Calcular total real con cantidades aprobadas
-            $subtotal = 0.0;
-            $lineas   = [];
-            foreach ($pedido['items'] as $item) {
-                $cant   = (float)$item['cantidad_aprobada'];
-                $precio = (float)$item['precio_unit_estimado'];
-                $sub    = round($cant * $precio, 2);
-                $subtotal += $sub;
-                $lineas[] = [
-                    'producto_id' => (int)$item['carnihub_producto_id'],
-                    'cantidad'    => $cant,
-                    'precio_unit' => $precio,
-                    'subtotal'    => $sub,
-                ];
-            }
-
-            // Insertar en pedidos (tabla B2B de CarniHub)
-            $this->execute(
-                "INSERT INTO pedidos
-                 (folio, empresa_id, usuario_id, fecha_pedido, total, estado, notas)
-                 VALUES (?, ?, ?, NOW(), ?, 'pendiente', ?)",
-                [
-                    $folio,
-                    (int)$pedido['empresa_id'],
-                    $compradorId,
-                    $subtotal,
-                    'Generado automáticamente por sistema de forecast — Restaurante ID: ' . $pedido['restaurante_id'],
-                ]
-            );
-            $carnihubPedidoId = (int)$this->db->lastInsertId();
-
-            // Insertar líneas en pedido_detalle
-            foreach ($lineas as $linea) {
-                $this->execute(
-                    "INSERT INTO pedido_detalle (pedido_id, producto_id, cantidad, precio_unitario, subtotal)
-                     VALUES (?, ?, ?, ?, ?)",
-                    [$carnihubPedidoId, $linea['producto_id'], $linea['cantidad'], $linea['precio_unit'], $linea['subtotal']]
-                );
-            }
-
-            // Marcar sugerido como convertido
-            $this->execute(
-                "UPDATE rest_pedidos_sugeridos
-                 SET estado = 'convertido', pedido_carnihub_id = ?, aprobado_at = COALESCE(aprobado_at, NOW())
-                 WHERE id = ?",
-                [$carnihubPedidoId, $id]
-            );
-
-            $this->db->commit();
-            return $carnihubPedidoId;
-        } catch (\Throwable $e) {
-            $this->db->rollBack();
-            throw $e;
-        }
+        return $result;
     }
 }
