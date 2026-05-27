@@ -517,7 +517,7 @@ class RestInventarioController extends BaseController
                 $carnihubError = null;
 
                 if (!empty($apiItems)) {
-                    $resultado = $apiService->crearPedido($restauranteId, $apiItems, $notas, $compradorInfo);
+                    $resultado = $apiService->crearPedido($restauranteId, $apiItems, $notas, $compradorInfo, $pedidoId);
                     if ($resultado['success'] ?? false) {
                         $chPedidoId = (int)($resultado['pedido_id'] ?? $resultado['id'] ?? 0);
                         $folio      = $resultado['folio'] ?? ('CH-' . $chPedidoId);

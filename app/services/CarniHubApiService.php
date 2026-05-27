@@ -38,7 +38,7 @@ class CarniHubApiService
      *                                 'comprador_lat', 'comprador_lng']
      * @return array  ['success'=>bool, 'pedido_id'=>int, 'folio'=>str, ...] | ['success'=>false, 'error'=>str]
      */
-    public function crearPedido(int $restauranteId, array $items, string $notas = '', array $compradorInfo = []): array
+    public function crearPedido(int $restauranteId, array $items, string $notas = '', array $compradorInfo = [], int $capirestPedidoId = 0): array
     {
         $config = $this->getConfig($restauranteId);
         if ($config === null) {
@@ -56,6 +56,10 @@ class CarniHubApiService
         }
         if ($notas !== '') {
             $payload['notas'] = substr($notas, 0, 500);
+        }
+        // Referencia de vuelta: CarniHub la incluirá en el webhook
+        if ($capirestPedidoId > 0) {
+            $payload['capirest_pedido_id'] = $capirestPedidoId;
         }
 
         // Dirección de entrega del restaurante (comprador)

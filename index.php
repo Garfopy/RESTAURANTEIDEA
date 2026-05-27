@@ -118,6 +118,8 @@ $routes = [
     'menu'          => 'RestPublicoController',
     // Login de staff por slug de restaurante
     'acceso'        => 'StaffAccesoController',
+    // Webhook entrante de CarniHub (sin login)
+    'carnihub'      => 'CarnihubController',
 ];
 
 // ── Auth guard ────────────────────────────────────────────────────────────────
@@ -151,6 +153,8 @@ $publicPaths = [
     'acceso/index',
     'acceso/login',
     'acceso/entrarComensal',
+    // Webhook entrante de CarniHub (autenticación por Bearer, no por sesión)
+    'carnihub/webhook',
 ];
 
 $currentPath = strtolower($ctrlSlug . '/' . $action);

@@ -547,6 +547,61 @@ class EmailService
     }
 
     /**
+     * Notifica al admin del restaurante que un pedido B2B fue cancelado o rechazado por CarniHub.
+     */
+    public function enviarCancelacionPedido(
+        string $destEmail,
+        string $destNombre,
+        string $folio,
+        int    $carnihubPedidoId,
+        string $estado
+    ): bool {
+        if (!$this->configured || !$destEmail) return false;
+
+        $nombreSafe = htmlspecialchars($destNombre, ENT_QUOTES, 'UTF-8');
+        $folioSafe  = htmlspecialchars($folio,      ENT_QUOTES, 'UTF-8');
+        $estadoSafe = htmlspecialchars($estado,     ENT_QUOTES, 'UTF-8');
+
+        try {
+            $mail = new PHPMailer(true);
+            $mail->isSMTP();
+            $mail->Host        = $this->smtpHost;
+            $mail->SMTPAuth    = true;
+            $mail->Username    = $this->smtpUsername;
+            $mail->Password    = $this->smtpPassword;
+            $mail->Port        = (int)$this->smtpPort;
+            $mail->Timeout     = 10;
+            $mail->SMTPOptions = ['ssl' => ['verify_peer' => false, 'verify_peer_name' => false, 'allow_self_signed' => true]];
+            if ($this->smtpEncryption === 'tls')     $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+            elseif ($this->smtpEncryption === 'ssl') $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
+
+            $mail->setFrom($this->smtpFromEmail, $this->smtpFromName);
+            $mail->addAddress($destEmail, $destNombre);
+            $mail->isHTML(true);
+            $mail->CharSet = 'UTF-8';
+            $mail->Subject = "Pedido CarniHub $folioSafe fue $estadoSafe";
+            $mail->Body = "<!DOCTYPE html><html lang='es'><head><meta charset='UTF-8'></head>
+<body style='font-family:Arial,sans-serif;background:#F3F4F6;padding:24px;'>
+<div style='max-width:540px;margin:0 auto;background:#fff;border-radius:10px;padding:28px;box-shadow:0 2px 8px rgba(0,0,0,.08);'>
+  <h2 style='color:#1F2937;margin-top:0;'>Pedido $folioSafe fue $estadoSafe</h2>
+  <p>Hola <strong>$nombreSafe</strong>,</p>
+  <p>Tu pedido <strong>$folioSafe</strong> (ID CarniHub: $carnihubPedidoId) fue <strong style='color:#DC2626;'>$estadoSafe</strong> por el proveedor.</p>
+  <p>Por favor revisa tu inventario y genera un nuevo pedido si es necesario.</p>
+  <a href='" . BASE_URL . "rest-inventario/pedidosSugeridos' style='display:inline-block;background:#1F2937;color:#fff;text-decoration:none;padding:10px 24px;border-radius:6px;font-weight:700;margin-top:12px;'>
+    Ver pedidos →
+  </a>
+</div>
+</body></html>";
+            $mail->AltBody = "Hola $destNombre, tu pedido $folio (ID CarniHub: $carnihubPedidoId) fue $estado por el proveedor.";
+            $mail->send();
+            return true;
+        } catch (\Exception $e) {
+            error_log("[EmailService] Error enviarCancelacionPedido a $destEmail: {$e->getMessage()}");
+            return false;
+        }
+    }
+
+    /**
      * Genera la plantilla HTML del email con credenciales
      *
      * @param array $data Datos para el template
