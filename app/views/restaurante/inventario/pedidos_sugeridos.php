@@ -252,16 +252,7 @@
                       onclick="actualizarEstado(<?= $pid ?>, this)">
                 🔄 Actualizar estado
               </button>
-              <?php if ($chId === 0): ?>
-              <div style="margin-top:6px;display:flex;align-items:center;gap:4px;flex-wrap:wrap">
-                <input type="number" id="ch-id-<?= $pid ?>" placeholder="ID CarniHub" min="1"
-                       style="width:90px;padding:4px 6px;border:1px solid #D1D5DB;border-radius:6px;font-size:.78rem">
-                <button type="button" onclick="vincularId(<?= $pid ?>)"
-                        style="padding:4px 10px;background:#EFF6FF;color:#1D4ED8;border:1px solid #BFDBFE;border-radius:6px;font-size:.75rem;font-weight:600;cursor:pointer">
-                  🔗 Vincular
-                </button>
-              </div>
-              <?php endif; ?>
+
               <?php if (!in_array($chEst, ['aprobado', 'en_camino', 'entregado'])): ?>
               <button class="btn-accion btn-cancelar"
                       onclick="accionPedido('cancelar', <?= $pid ?>, this)">
@@ -462,29 +453,6 @@ async function confirmarPagoTransf() {
 function _actualizarBadgePago(id, estado) {
   const cell = document.getElementById('pago-badge-' + id);
   if (cell) cell.innerHTML = '<span style="background:#DCFCE7;color:#166534;padding:3px 8px;border-radius:6px;font-size:.72rem;font-weight:700">✅ Pagado</span>';
-}
-
-async function vincularId(id) {
-  const inp = document.getElementById('ch-id-' + id);
-  const chId = parseInt(inp?.value || '0', 10);
-  if (!chId || chId <= 0) { mostrarToast('Ingresa un ID válido', '#DC2626'); return; }
-  try {
-    const resp = await fetch(BASE + 'rest-inventario/vincularPedidoCarnihub/' + id, {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
-      body: 'carnihub_id=' + chId,
-    });
-    const data = await resp.json();
-    if (data.ok) {
-      mostrarToast('ID vinculado ✓', '#059669');
-      if (inp?.closest('div')) inp.closest('div').remove();
-    } else {
-      mostrarToast(data.error || 'Error al vincular', '#DC2626');
-    }
-  } catch (e) {
-    mostrarToast('Error de conexión', '#DC2626');
-  }
 }
 
 async function actualizarEstado(id, btn) {

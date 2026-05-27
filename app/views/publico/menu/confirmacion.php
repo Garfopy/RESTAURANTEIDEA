@@ -476,6 +476,7 @@ const pollTimer = setInterval(pollEstado, 3000);
 if (cuentaPagada) clearInterval(pollTimer);
 
 // ── Polling de salida (cuando la cuenta está pagada, esperar que el portero escanee el QR) ──
+const QR_CODE     = '<?= addslashes($visitaQr) ?>';
 let _salidaTimer = null;
 function iniciarPollingsSalida() {
   if (_salidaTimer || !QR_CODE) return;
@@ -526,7 +527,6 @@ function cancelarPedido(pedidoId) {
 // ── Generar ticket vía AJAX ────────────────────────────
 const REST_NOMBRE = '<?= addslashes($restaurante['nombre'] ?? '') ?>';
 const MESA_NOMBRE = '<?= addslashes($mesaNombre) ?>';
-const QR_CODE     = '<?= addslashes($visitaQr) ?>';
 
 function generarTicket() {
   const btn = document.getElementById('btn-generar-ticket');

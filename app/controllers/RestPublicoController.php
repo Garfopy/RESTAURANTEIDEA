@@ -566,6 +566,8 @@ class RestPublicoController extends BaseController
                 $total    = (float)($ticket['total'] ?? 0);
                 $centavos = (int)round($total * 100);
 
+                error_log('[Stripe:confirmarPago] key=' . (empty($stripeKey) ? 'VACÍA' : 'OK') . ' | cents=' . $centavos . ' | ticket=' . $ticketId . ' | slug=' . $realSlug);
+
                 $session = \Stripe\Checkout\Session::create([
                     'payment_method_types' => ['card'],
                     'mode'                 => 'payment',
@@ -596,6 +598,7 @@ class RestPublicoController extends BaseController
                 header('Location: ' . $session->url);
                 exit;
             } catch (\Throwable $e) {
+                error_log('[Stripe:confirmarPago] ERROR: ' . $e->getMessage() . ' | class=' . get_class($e) . ' | ticket=' . $ticketId);
                 $_SESSION['flash_error'] = 'Error al iniciar pago con tarjeta. Elige otro método.';
                 $this->redirect('menu/' . $realSlug . '/pagar/' . $ticket['visita_id']);
                 return;
@@ -983,6 +986,8 @@ class RestPublicoController extends BaseController
             if (empty($stripeKey)) throw new \RuntimeException('Stripe no configurado');
             \Stripe\Stripe::setApiKey($stripeKey);
 
+            error_log('[Stripe:stripeRetorno] key=' . (empty($stripeKey) ? 'VACÍA' : 'OK') . ' | sessionId=' . $sessionId . ' | ticket=' . $ticketId);
+
             $session = \Stripe\Checkout\Session::retrieve($sessionId);
 
             if ($session->payment_status !== 'paid') {
@@ -992,6 +997,7 @@ class RestPublicoController extends BaseController
                 throw new \RuntimeException('El pago no corresponde a este ticket');
             }
         } catch (\Throwable $e) {
+            error_log('[Stripe:stripeRetorno] ERROR: ' . $e->getMessage() . ' | class=' . get_class($e) . ' | sessionId=' . $sessionId . ' | ticket=' . $ticketId);
             $_SESSION['flash_error'] = 'No se pudo verificar el pago. Contacta al restaurante.';
             $this->redirect('menu/' . $realSlug . '/pagar/' . $ticket['visita_id']);
             return;
