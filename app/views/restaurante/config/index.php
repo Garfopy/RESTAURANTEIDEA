@@ -454,7 +454,7 @@
       <div class="form-group">
         <label class="form-label">Método de pago al proveedor</label>
         <select name="ch_metodo_pago" class="form-input"
-                onchange="document.getElementById('chTransfPanel').style.display=this.value==='transferencia'?'block':'none'">
+                onchange="chOnMetodoChange(this.value)">
           <?php foreach (['stripe'=>'💳 Cargo automático con Stripe','paypal'=>'🅿️ PayPal','transferencia'=>'📲 Transferencia bancaria'] as $v => $lbl): ?>
           <option value="<?= $v ?>" <?= ($cfgCarniHub['metodo_pago'] ?? 'transferencia') === $v ? 'selected' : '' ?>>
             <?= $lbl ?>
@@ -478,9 +478,52 @@
           Estas instrucciones se mostrarán al administrador al enviar un pedido de insumos.
         </div>
       </div>
-      <?php endif; ?>
 
-      <!-- Nota footer -->
+      <!-- Panel tarjeta Stripe para cobro automático off-session -->
+      <div id="chStripeCardPanel"
+           style="display:<?= ($cfgCarniHub['metodo_pago'] ?? 'transferencia') === 'stripe' ? 'block' : 'none' ?>;
+                  margin-bottom:16px">
+        <div style="background:#F0F9FF;border:1.5px solid #BAE6FD;border-radius:10px;padding:14px">
+          <div style="font-size:.84rem;font-weight:600;color:#0369A1;margin-bottom:10px">
+            💳 Tarjeta para cobro automático
+          </div>
+
+          <?php if (!empty($cfgCarniHub['stripe_payment_method_id'])): ?>
+          <div id="chCardSavedInfo" style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+            <span style="background:#fff;border:1.5px solid #E5E7EB;border-radius:8px;padding:6px 12px;
+                         font-size:.9rem;letter-spacing:.05em;font-family:monospace">
+              •••• •••• •••• <?= htmlspecialchars($cfgCarniHub['stripe_card_last4'] ?? '????') ?>
+            </span>
+            <span style="font-size:.78rem;color:#059669;font-weight:600">✓ Activa</span>
+            <button type="button"
+                    onclick="document.getElementById('chCardSavedInfo').style.display='none';document.getElementById('chCardInputWrap').style.display='block'"
+                    style="font-size:.76rem;color:#6B7280;background:none;border:1px solid #D1D5DB;border-radius:6px;padding:3px 10px;cursor:pointer">
+              Cambiar tarjeta
+            </button>
+          </div>
+          <?php endif; ?>
+
+          <div id="chCardInputWrap" style="display:<?= empty($cfgCarniHub['stripe_payment_method_id']) ? 'block' : 'none' ?>">
+            <div style="font-size:.78rem;color:#0C4A6E;margin-bottom:8px">
+              Ingresa los datos de tu tarjeta. Se guardará de forma segura para cobros futuros.
+            </div>
+            <div id="chCardElement" style="padding:12px 14px;border:1.5px solid #BAE6FD;border-radius:10px;background:#fff;margin-bottom:10px"></div>
+            <div id="chCardError" style="color:#EF4444;font-size:.78rem;margin-bottom:8px"></div>
+            <button type="button" id="chBtnGuardarTarjeta" onclick="chGuardarTarjeta()"
+                    style="background:#0369A1;color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:.84rem;font-weight:600;cursor:pointer">
+              Guardar tarjeta
+            </button>
+          </div>
+
+          <div style="font-size:.73rem;color:#0C4A6E;margin-top:10px">
+            Al enviar un pedido a CarniHub se cobrará automáticamente, sin necesidad de confirmar manualmente.
+          </div>
+        </div>
+      </div>
+
+      <?php endif; // if (!empty($cfgCarniHub)) ?>
+
+<!-- Nota footer -->
       <div style="background:#F9FAFB;border-radius:8px;padding:12px;font-size:.8rem;color:#6B7280;margin-bottom:20px">
         El footer del menú siempre mostrará: <strong>Potenciado por CarniHub</strong>
       </div>
@@ -523,6 +566,109 @@
 </div>
 
 <script>
+// ── CarniHub: método de pago + tarjeta guardada ──────────────────────────────
+function chOnMetodoChange(val) {
+  document.getElementById('chTransfPanel').style.display     = val === 'transferencia' ? 'block' : 'none';
+  document.getElementById('chStripeCardPanel').style.display = val === 'stripe'        ? 'block' : 'none';
+  if (val === 'stripe') setTimeout(chInitCard, 100);
+}
+
+(function() {
+  const stripePk = '<?= htmlspecialchars($cfgPagos['stripe_public_key'] ?? '', ENT_QUOTES) ?>';
+  let _chStripe, _chCard, _chCardMounted = false;
+
+  window.chInitCard = function() {
+    if (_chCardMounted) return;
+    if (!stripePk) {
+      document.getElementById('chCardError').textContent = 'Configura las claves Stripe en la sección "Métodos de pago" primero.';
+      return;
+    }
+    if (typeof Stripe === 'undefined') {
+      // Cargar Stripe.js dinámicamente si no está disponible
+      const s = document.createElement('script');
+      s.src = 'https://js.stripe.com/v3/';
+      s.onload = function() { chInitCard(); };
+      document.head.appendChild(s);
+      return;
+    }
+    _chStripe = Stripe(stripePk);
+    const elements = _chStripe.elements();
+    _chCard = elements.create('card', { style: { base: { fontSize: '15px', color: '#111827' } } });
+    _chCard.mount('#chCardElement');
+    _chCard.on('change', function(e) {
+      document.getElementById('chCardError').textContent = e.error ? e.error.message : '';
+    });
+    _chCardMounted = true;
+  };
+
+  // Auto-inicializar si Stripe ya está seleccionado
+  if ('<?= ($cfgCarniHub['metodo_pago'] ?? '') ?>' === 'stripe' &&
+      '<?= htmlspecialchars($cfgCarniHub['stripe_payment_method_id'] ?? '') ?>' === '') {
+    if (typeof Stripe !== 'undefined') setTimeout(chInitCard, 200);
+  }
+
+  window.chGuardarTarjeta = async function() {
+    if (!_chCard) { chInitCard(); return; }
+    const btn = document.getElementById('chBtnGuardarTarjeta');
+    btn.disabled = true; btn.textContent = 'Guardando…';
+    document.getElementById('chCardError').textContent = '';
+    try {
+      // 1. Obtener SetupIntent clientSecret
+      const setupResp = await fetch(BASE + 'rest-config/setupCardCarniHub', { credentials: 'same-origin' });
+      const setupData = await setupResp.json();
+      if (!setupData.ok) throw new Error(setupData.error || 'Error al iniciar guardado');
+
+      // 2. Confirmar tarjeta con Stripe
+      const { setupIntent, error } = await _chStripe.confirmCardSetup(setupData.clientSecret, {
+        payment_method: { card: _chCard }
+      });
+      if (error) throw new Error(error.message);
+      if (setupIntent.status !== 'succeeded') throw new Error('No se pudo guardar la tarjeta');
+
+      // 3. Guardar PM ID en backend
+      const saveResp = await fetch(BASE + 'rest-config/guardarTarjetaCarniHub', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ payment_method_id: setupIntent.payment_method })
+      });
+      const saveData = await saveResp.json();
+      if (!saveData.ok) throw new Error(saveData.error || 'Error al guardar');
+
+      // 4. Mostrar tarjeta guardada en UI
+      document.getElementById('chCardInputWrap').style.display = 'none';
+      const last4 = saveData.last4 || '????';
+      const existing = document.getElementById('chCardSavedInfo');
+      if (existing) {
+        existing.querySelector('span:first-child').textContent = '\u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 ' + last4;
+        existing.style.display = 'flex';
+      } else {
+        document.getElementById('chCardInputWrap').insertAdjacentHTML('beforebegin',
+          '<div id="chCardSavedInfo" style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">' +
+          '<span style="background:#fff;border:1.5px solid #E5E7EB;border-radius:8px;padding:6px 12px;' +
+                       'font-size:.9rem;letter-spacing:.05em;font-family:monospace">' +
+            '\u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 ' + last4 +
+          '</span>' +
+          '<span style="font-size:.78rem;color:#059669;font-weight:600">\u2713 Activa</span>' +
+          '<button type="button" onclick="document.getElementById(\'chCardSavedInfo\').style.display=\'none\';document.getElementById(\'chCardInputWrap\').style.display=\'block\'"' +
+                  ' style="font-size:.76rem;color:#6B7280;background:none;border:1px solid #D1D5DB;border-radius:6px;padding:3px 10px;cursor:pointer">' +
+            'Cambiar tarjeta' +
+          '</button></div>');
+      }
+
+      // Pequeño mensaje de confirmación
+      const err = document.getElementById('chCardError');
+      err.style.color = '#059669';
+      err.textContent = '✓ Tarjeta guardada correctamente';
+    } catch(e) {
+      const err = document.getElementById('chCardError');
+      err.style.color = '#EF4444';
+      err.textContent = e.message;
+    } finally {
+      btn.disabled = false; btn.textContent = 'Guardar tarjeta';
+    }
+  };
+})();
+
 // ── Horarios ────────────────────────────────────────────────────────────────
 const DIAS = ['lun','mar','mie','jue','vie','sab','dom'];
 

@@ -209,6 +209,98 @@ class RestConfigController extends BaseController
         $this->redirect('rest-config/index');
     }
 
+    /**
+     * GET /rest-config/setupCardCarniHub
+     * Crea un SetupIntent (usage=off_session) para guardar la tarjeta del restaurante.
+     * Devuelve JSON { ok, clientSecret }.
+     */
+    public function setupCardCarniHub(?string $p = null): void
+    {
+        $restauranteId = $this->restauranteId();
+        try {
+            require_once ROOT_PATH . '/app/models/ConfigModel.php';
+            $cfg       = new ConfigModel();
+            $stripeKey = defined('STRIPE_SECRET_KEY') && STRIPE_SECRET_KEY !== ''
+                ? STRIPE_SECRET_KEY
+                : $cfg->get('stripe_secret_key', '');
+            if (empty($stripeKey)) throw new \RuntimeException('Stripe no configurado. Agrega las claves en Configuración.');
+
+            \Stripe\Stripe::setApiKey($stripeKey);
+
+            $db  = \Database::getInstance();
+
+            // Obtener o crear Customer Stripe para este restaurante
+            $row = $db->prepare("SELECT stripe_customer_id FROM carnihub_api_config WHERE restaurante_id = ? LIMIT 1");
+            $row->execute([$restauranteId]);
+            $chRow      = $row->fetch(\PDO::FETCH_ASSOC) ?: [];
+            $customerId = $chRow['stripe_customer_id'] ?? null;
+
+            if (!$customerId) {
+                $rRow = $db->prepare("SELECT nombre FROM rest_restaurantes WHERE id = ? LIMIT 1");
+                $rRow->execute([$restauranteId]);
+                $rData    = $rRow->fetch(\PDO::FETCH_ASSOC) ?: [];
+                $customer = \Stripe\Customer::create([
+                    'metadata' => ['restaurante_id' => (string)$restauranteId, 'nombre' => $rData['nombre'] ?? ''],
+                ]);
+                $customerId = $customer->id;
+                $db->prepare("UPDATE carnihub_api_config SET stripe_customer_id = ? WHERE restaurante_id = ?")
+                   ->execute([$customerId, $restauranteId]);
+            }
+
+            $intent = \Stripe\SetupIntent::create([
+                'customer' => $customerId,
+                'usage'    => 'off_session',
+                'metadata' => ['restaurante_id' => (string)$restauranteId],
+            ]);
+
+            $this->json(['ok' => true, 'clientSecret' => $intent->client_secret]);
+        } catch (\Throwable $e) {
+            $this->json(['ok' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * POST /rest-config/guardarTarjetaCarniHub
+     * Guarda el PaymentMethod resultante del SetupIntent en la BD.
+     * Body: payment_method_id (pm_...)
+     */
+    public function guardarTarjetaCarniHub(?string $p = null): void
+    {
+        if (!$this->isPost()) { $this->json(['ok' => false, 'error' => 'POST requerido'], 405); return; }
+        $restauranteId = $this->restauranteId();
+        $pmId          = trim((string)$this->post('payment_method_id', ''));
+
+        if (empty($pmId) || strpos($pmId, 'pm_') !== 0) {
+            $this->json(['ok' => false, 'error' => 'ID de método de pago inválido']);
+            return;
+        }
+
+        try {
+            require_once ROOT_PATH . '/app/models/ConfigModel.php';
+            $cfg       = new ConfigModel();
+            $stripeKey = defined('STRIPE_SECRET_KEY') && STRIPE_SECRET_KEY !== ''
+                ? STRIPE_SECRET_KEY
+                : $cfg->get('stripe_secret_key', '');
+            if (empty($stripeKey)) throw new \RuntimeException('Stripe no configurado');
+
+            \Stripe\Stripe::setApiKey($stripeKey);
+
+            $pm    = \Stripe\PaymentMethod::retrieve($pmId);
+            $last4 = $pm->card->last4 ?? null;
+
+            $db = \Database::getInstance();
+            $db->prepare(
+                "UPDATE carnihub_api_config
+                 SET stripe_payment_method_id = ?, stripe_card_last4 = ?
+                 WHERE restaurante_id = ?"
+            )->execute([$pmId, $last4, $restauranteId]);
+
+            $this->json(['ok' => true, 'last4' => $last4]);
+        } catch (\Throwable $e) {
+            $this->json(['ok' => false, 'error' => $e->getMessage()]);
+        }
+    }
+
     public function qr(?string $p = null): void
     {
         $restauranteId = $this->restauranteId();

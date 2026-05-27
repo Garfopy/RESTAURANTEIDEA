@@ -336,6 +336,20 @@ async function abrirModalPago(id, monto, btn) {
 }
 
 function _mostrarModalPago(id, pago) {
+  // Cobro automático off-session completado — sin modal
+  if (pago.auto) {
+    mostrarToast('✅ Cobro automático con Stripe: $' + parseFloat(pago.monto || 0).toFixed(2), '#059669');
+    _actualizarBadgePago(id, 'pagado');
+    return;
+  }
+  // Autenticación 3DS necesaria
+  if (pago.action_url) {
+    if (confirm('Tu banco requiere autenticación adicional para procesar el pago. ¿Continuar?')) {
+      window.location.href = pago.action_url;
+    }
+    return;
+  }
+
   _pagoModal = { id, monto: pago.monto, metodo: pago.metodo, data: pago };
   const modal   = document.getElementById('modalPago');
   const content = document.getElementById('modalPagoContent');

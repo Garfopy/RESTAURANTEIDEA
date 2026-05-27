@@ -707,8 +707,7 @@ class RestInventarioController extends BaseController
         $instrTransferencia  = '';
         try {
             $stCh = $db->prepare(
-                "SELECT metodo_pago, instrucciones_transferencia
-                 FROM carnihub_api_config WHERE restaurante_id = ? LIMIT 1"
+                "SELECT * FROM carnihub_api_config WHERE restaurante_id = ? LIMIT 1"
             );
             $stCh->execute([$restauranteId]);
             $chCfg            = $stCh->fetch(\PDO::FETCH_ASSOC) ?: [];
@@ -738,17 +737,50 @@ class RestInventarioController extends BaseController
                 if (empty($stripeKey)) throw new \RuntimeException('Stripe no configurado');
                 \Stripe\Stripe::setApiKey($stripeKey);
                 $centavos = (int)round($montoTotal * 100);
-                $intent   = \Stripe\PaymentIntent::create([
-                    'amount'   => max(1000, $centavos),
-                    'currency' => 'mxn',
-                    'metadata' => [
-                        'pedido_sugerido_id' => $pedidoId,
-                        'pedido_carnihub_id' => $pedidoExternoId,
-                        'restaurante_id'     => $restauranteId,
-                    ],
-                ]);
-                $_SESSION['stripe_pedido_intent_' . $pedidoId] = $intent->id;
-                $pagoData['clientSecret'] = $intent->client_secret;
+                $metadata = [
+                    'pedido_sugerido_id' => (string)$pedidoId,
+                    'pedido_carnihub_id' => (string)$pedidoExternoId,
+                    'restaurante_id'     => (string)$restauranteId,
+                ];
+
+                $savedPm  = $chCfg['stripe_payment_method_id'] ?? null;
+                $savedCus = $chCfg['stripe_customer_id'] ?? null;
+
+                if ($savedPm && $savedCus) {
+                    // Cobro automático off-session — sin necesidad de modal
+                    $intent = \Stripe\PaymentIntent::create([
+                        'amount'         => max(1000, $centavos),
+                        'currency'       => 'mxn',
+                        'customer'       => $savedCus,
+                        'payment_method' => $savedPm,
+                        'confirm'        => true,
+                        'off_session'    => true,
+                        'metadata'       => $metadata,
+                    ]);
+                    if ($intent->status === 'succeeded') {
+                        try {
+                            $db->prepare(
+                                "UPDATE rest_pedidos_sugeridos
+                                 SET estado_pago = 'pagado', pago_referencia = ?, pagado_at = NOW()
+                                 WHERE id = ?"
+                            )->execute([$intent->id, $pedidoId]);
+                        } catch (\Throwable $_e) {}
+                        $pagoData['auto']       = true;
+                        $pagoData['referencia'] = $intent->id;
+                    } elseif ($intent->status === 'requires_action') {
+                        $pagoData['action_url'] = $intent->next_action->redirect_to_url->url ?? null;
+                    } else {
+                        throw new \RuntimeException('Estado inesperado de Stripe: ' . $intent->status);
+                    }
+                } else {
+                    // Sin tarjeta guardada → flujo manual con modal
+                    $intent = \Stripe\PaymentIntent::create([
+                        'amount'   => max(1000, $centavos),
+                        'currency' => 'mxn',
+                        'metadata' => $metadata,
+                    ]);
+                    $pagoData['clientSecret'] = $intent->client_secret;
+                }
             } catch (\Throwable $e) {
                 error_log('[enviarACarnihub] Stripe error: ' . $e->getMessage());
                 $pagoData['error'] = 'No se pudo crear el cargo Stripe: ' . $e->getMessage();
@@ -813,14 +845,13 @@ class RestInventarioController extends BaseController
         $errMsg     = null;
 
         if ($metodo === 'stripe') {
-            // Verificar PaymentIntent
             $intentId = trim((string)$this->post('payment_intent_id', ''));
-            $sesKey   = 'stripe_pedido_intent_' . $pedidoId;
-            if (!$intentId || empty($_SESSION[$sesKey]) || $_SESSION[$sesKey] !== $intentId) {
-                $this->json(['ok' => false, 'error' => 'Confirmación Stripe inválida. Intenta de nuevo.']);
+            unset($_SESSION['stripe_pedido_intent_' . $pedidoId]); // limpiar sesión antigua
+
+            if (!$intentId) {
+                $this->json(['ok' => false, 'error' => 'No se recibió confirmación de pago.']);
                 return;
             }
-            unset($_SESSION[$sesKey]);
             try {
                 require_once ROOT_PATH . '/app/models/ConfigModel.php';
                 $cfg       = new ConfigModel();
@@ -830,6 +861,10 @@ class RestInventarioController extends BaseController
                 \Stripe\Stripe::setApiKey($stripeKey);
                 $intent = \Stripe\PaymentIntent::retrieve($intentId);
                 if ($intent->status !== 'succeeded') throw new \RuntimeException('Estado: ' . $intent->status);
+                // Seguridad: verificar que el intent pertenece a este pedido
+                if ((int)($intent->metadata['pedido_sugerido_id'] ?? 0) !== $pedidoId) {
+                    throw new \RuntimeException('El intento de pago no corresponde a este pedido');
+                }
                 $referencia = $intentId;
             } catch (\Throwable $e) {
                 $this->json(['ok' => false, 'error' => 'Pago Stripe no completado: ' . $e->getMessage()]);
