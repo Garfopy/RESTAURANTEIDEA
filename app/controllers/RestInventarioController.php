@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require_once ROOT_PATH . '/app/controllers/BaseController.php';
 
 class RestInventarioController extends BaseController

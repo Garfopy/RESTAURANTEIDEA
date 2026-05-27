@@ -131,9 +131,11 @@ class RestInventarioModel extends BaseModel
             );
         }
 
-        // ── Platillos SIN receta (bebidas, dulces, postres) ─────────────────
-        // Para platillos que no tienen receta (B*, DP*) pero existen como
-        // rest_ingredientes con el mismo codigo, descuenta 1 unidad por pieza pedida.
+        // ── Platillos sin ingredientes de receta (bebidas, dulces, postres) ────
+        // Migration 036 crea una receta vacía para TODOS los platillos, pero
+        // bebidas/postres no tienen filas en rest_receta_ingredientes.
+        // Detectamos platillos cuya receta tiene 0 ingredientes no-informativos
+        // y buscamos el ingrediente correspondiente por su codigo (B*, DP*).
         $sinReceta = $this->query(
             "SELECT pi.cantidad AS cantidad_pedida,
                     i.id        AS ingrediente_id,
@@ -143,12 +145,17 @@ class RestInventarioModel extends BaseModel
              JOIN rest_platillos pl ON pl.id = pi.platillo_id
              JOIN rest_ingredientes i
                   ON i.restaurante_id = ?
+                 AND TRIM(i.codigo) != ''
                  AND TRIM(i.codigo) = TRIM(COALESCE(pl.codigo, ''))
                  AND i.activo = 1
-             LEFT JOIN rest_recetas rec ON rec.platillo_id = pl.id
+             LEFT JOIN rest_recetas rec
+                  ON rec.platillo_id = pl.id
+             LEFT JOIN rest_receta_ingredientes ri_check
+                  ON ri_check.receta_id = rec.id
+                 AND COALESCE(ri_check.es_informativo, 0) = 0
              WHERE pi.pedido_id = ?
-               AND rec.id IS NULL
-               AND COALESCE(pl.codigo, '') != ''",
+               AND ri_check.id IS NULL
+               AND COALESCE(TRIM(pl.codigo), '') != ''",
             [$restauranteId, $pedidoId]
         );
 

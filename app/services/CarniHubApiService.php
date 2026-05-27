@@ -300,8 +300,8 @@ class CarniHubApiService
             CURLOPT_TIMEOUT        => self::TIMEOUT_SECONDS,
             CURLOPT_CONNECTTIMEOUT => self::CONNECT_TIMEOUT,
             CURLOPT_HTTPHEADER     => $headers,
-            CURLOPT_FOLLOWLOCATION => false,   // Sin redirects para seguridad
-            CURLOPT_MAXREDIRS      => 0,
+            CURLOPT_FOLLOWLOCATION => true,    // Seguir redirects legítimos (http→https, trailing slash, etc.)
+            CURLOPT_MAXREDIRS      => 3,
             CURLOPT_SSL_VERIFYPEER => true,
             CURLOPT_SSL_VERIFYHOST => 2,
         ]);
