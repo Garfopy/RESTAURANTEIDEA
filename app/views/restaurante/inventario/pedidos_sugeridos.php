@@ -274,8 +274,21 @@
   </div>
 </div>
 
+<?php
+// IDs de pedidos convertidos que aún pueden cambiar de estado (para auto-poll)
+$idsParaPoll = array_values(array_map(
+    fn($p) => (int)$p['id'],
+    array_filter($pedidos, fn($p) =>
+        $p['estado'] === 'convertido' &&
+        !in_array($p['estado_carnihub'] ?? null, ['entregado', 'cancelado'])
+    )
+));
+?>
+
 <script>
 const BASE = '<?= BASE_URL ?>';
+const _pedidosParaPoll = <?= json_encode($idsParaPoll) ?>;
+let _pollingActivo = {};   // id => true mientras no sea estado final
 let _pagoModal = { id: null, monto: null, metodo: null, data: null };
 
 function mostrarToast(msg, color) {
@@ -284,6 +297,71 @@ function mostrarToast(msg, color) {
   t.style.background = color || '#1D4ED8';
   t.style.display = 'block';
   setTimeout(() => t.style.display = 'none', 4500);
+}
+
+function _eliminarFila(id) {
+  const fila = document.getElementById('fila-' + id);
+  if (!fila) return;
+  fila.style.transition = 'opacity .5s, transform .5s';
+  fila.style.opacity    = '0';
+  fila.style.transform  = 'translateX(40px)';
+  setTimeout(() => fila.remove(), 520);
+}
+
+function _actualizarBadgeCH(id, est) {
+  const cell = document.getElementById('ch-estado-' + id);
+  if (!cell) return;
+  const clsMap = { pendiente:'ch-pendiente', aprobado:'ch-aprobado', en_camino:'ch-en_camino', entregado:'ch-entregado', cancelado:'ch-cancelado' };
+  const lblMap = { pendiente:'⏳ Pendiente', aprobado:'✅ Aprobado', en_camino:'🚚 En camino', entregado:'📦 Entregado', cancelado:'✗ Cancelado' };
+  cell.dataset.est = est;
+  cell.innerHTML   = `<span class="estado-badge ${clsMap[est]||''}">${lblMap[est]||est}</span>`;
+}
+
+async function _pollUno(id) {
+  if (!_pollingActivo[id]) return;
+  try {
+    const resp = await fetch(BASE + 'rest-inventario/seguimientoPedido/' + id, {
+      credentials: 'same-origin',
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    });
+    if (!resp.ok) return;
+    const data = await resp.json();
+    if (!data.ok) return;
+    const est    = data.estado_carnihub;
+    const cellEl = document.getElementById('ch-estado-' + id);
+    const prev   = cellEl?.dataset?.est || '';
+    if (!est || est === prev) return;   // sin cambio, no hacer nada
+    _actualizarBadgeCH(id, est);
+    if (est === 'cancelado') {
+      delete _pollingActivo[id];
+      mostrarToast('⚠️ Pedido #' + id + ' cancelado por CarniHub', '#DC2626');
+      setTimeout(() => _eliminarFila(id), 2200);
+    } else if (est === 'entregado') {
+      delete _pollingActivo[id];
+      mostrarToast('📦 Pedido #' + id + ' marcado como entregado', '#059669');
+    } else {
+      mostrarToast('Pedido #' + id + ': estado → ' + est, '#7C3AED');
+    }
+  } catch (_) { /* error de red — ignorar en segundo plano */ }
+}
+
+// Inicializar estado actual en dataset + arrancar polling
+if (_pedidosParaPoll.length > 0) {
+  _pedidosParaPoll.forEach(id => {
+    _pollingActivo[id] = true;
+    const cell  = document.getElementById('ch-estado-' + id);
+    const badge = cell?.querySelector('[class*="ch-"]');
+    if (badge && cell) {
+      const m = [...badge.classList].find(c => c.startsWith('ch-'));
+      cell.dataset.est = m ? m.replace('ch-', '') : '';
+    }
+  });
+  // Poll cada 75 s, escalonado 1.5 s entre pedidos para no saturar
+  setInterval(() => {
+    Object.keys(_pollingActivo).forEach((id, i) =>
+      setTimeout(() => _pollUno(parseInt(id)), i * 1500)
+    );
+  }, 75000);
 }
 
 async function accionPedido(tipo, id, btn) {
@@ -309,6 +387,10 @@ async function accionPedido(tipo, id, btn) {
       if (data.pago) {
         mostrarToast(data.message || 'Pedido enviado. Procesa el pago.', '#7C3AED');
         _mostrarModalPago(id, data.pago);
+      } else if (tipo === 'cancelar') {
+        mostrarToast(data.message || 'Pedido cancelado', '#EF4444');
+        delete _pollingActivo[id];
+        _eliminarFila(id);
       } else {
         mostrarToast(data.message || 'Operación exitosa', '#059669');
         setTimeout(() => location.reload(), 1500);
@@ -481,8 +563,15 @@ async function actualizarEstado(id, btn) {
         };
         const cls = clsMap[est] || '';
         cell.innerHTML = `<span class="estado-badge ${cls}">${lblMap[est] || est}</span>`;
+        cell.dataset.est = est;
       }
-      mostrarToast('Estado CarniHub: ' + est, '#7C3AED');
+      if (est === 'cancelado') {
+        mostrarToast('Pedido cancelado por CarniHub', '#DC2626');
+        delete _pollingActivo[id];
+        setTimeout(() => _eliminarFila(id), 1800);
+      } else {
+        mostrarToast('Estado CarniHub: ' + est, '#7C3AED');
+      }
     } else {
       mostrarToast('Error: ' + (data.error || 'No se pudo consultar'), '#DC2626');
     }
