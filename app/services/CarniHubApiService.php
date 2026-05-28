@@ -6,8 +6,9 @@
  * del sistema CarniHub externo.
  *
  * Configuración por restaurante: tabla `carnihub_api_config`
- *   · carnihub_url   → URL base (ej: https://app.carnihub.mx/api/v1)
- *   · api_key        → Bearer token emitido por CarniHub
+ *   · carnihub_url   → URL base del servidor CarniHub (ej: https://carnihub.digital)
+ *                     SIN sufijo /api/v1 — los paths del servicio ya incluyen /api/
+ *   · api_key        → Bearer token emitido por CarniHub (raw, nunca hash)
  *
  * Uso:
  *   $service = new CarniHubApiService();
@@ -95,7 +96,7 @@ class CarniHubApiService
             ];
         }
 
-        return $this->request('POST', '/pedidos', $config, $payload);
+        return $this->request('POST', '/api/pedidos', $config, $payload);
     }
 
     /**
@@ -117,10 +118,10 @@ class CarniHubApiService
         }
 
         // Intentar primero con DELETE, fallback a POST /cancelar
-        $result = $this->request('DELETE', '/pedidos/' . $pedidoCarnihubId, $config);
+        $result = $this->request('DELETE', '/api/pedidos/' . $pedidoCarnihubId, $config);
         if (!($result['success'] ?? false) && ($result['http_code'] ?? 0) === 405) {
             // Algunos servidores usan POST /cancelar en lugar de DELETE
-            $result = $this->request('POST', '/pedidos/' . $pedidoCarnihubId . '/cancelar', $config, []);
+            $result = $this->request('POST', '/api/pedidos/' . $pedidoCarnihubId . '/cancelar', $config, []);
         }
 
         return $result;
@@ -144,7 +145,7 @@ class CarniHubApiService
             return $this->errorResponse('ID de pedido inválido');
         }
 
-        return $this->request('GET', '/pedidos/' . $pedidoCarnihubId, $config);
+        return $this->request('GET', '/api/pedidos/' . $pedidoCarnihubId, $config);
     }
 
     /**
@@ -176,7 +177,7 @@ class CarniHubApiService
             $params['categoria'] = $categoria;
         }
 
-        return $this->request('GET', '/productos?' . http_build_query($params), $config);
+        return $this->request('GET', '/api/productos?' . http_build_query($params), $config);
     }
 
     /**
@@ -197,7 +198,7 @@ class CarniHubApiService
             return $this->errorResponse('ID de producto inválido');
         }
 
-        return $this->request('GET', '/productos/' . $carnihubProductoId, $config);
+        return $this->request('GET', '/api/productos/' . $carnihubProductoId, $config);
     }
 
     /**
@@ -214,7 +215,7 @@ class CarniHubApiService
         }
 
         $start  = microtime(true);
-        $result = $this->request('GET', '/productos?per_page=1', $config);
+        $result = $this->request('GET', '/api/productos?per_page=1', $config);
         $ms     = (int)round((microtime(true) - $start) * 1000);
 
         if ($result['success']) {
