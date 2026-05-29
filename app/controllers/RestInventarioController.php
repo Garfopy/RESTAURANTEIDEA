@@ -73,12 +73,13 @@ class RestInventarioController extends BaseController
                     foreach ($lote as $prod) {
                         $pid = (int)($prod['id'] ?? 0);
                         if ($pid <= 0 || isset($vistos[$pid])) continue;
-                        $precio = (float)($prod['precio_comprador'] ?? $prod['precio_base'] ?? $prod['precio'] ?? 0);
+                        $precio = $this->extraerPrecioDesdeFilaProducto($prod);
+                        $unidad = $this->extraerUnidadDesdeFilaProducto($prod);
                         $vistos[$pid] = true;
                         $productosCarnihub[] = [
                             'id'             => $pid,
                             'nombre'         => $prod['nombre'] ?? '',
-                            'unidad'         => $prod['presentacion'] ?? '',
+                            'unidad'         => $unidad,
                             'empresa_nombre' => $grupNombre,
                             'precio'         => $precio,
                         ];
@@ -121,6 +122,53 @@ class RestInventarioController extends BaseController
                             'nuevos' => $nuevos, 'acumulado' => count($productosCarnihub),
                         ];
                     }
+                }
+
+                // Fallback adicional: el listado remoto suele regresar precio/unidad en 0/vacío.
+                // Para ingredientes ya vinculados, completar desde detalleProducto.
+                $idsVinculados = [];
+                foreach ($ingredientes as $ing) {
+                    if ((int)($ing['proveedor_carnihub'] ?? 0) !== 1) continue;
+                    $pid = (int)($ing['carnihub_producto_id'] ?? 0);
+                    if ($pid > 0) $idsVinculados[$pid] = true;
+                }
+
+                if (!empty($idsVinculados)) {
+                    $detalleCache = [];
+                    $enriquecidos = 0;
+
+                    foreach ($productosCarnihub as &$pc) {
+                        $pid = (int)($pc['id'] ?? 0);
+                        if ($pid <= 0 || !isset($idsVinculados[$pid])) continue;
+
+                        $precioActual = (float)($pc['precio'] ?? 0);
+                        $unidadActual = trim((string)($pc['unidad'] ?? ''));
+                        if ($precioActual > 0 && $unidadActual !== '') continue;
+
+                        if (!isset($detalleCache[$pid])) {
+                            $detalleResp = $apiService->detalleProducto($restauranteId, $pid);
+                            $detalleCache[$pid] = [
+                                'precio' => $this->extraerPrecioDetalleProducto(is_array($detalleResp) ? $detalleResp : []),
+                                'unidad' => $this->extraerUnidadDetalleProducto(is_array($detalleResp) ? $detalleResp : []),
+                            ];
+                        }
+
+                        $det = $detalleCache[$pid];
+                        if ($precioActual <= 0 && (float)$det['precio'] > 0) {
+                            $pc['precio'] = (float)$det['precio'];
+                            $enriquecidos++;
+                        }
+                        if ($unidadActual === '' && trim((string)$det['unidad']) !== '') {
+                            $pc['unidad'] = trim((string)$det['unidad']);
+                            $enriquecidos++;
+                        }
+                    }
+                    unset($pc);
+
+                    $carnihubDebug[] = [
+                        'detalle_fallback_vinculados' => count($idsVinculados),
+                        'campos_enriquecidos' => $enriquecidos,
+                    ];
                 }
 
                 $carnihubDebug[] = ['TOTAL_UNICOS' => count($productosCarnihub)];
@@ -1200,17 +1248,71 @@ class RestInventarioController extends BaseController
         $candidatos[] = $respuesta;
 
         foreach ($candidatos as $row) {
-            foreach (['precio_comprador', 'precio_base', 'precio'] as $campo) {
-                if (isset($row[$campo])) {
-                    $valor = (float)$row[$campo];
-                    if ($valor > 0) {
-                        return $valor;
-                    }
-                }
-            }
+            $valor = $this->extraerPrecioDesdeFilaProducto(is_array($row) ? $row : []);
+            if ($valor > 0) return $valor;
         }
 
         return 0.0;
+    }
+
+    /** Extrae precio usando varios posibles nombres de campo. */
+    private function extraerPrecioDesdeFilaProducto(array $row): float
+    {
+        foreach ([
+            'precio_comprador',
+            'precio_base',
+            'precio',
+            'precio_unitario',
+            'precio_venta',
+            'precio_final',
+            'costo_unitario',
+            'costo',
+            'importe',
+        ] as $campo) {
+            if (!array_key_exists($campo, $row)) continue;
+            $raw = $row[$campo];
+            if (is_string($raw)) {
+                $raw = str_replace([',', '$', ' '], ['', '', ''], $raw);
+            }
+            $valor = (float)$raw;
+            if ($valor > 0) return $valor;
+        }
+        return 0.0;
+    }
+
+    /** Extrae unidad/presentación con tolerancia de formato. */
+    private function extraerUnidadDesdeFilaProducto(array $row): string
+    {
+        foreach (['presentacion', 'unidad_principal', 'unidad', 'um', 'uom'] as $campo) {
+            $v = trim((string)($row[$campo] ?? ''));
+            if ($v !== '') return $v;
+        }
+        return '';
+    }
+
+    /** Extrae unidad desde la respuesta de detalle de producto. */
+    private function extraerUnidadDetalleProducto(array $respuesta): string
+    {
+        $candidatos = [];
+
+        if (isset($respuesta['producto']) && is_array($respuesta['producto'])) {
+            $candidatos[] = $respuesta['producto'];
+        }
+        if (isset($respuesta['data']) && is_array($respuesta['data'])) {
+            $candidatos[] = $respuesta['data'];
+            if (isset($respuesta['data']['producto']) && is_array($respuesta['data']['producto'])) {
+                $candidatos[] = $respuesta['data']['producto'];
+            }
+        }
+
+        $candidatos[] = $respuesta;
+
+        foreach ($candidatos as $row) {
+            $unidad = $this->extraerUnidadDesdeFilaProducto(is_array($row) ? $row : []);
+            if ($unidad !== '') return $unidad;
+        }
+
+        return '';
     }
 
     /**
@@ -1261,8 +1363,8 @@ class RestInventarioController extends BaseController
                 if (!$nombre && !empty($row['nombre'])) {
                     $nombre = trim((string)$row['nombre']);
                 }
-                if (!$unidad && !empty($row['presentacion'])) {
-                    $unidad = trim((string)$row['presentacion']);
+                if (!$unidad) {
+                    $unidad = $this->extraerUnidadDesdeFilaProducto(is_array($row) ? $row : []);
                 }
             }
 
