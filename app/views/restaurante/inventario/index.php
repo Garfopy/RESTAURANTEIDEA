@@ -450,7 +450,7 @@ sort($ingCategorias);
                data-nombre="<?= htmlspecialchars(strtolower($pc['nombre'])) ?>"
                data-precio="<?= number_format((float)($pc['precio'] ?? 0), 4, '.', '') ?>"
                onmouseover="this.style.background='#FAF5FF'" onmouseout="this.style.background=''"
-               onclick="seleccionarCarniHub(<?= $pc['id'] ?>, '<?= htmlspecialchars($pc['nombre'], ENT_QUOTES) ?>', '<?= htmlspecialchars($pc['unidad'] ?? 'kg', ENT_QUOTES) ?>', <?= (float)($pc['precio'] ?? 0) ?>)">
+               onclick="seleccionarCarniHub(<?= $pc['id'] ?>, '<?= htmlspecialchars($pc['nombre'], ENT_QUOTES) ?>', '<?= htmlspecialchars($pc['unidad'] ?? 'kg', ENT_QUOTES) ?>', <?= (float)($pc['precio'] ?? 0) ?>, this)">
             <div>
               <div style="font-weight:600;font-size:.875rem"><?= htmlspecialchars($pc['nombre']) ?></div>
               <div style="font-size:.73rem;color:#9CA3AF">
@@ -653,7 +653,7 @@ sort($ingCategorias);
                           justify-content:space-between;align-items:center;cursor:pointer;transition:.1s"
                    onmouseover="if(!this.classList.contains('ch-sel'))this.style.background='#FAF5FF'"
                    onmouseout="if(!this.classList.contains('ch-sel'))this.style.background=''"
-                   onclick="seleccionarCarniHubEdit(<?= $pc['id'] ?>, '<?= htmlspecialchars($pc['nombre'], ENT_QUOTES) ?>', <?= (float)($pc['precio'] ?? 0) ?>)">
+                   onclick="seleccionarCarniHubEdit(<?= $pc['id'] ?>, '<?= htmlspecialchars($pc['nombre'], ENT_QUOTES) ?>', <?= (float)($pc['precio'] ?? 0) ?>, this)">
                 <div>
                   <div style="font-weight:600;font-size:.85rem"><?= htmlspecialchars($pc['nombre']) ?></div>
                   <div style="font-size:.72rem;color:#9CA3AF">
@@ -732,7 +732,58 @@ function switchTab(tab) {
   document.getElementById('ingNombre').required = tab !== 'ch';
 }
 
-function seleccionarCarniHub(id, nombre, unidad, precio) {
+async function syncPrecioCarniHub(productId, modo) {
+  const idNum = parseInt(productId, 10);
+  if (!idNum) return;
+
+  const BASE = '<?= BASE_URL ?>';
+  try {
+    const res = await fetch(BASE + 'rest-inventario/precioProductoCarnihub/' + idNum + '?t=' + Date.now(), {
+      credentials: 'same-origin',
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    });
+    if (!res.ok) return;
+
+    const data = await res.json();
+    if (!data || !data.ok) return;
+
+    const precio = parseFloat(data.precio || 0);
+    const unidad = (data.unidad || '').trim();
+
+    if (modo === 'alta') {
+      if (unidad) {
+        const selUnidad = document.getElementById('ingUnidad');
+        if (selUnidad) {
+          let opt = [...selUnidad.options].find(o => o.value === unidad);
+          if (!opt) { opt = new Option(unidad, unidad); selUnidad.appendChild(opt); }
+          selUnidad.value = unidad;
+        }
+      }
+      if (precio > 0) {
+        const costo = document.getElementById('ingCosto');
+        if (costo) {
+          costo.value = precio.toFixed(4);
+          calcCostos();
+        }
+      }
+    }
+
+    if (modo === 'edit') {
+      if (unidad) {
+        const u = document.getElementById('modifEditUnidad');
+        if (u) u.value = unidad;
+      }
+      if (precio > 0) {
+        const costoEdit = document.getElementById('modifEditCosto');
+        if (costoEdit) costoEdit.value = precio.toFixed(4);
+      }
+    }
+  } catch (e) {
+    // fallback silencioso al precio local ya cargado en la fila
+  }
+}
+
+function seleccionarCarniHub(id, nombre, unidad, precio, rowEl = null) {
   document.getElementById('ingCarniHubId').value = id;
   document.getElementById('ingNombreCh').value   = nombre;
   // Propagar al campo nombre del panel externo para que llegue al POST
@@ -752,7 +803,9 @@ function seleccionarCarniHub(id, nombre, unidad, precio) {
   }
   document.getElementById('chNombreWrap').style.display = 'block';
   document.querySelectorAll('.ch-prod-row').forEach(r => r.style.background = '');
-  event.currentTarget.style.background = 'var(--cp-light, #FAF5FF)';
+  const row = rowEl || document.querySelector('.ch-prod-row[onclick*="seleccionarCarniHub(' + id + '"]');
+  if (row) row.style.background = 'var(--cp-light, #FAF5FF)';
+  syncPrecioCarniHub(id, 'alta');
 }
 
 function filtrarCh(q) {
@@ -858,6 +911,7 @@ function abrirModificar(ing) {
         if (costoCab) costoCab.textContent = precioFila.toFixed(2);
       }
     }
+    syncPrecioCarniHub(ing.carnihub_producto_id, 'edit');
   } else if (!ing.carnihub_producto_id) {
     // Auto-detectar coincidencia en CarniHub por nombre del ingrediente
     // (siempre, aunque el proveedor actual sea externo: queda listo si toggle a CH)
@@ -918,10 +972,10 @@ function switchModifProv(tipo) {
   }
 }
 
-function seleccionarCarniHubEdit(id, nombre, precio) {
+function seleccionarCarniHubEdit(id, nombre, precio, rowEl = null) {
   document.getElementById('modifEditCarnihubId').value = id;
   document.querySelectorAll('.modif-ch-prod-row').forEach(r => { r.style.background=''; r.classList.remove('ch-sel'); });
-  const row = document.querySelector(`.modif-ch-prod-row[data-id="${id}"]`);
+  const row = rowEl || document.querySelector(`.modif-ch-prod-row[data-id="${id}"]`);
   if (row) { row.style.background = 'var(--cp-light, #FAF5FF)'; row.classList.add('ch-sel'); }
   document.getElementById('modifChSelNombre').textContent = nombre;
   document.getElementById('modifChSelWrap').style.display = 'block';
@@ -931,6 +985,7 @@ function seleccionarCarniHubEdit(id, nombre, precio) {
   }
   const noMatchBox = document.getElementById('modifChNoMatch');
   if (noMatchBox) noMatchBox.style.display = 'none';
+  syncPrecioCarniHub(id, 'edit');
 }
 
 function filtrarChEdit(q) {
@@ -998,6 +1053,7 @@ function autoDetectarCarniHub(nombreIng) {
     if (selWrap) selWrap.style.display = 'block';
     const buscar = document.getElementById('modifChBuscar');
     if (buscar) { buscar.value = ''; filtrarChEdit(''); }
+    syncPrecioCarniHub(id, 'edit');
     setTimeout(() => {
       try { exactRow.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch(e){}
     }, 80);

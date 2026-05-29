@@ -1125,6 +1125,75 @@ class RestInventarioController extends BaseController
     }
 
     /**
+     * GET /rest-inventario/precioProductoCarnihub/{id}
+     * Devuelve el precio actual y datos básicos de un producto CarniHub.
+     */
+    public function precioProductoCarnihub(?string $id = null): void
+    {
+        $productoId = (int)$id;
+        if ($productoId <= 0) {
+            $this->json(['ok' => false, 'error' => 'Producto inválido'], 400);
+        }
+
+        try {
+            if (defined('RESTAURANTE_STANDALONE') && RESTAURANTE_STANDALONE) {
+                require_once ROOT_PATH . '/app/services/CarniHubApiService.php';
+
+                $api = new CarniHubApiService();
+                $res = $api->detalleProducto($this->restauranteId(), $productoId);
+
+                if (!($res['success'] ?? false)) {
+                    $this->json(['ok' => false, 'error' => $res['error'] ?? 'No se pudo consultar producto'], 502);
+                }
+
+                $producto = [];
+                if (isset($res['producto']) && is_array($res['producto'])) {
+                    $producto = $res['producto'];
+                } elseif (isset($res['data']['producto']) && is_array($res['data']['producto'])) {
+                    $producto = $res['data']['producto'];
+                } elseif (isset($res['data']) && is_array($res['data'])) {
+                    $producto = $res['data'];
+                }
+
+                $this->json([
+                    'ok' => true,
+                    'producto_id' => $productoId,
+                    'nombre' => (string)($producto['nombre'] ?? $producto['name'] ?? ''),
+                    'unidad' => (string)($producto['presentacion'] ?? $producto['unidad'] ?? $producto['unit'] ?? 'kg'),
+                    'precio' => $this->extraerPrecioDetalleProducto($res),
+                    'fuente' => 'remote',
+                ]);
+            }
+
+            $db = Database::getInstance();
+            $stmt = $db->prepare(
+                "SELECT p.id, p.nombre, p.presentacion AS unidad, p.precio_base
+                   FROM productos p
+                  WHERE p.id = ? AND p.activo = 1
+                  LIMIT 1"
+            );
+            $stmt->execute([$productoId]);
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+            if (!$row) {
+                $this->json(['ok' => false, 'error' => 'Producto no encontrado'], 404);
+            }
+
+            $this->json([
+                'ok' => true,
+                'producto_id' => (int)$row['id'],
+                'nombre' => (string)$row['nombre'],
+                'unidad' => (string)($row['unidad'] ?? 'kg'),
+                'precio' => (float)($row['precio_base'] ?? 0),
+                'fuente' => 'local',
+            ]);
+        } catch (\Throwable $e) {
+            error_log('[RestInventarioController::precioProductoCarnihub] ' . $e->getMessage());
+            $this->json(['ok' => false, 'error' => 'No se pudo obtener el precio'], 500);
+        }
+    }
+
+    /**
      * GET /rest-inventario/seguimientoPedido/{id}
      * Consulta el estado actual del pedido en CarniHub y actualiza estado_carnihub local.
      */
