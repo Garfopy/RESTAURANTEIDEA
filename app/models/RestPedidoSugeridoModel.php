@@ -68,6 +68,36 @@ class RestPedidoSugeridoModel extends BaseModel
         return (int)($row['n'] ?? 0);
     }
 
+    /**
+     * Ingredientes que ya tienen un pedido abierto para evitar re-pedirlos.
+     *
+     * Criterio de bloqueo:
+     * - estado local en sugerido, aprobado o convertido
+     * - excluye convertidos con estado CarniHub final (entregado/cancelado)
+     *
+     * @return int[]
+     */
+    public function getIngredientesConPedidoAbierto(int $restauranteId): array
+    {
+        $rows = $this->query(
+            "SELECT DISTINCT psi.ingrediente_id
+             FROM rest_pedidos_sugeridos ps
+             JOIN rest_pedido_sugerido_items psi ON psi.pedido_sugerido_id = ps.id
+             WHERE ps.restaurante_id = ?
+               AND ps.estado IN ('sugerido','aprobado','convertido')
+               AND NOT (
+                   ps.estado = 'convertido'
+                   AND COALESCE(ps.estado_carnihub, '') IN ('entregado','cancelado')
+               )",
+            [$restauranteId]
+        );
+
+        return array_values(array_map(
+            static fn($r) => (int)$r['ingrediente_id'],
+            $rows
+        ));
+    }
+
     // ── Crear ─────────────────────────────────────────────────────
 
     /**

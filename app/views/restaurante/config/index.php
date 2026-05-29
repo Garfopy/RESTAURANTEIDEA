@@ -496,7 +496,7 @@
             </span>
             <span style="font-size:.78rem;color:#059669;font-weight:600">✓ Activa</span>
             <button type="button"
-                    onclick="document.getElementById('chCardSavedInfo').style.display='none';document.getElementById('chCardInputWrap').style.display='block'"
+                  onclick="document.getElementById('chCardSavedInfo').style.display='none';document.getElementById('chCardInputWrap').style.display='block';if(window.chInitCard){window.chInitCard();}"
                     style="font-size:.76rem;color:#6B7280;background:none;border:1px solid #D1D5DB;border-radius:6px;padding:3px 10px;cursor:pointer">
               Cambiar tarjeta
             </button>
@@ -609,7 +609,14 @@ function chOnMetodoChange(val) {
   }
 
   window.chGuardarTarjeta = async function() {
-    if (!_chCard) { chInitCard(); return; }
+    if (!_chCard) {
+      chInitCard();
+      await new Promise(resolve => setTimeout(resolve, 250));
+      if (!_chCard) {
+        document.getElementById('chCardError').textContent = 'No se pudo inicializar el formulario de tarjeta. Verifica Stripe y vuelve a intentar.';
+        return;
+      }
+    }
     const btn = document.getElementById('chBtnGuardarTarjeta');
     btn.disabled = true; btn.textContent = 'Guardando…';
     document.getElementById('chCardError').textContent = '';
@@ -650,7 +657,7 @@ function chOnMetodoChange(val) {
             '\u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 ' + last4 +
           '</span>' +
           '<span style="font-size:.78rem;color:#059669;font-weight:600">\u2713 Activa</span>' +
-          '<button type="button" onclick="document.getElementById(\'chCardSavedInfo\').style.display=\'none\';document.getElementById(\'chCardInputWrap\').style.display=\'block\'"' +
+          '<button type="button" onclick="document.getElementById(\'chCardSavedInfo\').style.display=\'none\';document.getElementById(\'chCardInputWrap\').style.display=\'block\';if(window.chInitCard){window.chInitCard();}"' +
                   ' style="font-size:.76rem;color:#6B7280;background:none;border:1px solid #D1D5DB;border-radius:6px;padding:3px 10px;cursor:pointer">' +
             'Cambiar tarjeta' +
           '</button></div>');

@@ -448,11 +448,17 @@ sort($ingCategorias);
           <?php endif; ?>
           <div class="ch-prod-row" style="padding:9px 14px;border-bottom:1px solid #F3F4F6;display:flex;justify-content:space-between;align-items:center;cursor:pointer;transition:.1s"
                data-nombre="<?= htmlspecialchars(strtolower($pc['nombre'])) ?>"
+               data-precio="<?= number_format((float)($pc['precio'] ?? 0), 4, '.', '') ?>"
                onmouseover="this.style.background='#FAF5FF'" onmouseout="this.style.background=''"
-               onclick="seleccionarCarniHub(<?= $pc['id'] ?>, '<?= htmlspecialchars($pc['nombre'], ENT_QUOTES) ?>', '<?= htmlspecialchars($pc['unidad'] ?? 'kg', ENT_QUOTES) ?>')">
+               onclick="seleccionarCarniHub(<?= $pc['id'] ?>, '<?= htmlspecialchars($pc['nombre'], ENT_QUOTES) ?>', '<?= htmlspecialchars($pc['unidad'] ?? 'kg', ENT_QUOTES) ?>', <?= (float)($pc['precio'] ?? 0) ?>)">
             <div>
               <div style="font-weight:600;font-size:.875rem"><?= htmlspecialchars($pc['nombre']) ?></div>
-              <div style="font-size:.73rem;color:#9CA3AF"><?= htmlspecialchars($pc['unidad'] ?? '') ?></div>
+              <div style="font-size:.73rem;color:#9CA3AF">
+                <?= htmlspecialchars($pc['unidad'] ?? '') ?>
+                <?php if ((float)($pc['precio'] ?? 0) > 0): ?>
+                  · $<?= number_format((float)$pc['precio'], 2) ?>
+                <?php endif; ?>
+              </div>
             </div>
             <span class="badge badge-purple" style="font-size:.68rem;white-space:nowrap">CarniHub</span>
           </div>
@@ -642,14 +648,20 @@ sort($ingCategorias);
                    data-id="<?= $pc['id'] ?>"
                    data-nombre="<?= htmlspecialchars(strtolower($pc['nombre']), ENT_QUOTES) ?>"
                    data-display="<?= htmlspecialchars($pc['nombre'], ENT_QUOTES) ?>"
+                   data-precio="<?= number_format((float)($pc['precio'] ?? 0), 4, '.', '') ?>"
                    style="padding:8px 12px;border-bottom:1px solid #F3F4F6;display:flex;
                           justify-content:space-between;align-items:center;cursor:pointer;transition:.1s"
                    onmouseover="if(!this.classList.contains('ch-sel'))this.style.background='#FAF5FF'"
                    onmouseout="if(!this.classList.contains('ch-sel'))this.style.background=''"
-                   onclick="seleccionarCarniHubEdit(<?= $pc['id'] ?>, '<?= htmlspecialchars($pc['nombre'], ENT_QUOTES) ?>')">
+                   onclick="seleccionarCarniHubEdit(<?= $pc['id'] ?>, '<?= htmlspecialchars($pc['nombre'], ENT_QUOTES) ?>', <?= (float)($pc['precio'] ?? 0) ?>)">
                 <div>
                   <div style="font-weight:600;font-size:.85rem"><?= htmlspecialchars($pc['nombre']) ?></div>
-                  <div style="font-size:.72rem;color:#9CA3AF"><?= htmlspecialchars($pc['unidad'] ?? '') ?></div>
+                  <div style="font-size:.72rem;color:#9CA3AF">
+                    <?= htmlspecialchars($pc['unidad'] ?? '') ?>
+                    <?php if ((float)($pc['precio'] ?? 0) > 0): ?>
+                      · $<?= number_format((float)$pc['precio'], 2) ?>
+                    <?php endif; ?>
+                  </div>
                 </div>
                 <span class="badge badge-purple" style="font-size:.68rem">CarniHub</span>
               </div>
@@ -720,7 +732,7 @@ function switchTab(tab) {
   document.getElementById('ingNombre').required = tab !== 'ch';
 }
 
-function seleccionarCarniHub(id, nombre, unidad) {
+function seleccionarCarniHub(id, nombre, unidad, precio) {
   document.getElementById('ingCarniHubId').value = id;
   document.getElementById('ingNombreCh').value   = nombre;
   // Propagar al campo nombre del panel externo para que llegue al POST
@@ -731,6 +743,12 @@ function seleccionarCarniHub(id, nombre, unidad) {
     let opt = [...selUnidad.options].find(o => o.value === unidad);
     if (!opt) { opt = new Option(unidad, unidad); selUnidad.appendChild(opt); }
     selUnidad.value = unidad;
+  }
+  const costoInput = document.getElementById('ingCosto');
+  const precioNum = parseFloat(precio || 0);
+  if (costoInput && precioNum > 0) {
+    costoInput.value = precioNum.toFixed(4);
+    calcCostos();
   }
   document.getElementById('chNombreWrap').style.display = 'block';
   document.querySelectorAll('.ch-prod-row').forEach(r => r.style.background = '');
@@ -894,13 +912,17 @@ function switchModifProv(tipo) {
   }
 }
 
-function seleccionarCarniHubEdit(id, nombre) {
+function seleccionarCarniHubEdit(id, nombre, precio) {
   document.getElementById('modifEditCarnihubId').value = id;
   document.querySelectorAll('.modif-ch-prod-row').forEach(r => { r.style.background=''; r.classList.remove('ch-sel'); });
   const row = document.querySelector(`.modif-ch-prod-row[data-id="${id}"]`);
   if (row) { row.style.background = 'var(--cp-light, #FAF5FF)'; row.classList.add('ch-sel'); }
   document.getElementById('modifChSelNombre').textContent = nombre;
   document.getElementById('modifChSelWrap').style.display = 'block';
+  const costo = parseFloat(precio || 0);
+  if (costo > 0) {
+    document.getElementById('modifEditCosto').value = costo.toFixed(4);
+  }
   const noMatchBox = document.getElementById('modifChNoMatch');
   if (noMatchBox) noMatchBox.style.display = 'none';
 }
@@ -959,10 +981,14 @@ function autoDetectarCarniHub(nombreIng) {
   if (exactRow) {
     const id = exactRow.dataset.id;
     const nombre = exactRow.dataset.display || exactRow.dataset.nombre || '';
+    const precio = parseFloat(exactRow.dataset.precio || '0');
     exactRow.style.background = 'var(--cp-light, #FAF5FF)';
     exactRow.classList.add('ch-sel');
     document.getElementById('modifEditCarnihubId').value = id;
     document.getElementById('modifChSelNombre').textContent = nombre;
+    if (precio > 0) {
+      document.getElementById('modifEditCosto').value = precio.toFixed(4);
+    }
     if (selWrap) selWrap.style.display = 'block';
     const buscar = document.getElementById('modifChBuscar');
     if (buscar) { buscar.value = ''; filtrarChEdit(''); }

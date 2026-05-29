@@ -73,12 +73,14 @@ class RestInventarioController extends BaseController
                     foreach ($lote as $prod) {
                         $pid = (int)($prod['id'] ?? 0);
                         if ($pid <= 0 || isset($vistos[$pid])) continue;
+                        $precio = (float)($prod['precio_comprador'] ?? $prod['precio_base'] ?? $prod['precio'] ?? 0);
                         $vistos[$pid] = true;
                         $productosCarnihub[] = [
                             'id'             => $pid,
                             'nombre'         => $prod['nombre'] ?? '',
                             'unidad'         => $prod['presentacion'] ?? '',
                             'empresa_nombre' => $grupNombre,
+                            'precio'         => $precio,
                         ];
                         $nuevos++;
                     }
@@ -140,7 +142,8 @@ class RestInventarioController extends BaseController
                 if (!isset($db)) $db = Database::getInstance();
                 if ($empresaProveedorId) {
                     $stmt = $db->prepare(
-                        "SELECT p.id, p.nombre, p.presentacion AS unidad, e.razon_social AS empresa_nombre
+                        "SELECT p.id, p.nombre, p.presentacion AS unidad, p.precio_base AS precio,
+                                e.razon_social AS empresa_nombre
                          FROM productos p
                          LEFT JOIN empresas e ON e.id = p.empresa_id
                          WHERE p.activo = 1
@@ -149,7 +152,8 @@ class RestInventarioController extends BaseController
                     $stmt->execute([$empresaProveedorId]);
                 } else {
                     $stmt = $db->query(
-                        "SELECT p.id, p.nombre, p.presentacion AS unidad, e.razon_social AS empresa_nombre
+                        "SELECT p.id, p.nombre, p.presentacion AS unidad, p.precio_base AS precio,
+                                e.razon_social AS empresa_nombre
                          FROM productos p
                          LEFT JOIN empresas e ON e.id = p.empresa_id
                          WHERE p.activo = 1
@@ -334,6 +338,7 @@ class RestInventarioController extends BaseController
     public function proyecciones(?string $p = null): void
     {
         require_once ROOT_PATH . '/app/services/RestForecastService.php';
+        require_once ROOT_PATH . '/app/models/RestPedidoSugeridoModel.php';
 
         $restauranteId = $this->restauranteId();
         $ingredientes  = $this->model->getByRestaurante($restauranteId, true);
@@ -342,6 +347,7 @@ class RestInventarioController extends BaseController
         $analisis     = $forecast->analizarIngredientes($ingredientes, $restauranteId);
         $criticos     = array_filter($analisis, fn($i) => $i['nivel_alerta'] === 'critico');
         $advertencias = array_filter($analisis, fn($i) => $i['nivel_alerta'] === 'advertencia');
+        $analisisParaPedido = $this->filtrarAnalisisPedidosAbiertos($analisis, $restauranteId);
 
         // ── AUTO-GENERAR PEDIDO ─────────────────────────────────────────
         $comprobante    = null;
@@ -360,7 +366,7 @@ class RestInventarioController extends BaseController
         $ultimoPedidoAt = $stCheck->fetchColumn() ?: null;
 
         if (!$ultimoPedidoAt || $forzar) {
-            $grupos = $forecast->agruparPorEmpresa($analisis);
+            $grupos = $forecast->agruparPorEmpresa($analisisParaPedido);
             if (!empty($grupos)) {
                 $comprobante = $this->_autoGenerarPedidos($restauranteId, $grupos);
                 if (!empty($comprobante)) $ultimoPedidoAt = date('Y-m-d H:i:s');
@@ -387,23 +393,65 @@ class RestInventarioController extends BaseController
         $pedidoModel   = new RestPedidoSugeridoModel();
         $pedidos       = $pedidoModel->getByRestaurante($restauranteId);
 
-        // Stripe PK para el modal de pago en la vista
-        $stripePk = defined('STRIPE_PUBLIC_KEY') && STRIPE_PUBLIC_KEY !== '' ? STRIPE_PUBLIC_KEY : '';
-        if (empty($stripePk)) {
-            try {
-                require_once ROOT_PATH . '/app/models/ConfigModel.php';
-                $cfg      = new ConfigModel();
-                $stripePk = $cfg->get('stripe_public_key', '');
-            } catch (\Throwable $e) {}
-        }
-
         $flash      = $this->getFlash();
         $pageTitle  = 'Historial de Pedidos Automáticos';
         $activeMenu = 'rest_inventario';
 
         $this->render('restaurante/inventario/pedidos_sugeridos', compact(
-            'pedidos', 'flash', 'pageTitle', 'activeMenu', 'stripePk'
+            'pedidos', 'flash', 'pageTitle', 'activeMenu'
         ));
+    }
+
+    /**
+     * GET /rest-inventario/detalleSugerido/{id}
+     * Devuelve pedido + items para el modal informativo.
+     */
+    public function detalleSugerido(?string $id = null): void
+    {
+        require_once ROOT_PATH . '/app/models/RestPedidoSugeridoModel.php';
+
+        $pedidoId      = (int)$id;
+        $restauranteId = $this->restauranteId();
+        $pedidoModel   = new RestPedidoSugeridoModel();
+
+        $pedido = $pedidoModel->findConItems($pedidoId);
+        if (!$pedido || (int)$pedido['restaurante_id'] !== $restauranteId) {
+            $this->json(['ok' => false, 'error' => 'Pedido no encontrado'], 404);
+        }
+
+        $items = array_map(static function (array $it): array {
+            $cant = (float)($it['cantidad_aprobada'] ?? $it['cantidad_sugerida'] ?? 0);
+            $precio = (float)($it['precio_unit_estimado'] ?? 0);
+            return [
+                'id' => (int)($it['id'] ?? 0),
+                'ingrediente_id' => (int)($it['ingrediente_id'] ?? 0),
+                'nombre' => $it['ingrediente_nombre'] ?? '',
+                'unidad' => $it['unidad'] ?? ($it['unidad_principal'] ?? ''),
+                'cantidad' => $cant,
+                'precio_unit' => $precio,
+                'subtotal' => round($cant * $precio, 2),
+            ];
+        }, $pedido['items'] ?? []);
+
+        $canCancel = in_array($pedido['estado'], ['sugerido', 'aprobado', 'convertido'], true)
+            && !in_array($pedido['estado_carnihub'] ?? '', ['aprobado', 'en_camino', 'entregado'], true);
+
+        $this->json([
+            'ok' => true,
+            'pedido' => [
+                'id' => (int)$pedido['id'],
+                'estado' => (string)$pedido['estado'],
+                'estado_carnihub' => $pedido['estado_carnihub'] ?? null,
+                'pedido_carnihub_id' => (int)($pedido['pedido_carnihub_id'] ?? 0),
+                'empresa_nombre' => $pedido['empresa_nombre'] ?? null,
+                'total_estimado' => (float)($pedido['total_estimado'] ?? 0),
+                'created_at' => $pedido['created_at'] ?? null,
+                'aprobado_at' => $pedido['aprobado_at'] ?? null,
+                'notas' => $pedido['notas'] ?? null,
+                'can_cancel' => $canCancel,
+                'items' => $items,
+            ],
+        ]);
     }
 
     /**
@@ -416,12 +464,14 @@ class RestInventarioController extends BaseController
         }
 
         require_once ROOT_PATH . '/app/services/RestForecastService.php';
+        require_once ROOT_PATH . '/app/models/RestPedidoSugeridoModel.php';
 
         $restauranteId = $this->restauranteId();
         $ingredientes  = $this->model->getByRestaurante($restauranteId, true);
 
         $forecast = new RestForecastService();
         $analisis = $forecast->analizarIngredientes($ingredientes, $restauranteId);
+        $analisis = $this->filtrarAnalisisPedidosAbiertos($analisis, $restauranteId);
         $grupos   = $forecast->agruparPorEmpresa($analisis);
 
         if (empty($grupos)) {
@@ -469,12 +519,21 @@ class RestInventarioController extends BaseController
         ], fn($v) => $v !== null && $v !== '');
 
         $creados = [];
+        $ingredientesBloqueados = array_fill_keys(
+            $pedidoModel->getIngredientesConPedidoAbierto($restauranteId),
+            true
+        );
 
         foreach ($grupos as $empresaId => $grupo) {
             $items    = [];
             $subtotal = 0.0;
 
             foreach ($grupo['items'] as $ing) {
+                $ingredienteId = (int)$ing['id'];
+                if (isset($ingredientesBloqueados[$ingredienteId])) {
+                    continue;
+                }
+
                 $precio = (float)($ing['empresa']['precio_base'] ?? $ing['costo_unitario'] ?? 0);
                 $cant   = (float)$ing['cantidad_sugerida'];
                 $sub    = round($cant * $precio, 2);
@@ -552,6 +611,10 @@ class RestInventarioController extends BaseController
                     $entrada['carnihub_error'] = $carnihubError;
                 }
                 $creados[] = $entrada;
+
+                foreach ($items as $it) {
+                    $ingredientesBloqueados[(int)$it['ingrediente_id']] = true;
+                }
 
             } catch (\Throwable $e) {
                 error_log('[_autoGenerarPedidos] Error: ' . $e->getMessage());
@@ -970,6 +1033,25 @@ class RestInventarioController extends BaseController
 
         $pedidoModel->cambiarEstado($pedidoId, 'cancelado', $this->usuarioId());
         $this->json(['ok' => true, 'message' => 'Pedido cancelado correctamente.']);
+    }
+
+    /**
+     * Filtra ingredientes de forecast que ya tienen un pedido abierto.
+     */
+    private function filtrarAnalisisPedidosAbiertos(array $analisis, int $restauranteId): array
+    {
+        require_once ROOT_PATH . '/app/models/RestPedidoSugeridoModel.php';
+        $pedidoModel = new RestPedidoSugeridoModel();
+        $bloqueados  = array_fill_keys($pedidoModel->getIngredientesConPedidoAbierto($restauranteId), true);
+
+        if (empty($bloqueados)) {
+            return $analisis;
+        }
+
+        return array_values(array_filter(
+            $analisis,
+            static fn($ing) => !isset($bloqueados[(int)($ing['id'] ?? 0)])
+        ));
     }
 
     /**

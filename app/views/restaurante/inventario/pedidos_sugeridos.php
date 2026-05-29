@@ -1,25 +1,20 @@
 ﻿<?php ob_start(); ?>
-<?php if (!empty($stripePk)): ?>
-<script src="https://js.stripe.com/v3/"></script>
-<?php endif; ?>
-
-<!-- Modal de pago a CarniHub -->
-<div id="modalPago"
+<!-- Modal informativo de pedido -->
+<div id="modalRevision"
      style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.5);
             align-items:center;justify-content:center;padding:20px">
-  <div style="background:#fff;border-radius:16px;padding:28px;width:100%;max-width:440px;
+  <div style="background:#fff;border-radius:16px;padding:24px;width:100%;max-width:740px;
               box-shadow:0 20px 60px rgba(0,0,0,.25)">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
       <div>
-        <div style="font-weight:700;font-size:1.05rem;color:#111827">Pago a CarniHub</div>
-        <div style="font-size:.82rem;color:#6B7280;margin-top:2px">
-          Método: <strong id="modalPagoMetodo"></strong> &nbsp;|&nbsp; Total: <strong id="modalPagoMonto"></strong>
-        </div>
+        <div style="font-weight:700;font-size:1.05rem;color:#111827">Revisión del pedido</div>
+        <div id="modalRevisionMeta" style="font-size:.82rem;color:#6B7280;margin-top:2px"></div>
       </div>
-      <button onclick="document.getElementById('modalPago').style.display='none'"
+      <button onclick="cerrarRevision()"
               style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:#6B7280;line-height:1">×</button>
     </div>
-    <div id="modalPagoContent"></div>
+    <div id="modalRevisionContent"></div>
+    <div id="modalRevisionActions" style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"></div>
   </div>
 </div>
 
@@ -222,6 +217,10 @@
                       onclick="accionPedido('reintentar', <?= $pid ?>, this)">
                 🔁 Reintentar envío
               </button>
+              <button class="btn-accion btn-actualizar"
+                      onclick="abrirRevision(<?= $pid ?>, this)">
+                👁 Ver / Revisar
+              </button>
               <button class="btn-accion btn-cancelar"
                       onclick="accionPedido('cancelar', <?= $pid ?>, this)">
                 ✗ Cancelar
@@ -232,21 +231,20 @@
                       onclick="accionPedido('reintentar', <?= $pid ?>, this)">
                 🚀 Enviar a CarniHub
               </button>
+              <button class="btn-accion btn-actualizar"
+                      onclick="abrirRevision(<?= $pid ?>, this)">
+                👁 Ver / Revisar
+              </button>
               <button class="btn-accion btn-cancelar"
                       onclick="accionPedido('cancelar', <?= $pid ?>, this)">
                 ✗ Cancelar
               </button>
 
             <?php elseif ($est === 'convertido'): ?>
-              <?php $epago = $p['estado_pago'] ?? 'pendiente'; ?>
-              <?php if ($epago !== 'pagado'): ?>
               <button class="btn-accion btn-reintentar"
-                      onclick="abrirModalPago(<?= $pid ?>, <?= (float)($p['total_estimado'] ?? 0) ?>, this)">
-                💳 Pagar
+                      onclick="abrirRevision(<?= $pid ?>, this)">
+                👁 Ver / Revisar
               </button>
-              <?php else: ?>
-              <span style="font-size:.75rem;color:#059669;font-weight:600">✅ Pagado</span>
-              <?php endif; ?>
               <button class="btn-accion btn-actualizar"
                       id="btn-seg-<?= $pid ?>"
                       onclick="actualizarEstado(<?= $pid ?>, this)">
@@ -261,10 +259,16 @@
               <?php endif; ?>
 
             <?php elseif ($est === 'cancelado'): ?>
-              <span style="font-size:.78rem;color:#9CA3AF">—</span>
+              <button class="btn-accion btn-actualizar"
+                      onclick="abrirRevision(<?= $pid ?>, this)">
+                👁 Ver / Revisar
+              </button>
 
             <?php else: ?>
-              <span style="font-size:.78rem;color:#9CA3AF">—</span>
+              <button class="btn-accion btn-actualizar"
+                      onclick="abrirRevision(<?= $pid ?>, this)">
+                👁 Ver / Revisar
+              </button>
             <?php endif; ?>
           </td>
         </tr>
@@ -289,7 +293,6 @@ $idsParaPoll = array_values(array_map(
 const BASE = '<?= BASE_URL ?>';
 const _pedidosParaPoll = <?= json_encode($idsParaPoll) ?>;
 let _pollingActivo = {};   // id => true mientras no sea estado final
-let _pagoModal = { id: null, monto: null, metodo: null, data: null };
 
 function mostrarToast(msg, color) {
   const t = document.getElementById('toast-msg');
@@ -383,11 +386,7 @@ async function accionPedido(tipo, id, btn) {
     const data = await resp.json();
 
     if (data.ok) {
-      // Si la respuesta incluye datos de pago, abrir modal
-      if (data.pago) {
-        mostrarToast(data.message || 'Pedido enviado. Procesa el pago.', '#7C3AED');
-        _mostrarModalPago(id, data.pago);
-      } else if (tipo === 'cancelar') {
+      if (tipo === 'cancelar') {
         mostrarToast(data.message || 'Pedido cancelado', '#EF4444');
         delete _pollingActivo[id];
         _eliminarFila(id);
@@ -407,134 +406,91 @@ async function accionPedido(tipo, id, btn) {
   }
 }
 
-// Abrir modal de pago para un pedido ya enviado a CarniHub
-async function abrirModalPago(id, monto, btn) {
-  btn.disabled = true;
-  // Solo abrir modal con los datos del pedido (no re-enviar)
-  // Leer configuración del método de pago via AJAX o inferir
-  btn.disabled = false;
-  // Abrimos modal con "transferencia" como fallback (el user puede cancelar y pagar más tarde)
-  const pagoFallback = { metodo: 'transferencia', monto: monto, instrucciones: '' };
-  _mostrarModalPago(id, pagoFallback);
-}
-
-function _mostrarModalPago(id, pago) {
-  // Cobro automático off-session completado — sin modal
-  if (pago.auto) {
-    mostrarToast('✅ Cobro automático con Stripe: $' + parseFloat(pago.monto || 0).toFixed(2), '#059669');
-    _actualizarBadgePago(id, 'pagado');
-    return;
+async function abrirRevision(id, btn = null) {
+  const orig = btn ? btn.textContent : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Cargando…';
   }
-  // Autenticación 3DS necesaria
-  if (pago.action_url) {
-    if (confirm('Tu banco requiere autenticación adicional para procesar el pago. ¿Continuar?')) {
-      window.location.href = pago.action_url;
+
+  try {
+    const resp = await fetch(BASE + 'rest-inventario/detalleSugerido/' + id, {
+      credentials: 'same-origin',
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    });
+    const data = await resp.json();
+    if (!data.ok) throw new Error(data.error || 'No se pudo cargar el pedido');
+
+    const p = data.pedido;
+    const itemsRows = (p.items || []).map(it => `
+      <tr>
+        <td style="padding:8px;border-bottom:1px solid #F3F4F6">${(it.nombre || '').replace(/</g, '&lt;')}</td>
+        <td style="padding:8px;border-bottom:1px solid #F3F4F6;text-align:right">${Number(it.cantidad || 0).toFixed(3)}</td>
+        <td style="padding:8px;border-bottom:1px solid #F3F4F6">${(it.unidad || '').replace(/</g, '&lt;')}</td>
+        <td style="padding:8px;border-bottom:1px solid #F3F4F6;text-align:right">$${Number(it.precio_unit || 0).toFixed(2)}</td>
+        <td style="padding:8px;border-bottom:1px solid #F3F4F6;text-align:right">$${Number(it.subtotal || 0).toFixed(2)}</td>
+      </tr>
+    `).join('') || '<tr><td colspan="5" style="padding:14px;color:#9CA3AF;text-align:center">Sin items</td></tr>';
+
+    document.getElementById('modalRevisionMeta').innerHTML =
+      `Pedido #${p.id} · Estado: <strong>${(p.estado || '').replace(/</g, '&lt;')}</strong> · Total: <strong>$${Number(p.total_estimado || 0).toFixed(2)}</strong>`;
+
+    document.getElementById('modalRevisionContent').innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;font-size:.83rem;color:#374151">
+        <div><strong>Distribuidor:</strong> ${(p.empresa_nombre || '—').replace(/</g, '&lt;')}</div>
+        <div><strong>CarniHub:</strong> ${(p.pedido_carnihub_id || 0) > 0 ? ('#' + p.pedido_carnihub_id) : '—'}</div>
+        <div><strong>Estado CarniHub:</strong> ${(p.estado_carnihub || '—').replace(/</g, '&lt;')}</div>
+        <div><strong>Generado:</strong> ${(p.created_at || '—').replace(/</g, '&lt;')}</div>
+      </div>
+      <div style="border:1px solid #E5E7EB;border-radius:10px;overflow:hidden">
+        <table style="width:100%;border-collapse:collapse;font-size:.82rem">
+          <thead>
+            <tr style="background:#F9FAFB;color:#6B7280;text-transform:uppercase;font-size:.72rem">
+              <th style="padding:8px;text-align:left">Ingrediente</th>
+              <th style="padding:8px;text-align:right">Cantidad</th>
+              <th style="padding:8px;text-align:left">Unidad</th>
+              <th style="padding:8px;text-align:right">Precio</th>
+              <th style="padding:8px;text-align:right">Subtotal</th>
+            </tr>
+          </thead>
+          <tbody>${itemsRows}</tbody>
+        </table>
+      </div>
+      ${p.notas ? `<div style="margin-top:10px;font-size:.8rem;color:#6B7280"><strong>Notas:</strong> ${String(p.notas).replace(/</g, '&lt;')}</div>` : ''}
+    `;
+
+    const actions = document.getElementById('modalRevisionActions');
+    actions.innerHTML = '<button class="btn btn-outline" onclick="cerrarRevision()">Cerrar</button>';
+    if (p.can_cancel) {
+      actions.insertAdjacentHTML('beforeend', `<button class="btn btn-danger" onclick="cancelarDesdeRevision(${p.id})">Cancelar pedido</button>`);
     }
-    return;
-  }
 
-  _pagoModal = { id, monto: pago.monto, metodo: pago.metodo, data: pago };
-  const modal   = document.getElementById('modalPago');
-  const content = document.getElementById('modalPagoContent');
-
-  document.getElementById('modalPagoMonto').textContent =
-    '$' + parseFloat(pago.monto || 0).toFixed(2);
-  document.getElementById('modalPagoMetodo').textContent =
-    { stripe: '💳 Tarjeta (Stripe)', transferencia: '📲 Transferencia', paypal: '🅿️ PayPal' }[pago.metodo] || pago.metodo;
-
-  // Contenido según método
-  if (pago.metodo === 'paypal' && pago.approvalUrl) {
-    content.innerHTML = `
-      <p style="font-size:.87rem;color:#374151;margin-bottom:16px">
-        Serás redirigido a PayPal para completar el pago.
-      </p>
-      <a href="${pago.approvalUrl}" class="btn btn-primary" style="display:block;text-align:center">
-        Pagar con PayPal →
-      </a>`;
-  } else if (pago.metodo === 'stripe' && pago.clientSecret) {
-    content.innerHTML = `
-      <div style="font-size:.85rem;font-weight:600;color:#374151;margin-bottom:8px">Datos de tarjeta</div>
-      <div id="cardElPago" style="padding:12px 14px;border:1.5px solid #E5E7EB;border-radius:10px;background:#fff"></div>
-      <div id="cardElPagoErr" style="color:#EF4444;font-size:.8rem;margin-top:6px"></div>
-      <button id="btnConfirmarStripe" onclick="confirmarPagoStripe()" class="btn btn-primary"
-              style="width:100%;margin-top:14px;justify-content:center">
-        Pagar $${parseFloat(pago.monto || 0).toFixed(2)}
-      </button>`;
-    // Montar card element
-    setTimeout(() => {
-      if (!window.Stripe) { content.innerHTML = '<p style="color:#EF4444">Stripe no disponible. Configura las claves Stripe en Configuración.</p>'; return; }
-      const stripePk = '<?= htmlspecialchars($stripePk ?? '', ENT_QUOTES) ?>';
-      if (!stripePk) { content.innerHTML = '<p style="color:#EF4444">Stripe no configurado. Agrega las claves en Configuración del restaurante.</p>'; return; }
-      const stripe   = Stripe(stripePk);
-      const elements = stripe.elements();
-      const card     = elements.create('card', { style: { base: { fontSize: '16px', color: '#111827' } } });
-      card.mount('#cardElPago');
-      card.on('change', e => document.getElementById('cardElPagoErr').textContent = e.error?.message || '');
-      window._cardElPago = card;
-      window._stripeInst = stripe;
-    }, 100);
-  } else {
-    // Transferencia u otros
-    const instrText = pago.instrucciones
-      ? `<div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;padding:14px;
-                    font-size:.84rem;white-space:pre-line;color:#065F46;font-family:monospace;margin-bottom:14px">
-             ${pago.instrucciones.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`
-      : `<p style="font-size:.84rem;color:#6B7280">El administrador debe registrar la referencia al confirmar la transferencia.</p>`;
-    content.innerHTML = instrText + `
-      <label style="display:block;font-size:.83rem;font-weight:600;color:#374151;margin-bottom:6px">Referencia / Folio de la transferencia</label>
-      <input id="inpRefTransf" type="text" class="form-input" placeholder="Ej: TRF-20240115-001" style="margin-bottom:12px">
-      <button onclick="confirmarPagoTransf()" class="btn btn-primary" style="width:100%;justify-content:center">
-        Confirmar pago
-      </button>`;
-  }
-
-  modal.style.display = 'flex';
-}
-
-async function confirmarPagoStripe() {
-  const btn = document.getElementById('btnConfirmarStripe');
-  btn.disabled = true; btn.textContent = 'Procesando…';
-  try {
-    const { paymentIntent, error } = await window._stripeInst.confirmCardPayment(
-      _pagoModal.data.clientSecret, { payment_method: { card: window._cardElPago } }
-    );
-    if (error) throw new Error(error.message);
-    if (paymentIntent.status !== 'succeeded') throw new Error('Pago no completado');
-    const body = new URLSearchParams({ payment_intent_id: paymentIntent.id });
-    const resp = await fetch(BASE + 'rest-inventario/confirmarPagoCarnihub/' + _pagoModal.id + '/stripe', {
-      method: 'POST', credentials: 'same-origin', body
-    });
-    const d = await resp.json();
-    if (!d.ok) throw new Error(d.error || 'Error al confirmar');
-    document.getElementById('modalPago').style.display = 'none';
-    mostrarToast('✅ Pago con tarjeta confirmado', '#059669');
-    _actualizarBadgePago(_pagoModal.id, 'pagado');
-  } catch(e) {
-    document.getElementById('cardElPagoErr').textContent = e.message;
-    btn.disabled = false; btn.textContent = 'Pagar $' + parseFloat(_pagoModal.monto||0).toFixed(2);
-  }
-}
-
-async function confirmarPagoTransf() {
-  const ref = document.getElementById('inpRefTransf')?.value?.trim() || '';
-  const body = new URLSearchParams({ referencia: ref });
-  try {
-    const resp = await fetch(BASE + 'rest-inventario/confirmarPagoCarnihub/' + _pagoModal.id + '/transferencia', {
-      method: 'POST', credentials: 'same-origin', body
-    });
-    const d = await resp.json();
-    if (!d.ok) throw new Error(d.error || 'Error al confirmar');
-    document.getElementById('modalPago').style.display = 'none';
-    mostrarToast('✅ Pago de transferencia registrado', '#059669');
-    _actualizarBadgePago(_pagoModal.id, 'pagado');
-  } catch(e) {
+    document.getElementById('modalRevision').style.display = 'flex';
+  } catch (e) {
     mostrarToast('Error: ' + e.message, '#DC2626');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = orig;
+    }
   }
 }
 
-function _actualizarBadgePago(id, estado) {
-  const cell = document.getElementById('pago-badge-' + id);
-  if (cell) cell.innerHTML = '<span style="background:#DCFCE7;color:#166534;padding:3px 8px;border-radius:6px;font-size:.72rem;font-weight:700">✅ Pagado</span>';
+function cerrarRevision() {
+  document.getElementById('modalRevision').style.display = 'none';
+}
+
+document.getElementById('modalRevision')?.addEventListener('click', function (e) {
+  if (e.target && e.target.id === 'modalRevision') {
+    cerrarRevision();
+  }
+});
+
+function cancelarDesdeRevision(id) {
+  const btnFake = document.createElement('button');
+  btnFake.textContent = 'Cancelar';
+  cerrarRevision();
+  accionPedido('cancelar', id, btnFake);
 }
 
 async function actualizarEstado(id, btn) {
