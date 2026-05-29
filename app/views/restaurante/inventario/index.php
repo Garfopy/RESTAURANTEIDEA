@@ -851,6 +851,12 @@ function abrirModificar(ing) {
       const nombre = row.querySelector('div > div:first-child')?.textContent.trim() || '';
       document.getElementById('modifChSelNombre').textContent = nombre;
       document.getElementById('modifChSelWrap').style.display = 'block';
+      const precioFila = parseFloat(row.dataset.precio || '0');
+      if (precioFila > 0) {
+        document.getElementById('modifEditCosto').value = precioFila.toFixed(4);
+        const costoCab = document.getElementById('modifCostoU');
+        if (costoCab) costoCab.textContent = precioFila.toFixed(2);
+      }
     }
   } else if (!ing.carnihub_producto_id) {
     // Auto-detectar coincidencia en CarniHub por nombre del ingrediente

@@ -190,21 +190,33 @@ class RestInventarioController extends BaseController
         $id              = (int)$this->post('id');
         $esCarnihub      = (int)(bool)$this->post('proveedor_carnihub', 0);
         $carnihubProdId  = $esCarnihub ? ((int)$this->post('carnihub_producto_id') ?: null) : null;
+        $costoPosteado   = (float)$this->post('costo_unitario', 0);
+        $precioRemoto    = 0.0;
 
         // Si viene de CarniHub, resolver nombre y unidad
         if ($esCarnihub && $carnihubProdId) {
             if (!defined('RESTAURANTE_STANDALONE') || !RESTAURANTE_STANDALONE) {
                 // Instalación B2B: la tabla 'productos' existe localmente
                 $db   = Database::getInstance();
-                $stmt = $db->prepare("SELECT nombre, presentacion FROM productos WHERE id = ? AND activo = 1");
+                $stmt = $db->prepare("SELECT nombre, presentacion, precio_base FROM productos WHERE id = ? AND activo = 1");
                 $stmt->execute([$carnihubProdId]);
                 $prod   = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
                 $nombre = $prod['nombre'] ?? $this->post('nombre', '');
                 $unidad = $prod['presentacion'] ?? $this->post('unidad_principal', 'kg');
+                $precioRemoto = (float)($prod['precio_base'] ?? 0);
             } else {
                 // Standalone: nombre y unidad vienen del formulario (JS los llena al seleccionar)
                 $nombre = trim($this->post('nombre', ''));
                 $unidad = $this->post('unidad_principal', 'kg');
+
+                try {
+                    require_once ROOT_PATH . '/app/services/CarniHubApiService.php';
+                    $apiService   = new CarniHubApiService();
+                    $detalle      = $apiService->detalleProducto($restauranteId, (int)$carnihubProdId);
+                    $precioRemoto = $this->extraerPrecioDetalleProducto($detalle);
+                } catch (\Throwable $e) {
+                    error_log('[guardar ingrediente CarniHub] ' . $e->getMessage());
+                }
             }
         } else {
             $nombre = trim($this->post('nombre', ''));
@@ -224,13 +236,17 @@ class RestInventarioController extends BaseController
             'codigo'              => $this->post('codigo') ?: null,
             'tipo'                => $this->post('tipo') ?: null,
             'unidad_principal'    => $unidad,
-            'costo_unitario'      => (float)$this->post('costo_unitario', 0),
+            'costo_unitario'      => $costoPosteado,
             'stock_minimo'        => $stockMinimo,
             'categoria'           => $this->post('categoria') ?: null,
             'proveedor_carnihub'  => $esCarnihub,
             'carnihub_producto_id'=> $carnihubProdId,
             'proveedor_nombre'    => !$esCarnihub ? ($this->post('proveedor_nombre') ?: null) : null,
         ];
+
+        if ($precioRemoto > 0) {
+            $data['costo_unitario'] = $precioRemoto;
+        }
 
         if ($id) {
             $this->model->update($id, array_diff_key($data, ['restaurante_id' => '']));
@@ -519,6 +535,7 @@ class RestInventarioController extends BaseController
         ], fn($v) => $v !== null && $v !== '');
 
         $creados = [];
+        $precioCacheCarnihub = [];
         $ingredientesBloqueados = array_fill_keys(
             $pedidoModel->getIngredientesConPedidoAbierto($restauranteId),
             true
@@ -534,13 +551,32 @@ class RestInventarioController extends BaseController
                     continue;
                 }
 
-                $precio = (float)($ing['empresa']['precio_base'] ?? $ing['costo_unitario'] ?? 0);
+                $carnihubProductoId = (int)($ing['carnihub_producto_id'] ?? 0);
+                $precioRemoto = 0.0;
+                if ($carnihubProductoId > 0) {
+                    if (array_key_exists($carnihubProductoId, $precioCacheCarnihub)) {
+                        $precioRemoto = (float)$precioCacheCarnihub[$carnihubProductoId];
+                    } else {
+                        try {
+                            $detalle = $apiService->detalleProducto($restauranteId, $carnihubProductoId);
+                            $precioRemoto = $this->extraerPrecioDetalleProducto($detalle);
+                        } catch (\Throwable $e) {
+                            $precioRemoto = 0.0;
+                            error_log('[_autoGenerarPedidos] detalleProducto error prod #' . $carnihubProductoId . ': ' . $e->getMessage());
+                        }
+                        $precioCacheCarnihub[$carnihubProductoId] = $precioRemoto;
+                    }
+                }
+
+                $precio = $precioRemoto > 0
+                    ? $precioRemoto
+                    : (float)($ing['empresa']['precio_base'] ?? $ing['costo_unitario'] ?? 0);
                 $cant   = (float)$ing['cantidad_sugerida'];
                 $sub    = round($cant * $precio, 2);
                 $subtotal += $sub;
                 $items[] = [
                     'ingrediente_id'       => (int)$ing['id'],
-                    'carnihub_producto_id' => (int)$ing['carnihub_producto_id'],
+                    'carnihub_producto_id' => $carnihubProductoId,
                     'cantidad_sugerida'    => $cant,
                     'unidad'               => $ing['unidad_principal'],
                     'precio_unit_estimado' => $precio,
@@ -1052,6 +1088,40 @@ class RestInventarioController extends BaseController
             $analisis,
             static fn($ing) => !isset($bloqueados[(int)($ing['id'] ?? 0)])
         ));
+    }
+
+    /**
+     * Extrae precio de respuesta de CarniHub con tolerancia de formato.
+     * Prioridad: precio_comprador > precio_base > precio.
+     */
+    private function extraerPrecioDetalleProducto(array $respuesta): float
+    {
+        $candidatos = [];
+
+        if (isset($respuesta['producto']) && is_array($respuesta['producto'])) {
+            $candidatos[] = $respuesta['producto'];
+        }
+        if (isset($respuesta['data']) && is_array($respuesta['data'])) {
+            $candidatos[] = $respuesta['data'];
+            if (isset($respuesta['data']['producto']) && is_array($respuesta['data']['producto'])) {
+                $candidatos[] = $respuesta['data']['producto'];
+            }
+        }
+
+        $candidatos[] = $respuesta;
+
+        foreach ($candidatos as $row) {
+            foreach (['precio_comprador', 'precio_base', 'precio'] as $campo) {
+                if (isset($row[$campo])) {
+                    $valor = (float)$row[$campo];
+                    if ($valor > 0) {
+                        return $valor;
+                    }
+                }
+            }
+        }
+
+        return 0.0;
     }
 
     /**
