@@ -843,11 +843,11 @@ function abrirModificar(ing) {
   document.getElementById('modifEditMinimo').value = ing.stock_minimo || 0;
   document.getElementById('modifEditProveedor').value = ing.proveedor_nombre || '';
 
+  // Toggle proveedor: inicializa panel según tipo actual
+  modifEditLocked = false;
+  switchModifProv(ing.proveedor_carnihub ? 'ch' : 'ext', true);
   modifEditLocked = !!ing.proveedor_carnihub;
   setModifEditReadOnly(modifEditLocked);
-
-  // Toggle proveedor: inicializa panel según tipo actual
-  switchModifProv(ing.proveedor_carnihub ? 'ch' : 'ext');
   if (ing.proveedor_carnihub && ing.carnihub_producto_id) {
     const row = document.querySelector(`.modif-ch-prod-row[data-id="${ing.carnihub_producto_id}"]`);
     if (row) {
@@ -886,8 +886,8 @@ function switchModifTab(tab) {
   document.getElementById('panelModifEdit').classList.toggle('active', tab === 'edit');
 }
 
-function switchModifProv(tipo) {
-  if (modifEditLocked) return;
+function switchModifProv(tipo, force) {
+  if (modifEditLocked && !force) return;
   const isExt = tipo === 'ext';
   const yaTeniaCh = document.getElementById('modifEditCarnihub').value === '1';
   document.getElementById('modifEditCarnihub').value = isExt ? '0' : '1';
