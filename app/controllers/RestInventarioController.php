@@ -164,6 +164,50 @@ class RestInventarioController extends BaseController
             } catch (\Throwable $e) {}
         }
 
+        // Mantener ingredientes CarniHub alineados con el catálogo actual.
+        // Así, al entrar a Inventario se refleja automáticamente precio/nombre/unidad.
+        if (!empty($ingredientes) && !empty($productosCarnihub)) {
+            $catalogoPorId = [];
+            foreach ($productosCarnihub as $pc) {
+                $pid = (int)($pc['id'] ?? 0);
+                if ($pid <= 0) continue;
+                $catalogoPorId[$pid] = [
+                    'nombre' => trim((string)($pc['nombre'] ?? '')),
+                    'unidad' => trim((string)($pc['unidad'] ?? '')),
+                    'precio' => (float)($pc['precio'] ?? 0),
+                ];
+            }
+
+            foreach ($ingredientes as &$ing) {
+                $esCarnihub = (int)($ing['proveedor_carnihub'] ?? 0) === 1;
+                $prodId = (int)($ing['carnihub_producto_id'] ?? 0);
+                if (!$esCarnihub || $prodId <= 0 || !isset($catalogoPorId[$prodId])) {
+                    continue;
+                }
+
+                $cat = $catalogoPorId[$prodId];
+                $update = [];
+
+                if ($cat['nombre'] !== '' && trim((string)($ing['nombre'] ?? '')) !== $cat['nombre']) {
+                    $update['nombre'] = $cat['nombre'];
+                    $ing['nombre'] = $cat['nombre'];
+                }
+                if ($cat['unidad'] !== '' && trim((string)($ing['unidad_principal'] ?? '')) !== $cat['unidad']) {
+                    $update['unidad_principal'] = $cat['unidad'];
+                    $ing['unidad_principal'] = $cat['unidad'];
+                }
+                if ($cat['precio'] > 0 && abs((float)($ing['costo_unitario'] ?? 0) - $cat['precio']) > 0.0001) {
+                    $update['costo_unitario'] = $cat['precio'];
+                    $ing['costo_unitario'] = $cat['precio'];
+                }
+
+                if (!empty($update)) {
+                    $this->model->update((int)$ing['id'], $update);
+                }
+            }
+            unset($ing);
+        }
+
         $inactivos = $this->model->getInactivos($restauranteId);
 
         // Diagnóstico opcional: agregar ?debug_carnihub=1 a la URL
