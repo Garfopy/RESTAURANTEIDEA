@@ -3,6 +3,14 @@
   <div class="rst-card">
     <form method="POST" action="<?= BASE_URL ?>rest-config/guardar" enctype="multipart/form-data" accept-charset="UTF-8">
 
+      <?php if (!empty($bloqueadoPorCarniHub)): ?>
+      <div style="background:#EFF6FF;border:1.5px solid #BFDBFE;border-radius:12px;padding:12px 14px;margin-bottom:16px;
+                  font-size:.82rem;color:#1E40AF;line-height:1.45">
+        <strong>Local sincronizado con CarniHub.</strong>
+        Los datos del restaurante se autocompletan desde CarniHub y no se pueden editar aquí para evitar desajustes en el pedido automático.
+      </div>
+      <?php endif; ?>
+
       <!-- Información general -->
       <div style="font-weight:700;font-size:.95rem;color:#111827;margin-bottom:16px;
                   display:flex;align-items:center;gap:8px">
@@ -529,9 +537,13 @@
       </div>
 
       <div style="display:flex;justify-content:flex-end">
-        <button type="submit" class="btn btn-primary">
-          Guardar configuración
+        <?php if (!empty($bloqueadoPorCarniHub)): ?>
+        <button type="button" class="btn btn-outline" disabled>
+          Sincronizado por CarniHub
         </button>
+        <?php else: ?>
+        <button type="submit" class="btn btn-primary">Guardar configuración</button>
+        <?php endif; ?>
       </div>
     </form>
   </div>
@@ -787,6 +799,24 @@ document.addEventListener('mouseout', function(e) {
   };
   document.head.appendChild(script);
 })();
+
+<?php if (!empty($bloqueadoPorCarniHub)): ?>
+(function() {
+  const form = document.querySelector('form[action="<?= BASE_URL ?>rest-config/guardar"]');
+  if (!form) return;
+
+  form.querySelectorAll('input, textarea, select').forEach(function(el) {
+    // Mantener habilitados los hidden para no romper JS que los lee/escribe.
+    if (el.type !== 'hidden') {
+      el.disabled = true;
+    }
+  });
+
+  form.addEventListener('submit', function(e) {
+    e.preventDefault();
+  });
+})();
+<?php endif; ?>
 </script>
 <?php
 $content = ob_get_clean();

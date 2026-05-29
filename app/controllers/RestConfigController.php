@@ -5,6 +5,119 @@ class RestConfigController extends BaseController
 {
     private RestauranteModel $model;
 
+    private function hasColumn(string $table, string $column): bool
+    {
+        try {
+            $db = \Database::getInstance();
+            $stmt = $db->prepare("SHOW COLUMNS FROM `{$table}` LIKE ?");
+            $stmt->execute([$column]);
+            return (bool)$stmt->fetch(\PDO::FETCH_ASSOC);
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    private function getSucursalColumn(): ?string
+    {
+        if ($this->hasColumn('rest_restaurantes', 'sucursal_id')) {
+            return 'sucursal_id';
+        }
+        if ($this->hasColumn('rest_restaurantes', 'sucursal_carnihub_id')) {
+            return 'sucursal_carnihub_id';
+        }
+        return null;
+    }
+
+    private function forzarCarniHubActivo(int $restauranteId): void
+    {
+        if (!$this->hasColumn('carnihub_api_config', 'activo')) {
+            return;
+        }
+
+        try {
+            $db = \Database::getInstance();
+            $stmt = $db->prepare(
+                "UPDATE carnihub_api_config
+                 SET activo = 1
+                 WHERE restaurante_id = ? AND COALESCE(activo, 0) = 0"
+            );
+            $stmt->execute([$restauranteId]);
+        } catch (\Throwable $e) {
+            // No bloquear la pantalla por un fail de hardening.
+        }
+    }
+
+    private function isBloqueadoPorCarniHub(int $restauranteId, array $cfgCarniHub = []): bool
+    {
+        $rest = $this->model->find($restauranteId);
+        if (!$rest) {
+            return false;
+        }
+
+        $empresaProveedorId = (int)($rest['empresa_proveedor_id'] ?? 0);
+        $colSucursal = $this->getSucursalColumn();
+        $sucursalId = $colSucursal ? (int)($rest[$colSucursal] ?? 0) : 0;
+
+        $cfgEmpresaId = (int)($cfgCarniHub['carnihub_empresa_id'] ?? 0);
+        $cfgConToken = !empty(trim((string)($cfgCarniHub['api_key'] ?? '')));
+
+        return $empresaProveedorId > 0 || $sucursalId > 0 || $cfgEmpresaId > 0 || $cfgConToken;
+    }
+
+    private function sincronizarDatosDesdeCarniHub(int $restauranteId): bool
+    {
+        $colSucursal = $this->getSucursalColumn();
+        if (!$colSucursal) {
+            return false;
+        }
+
+        try {
+            $db = \Database::getInstance();
+
+            $stmtRest = $db->prepare("SELECT {$colSucursal} AS sucursal_ref FROM rest_restaurantes WHERE id = ? LIMIT 1");
+            $stmtRest->execute([$restauranteId]);
+            $rest = $stmtRest->fetch(\PDO::FETCH_ASSOC) ?: [];
+            $sucursalId = (int)($rest['sucursal_ref'] ?? 0);
+            if ($sucursalId <= 0) {
+                return false;
+            }
+
+            $stmtSuc = $db->prepare(
+                "SELECT nombre, direccion, telefono, lat, lng
+                 FROM sucursales
+                 WHERE id = ?
+                 LIMIT 1"
+            );
+            $stmtSuc->execute([$sucursalId]);
+            $sucursal = $stmtSuc->fetch(\PDO::FETCH_ASSOC) ?: [];
+            if (!$sucursal) {
+                return false;
+            }
+
+            $update = [
+                'nombre'    => trim((string)($sucursal['nombre'] ?? '')),
+                'direccion' => trim((string)($sucursal['direccion'] ?? '')),
+                'telefono'  => trim((string)($sucursal['telefono'] ?? '')),
+                'lat'       => $sucursal['lat'] !== null && $sucursal['lat'] !== '' ? (float)$sucursal['lat'] : null,
+                'lng'       => $sucursal['lng'] !== null && $sucursal['lng'] !== '' ? (float)$sucursal['lng'] : null,
+            ];
+
+            // Conserva nombre previo si la sucursal no trae uno válido.
+            if ($update['nombre'] === '') {
+                unset($update['nombre']);
+            }
+
+            if (empty($update)) {
+                return false;
+            }
+
+            $this->model->update($restauranteId, $update);
+            return true;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
     /**
      * Normaliza texto de formularios para evitar mojibake (ej. QuerÃ©taro)
      * y guardar siempre UTF-8 válido.
@@ -72,16 +185,41 @@ class RestConfigController extends BaseController
 
         } catch (\Exception $e) { /* tables may not exist */ }
 
+        $bloqueadoPorCarniHub = $this->isBloqueadoPorCarniHub($restauranteId, $cfgCarniHub);
+        if ($bloqueadoPorCarniHub) {
+            $this->forzarCarniHubActivo($restauranteId);
+            $this->sincronizarDatosDesdeCarniHub($restauranteId);
+            $restaurante = $this->model->find($restauranteId);
+        }
+
         $pageTitle  = 'Configuración del Restaurante';
         $activeMenu = 'rest_config';
         $this->render('restaurante/config/index',
-            compact('restaurante','flash','pageTitle','activeMenu','mapsApiKey','cfgPagos','cfgCarniHub'));
+            compact('restaurante','flash','pageTitle','activeMenu','mapsApiKey','cfgPagos','cfgCarniHub','bloqueadoPorCarniHub'));
     }
 
     public function guardar(?string $p = null): void
     {
         if (!$this->isPost()) $this->redirect('rest-config/index');
         $restauranteId = $this->restauranteId();
+
+        $cfgCarniHub = [];
+        try {
+            $dbLock = \Database::getInstance();
+            $stmtLock = $dbLock->prepare("SELECT * FROM carnihub_api_config WHERE restaurante_id = :rid LIMIT 1");
+            $stmtLock->execute([':rid' => $restauranteId]);
+            $cfgCarniHub = $stmtLock->fetch(\PDO::FETCH_ASSOC) ?: [];
+        } catch (\Throwable $e) {
+            $cfgCarniHub = [];
+        }
+
+        if ($this->isBloqueadoPorCarniHub($restauranteId, $cfgCarniHub)) {
+            $this->forzarCarniHubActivo($restauranteId);
+            $this->sincronizarDatosDesdeCarniHub($restauranteId);
+            $this->flash('success', 'Configuración bloqueada: este local está vinculado a CarniHub y sus datos se sincronizan automáticamente.');
+            $this->redirect('rest-config/index');
+            return;
+        }
 
         $nombre      = trim((string)$this->normalizeUtf8Input($this->post('nombre', '')));
         $descripcion = $this->normalizeUtf8Input($this->post('descripcion'));
