@@ -188,36 +188,54 @@ class RestInventarioController extends BaseController
         $restauranteId = $this->restauranteId();
 
         $id              = (int)$this->post('id');
+        $ingredienteAct  = $id ? $this->model->find($id) : null;
+        if ($id && (!$ingredienteAct || (int)($ingredienteAct['restaurante_id'] ?? 0) !== $restauranteId)) {
+            $this->flash('error', 'Ingrediente no encontrado.');
+            $this->redirect('rest-inventario/index');
+            return;
+        }
+
+        $bloqueadoCarniHub = $ingredienteAct && (int)($ingredienteAct['proveedor_carnihub'] ?? 0) === 1;
         $esCarnihub      = (int)(bool)$this->post('proveedor_carnihub', 0);
         $carnihubProdId  = $esCarnihub ? ((int)$this->post('carnihub_producto_id') ?: null) : null;
         $costoPosteado   = (float)$this->post('costo_unitario', 0);
         $precioRemoto    = 0.0;
 
+        if ($bloqueadoCarniHub) {
+            $carniProdExistente = (int)($ingredienteAct['carnihub_producto_id'] ?? 0);
+            if ($carniProdExistente <= 0) {
+                $this->flash('error', 'Ingrediente CarniHub sin vínculo de producto. No se puede editar manualmente.');
+                $this->redirect('rest-inventario/index');
+                return;
+            }
+
+            $sync = $this->obtenerDatosProductoCarniHub($restauranteId, $carniProdExistente);
+            $this->model->update($id, [
+                'nombre'               => trim((string)($sync['nombre'] ?? '')) ?: (string)($ingredienteAct['nombre'] ?? ''),
+                'unidad_principal'     => trim((string)($sync['unidad'] ?? '')) ?: (string)($ingredienteAct['unidad_principal'] ?? 'kg'),
+                'costo_unitario'       => (float)($sync['precio'] ?? 0) > 0 ? (float)$sync['precio'] : (float)($ingredienteAct['costo_unitario'] ?? 0),
+                'proveedor_carnihub'   => 1,
+                'carnihub_producto_id' => $carniProdExistente,
+                'proveedor_nombre'     => null,
+            ]);
+
+            $this->flash('success', 'Ingrediente bloqueado por CarniHub. Datos sincronizados automáticamente.');
+            $this->redirect('rest-inventario/index');
+            return;
+        }
+
+        if ($esCarnihub && !$carnihubProdId) {
+            $this->flash('error', 'Selecciona un producto de CarniHub para continuar.');
+            $this->redirect('rest-inventario/index');
+            return;
+        }
+
         // Si viene de CarniHub, resolver nombre y unidad
         if ($esCarnihub && $carnihubProdId) {
-            if (!defined('RESTAURANTE_STANDALONE') || !RESTAURANTE_STANDALONE) {
-                // Instalación B2B: la tabla 'productos' existe localmente
-                $db   = Database::getInstance();
-                $stmt = $db->prepare("SELECT nombre, presentacion, precio_base FROM productos WHERE id = ? AND activo = 1");
-                $stmt->execute([$carnihubProdId]);
-                $prod   = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
-                $nombre = $prod['nombre'] ?? $this->post('nombre', '');
-                $unidad = $prod['presentacion'] ?? $this->post('unidad_principal', 'kg');
-                $precioRemoto = (float)($prod['precio_base'] ?? 0);
-            } else {
-                // Standalone: nombre y unidad vienen del formulario (JS los llena al seleccionar)
-                $nombre = trim($this->post('nombre', ''));
-                $unidad = $this->post('unidad_principal', 'kg');
-
-                try {
-                    require_once ROOT_PATH . '/app/services/CarniHubApiService.php';
-                    $apiService   = new CarniHubApiService();
-                    $detalle      = $apiService->detalleProducto($restauranteId, (int)$carnihubProdId);
-                    $precioRemoto = $this->extraerPrecioDetalleProducto($detalle);
-                } catch (\Throwable $e) {
-                    error_log('[guardar ingrediente CarniHub] ' . $e->getMessage());
-                }
-            }
+            $sync = $this->obtenerDatosProductoCarniHub($restauranteId, (int)$carnihubProdId);
+            $nombre = trim((string)($sync['nombre'] ?? '')) ?: trim($this->post('nombre', ''));
+            $unidad = trim((string)($sync['unidad'] ?? '')) ?: $this->post('unidad_principal', 'kg');
+            $precioRemoto = (float)($sync['precio'] ?? 0);
         } else {
             $nombre = trim($this->post('nombre', ''));
             $unidad = $this->post('unidad_principal', 'kg');
@@ -1122,6 +1140,70 @@ class RestInventarioController extends BaseController
         }
 
         return 0.0;
+    }
+
+    /**
+     * Obtiene y normaliza nombre/unidad/precio de un producto de CarniHub.
+     */
+    private function obtenerDatosProductoCarniHub(int $restauranteId, int $carnihubProductoId): array
+    {
+        if ($carnihubProductoId <= 0) {
+            return ['nombre' => '', 'unidad' => '', 'precio' => 0.0];
+        }
+
+        if (!defined('RESTAURANTE_STANDALONE') || !RESTAURANTE_STANDALONE) {
+            try {
+                $db   = Database::getInstance();
+                $stmt = $db->prepare("SELECT nombre, presentacion, precio_base FROM productos WHERE id = ? AND activo = 1 LIMIT 1");
+                $stmt->execute([$carnihubProductoId]);
+                $row = $stmt->fetch(\PDO::FETCH_ASSOC) ?: [];
+                return [
+                    'nombre' => trim((string)($row['nombre'] ?? '')),
+                    'unidad' => trim((string)($row['presentacion'] ?? '')),
+                    'precio' => (float)($row['precio_base'] ?? 0),
+                ];
+            } catch (\Throwable $e) {
+                return ['nombre' => '', 'unidad' => '', 'precio' => 0.0];
+            }
+        }
+
+        try {
+            require_once ROOT_PATH . '/app/services/CarniHubApiService.php';
+            $apiService = new CarniHubApiService();
+            $detalle    = $apiService->detalleProducto($restauranteId, $carnihubProductoId);
+
+            $candidatos = [];
+            if (isset($detalle['producto']) && is_array($detalle['producto'])) {
+                $candidatos[] = $detalle['producto'];
+            }
+            if (isset($detalle['data']) && is_array($detalle['data'])) {
+                $candidatos[] = $detalle['data'];
+                if (isset($detalle['data']['producto']) && is_array($detalle['data']['producto'])) {
+                    $candidatos[] = $detalle['data']['producto'];
+                }
+            }
+            $candidatos[] = $detalle;
+
+            $nombre = '';
+            $unidad = '';
+            foreach ($candidatos as $row) {
+                if (!$nombre && !empty($row['nombre'])) {
+                    $nombre = trim((string)$row['nombre']);
+                }
+                if (!$unidad && !empty($row['presentacion'])) {
+                    $unidad = trim((string)$row['presentacion']);
+                }
+            }
+
+            return [
+                'nombre' => $nombre,
+                'unidad' => $unidad,
+                'precio' => $this->extraerPrecioDetalleProducto($detalle),
+            ];
+        } catch (\Throwable $e) {
+            error_log('[obtenerDatosProductoCarniHub] ' . $e->getMessage());
+            return ['nombre' => '', 'unidad' => '', 'precio' => 0.0];
+        }
     }
 
     /**
