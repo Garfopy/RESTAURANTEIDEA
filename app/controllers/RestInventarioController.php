@@ -166,6 +166,7 @@ class RestInventarioController extends BaseController
 
         // Mantener ingredientes CarniHub alineados con el catálogo actual.
         // Así, al entrar a Inventario se refleja automáticamente precio/nombre/unidad.
+        $syncDiag = [];
         if (!empty($ingredientes) && !empty($productosCarnihub)) {
             $catalogoPorId = [];
             foreach ($productosCarnihub as $pc) {
@@ -182,6 +183,15 @@ class RestInventarioController extends BaseController
                 $esCarnihub = (int)($ing['proveedor_carnihub'] ?? 0) === 1;
                 $prodId = (int)($ing['carnihub_producto_id'] ?? 0);
                 if (!$esCarnihub || $prodId <= 0 || !isset($catalogoPorId[$prodId])) {
+                    if ($esCarnihub) {
+                        $syncDiag[] = [
+                            'ingrediente_id' => (int)($ing['id'] ?? 0),
+                            'nombre_local' => (string)($ing['nombre'] ?? ''),
+                            'carnihub_producto_id' => $prodId,
+                            'estado' => $prodId <= 0 ? 'sin_producto_vinculado' : 'producto_no_en_catalogo_cargado',
+                            'precio_local' => (float)($ing['costo_unitario'] ?? 0),
+                        ];
+                    }
                     continue;
                 }
 
@@ -204,6 +214,18 @@ class RestInventarioController extends BaseController
                 if (!empty($update)) {
                     $this->model->update((int)$ing['id'], $update);
                 }
+
+                $syncDiag[] = [
+                    'ingrediente_id' => (int)($ing['id'] ?? 0),
+                    'nombre_local' => (string)($ing['nombre'] ?? ''),
+                    'carnihub_producto_id' => $prodId,
+                    'nombre_catalogo' => (string)$cat['nombre'],
+                    'unidad_catalogo' => (string)$cat['unidad'],
+                    'precio_catalogo' => (float)$cat['precio'],
+                    'precio_local' => (float)($ing['costo_unitario'] ?? 0),
+                    'actualizado' => !empty($update),
+                    'campos_actualizados' => array_keys($update),
+                ];
             }
             unset($ing);
         }
@@ -217,6 +239,11 @@ class RestInventarioController extends BaseController
             echo "Productos cargados al modal: " . count($productosCarnihub) . "\n\n";
             echo "Páginas pedidas al API:\n";
             echo json_encode($carnihubDebug, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) . "\n";
+            echo "\n=== Sync ingredientes CarniHub ===\n";
+            echo "Total ingredientes activos: " . count($ingredientes) . "\n";
+            $totalCH = count(array_filter($ingredientes, fn($i) => (int)($i['proveedor_carnihub'] ?? 0) === 1));
+            echo "Ingredientes vinculados a CarniHub: " . $totalCH . "\n";
+            echo json_encode($syncDiag, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) . "\n";
             return;
         }
 
