@@ -59,8 +59,16 @@ class RestMermasModel extends BaseModel
             [$restauranteId, $d, $h]
         );
 
-        $dias = max(1, (int)ceil((strtotime($hasta) - strtotime($desde)) / 86400) + 1);
-        $promedioDiario = round($mermaTotal / $dias, 3);
+        // Días que realmente tienen registros de merma (no días de calendario)
+        $diasConData = $this->queryOne(
+            "SELECT COUNT(DISTINCT DATE(created_at)) AS dias
+             FROM rest_movimientos_inventario
+             WHERE restaurante_id = ? AND tipo = 'merma'
+               AND created_at BETWEEN ? AND ?",
+            [$restauranteId, $d, $h]
+        );
+        $diasReales = max(1, (int)($diasConData['dias'] ?? 1));
+        $promedioDiario = round($mermaTotal / $diasReales, 3);
 
         return [
             'cantidad_total'        => $mermaTotal,

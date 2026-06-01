@@ -76,11 +76,6 @@ class RestFinanzasController extends BaseController
         $this->redirect('rest-finanzas/egresos?tab=gastos');
     }
 
-    public function retiros(?string $p = null): void
-    {
-        $this->redirect('rest-finanzas/egresos?tab=retiros');
-    }
-
     public function guardarRetiro(?string $p = null): void
     {
         if (!$this->isPost()) $this->redirect('rest-finanzas/egresos?tab=retiros');
