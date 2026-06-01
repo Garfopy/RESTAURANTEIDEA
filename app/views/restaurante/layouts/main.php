@@ -29,6 +29,24 @@ $_isMesero = in_array($_rol, ['mesero', 'comprador'], true);            // opera
       --color-primary:   <?= htmlspecialchars($colorPri) ?>;
       --color-secondary: <?= htmlspecialchars($colorSec) ?>;
     }
+    /* Sidebar con color de marca */
+    .rst-sidebar {
+      background: var(--cp);
+      border-right: none;
+    }
+    .rst-sidebar-logo { border-bottom-color: rgba(255,255,255,.15); }
+    .rst-sidebar nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,.25); }
+    .rst-nav-section { color: rgba(255,255,255,.55); }
+    .rst-nav-link { color: rgba(255,255,255,.82); }
+    .rst-nav-link:hover { background: rgba(255,255,255,.15); color: #fff; }
+    .rst-nav-link.active {
+      background: rgba(255,255,255,.22);
+      color: #fff;
+      border-left-color: rgba(255,255,255,.9);
+      font-weight: 700;
+    }
+    .rst-sidebar-footer { border-top-color: rgba(255,255,255,.15); color: rgba(255,255,255,.5); }
+    .rst-sidebar-footer strong { color: rgba(255,255,255,.7); }
   </style>
 </head>
 <body>
@@ -40,10 +58,10 @@ $_isMesero = in_array($_rol, ['mesero', 'comprador'], true);            // opera
     <img src="<?= BASE_URL . htmlspecialchars($restLogo) ?>" alt="Logo"
          style="height:36px;object-fit:contain;margin-bottom:8px;display:block">
     <?php endif; ?>
-    <div style="font-weight:700;font-size:.95rem;color:#111827;line-height:1.2">
+    <div style="font-weight:700;font-size:.95rem;color:#fff;line-height:1.2">
       <?= htmlspecialchars($restNombre) ?>
     </div>
-    <div style="font-size:.7rem;color:#9CA3AF;margin-top:3px">Mi Empresa</div>
+    <div style="font-size:.7rem;color:rgba(255,255,255,.65);margin-top:3px">Mi Empresa</div>
   </div>
 
   <nav>
@@ -149,10 +167,10 @@ $_isMesero = in_array($_rol, ['mesero', 'comprador'], true);            // opera
     <a href="<?= BASE_URL ?>auth/logout"
        style="display:flex;align-items:center;justify-content:center;gap:6px;
               padding:8px 12px;margin-bottom:10px;border-radius:8px;
-              background:#FEE2E2;color:#991B1B;text-decoration:none;
+              background:rgba(255,255,255,.15);color:#fff;text-decoration:none;
               font-size:.82rem;font-weight:600;transition:background .15s"
-       onmouseover="this.style.background='#FECACA'"
-       onmouseout="this.style.background='#FEE2E2'">
+       onmouseover="this.style.background='rgba(255,255,255,.25)'"
+       onmouseout="this.style.background='rgba(255,255,255,.15)'">
       <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
       Cerrar sesión
     </a>
