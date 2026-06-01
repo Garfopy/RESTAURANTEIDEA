@@ -49,6 +49,9 @@ if ($_earlyCtrl === 'auth' && $_earlyAction === 'logoutstaff') {
     }
 }
 
+// Sesión sin expiración automática por inactividad
+ini_set('session.gc_maxlifetime', 31536000); // 1 año en segundos
+session_set_cookie_params(['lifetime' => 0, 'path' => '/', 'samesite' => 'Lax']);
 session_name(SESSION_NAME . $_cookieSuffix);
 session_start();
 

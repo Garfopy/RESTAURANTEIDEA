@@ -95,7 +95,7 @@
         <td style="font-weight:600"><?= htmlspecialchars($m['nombre']) ?></td>
         <td style="color:#6B7280"><?= htmlspecialchars($m['zona_nombre'] ?? '—') ?></td>
         <td style="text-align:center"><?= (int)$m['capacidad'] ?></td>
-        <td><?= $badgeCls ? "<span class=\"badge $badgeCls\">$badgeTxt</span>" : $badgeTxt ?></td>
+        <td data-estado-mesa="<?= (int)$m['id'] ?>"><?= $badgeCls ? "<span class=\"badge $badgeCls\">$badgeTxt</span>" : $badgeTxt ?></td>
         <td class="qr-cell">
           <div id="qr-<?= $m['id'] ?>"></div>
           <div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
@@ -318,6 +318,29 @@ function editMesa(m) {
   document.getElementById('modalMesaTitle').textContent = 'Editar Mesa';
   document.getElementById('modalMesa').classList.add('open');
 }
+
+// ── Polling en vivo de estados de mesas ──────────────────────────────────────
+const _mesaEstadoBadge = {
+  disponible: ['badge badge-green',  'Disponible'],
+  ocupada:    ['badge badge-red',    'Ocupada'],
+  reservada:  ['badge badge-blue',   'Reservada'],
+  pagando:    ['badge badge-amber',  'Pagando'],
+};
+function _pollMesas() {
+  fetch('<?= BASE_URL ?>rest-mesa/estados', { credentials: 'same-origin' })
+    .then(r => r.ok ? r.json() : null)
+    .then(data => {
+      if (!Array.isArray(data)) return;
+      data.forEach(m => {
+        const cell = document.querySelector('[data-estado-mesa="' + m.id + '"]');
+        if (!cell) return;
+        const [cls, txt] = _mesaEstadoBadge[m.estado] || ['badge badge-gray', m.estado];
+        cell.innerHTML = '<span class="' + cls + '">' + txt + '</span>';
+      });
+    })
+    .catch(() => {});
+}
+setInterval(_pollMesas, 10000); // cada 10 segundos
 </script>
 <?php
 $content = ob_get_clean();

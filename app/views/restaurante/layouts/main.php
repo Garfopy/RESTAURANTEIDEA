@@ -3,6 +3,19 @@ $usuario    = $_SESSION['usuario'] ?? [];
 $restaurante = $restaurante ?? (new RestauranteModel())->find($_SESSION['restaurante_activo_id'] ?? 0);
 $colorPri   = $restaurante['color_primario']   ?? '#C8102E';
 $colorSec   = $restaurante['color_secundario'] ?? '#1f2937';
+
+// Detecta si el color primario es claro (para usar texto oscuro en el sidebar)
+function _sidebarIsLight(string $hex): bool {
+    $hex = ltrim($hex, '#');
+    if (strlen($hex) === 3) $hex = $hex[0].$hex[0].$hex[1].$hex[1].$hex[2].$hex[2];
+    if (strlen($hex) !== 6) return false;
+    $r = hexdec(substr($hex,0,2))/255;
+    $g = hexdec(substr($hex,2,2))/255;
+    $b = hexdec(substr($hex,4,2))/255;
+    foreach ([$r,$g,$b] as &$c) $c = $c<=0.04045 ? $c/12.92 : (($c+0.055)/1.055)**2.4;
+    return (0.2126*$r + 0.7152*$g + 0.0722*$b) > 0.35;
+}
+$_sidebarLight = _sidebarIsLight($colorPri);
 $restNombre = $restaurante['nombre'] ?? 'Mi Restaurante';
 $restLogo   = $restaurante['logo']   ?? '';
 $activeMenu = $activeMenu ?? '';
@@ -32,8 +45,25 @@ $_isMesero = in_array($_rol, ['mesero', 'comprador'], true);            // opera
     /* Sidebar con color de marca */
     .rst-sidebar {
       background: var(--cp);
-      border-right: none;
+      border-right: <?= $_sidebarLight ? '1px solid #E5E7EB' : 'none' ?>;
     }
+    <?php if ($_sidebarLight): ?>
+    /* Color primario claro → texto oscuro para contraste */
+    .rst-sidebar-logo { border-bottom-color: rgba(0,0,0,.10); }
+    .rst-sidebar nav::-webkit-scrollbar-thumb { background: rgba(0,0,0,.15); }
+    .rst-nav-section { color: rgba(0,0,0,.45); }
+    .rst-nav-link { color: rgba(0,0,0,.70); }
+    .rst-nav-link:hover { background: rgba(0,0,0,.08); color: #111827; }
+    .rst-nav-link.active {
+      background: rgba(0,0,0,.12);
+      color: #111827;
+      border-left-color: rgba(0,0,0,.6);
+      font-weight: 700;
+    }
+    .rst-sidebar-footer { border-top-color: rgba(0,0,0,.10); color: rgba(0,0,0,.45); }
+    .rst-sidebar-footer strong { color: rgba(0,0,0,.6); }
+    <?php else: ?>
+    /* Color primario oscuro → texto blanco */
     .rst-sidebar-logo { border-bottom-color: rgba(255,255,255,.15); }
     .rst-sidebar nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,.25); }
     .rst-nav-section { color: rgba(255,255,255,.55); }
@@ -47,6 +77,7 @@ $_isMesero = in_array($_rol, ['mesero', 'comprador'], true);            // opera
     }
     .rst-sidebar-footer { border-top-color: rgba(255,255,255,.15); color: rgba(255,255,255,.5); }
     .rst-sidebar-footer strong { color: rgba(255,255,255,.7); }
+    <?php endif; ?>
   </style>
 </head>
 <body>
@@ -58,10 +89,10 @@ $_isMesero = in_array($_rol, ['mesero', 'comprador'], true);            // opera
     <img src="<?= BASE_URL . htmlspecialchars($restLogo) ?>" alt="Logo"
          style="height:36px;object-fit:contain;margin-bottom:8px;display:block">
     <?php endif; ?>
-    <div style="font-weight:700;font-size:.95rem;color:#fff;line-height:1.2">
+    <div style="font-weight:700;font-size:.95rem;color:<?= $_sidebarLight ? '#111827' : '#fff' ?>;line-height:1.2">
       <?= htmlspecialchars($restNombre) ?>
     </div>
-    <div style="font-size:.7rem;color:rgba(255,255,255,.65);margin-top:3px">Mi Empresa</div>
+    <div style="font-size:.7rem;color:<?= $_sidebarLight ? 'rgba(0,0,0,.5)' : 'rgba(255,255,255,.65)' ?>;margin-top:3px">Mi Empresa</div>
   </div>
 
   <nav>
@@ -167,10 +198,11 @@ $_isMesero = in_array($_rol, ['mesero', 'comprador'], true);            // opera
     <a href="<?= BASE_URL ?>auth/logout"
        style="display:flex;align-items:center;justify-content:center;gap:6px;
               padding:8px 12px;margin-bottom:10px;border-radius:8px;
-              background:rgba(255,255,255,.15);color:#fff;text-decoration:none;
+              background:<?= $_sidebarLight ? 'rgba(0,0,0,.08)' : 'rgba(255,255,255,.15)' ?>;
+              color:<?= $_sidebarLight ? '#374151' : '#fff' ?>;text-decoration:none;
               font-size:.82rem;font-weight:600;transition:background .15s"
-       onmouseover="this.style.background='rgba(255,255,255,.25)'"
-       onmouseout="this.style.background='rgba(255,255,255,.15)'">
+       onmouseover="this.style.background='<?= $_sidebarLight ? 'rgba(0,0,0,.14)' : 'rgba(255,255,255,.25)' ?>'"
+       onmouseout="this.style.background='<?= $_sidebarLight ? 'rgba(0,0,0,.08)' : 'rgba(255,255,255,.15)' ?>'">
       <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
       Cerrar sesión
     </a>
