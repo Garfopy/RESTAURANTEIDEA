@@ -15,7 +15,7 @@ class RestMenuController extends BaseController
     public function index(?string $p = null): void
     {
         $restauranteId = $this->restauranteId();
-        $platillos  = $this->model->getByRestaurante($restauranteId);
+        $platillos  = $this->model->getByRestaurante($restauranteId, true);
         $categorias = $this->model->getCategorias($restauranteId);
         $flash      = $this->getFlash();
         $pageTitle  = 'Menú';
@@ -171,9 +171,11 @@ class RestMenuController extends BaseController
     {
         $platillo = $this->model->find((int)$id);
         if ($platillo) {
-            $this->model->update((int)$id, ['disponible' => $platillo['disponible'] ? 0 : 1]);
+            $nuevo = $platillo['disponible'] ? 0 : 1;
+            $this->model->update((int)$id, ['disponible' => $nuevo]);
+            $this->flash('success', $nuevo ? 'Platillo activado.' : 'Platillo pausado.');
         }
-        $this->json(['ok' => true]);
+        $this->redirect('rest-menu/index');
     }
 
     // ── Categorías ────────────────────────────────────────────────
