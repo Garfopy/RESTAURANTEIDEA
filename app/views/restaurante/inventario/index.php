@@ -926,6 +926,10 @@ function abrirModificar(ing) {
         const costoCab = document.getElementById('modifCostoU');
         if (costoCab) costoCab.textContent = precioFila.toFixed(2);
       }
+      // Rellenar categoría desde el producto CarniHub si el ingrediente no la tiene guardada
+      const catFila = row.dataset.categoria || '';
+      const catEditEl = document.getElementById('modifEditCategoria');
+      if (catEditEl && catFila && !catEditEl.value) catEditEl.value = catFila;
     }
     syncPrecioCarniHub(ing.carnihub_producto_id, 'edit');
   } else if (!ing.carnihub_producto_id) {
