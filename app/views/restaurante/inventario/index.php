@@ -801,9 +801,9 @@ function seleccionarCarniHub(id, nombre, unidad, precio, categoria = '', rowEl =
   document.getElementById('ingNombreCh').value   = nombre;
   // Propagar al campo nombre del panel externo para que llegue al POST
   document.getElementById('ingNombre').value     = nombre;
-  // Auto-rellenar categoría del producto CarniHub (solo si el campo está vacío)
+  // Auto-rellenar categoría del producto CarniHub
   const catInput = document.getElementById('ingCategoria');
-  if (catInput && categoria && !catInput.value) catInput.value = categoria;
+  if (catInput && categoria) catInput.value = categoria;
   // Propagar unidad del producto CarniHub al select de unidad
   const selUnidad = document.getElementById('ingUnidad');
   if (selUnidad && unidad) {
@@ -1000,9 +1000,9 @@ function seleccionarCarniHubEdit(id, nombre, precio, categoria = '', rowEl = nul
   if (costo > 0) {
     document.getElementById('modifEditCosto').value = costo.toFixed(4);
   }
-  // Auto-rellenar categoría si el campo está vacío
+  // Auto-rellenar categoría del producto CarniHub
   const catEdit = document.getElementById('modifEditCategoria');
-  if (catEdit && categoria && !catEdit.value) catEdit.value = categoria;
+  if (catEdit && categoria) catEdit.value = categoria;
   const noMatchBox = document.getElementById('modifChNoMatch');
   if (noMatchBox) noMatchBox.style.display = 'none';
   syncPrecioCarniHub(id, 'edit');
