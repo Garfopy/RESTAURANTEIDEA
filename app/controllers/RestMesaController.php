@@ -80,6 +80,17 @@ class RestMesaController extends BaseController
         $this->redirect('rest-mesa/index');
     }
 
+    /** Endpoint JSON para polling en vivo de estados de mesas */
+    public function estados(?string $p = null): void
+    {
+        $restauranteId = $this->restauranteId();
+        $mesas = $this->model->getByRestaurante($restauranteId, true);
+        $this->json(array_map(fn($m) => [
+            'id'     => (int)$m['id'],
+            'estado' => $m['estado'] ?? 'disponible',
+        ], $mesas));
+    }
+
     public function activar(?string $id = null): void
     {
         $this->model->update((int)$id, ['activo' => 1]);
