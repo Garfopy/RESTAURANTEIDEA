@@ -103,6 +103,7 @@ $routes = [
     'rest-mesa'     => 'RestMesaController',
     'rest-menu'     => 'RestMenuController',
     'rest-inventario' => 'RestInventarioController',
+    'rest-mermas'   => 'RestMermasController',
     'rest-pedido'   => 'RestPedidoController',
     'rest-finanzas' => 'RestFinanzasController',
     'rest-cliente'  => 'RestClienteController',

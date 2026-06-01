@@ -68,6 +68,24 @@
         $esInactiva = (int)($m['activo'] ?? 1) === 0;
         if ($esInactiva) {
           $badgeCls = 'badge-gray'; $badgeTxt = 'Inactiva';
+        } elseif ($m['estado'] === 'reservada') {
+          // Verificar si la reservación ya comenzó (llegó) o está completada
+          $resInfo = $reservasTiempoHoy[$m['id']] ?? null;
+          if ($resInfo) {
+            $resTs = strtotime($resInfo['fecha'] . ' ' . $resInfo['hora']);
+            $now   = time();
+            if ($now >= $resTs && $now <= $resTs + 3 * 3600) {
+              // Dentro de la ventana de 3h → llegó
+              $badgeCls = ''; $badgeTxt = '<span style="padding:2px 8px;border-radius:99px;font-size:.78rem;font-weight:600;background:#DBEAFE;color:#1D4ED8">llegó 📍</span>';
+            } elseif ($now > $resTs + 3 * 3600) {
+              // Pasó la ventana → completada
+              $badgeCls = ''; $badgeTxt = '<span style="padding:2px 8px;border-radius:99px;font-size:.78rem;font-weight:600;background:#F3F4F6;color:#374151">completada</span>';
+            } else {
+              [$badgeCls, $badgeTxt] = $estadoMap['reservada'];
+            }
+          } else {
+            [$badgeCls, $badgeTxt] = $estadoMap['reservada'];
+          }
         } else {
           [$badgeCls, $badgeTxt] = $estadoMap[$m['estado']] ?? ['badge-gray', $m['estado']];
         }
@@ -77,7 +95,7 @@
         <td style="font-weight:600"><?= htmlspecialchars($m['nombre']) ?></td>
         <td style="color:#6B7280"><?= htmlspecialchars($m['zona_nombre'] ?? '—') ?></td>
         <td style="text-align:center"><?= (int)$m['capacidad'] ?></td>
-        <td><span class="badge <?= $badgeCls ?>"><?= $badgeTxt ?></span></td>
+        <td><?= $badgeCls ? "<span class=\"badge $badgeCls\">$badgeTxt</span>" : $badgeTxt ?></td>
         <td class="qr-cell">
           <div id="qr-<?= $m['id'] ?>"></div>
           <div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">

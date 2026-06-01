@@ -66,4 +66,27 @@ class RestMesaModel extends BaseModel
         );
         return (int) $this->db->lastInsertId();
     }
+
+    /**
+     * Devuelve [mesa_id => ['fecha'=>…, 'hora'=>…]] para reservaciones
+     * confirmadas/pendientes de HOY, indexadas por mesa_id.
+     */
+    public function reservacionesActivasHoy(int $restauranteId): array
+    {
+        $rows = $this->query(
+            "SELECT r.mesa_id, r.fecha, r.hora
+             FROM rest_reservaciones r
+             WHERE r.restaurante_id = ? AND r.estado IN ('confirmada','pendiente')
+               AND r.fecha = CURDATE()
+             ORDER BY r.hora ASC",
+            [$restauranteId]
+        );
+        $map = [];
+        foreach ($rows as $row) {
+            if ($row['mesa_id'] && !isset($map[$row['mesa_id']])) {
+                $map[$row['mesa_id']] = ['fecha' => $row['fecha'], 'hora' => $row['hora']];
+            }
+        }
+        return $map;
+    }
 }

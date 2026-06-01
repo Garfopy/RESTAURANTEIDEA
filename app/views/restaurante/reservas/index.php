@@ -7,8 +7,18 @@ $_qrUrl  = BASE_URL . 'menu/' . $_qrSlug . '/reservar';
 // Solo reservaciones del comensal (QR)
 $_delComensal = array_values(array_filter($data ?? [], fn($r) => ($r['origen'] ?? 'restaurante') === 'comensal'));
 
-// Badge de estado
-$_badge = function(string $estado): string {
+// Badge de estado — muestra 'llegó' durante la ventana activa y 'completada' al finalizar
+$_badge = function(string $estado, string $fecha = '', string $hora = ''): string {
+    // Estado visual dinámico para reservaciones confirmadas
+    if ($estado === 'confirmada' && $fecha && $hora) {
+        $reservaTs = strtotime("$fecha $hora");
+        $now       = time();
+        if ($now >= $reservaTs && $now <= $reservaTs + 3 * 3600) {
+            return "<span style='padding:2px 8px;border-radius:99px;font-size:.72rem;font-weight:600;background:#DBEAFE;color:#1D4ED8'>llegó \u{1F4CD}</span>";
+        } elseif ($now > $reservaTs + 3 * 3600) {
+            return "<span style='padding:2px 8px;border-radius:99px;font-size:.72rem;font-weight:600;background:#F3F4F6;color:#374151'>completada</span>";
+        }
+    }
     $map = [
         'pendiente'  => ['#FEF3C7','#92400E'],
         'confirmada' => ['#DCFCE7','#166534'],
@@ -151,7 +161,7 @@ function filtroRapido(periodo) {
         <td style="padding:11px 14px">
           <?= $r['mesa_nombre'] ? htmlspecialchars($r['mesa_nombre']) : '<span style="color:#9CA3AF;font-size:.82rem">—</span>' ?>
         </td>
-        <td style="padding:11px 14px"><?= $_badge($r['estado']) ?></td>
+        <td style="padding:11px 14px"><?= $_badge($r['estado'], $r['fecha'] ?? '', $r['hora'] ?? '') ?></td>
         <td style="padding:11px 14px">
           <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
             <!-- Ver detalles -->
@@ -238,13 +248,28 @@ function filtroRapido(periodo) {
 function abrirDetalle(r) {
   const fmtFecha = r.fecha ? r.fecha.split('-').reverse().join('/') : '—';
   const hora     = (r.hora || '').substring(0, 5) || '—';
-  const estadoMap = {
-    pendiente:  ['#FEF3C7','#92400E'],
-    confirmada: ['#DCFCE7','#166534'],
-    cancelada:  ['#FEE2E2','#991B1B'],
-    completada: ['#F3F4F6','#374151'],
-  };
-  const [bg, fg] = estadoMap[r.estado] || ['#F3F4F6','#374151'];
+
+  // Calcular estado visual según hora actual
+  function estadoVisual(estado, fecha, hora) {
+    if (estado === 'confirmada' && fecha && hora) {
+      const reservaTs = new Date(fecha + 'T' + hora).getTime();
+      const now = Date.now();
+      if (now >= reservaTs && now <= reservaTs + 3 * 3600 * 1000)
+        return { label: 'lleg\u00f3 \uD83D\uDCCD', bg: '#DBEAFE', fg: '#1D4ED8' };
+      if (now > reservaTs + 3 * 3600 * 1000)
+        return { label: 'completada', bg: '#F3F4F6', fg: '#374151' };
+    }
+    const estadoMap = {
+      pendiente:  { label: 'pendiente',  bg: '#FEF3C7', fg: '#92400E' },
+      confirmada: { label: 'confirmada', bg: '#DCFCE7', fg: '#166534' },
+      cancelada:  { label: 'cancelada',  bg: '#FEE2E2', fg: '#991B1B' },
+      completada: { label: 'completada', bg: '#F3F4F6', fg: '#374151' },
+    };
+    return estadoMap[estado] || { label: estado, bg: '#F3F4F6', fg: '#374151' };
+  }
+
+  const ev = estadoVisual(r.estado, r.fecha, r.hora);
+  const { bg, fg } = ev;
 
   document.getElementById('modal-reserva-body').innerHTML = `
     <div style="display:grid;gap:16px">
@@ -287,7 +312,7 @@ function abrirDetalle(r) {
       <div>
         <div style="font-size:.72rem;color:#9CA3AF;text-transform:uppercase;letter-spacing:.05em">Estado</div>
         <div style="margin-top:4px">
-          <span style="padding:3px 10px;border-radius:99px;font-size:.78rem;font-weight:600;background:${bg};color:${fg}">${r.estado}</span>
+          <span style="padding:3px 10px;border-radius:99px;font-size:.78rem;font-weight:600;background:${bg};color:${fg}">${ev.label}</span>
         </div>
       </div>
     </div>

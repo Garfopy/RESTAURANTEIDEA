@@ -22,10 +22,11 @@ class RestMesaController extends BaseController
         $countInactivas = count($this->model->getByRestaurante($restauranteId, false));
         $zonas  = $this->model->getZonas($restauranteId);
         $rest   = (new RestauranteModel())->find($restauranteId);
+        $reservasTiempoHoy = $this->model->reservacionesActivasHoy($restauranteId);
         $flash  = $this->getFlash();
         $pageTitle  = 'Mesas';
         $activeMenu = 'rest_mesas';
-        $this->render('restaurante/mesas/index', compact('mesas','zonas','rest','flash','pageTitle','activeMenu','filtro','countActivas','countInactivas'));
+        $this->render('restaurante/mesas/index', compact('mesas','zonas','rest','flash','pageTitle','activeMenu','filtro','countActivas','countInactivas','reservasTiempoHoy'));
     }
 
     public function layout(?string $p = null): void

@@ -34,18 +34,35 @@ class RestFinanzasController extends BaseController
 
     public function gastos(?string $p = null): void
     {
+        $this->redirect('rest-finanzas/egresos?tab=gastos');
+    }
+
+    public function retiros(?string $p = null): void
+    {
+        $this->redirect('rest-finanzas/egresos?tab=retiros');
+    }
+
+    public function egresos(?string $p = null): void
+    {
         $restauranteId = $this->restauranteId();
+        $tab      = $this->get('tab', 'gastos');
+        $tab      = in_array($tab, ['gastos','retiros'], true) ? $tab : 'gastos';
         $page     = (int)$this->get('page', 1);
-        $resultado = $this->model->getGastos($restauranteId, $page);
-        $flash    = $this->getFlash();
-        $pageTitle = 'Gastos';
-        $activeMenu = 'rest_gastos';
-        $this->render('restaurante/finanzas/gastos', array_merge($resultado, compact('flash','pageTitle','activeMenu')));
+
+        $resGastos  = $this->model->getGastos($restauranteId, $page);
+        $resRetiros = $this->model->getRetiros($restauranteId, $page);
+
+        $flash     = $this->getFlash();
+        $pageTitle = 'Gastos y Retiros';
+        $activeMenu = 'rest_egresos';
+        $this->render('restaurante/finanzas/egresos', compact(
+            'resGastos','resRetiros','tab','flash','pageTitle','activeMenu'
+        ));
     }
 
     public function guardarGasto(?string $p = null): void
     {
-        if (!$this->isPost()) $this->redirect('rest-finanzas/gastos');
+        if (!$this->isPost()) $this->redirect('rest-finanzas/egresos?tab=gastos');
         $this->model->insertGasto([
             'restaurante_id' => $this->restauranteId(),
             'categoria'      => $this->post('categoria', 'otros'),
@@ -56,23 +73,12 @@ class RestFinanzasController extends BaseController
             'usuario_id'     => $this->usuarioId(),
         ]);
         $this->flash('success', 'Gasto registrado.');
-        $this->redirect('rest-finanzas/gastos');
-    }
-
-    public function retiros(?string $p = null): void
-    {
-        $restauranteId = $this->restauranteId();
-        $page     = (int)$this->get('page', 1);
-        $resultado = $this->model->getRetiros($restauranteId, $page);
-        $flash    = $this->getFlash();
-        $pageTitle = 'Retiros';
-        $activeMenu = 'rest_retiros';
-        $this->render('restaurante/finanzas/retiros', array_merge($resultado, compact('flash','pageTitle','activeMenu')));
+        $this->redirect('rest-finanzas/egresos?tab=gastos');
     }
 
     public function guardarRetiro(?string $p = null): void
     {
-        if (!$this->isPost()) $this->redirect('rest-finanzas/retiros');
+        if (!$this->isPost()) $this->redirect('rest-finanzas/egresos?tab=retiros');
         $this->model->insertRetiro([
             'restaurante_id' => $this->restauranteId(),
             'descripcion'    => trim($this->post('descripcion', '')),
@@ -80,7 +86,7 @@ class RestFinanzasController extends BaseController
             'usuario_id'     => $this->usuarioId(),
         ]);
         $this->flash('success', 'Retiro registrado.');
-        $this->redirect('rest-finanzas/retiros');
+        $this->redirect('rest-finanzas/egresos?tab=retiros');
     }
 
     public function cortes(?string $p = null): void
