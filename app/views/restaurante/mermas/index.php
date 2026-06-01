@@ -18,23 +18,79 @@
   .btn-merma-outline { padding:9px 16px;background:#fff;color:#1f2937;border:1px solid #D1D5DB;border-radius:8px;font-size:.85rem;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px }
 </style>
 
-<!-- Top bar: filtros + acciones -->
-<div style="display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:18px;flex-wrap:wrap">
-  <form method="GET" action="<?= BASE_URL ?>rest-mermas/index"
-        style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-    <input type="date" name="desde" value="<?= htmlspecialchars($desde) ?>"
-           style="padding:8px 12px;border:1px solid #D1D5DB;border-radius:8px;font-size:.875rem">
-    <span style="color:#6B7280">—</span>
-    <input type="date" name="hasta" value="<?= htmlspecialchars($hasta) ?>"
-           style="padding:8px 12px;border:1px solid #D1D5DB;border-radius:8px;font-size:.875rem">
-    <button type="submit" class="btn-merma-primary">Filtrar</button>
-  </form>
-  <div style="display:flex;gap:10px">
+<!-- Panel de período + rangos rápidos -->
+<form method="GET" action="<?= BASE_URL ?>rest-mermas/index" id="formFiltro">
+  <input type="hidden" name="desde" id="inputDesde" value="<?= htmlspecialchars($desde) ?>">
+  <input type="hidden" name="hasta" id="inputHasta" value="<?= htmlspecialchars($hasta) ?>">
+
+  <div style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:14px 18px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+    <div>
+      <div style="font-size:.68rem;color:#6B7280;text-transform:uppercase;letter-spacing:.6px;font-weight:700">Período de análisis</div>
+      <div style="font-weight:600;font-size:.95rem;margin-top:3px" id="periodoLabel">
+        <?php
+          $diasDiff = (strtotime($hasta) - strtotime($desde)) / 86400;
+          if ($diasDiff == 0)        echo 'Hoy';
+          elseif ($diasDiff == 6)    echo 'Últimos 7 días';
+          elseif ($diasDiff == 29)   echo 'Últimos 30 días';
+          elseif ($diasDiff == 89)   echo 'Últimos 90 días';
+          elseif ($desde == date('Y-01-01')) echo 'Este año';
+          else echo htmlspecialchars($desde) . ' — ' . htmlspecialchars($hasta);
+        ?>
+      </div>
+    </div>
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+      <?php
+        $hoy     = date('Y-m-d');
+        $rangos  = [
+          ['Hoy',        $hoy,                       $hoy],
+          ['7 días',     date('Y-m-d',strtotime('-6 days')), $hoy],
+          ['30 días',    date('Y-m-d',strtotime('-29 days')),$hoy],
+          ['90 días',    date('Y-m-d',strtotime('-89 days')),$hoy],
+          ['Este año',   date('Y-01-01'),              $hoy],
+        ];
+        foreach ($rangos as [$label, $d, $h]):
+          $active = ($desde === $d && $hasta === $h);
+      ?>
+      <a href="<?= BASE_URL ?>rest-mermas/index?desde=<?= $d ?>&hasta=<?= $h ?>"
+         style="padding:7px 14px;border-radius:8px;font-size:.82rem;font-weight:600;text-decoration:none;border:1px solid <?= $active ? 'transparent' : '#D1D5DB' ?>;background:<?= $active ? '#C8102E' : '#fff' ?>;color:<?= $active ? '#fff' : '#374151' ?>;transition:.15s"
+         onmouseover="if(this.style.background!='rgb(200, 16, 46)')this.style.background='#F3F4F6'"
+         onmouseout="if(this.style.background!='rgb(200, 16, 46)')this.style.background='#fff'"><?= $label ?></a>
+      <?php endforeach; ?>
+      <button type="button"
+              onclick="document.getElementById('rangoCustom').style.display=document.getElementById('rangoCustom').style.display==='none'?'flex':'none'"
+              style="padding:7px 14px;border-radius:8px;font-size:.82rem;font-weight:600;border:1px solid #D1D5DB;background:#fff;color:#374151;cursor:pointer">Personalizado</button>
+    </div>
+  </div>
+
+  <!-- Rango personalizado (oculto por defecto) -->
+  <div id="rangoCustom" style="display:none;gap:10px;align-items:center;background:#fff;border:1px solid #E5E7EB;border-radius:10px;padding:10px 16px;margin-bottom:10px;flex-wrap:wrap">
+    <input type="date" id="customDesde" value="<?= htmlspecialchars($desde) ?>"
+           style="padding:7px 12px;border:1px solid #D1D5DB;border-radius:8px;font-size:.875rem">
+    <span style="color:#9CA3AF">—</span>
+    <input type="date" id="customHasta" value="<?= htmlspecialchars($hasta) ?>"
+           style="padding:7px 12px;border:1px solid #D1D5DB;border-radius:8px;font-size:.875rem">
+    <button type="button" class="btn-merma-primary" onclick="aplicarCustom()">Aplicar</button>
+  </div>
+</form>
+
+<!-- Panel secciones PDF + acciones -->
+<div style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:12px 18px;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+  <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+    <span style="font-size:.68rem;color:#6B7280;text-transform:uppercase;letter-spacing:.6px;font-weight:700">Mostrar / incluir en PDF:</span>
+    <?php foreach ([['chkLogo','Logo'],['chkKpis','KPIs'],['chkGraficas','Gráficas'],['chkTabla','Tabla'],['chkNotas','Notas']] as [$id,$lbl]): ?>
+    <label style="display:flex;align-items:center;gap:5px;font-size:.85rem;font-weight:500;color:#374151;cursor:pointer">
+      <input type="checkbox" id="<?= $id ?>" checked
+             style="width:15px;height:15px;accent-color:#1f2937;cursor:pointer">
+      <?= $lbl ?>
+    </label>
+    <?php endforeach; ?>
+  </div>
+  <div style="display:flex;gap:8px">
     <button type="button" class="btn-merma-outline" onclick="document.getElementById('modalRegMerma').classList.add('open')">
       <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
       Registrar merma
     </button>
-    <button type="button" class="btn-merma-primary" onclick="generarReporteMermasPDF()">
+    <button type="button" style="padding:9px 16px;background:#1f2937;color:#fff;border:none;border-radius:8px;font-size:.85rem;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px" onclick="generarReporteMermasPDF()">
       <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
       Generar reporte PDF
     </button>
@@ -94,21 +150,21 @@
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
   <div class="merma-chart-wrap">
     <div class="ttl">Top 10 productos con más mermas</div>
-    <canvas id="chartTopMermas" height="220"></canvas>
+    <div style="position:relative;height:240px"><canvas id="chartTopMermas"></canvas></div>
   </div>
   <div class="merma-chart-wrap">
     <div class="ttl">Distribución por motivo</div>
-    <canvas id="chartMotivos" height="220"></canvas>
+    <div style="position:relative;height:240px"><canvas id="chartMotivos"></canvas></div>
   </div>
 </div>
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
   <div class="merma-chart-wrap">
     <div class="ttl">Tendencia diaria de mermas</div>
-    <canvas id="chartTendencia" height="220"></canvas>
+    <div style="position:relative;height:240px"><canvas id="chartTendencia"></canvas></div>
   </div>
   <div class="merma-chart-wrap">
     <div class="ttl">Top 10 productos con menos mermas</div>
-    <canvas id="chartMenosMermas" height="220"></canvas>
+    <div style="position:relative;height:240px"><canvas id="chartMenosMermas"></canvas></div>
   </div>
 </div>
 
@@ -344,6 +400,13 @@ $notas[] = 'Rango técnico de conservación para cadena fría: 0°C a 4°C.';
   function fmtNum(n, d=3) { return Number(n||0).toLocaleString('es-MX',{minimumFractionDigits:d,maximumFractionDigits:d}); }
 
   window.generarReporteMermasPDF = async function () {
+    const sec = {
+      logo:     document.getElementById('chkLogo')?.checked    ?? true,
+      kpis:     document.getElementById('chkKpis')?.checked    ?? true,
+      graficas: document.getElementById('chkGraficas')?.checked ?? true,
+      tabla:    document.getElementById('chkTabla')?.checked    ?? true,
+      notas:    document.getElementById('chkNotas')?.checked    ?? true,
+    };
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ unit:'pt', format:'a4' });
     const W = doc.internal.pageSize.getWidth();
@@ -356,7 +419,7 @@ $notas[] = 'Rango técnico de conservación para cadena fría: 0°C a 4°C.';
     doc.setFillColor(31,41,55);
     doc.rect(0,0,W,80,'F');
 
-    const logo = await loadLogoDataURL(REPORT_DATA.restaurante.logo);
+    const logo = sec.logo ? await loadLogoDataURL(REPORT_DATA.restaurante.logo) : null;
     let textX = MARGIN;
     if (logo) {
       const targetH = 44;
@@ -371,7 +434,7 @@ $notas[] = 'Rango técnico de conservación para cadena fría: 0°C a 4°C.';
     doc.text('CarniHub', textX, 36);
     doc.setFont('helvetica','normal');
     doc.setFontSize(11);
-    doc.text('Reporte de Mermas — ' + REPORT_DATA.restaurante.nombre, textX, 54);
+    doc.text('Reporte de Mermas', textX, 54);
 
     doc.setFontSize(9);
     doc.text('Fecha: ' + fechaTxt, W - MARGIN, 36, { align:'right' });
@@ -379,13 +442,15 @@ $notas[] = 'Rango técnico de conservación para cadena fría: 0°C a 4°C.';
     doc.text('ID: #' + folio, W - MARGIN, 64, { align:'right' });
 
     let y = 100;
+
+    // ── KPI cards (4x2) ──
+    if (sec.kpis) {
     doc.setTextColor(107,114,128);
     doc.setFont('helvetica','bold');
     doc.setFontSize(9);
     doc.text('INDICADORES DEL PERÍODO', MARGIN, y);
     y += 8;
 
-    // ── KPI cards (4x2) ──
     const kpiCards = [
       { lbl:'TOTAL MERMAS',        val: fmtNum(REPORT_DATA.kpis.cantidad_total),         sub:'unidades', color:[200,16,46] },
       { lbl:'EVENTOS DEL PERÍODO', val: String(REPORT_DATA.kpis.eventos),                 sub:'registros', color:[31,41,55] },
@@ -430,8 +495,10 @@ $notas[] = 'Rango técnico de conservación para cadena fría: 0°C a 4°C.';
     });
 
     y += 6 + 2 * (cardH + gapKPI) + 10;
+    } // end sec.kpis
 
     // ── Sección gráficas ──
+    if (sec.graficas) {
     doc.setTextColor(107,114,128);
     doc.setFont('helvetica','bold');
     doc.setFontSize(9);
@@ -476,8 +543,10 @@ $notas[] = 'Rango técnico de conservación para cadena fría: 0°C a 4°C.';
     });
 
     y += 2 * (chartH + 24) + 6;
+    } // end sec.graficas
 
-    // ── Tabla detalle (autoTable, puede paginar) ──
+    // ── Tabla detalle ──
+    if (sec.tabla) {
     if (y > H - 140) { doc.addPage(); y = 40; }
 
     doc.setTextColor(107,114,128);
@@ -506,25 +575,30 @@ $notas[] = 'Rango técnico de conservación para cadena fría: 0°C a 4°C.';
       alternateRowStyles: { fillColor: [249,250,251] },
     });
 
-    let yAfter = doc.lastAutoTable.finalY + 18;
+    let yAfter = doc.lastAutoTable ? doc.lastAutoTable.finalY + 18 : y + 18;
     if (yAfter > H - 120) { doc.addPage(); yAfter = 40; }
+    } // end sec.tabla
 
     // ── Notas críticas ──
+    if (sec.notas) {
+    let yNotas = typeof yAfter !== 'undefined' ? yAfter : y;
+    if (yNotas > H - 120) { doc.addPage(); yNotas = 40; }
     doc.setFillColor(254,243,199);
     doc.setDrawColor(245,158,11);
     const notasH = 22 + REPORT_DATA.notas.length * 12;
-    doc.roundedRect(MARGIN, yAfter, W - MARGIN*2, notasH, 5, 5, 'FD');
+    doc.roundedRect(MARGIN, yNotas, W - MARGIN*2, notasH, 5, 5, 'FD');
     doc.setTextColor(146,64,14);
     doc.setFont('helvetica','bold');
     doc.setFontSize(9);
-    doc.text('NOTAS CRÍTICAS', MARGIN + 10, yAfter + 14);
+    doc.text('NOTAS CRÍTICAS', MARGIN + 10, yNotas + 14);
     doc.setFont('helvetica','normal');
     doc.setFontSize(8);
     doc.setTextColor(124,45,18);
     REPORT_DATA.notas.forEach((n, i) => {
       const lines = doc.splitTextToSize('• ' + n, W - MARGIN*2 - 20);
-      doc.text(lines, MARGIN + 14, yAfter + 28 + i * 12);
+      doc.text(lines, MARGIN + 14, yNotas + 28 + i * 12);
     });
+    } // end sec.notas
 
     // ── Footer en todas las páginas ──
     const total = doc.internal.getNumberOfPages();
@@ -544,6 +618,12 @@ $notas[] = 'Rango técnico de conservación para cadena fría: 0°C a 4°C.';
     const fname = 'mermas-' + slug + '-' + folio.split('-').slice(2,4).join('-') + '.pdf';
     doc.save(fname);
   };
+  window.aplicarCustom = function () {
+    const d = document.getElementById('customDesde').value;
+    const h = document.getElementById('customHasta').value;
+    if (d && h) window.location.href = '<?= BASE_URL ?>rest-mermas/index?desde=' + d + '&hasta=' + h;
+  };
+
 })();
 </script>
 <?php
