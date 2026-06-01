@@ -329,6 +329,14 @@ class CarniHubApiService
             return $this->errorResponse('No se pudo conectar con CarniHub: ' . $curlError);
         }
 
+        // Detectar respuesta HTML: ocurre cuando el token es inválido/expirado
+        // y el servidor redirige (302→login) en lugar de devolver 401 JSON.
+        $trimmed = ltrim((string)$rawBody);
+        if ($trimmed !== '' && ($trimmed[0] === '<' || stripos($trimmed, '<html') !== false || stripos($trimmed, '<!doctype') !== false)) {
+            error_log("[CarniHubApiService] Respuesta HTML (HTTP {$httpCode}) — token inválido o URL incorrecta | URL: {$url}");
+            return $this->errorResponse('Token API de CarniHub inválido o expirado. Verifica la clave API en la configuración del restaurante.', $httpCode);
+        }
+
         $decoded = json_decode($rawBody, true);
         if (json_last_error() !== JSON_ERROR_NONE) {
             error_log("[CarniHubApiService] Respuesta no JSON (HTTP {$httpCode}): " . substr($rawBody, 0, 200));

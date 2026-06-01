@@ -58,10 +58,9 @@ class RestConfigController extends BaseController
         $colSucursal = $this->getSucursalColumn();
         $sucursalId = $colSucursal ? (int)($rest[$colSucursal] ?? 0) : 0;
 
-        $cfgEmpresaId = (int)($cfgCarniHub['carnihub_empresa_id'] ?? 0);
-        $cfgConToken = !empty(trim((string)($cfgCarniHub['api_key'] ?? '')));
-
-        return $empresaProveedorId > 0 || $sucursalId > 0 || $cfgEmpresaId > 0 || $cfgConToken;
+        // Solo bloquear si hay vinculación estructural directa (sucursal o empresa proveedora).
+        // Las credenciales de API para sincronizar productos NO bloquean la edición del restaurante.
+        return $empresaProveedorId > 0 || $sucursalId > 0;
     }
 
     private function sincronizarDatosDesdeCarniHub(int $restauranteId): bool
