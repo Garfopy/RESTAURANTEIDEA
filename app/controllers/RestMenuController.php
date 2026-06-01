@@ -171,9 +171,7 @@ class RestMenuController extends BaseController
     {
         $platillo = $this->model->find((int)$id);
         if ($platillo) {
-            $nuevo = $platillo['disponible'] ? 0 : 1;
-            $this->model->update((int)$id, ['disponible' => $nuevo]);
-            $this->flash('success', $nuevo ? 'Platillo activado.' : 'Platillo pausado.');
+            $this->model->update((int)$id, ['disponible' => $platillo['disponible'] ? 0 : 1]);
         }
         $this->redirect('rest-menu/index');
     }
