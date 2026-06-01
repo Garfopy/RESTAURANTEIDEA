@@ -249,11 +249,14 @@ $notas[] = 'Rango técnico de conservación para cadena fría: 0°C a 4°C.';
                  placeholder="0.000"
                  style="flex:1;padding:9px 12px;border:1px solid #D1D5DB;border-radius:8px;font-size:.875rem">
           <select id="selUnidad"
-                  style="flex:0 0 72px;padding:9px 8px;border:1px solid #D1D5DB;border-radius:8px;font-size:.875rem">
+                  style="flex:0 0 86px;padding:9px 8px;border:1px solid #D1D5DB;border-radius:8px;font-size:.875rem">
             <option value="g">g</option>
             <option value="kg">kg</option>
             <option value="ml">ml</option>
             <option value="l">l</option>
+            <option value="paquete">Paquete</option>
+            <option value="botella">Botella</option>
+            <option value="pieza">Pieza</option>
           </select>
         </div>
         <div id="conversionHint" style="font-size:.75rem;color:#6B7280;margin-top:5px"></div>
@@ -456,10 +459,11 @@ $notas[] = 'Rango técnico de conservación para cadena fría: 0°C a 4°C.';
     doc.setFontSize(18);
     doc.text('Reporte de Mermas', textX, 44);
 
-    doc.setFontSize(9);
-    doc.text('Fecha: ' + fechaTxt, W - MARGIN, 36, { align:'right' });
-    doc.text('Período: ' + REPORT_DATA.desde + ' a ' + REPORT_DATA.hasta, W - MARGIN, 50, { align:'right' });
-    doc.text('ID: #' + folio, W - MARGIN, 64, { align:'right' });
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica','normal');
+    doc.text('Fecha: ' + fechaTxt, W - MARGIN, 28, { align:'right' });
+    doc.text('Período: ' + REPORT_DATA.desde + ' a ' + REPORT_DATA.hasta, W - MARGIN, 41, { align:'right' });
+    doc.text('ID: #' + folio, W - MARGIN, 54, { align:'right' });
 
     let y = 100;
 
