@@ -573,6 +573,11 @@ sort($ingCategorias);
         <input type="hidden" name="proveedor_carnihub" id="modifEditCarnihub" value="0">
         <input type="hidden" name="carnihub_producto_id" id="modifEditCarnihubId" value="">
 
+        <!-- Banner CarniHub (se muestra cuando el ingrediente está vinculado a CarniHub) -->
+        <div id="modifChBanner" style="display:none;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:.82rem;color:#1E3A5F">
+          Este ingrediente está vinculado a CarniHub. Los datos se sincronizan automáticamente y no se pueden editar manualmente.
+        </div>
+
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
           <div class="form-group" style="grid-column:span 2;margin-bottom:0">
             <label class="form-label">Nombre *</label>
@@ -693,7 +698,7 @@ sort($ingCategorias);
 
         <div class="rst-modal-footer">
           <button type="button" onclick="rstModal('modalModificar')" class="btn btn-outline">Cancelar</button>
-          <button type="submit" class="btn btn-primary">Guardar cambios</button>
+          <button type="submit" id="modifEditSubmitBtn" class="btn btn-primary">Guardar cambios</button>
         </div>
       </form>
     </div>
@@ -769,6 +774,10 @@ async function syncPrecioCarniHub(productId, modo) {
     }
 
     if (modo === 'edit') {
+      if (data.nombre) {
+        const elNombre = document.getElementById('modifEditNombre');
+        if (elNombre) elNombre.value = data.nombre;
+      }
       if (unidad) {
         const u = document.getElementById('modifEditUnidad');
         if (u) u.value = unidad;
@@ -937,6 +946,7 @@ function switchModifProv(tipo) {
   const isExt = tipo === 'ext';
   const yaTeniaCh = document.getElementById('modifEditCarnihub').value === '1';
   document.getElementById('modifEditCarnihub').value = isExt ? '0' : '1';
+  aplicarBloqueoCarniHub(!isExt);
   document.getElementById('modifEditProvPanelExt').style.display = isExt ? '' : 'none';
   document.getElementById('modifEditProvPanelCh').style.display  = isExt ? 'none' : '';
   const btnExt = document.getElementById('modifProvBtnExt');
@@ -993,6 +1003,29 @@ function filtrarChEdit(q) {
   document.querySelectorAll('.modif-ch-prod-row').forEach(row => {
     row.style.display = (!q || row.dataset.nombre.includes(q)) ? '' : 'none';
   });
+}
+
+function aplicarBloqueoCarniHub(bloquear) {
+  const banner   = document.getElementById('modifChBanner');
+  const elNombre = document.getElementById('modifEditNombre');
+  const elCosto  = document.getElementById('modifEditCosto');
+  const elUnidad = document.getElementById('modifEditUnidad');
+  const btn      = document.getElementById('modifEditSubmitBtn');
+  const bloqStyle = { background: '#F3F4F6', cursor: 'not-allowed', color: '#6B7280' };
+
+  if (bloquear) {
+    if (banner)   banner.style.display = '';
+    if (elNombre) { elNombre.readOnly = true; Object.assign(elNombre.style, bloqStyle); }
+    if (elCosto)  { elCosto.readOnly  = true; Object.assign(elCosto.style,  bloqStyle); }
+    if (elUnidad) { elUnidad.disabled = true; Object.assign(elUnidad.style, bloqStyle); }
+    if (btn) { btn.textContent = 'Sincronizado por CarniHub'; btn.style.background = '#5B21B6'; btn.style.borderColor = '#5B21B6'; }
+  } else {
+    if (banner)   banner.style.display = 'none';
+    if (elNombre) { elNombre.readOnly = false; elNombre.style.background = ''; elNombre.style.cursor = ''; elNombre.style.color = ''; }
+    if (elCosto)  { elCosto.readOnly  = false; elCosto.style.background  = ''; elCosto.style.cursor  = ''; elCosto.style.color  = ''; }
+    if (elUnidad) { elUnidad.disabled = false; elUnidad.style.background = ''; elUnidad.style.cursor = ''; elUnidad.style.color = ''; }
+    if (btn) { btn.textContent = 'Guardar cambios'; btn.style.background = ''; btn.style.borderColor = ''; }
+  }
 }
 
 function normalizarNombre(str) {
