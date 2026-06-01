@@ -5,6 +5,9 @@ RewriteEngine On
 # `index.php?url=$1` es relativa y Apache la resuelve contra la carpeta actual.
 # El BASE_URL del PHP se autodetecta en config/config.php desde SCRIPT_NAME.
 
+# Reenviar el header Authorization a PHP — DEBE ir ANTES de cualquier <IfModule> y RewriteRule
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
 # ── Content Security Policy ───────────────────────────────────────────────────
 # Incluye todos los dominios necesarios para Google Maps JS API + Embed API + Firebase
 <IfModule mod_headers.c>
@@ -51,9 +54,6 @@ RewriteEngine On
     object-src 'none'"
   Header always set Permissions-Policy "geolocation=(self)"
 </IfModule>
-
-# Reenviar el header Authorization a PHP (Apache lo elimina por defecto con mod_rewrite)
-RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 
 # Block direct file access to sensitive directories (but allow virtual routes like config/general)
 RewriteCond %{REQUEST_FILENAME} -f

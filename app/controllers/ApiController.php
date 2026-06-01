@@ -957,11 +957,23 @@ class ApiController extends BaseController
     {
         $header = $_SERVER['HTTP_AUTHORIZATION']
                   ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION']
+                  ?? $_SERVER['REDIRECT_REDIRECT_HTTP_AUTHORIZATION']
                   ?? '';
+
+        // Diagnóstico: registrar siempre qué recibió PHP (visible en error_log del servidor)
+        error_log('[CarniHub API] requireBearer'
+            . ' | URI='    . ($_SERVER['REQUEST_URI']    ?? '')
+            . ' | METHOD=' . ($_SERVER['REQUEST_METHOD'] ?? '')
+            . ' | HTTP_AUTHORIZATION='          . (isset($_SERVER['HTTP_AUTHORIZATION'])                        ? substr($_SERVER['HTTP_AUTHORIZATION'], 0, 40)                        : 'NO\_SET')
+            . ' | REDIRECT_HTTP_AUTHORIZATION=' . (isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])               ? substr($_SERVER['REDIRECT_HTTP_AUTHORIZATION'], 0, 40)               : 'NO\_SET')
+            . ' | header_usado='                . (empty($header) ? 'VACIO' : substr($header, 0, 40))
+        );
 
         if (!preg_match('/^Bearer\s+(\S+)$/i', trim($header), $m)) {
             http_response_code(401);
             header('Content-Type: application/json');
+            error_log('[CarniHub API] requireBearer FALLO — header vacío o malformado'
+                . ' | URI=' . ($_SERVER['REQUEST_URI'] ?? ''));
             echo json_encode(['ok' => false, 'error' => 'Token requerido']);
             exit;
         }
@@ -982,6 +994,9 @@ class ApiController extends BaseController
         if (!$tokenRow) {
             http_response_code(401);
             header('Content-Type: application/json');
+            error_log('[CarniHub API] requireBearer FALLO — token no encontrado en BD'
+                . ' | hash=' . $tokenHash
+                . ' | raw_prefix=' . substr($rawToken, 0, 12));
             echo json_encode(['ok' => false, 'error' => 'Token inválido o inactivo']);
             exit;
         }
