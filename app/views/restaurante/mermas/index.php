@@ -129,9 +129,9 @@
     <div class="sub">Meta ideal &lt; 5%</div>
   </div>
   <div class="merma-card">
-    <div class="lbl">Stock crítico</div>
-    <div class="val" style="color:#F59E0B"><?= count($alertas) ?></div>
-    <div class="sub">productos en alerta</div>
+    <div class="lbl">Promedio diario</div>
+    <div class="val" style="color:#F59E0B"><?= number_format($kpis['promedio_diario'],3) ?></div>
+    <div class="sub">unidades por día</div>
   </div>
   <div class="merma-card">
     <div class="lbl">Motivo más frecuente</div>
@@ -378,7 +378,6 @@ $notas[] = 'Rango técnico de conservación para cadena fría: 0°C a 4°C.';
     desde: <?= json_encode($desde) ?>,
     hasta: <?= json_encode($hasta) ?>,
     kpis:  <?= json_encode($kpis) ?>,
-    alertas: <?= (int)count($alertas) ?>,
     notas: <?= json_encode($notas) ?>,
     detalle: <?= json_encode(array_map(fn($d)=>[
       'fecha'        => date('Y-m-d H:i', strtotime($d['created_at'])),
@@ -481,7 +480,7 @@ $notas[] = 'Rango técnico de conservación para cadena fría: 0°C a 4°C.';
       { lbl:'INGREDIENTES',        val: String(REPORT_DATA.kpis.ingredientes_afectados), sub:'afectados', color:[31,41,55] },
       { lbl:'VALOR ESTIMADO',      val: fmtMoney(REPORT_DATA.kpis.valor_estimado),       sub:'pérdida $', color:[239,68,68] },
       { lbl:'% MERMA vs CONSUMO',  val: Number(REPORT_DATA.kpis.pct_merma).toFixed(2)+'%', sub:'meta <5%', color:[31,41,55] },
-      { lbl:'STOCK CRÍTICO',       val: String(REPORT_DATA.alertas),                     sub:'en alerta', color:[245,158,11] },
+      { lbl:'PROMEDIO DIARIO',     val: Number(REPORT_DATA.kpis.promedio_diario||0).toFixed(3), sub:'unidades/día', color:[245,158,11] },
       { lbl:'MOTIVO PRINCIPAL',    val: REPORT_DATA.kpis.top_motivo || '—',              sub:'más frecuente', color:[31,41,55], small:true },
       { lbl:'INGREDIENTE TOP',     val: REPORT_DATA.kpis.top_ingrediente || '—',         sub:'más afectado', color:[200,16,46], small:true },
     ];
@@ -570,6 +569,7 @@ $notas[] = 'Rango técnico de conservación para cadena fría: 0°C a 4°C.';
     } // end sec.graficas
 
     // ── Tabla detalle ──
+    let yAfter = y;
     if (sec.tabla) {
     if (y > H - 140) { doc.addPage(); y = 40; }
 
@@ -599,13 +599,13 @@ $notas[] = 'Rango técnico de conservación para cadena fría: 0°C a 4°C.';
       alternateRowStyles: { fillColor: [249,250,251] },
     });
 
-    let yAfter = doc.lastAutoTable ? doc.lastAutoTable.finalY + 18 : y + 18;
+    yAfter = doc.lastAutoTable ? doc.lastAutoTable.finalY + 18 : y + 18;
     if (yAfter > H - 120) { doc.addPage(); yAfter = 40; }
     } // end sec.tabla
 
     // ── Notas críticas ──
     if (sec.notas) {
-    let yNotas = typeof yAfter !== 'undefined' ? yAfter : y;
+    let yNotas = yAfter;
     if (yNotas > H - 120) { doc.addPage(); yNotas = 40; }
     doc.setFillColor(254,243,199);
     doc.setDrawColor(245,158,11);

@@ -50,7 +50,7 @@ class RestMermasModel extends BaseModel
 
         $topMot = $this->queryOne(
             "SELECT COALESCE(NULLIF(TRIM(motivo),''),'Sin especificar') AS motivo,
-                    COUNT(*) AS n
+                    SUM(cantidad) AS n
              FROM rest_movimientos_inventario
              WHERE restaurante_id = ? AND tipo = 'merma'
                AND created_at BETWEEN ? AND ?
@@ -59,12 +59,16 @@ class RestMermasModel extends BaseModel
             [$restauranteId, $d, $h]
         );
 
+        $dias = max(1, (int)ceil((strtotime($hasta) - strtotime($desde)) / 86400) + 1);
+        $promedioDiario = round($mermaTotal / $dias, 3);
+
         return [
             'cantidad_total'        => $mermaTotal,
             'eventos'               => (int)($tot['eventos'] ?? 0),
             'ingredientes_afectados'=> (int)($tot['ingredientes_afectados'] ?? 0),
             'valor_estimado'        => (float)($tot['valor_estimado'] ?? 0),
             'pct_merma'             => $pct,
+            'promedio_diario'       => $promedioDiario,
             'top_ingrediente'       => $topIng['nombre'] ?? '—',
             'top_motivo'            => $topMot['motivo'] ?? '—',
         ];
