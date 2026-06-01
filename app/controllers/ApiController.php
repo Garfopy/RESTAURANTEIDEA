@@ -1168,31 +1168,28 @@ class ApiController extends BaseController
         $this->requireScope($tokenRow, 'productos:leer');
 
         $empresaId = (int)$tokenRow['empresa_id'];
-        $compradorId = (int)$tokenRow['comprador_id'];
 
-        $buscar = substr(trim($this->get('buscar', '')), 0, 100);
+        // Acepta tanto "buscar" (nombre histórico) como "q" (enviado por CarniHubApiService)
+        $buscar = substr(trim($this->get('buscar', $this->get('q', ''))), 0, 100);
         $page   = max(1, (int)$this->get('page', 1));
-        $limit  = min(50, max(1, (int)$this->get('limit', 20)));
+        $limit  = min(100, max(1, (int)$this->get('limit', 20)));
         $offset = ($page - 1) * $limit;
 
         $db = Database::getInstance();
 
         $where  = ['p.empresa_id = ?', 'p.activo = 1'];
-        $params = [$empresaId, $empresaId];
+        $params = [$empresaId];
 
         if ($buscar !== '') {
-            $where[]  = '(p.nombre LIKE ? OR p.codigo LIKE ? OR p.descripcion LIKE ?)';
+            $where[]  = '(p.nombre LIKE ? OR p.descripcion LIKE ?)';
             $t = '%' . $buscar . '%';
-            array_push($params, $t, $t, $t);
+            array_push($params, $t, $t);
         }
 
-        $sql = 'SELECT p.id, p.codigo, p.nombre, p.descripcion, p.unidad,
-                       p.precio_base,
-                       COALESCE(ep.precio_especial, p.precio_base) AS precio_comprador,
-                       p.stock_disponible, p.imagen_path
+        $sql = 'SELECT p.id, p.nombre, p.descripcion, p.presentacion, p.precio_base, p.imagen,
+                       c.id AS categoria_id, c.nombre AS categoria
                   FROM productos p
-                  LEFT JOIN empresa_precio_especial ep
-                    ON ep.producto_id = p.id AND ep.comprador_id = ?
+                  LEFT JOIN categorias c ON c.id = p.categoria_id
                  WHERE ' . implode(' AND ', $where) . '
               ORDER BY p.nombre ASC
                  LIMIT ' . $limit . ' OFFSET ' . $offset;
@@ -1202,14 +1199,14 @@ class ApiController extends BaseController
         $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
         $productos = array_map(static fn(array $r): array => [
-            'id'               => (int)$r['id'],
-            'codigo'           => $r['codigo'],
-            'nombre'           => $r['nombre'],
-            'descripcion'      => $r['descripcion'],
-            'unidad'           => $r['unidad'],
-            'precio_base'      => (float)$r['precio_base'],
-            'precio_comprador' => (float)$r['precio_comprador'],
-            'stock_disponible' => (float)$r['stock_disponible'],
+            'id'           => (int)$r['id'],
+            'nombre'       => $r['nombre'],
+            'descripcion'  => $r['descripcion'],
+            'presentacion' => $r['presentacion'],
+            'precio_base'  => (float)$r['precio_base'],
+            'imagen'       => $r['imagen'],
+            'categoria_id' => $r['categoria_id'] !== null ? (int)$r['categoria_id'] : null,
+            'categoria'    => $r['categoria'],
         ], $rows);
 
         $this->json(['ok' => true, 'page' => $page, 'limit' => $limit, 'productos' => $productos]);

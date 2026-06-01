@@ -78,9 +78,10 @@ class RestInventarioController extends BaseController
                         $productosCarnihub[] = [
                             'id'             => $pid,
                             'nombre'         => $prod['nombre'] ?? '',
-                            'unidad'         => $prod['presentacion'] ?? '',
+                            'unidad'         => $prod['presentacion'] ?? $prod['unidad'] ?? '',
                             'empresa_nombre' => $grupNombre,
                             'precio'         => $precio,
+                            'categoria'      => $prod['categoria'] ?? '',
                         ];
                         $nuevos++;
                     }
