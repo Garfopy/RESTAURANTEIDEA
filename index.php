@@ -121,6 +121,8 @@ $routes = [
     'acceso'        => 'StaffAccesoController',
     // Webhook entrante de CarniHub (sin login)
     'carnihub'      => 'CarnihubController',
+    // API v1 REST — autenticación por Bearer token (CapiRest, etc.)
+    'api'           => 'ApiController',
 ];
 
 // ── Auth guard ────────────────────────────────────────────────────────────────
@@ -156,6 +158,11 @@ $publicPaths = [
     'acceso/entrarComensal',
     // Webhook entrante de CarniHub (autenticación por Bearer, no por sesión)
     'carnihub/webhook',
+    // API v1 REST (autenticación por Bearer token, sin sesión PHP)
+    'api/v1',
+    'api/v1/ping',
+    'api/v1/pedidos',
+    'api/v1/productos',
 ];
 
 $currentPath = strtolower($ctrlSlug . '/' . $action);

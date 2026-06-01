@@ -52,6 +52,9 @@ RewriteEngine On
   Header always set Permissions-Policy "geolocation=(self)"
 </IfModule>
 
+# Reenviar el header Authorization a PHP (Apache lo elimina por defecto con mod_rewrite)
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
 # Block direct file access to sensitive directories (but allow virtual routes like config/general)
 RewriteCond %{REQUEST_FILENAME} -f
 RewriteRule ^(config|app)/.*$ - [F,L]
