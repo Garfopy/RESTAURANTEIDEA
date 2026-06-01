@@ -518,12 +518,11 @@ sort($ingCategorias);
 
         <div class="form-group">
           <label class="form-label">Tipo de movimiento</label>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px">
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px">
             <?php
             $tiposM = [
               ['val'=>'entrada','label'=>'Entrada', 'cls'=>'badge-green', 'desc'=>'Suma al stock'],
               ['val'=>'salida', 'label'=>'Salida',  'cls'=>'badge-red',   'desc'=>'Resta del stock'],
-              ['val'=>'merma',  'label'=>'Merma',   'cls'=>'badge-amber', 'desc'=>'Pérdida/daño'],
               ['val'=>'ajuste', 'label'=>'Ajuste',  'cls'=>'badge-blue',  'desc'=>'Corrección manual'],
             ];
             foreach ($tiposM as $t):

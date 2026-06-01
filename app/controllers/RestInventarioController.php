@@ -409,7 +409,14 @@ class RestInventarioController extends BaseController
         $ingredienteId = (int)$this->post('ingrediente_id');
         $tipo          = $this->post('tipo', 'entrada');
         $cantidad      = abs((float)$this->post('cantidad', 0));
-        $delta         = in_array($tipo, ['salida','merma']) ? -$cantidad : $cantidad;
+
+        // Las mermas se registran exclusivamente desde el módulo Mermas.
+        if ($tipo === 'merma') {
+            $this->flash('error', 'Las mermas se registran desde el módulo Mermas.');
+            $this->redirect('rest-mermas/index');
+        }
+
+        $delta         = $tipo === 'salida' ? -$cantidad : $cantidad;
 
         $this->model->ajustarStock(
             $ingredienteId,
