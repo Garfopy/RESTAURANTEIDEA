@@ -226,14 +226,16 @@ $notas[] = 'Rango técnico de conservación para cadena fría: 0°C a 4°C.';
       <h3 style="margin:0;font-size:1.1rem">Registrar nueva merma</h3>
       <button onclick="document.getElementById('modalRegMerma').classList.remove('open')" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:#9CA3AF">&times;</button>
     </div>
-    <form method="POST" action="<?= BASE_URL ?>rest-mermas/registrar">
+    <form method="POST" action="<?= BASE_URL ?>rest-mermas/registrar" id="formRegMerma" onsubmit="return convertirUnidadMerma()">
+      <input type="hidden" name="cantidad" id="hiddenCantidad">
       <div style="margin-bottom:14px">
         <label style="display:block;font-size:.82rem;font-weight:600;margin-bottom:6px;color:#374151">Ingrediente</label>
-        <select name="ingrediente_id" required
+        <select name="ingrediente_id" id="selIngrediente" required
                 style="width:100%;padding:9px 12px;border:1px solid #D1D5DB;border-radius:8px;font-size:.875rem">
           <option value="">— Selecciona ingrediente —</option>
           <?php foreach ($ingredientes as $i): ?>
-            <option value="<?= (int)$i['id'] ?>">
+            <option value="<?= (int)$i['id'] ?>"
+                    data-unidad="<?= htmlspecialchars($i['unidad_principal']) ?>">
               <?= htmlspecialchars($i['nombre']) ?>
               (stock: <?= number_format((float)$i['stock'],3) ?> <?= htmlspecialchars($i['unidad_principal']) ?>)
             </option>
@@ -242,14 +244,35 @@ $notas[] = 'Rango técnico de conservación para cadena fría: 0°C a 4°C.';
       </div>
       <div style="margin-bottom:14px">
         <label style="display:block;font-size:.82rem;font-weight:600;margin-bottom:6px;color:#374151">Cantidad</label>
-        <input type="number" name="cantidad" step="0.001" min="0.001" required
-               placeholder="0.000"
-               style="width:100%;padding:9px 12px;border:1px solid #D1D5DB;border-radius:8px;font-size:.875rem">
+        <div style="display:flex;gap:8px">
+          <input type="number" id="inputCantidad" step="0.001" min="0.001" required
+                 placeholder="0.000"
+                 style="flex:1;padding:9px 12px;border:1px solid #D1D5DB;border-radius:8px;font-size:.875rem">
+          <select id="selUnidad"
+                  style="flex:0 0 72px;padding:9px 8px;border:1px solid #D1D5DB;border-radius:8px;font-size:.875rem">
+            <option value="g">g</option>
+            <option value="kg">kg</option>
+            <option value="ml">ml</option>
+            <option value="l">l</option>
+          </select>
+        </div>
+        <div id="conversionHint" style="font-size:.75rem;color:#6B7280;margin-top:5px"></div>
       </div>
       <div style="margin-bottom:18px">
         <label style="display:block;font-size:.82rem;font-weight:600;margin-bottom:6px;color:#374151">Motivo</label>
-        <input type="text" name="motivo" placeholder="Ej: caducidad, daño, derrame, error de manipulación"
-               style="width:100%;padding:9px 12px;border:1px solid #D1D5DB;border-radius:8px;font-size:.875rem">
+        <select name="motivo"
+                style="width:100%;padding:9px 12px;border:1px solid #D1D5DB;border-radius:8px;font-size:.875rem">
+          <option value="">— Selecciona motivo —</option>
+          <option>Caducidad</option>
+          <option>Error de preparación</option>
+          <option>Accidente de cocina</option>
+          <option>Error de entrega</option>
+          <option>Accidente en entrega</option>
+          <option>Rechazo por calidad</option>
+          <option>Cortesía</option>
+          <option>Defecto</option>
+          <option>Inventario</option>
+        </select>
       </div>
       <div style="display:flex;justify-content:flex-end;gap:10px">
         <button type="button" class="btn-merma-outline" onclick="document.getElementById('modalRegMerma').classList.remove('open')">Cancelar</button>
@@ -430,11 +453,8 @@ $notas[] = 'Rango técnico de conservación para cadena fría: 0°C a 4°C.';
 
     doc.setTextColor(255,255,255);
     doc.setFont('helvetica','bold');
-    doc.setFontSize(20);
-    doc.text('CarniHub', textX, 36);
-    doc.setFont('helvetica','normal');
-    doc.setFontSize(11);
-    doc.text('Reporte de Mermas', textX, 54);
+    doc.setFontSize(18);
+    doc.text('Reporte de Mermas', textX, 44);
 
     doc.setFontSize(9);
     doc.text('Fecha: ' + fechaTxt, W - MARGIN, 36, { align:'right' });
@@ -618,6 +638,45 @@ $notas[] = 'Rango técnico de conservación para cadena fría: 0°C a 4°C.';
     const fname = 'mermas-' + slug + '-' + folio.split('-').slice(2,4).join('-') + '.pdf';
     doc.save(fname);
   };
+  // ── Conversión de unidades en modal merma ──
+  function convertirFactor(desde, hasta) {
+    desde = desde.toLowerCase(); hasta = hasta.toLowerCase();
+    if (desde === hasta) return 1;
+    if (desde === 'g'  && hasta === 'kg') return 1/1000;
+    if (desde === 'kg' && hasta === 'g')  return 1000;
+    if (desde === 'ml' && hasta === 'l')  return 1/1000;
+    if (desde === 'l'  && hasta === 'ml') return 1000;
+    return 1; // unidades incompatibles → 1:1
+  }
+
+  function actualizarHint() {
+    const sel  = document.getElementById('selIngrediente');
+    const opt  = sel.options[sel.selectedIndex];
+    const base = (opt && opt.dataset.unidad) ? opt.dataset.unidad : '';
+    const cant = parseFloat(document.getElementById('inputCantidad').value) || 0;
+    const uni  = document.getElementById('selUnidad').value;
+    const hint = document.getElementById('conversionHint');
+    if (!base || cant <= 0) { hint.textContent = ''; return; }
+    const factor   = convertirFactor(uni, base);
+    const resultado = cant * factor;
+    hint.textContent = cant + ' ' + uni + ' = ' + resultado.toFixed(4) + ' ' + base + ' (unidad del ingrediente)';
+  }
+
+  window.convertirUnidadMerma = function () {
+    const sel  = document.getElementById('selIngrediente');
+    const opt  = sel.options[sel.selectedIndex];
+    const base = (opt && opt.dataset.unidad) ? opt.dataset.unidad : '';
+    const cant = parseFloat(document.getElementById('inputCantidad').value) || 0;
+    const uni  = document.getElementById('selUnidad').value;
+    const factor = base ? convertirFactor(uni, base) : 1;
+    document.getElementById('hiddenCantidad').value = (cant * factor).toFixed(6);
+    return true;
+  };
+
+  document.getElementById('selIngrediente').addEventListener('change', actualizarHint);
+  document.getElementById('inputCantidad').addEventListener('input', actualizarHint);
+  document.getElementById('selUnidad').addEventListener('change', actualizarHint);
+
   window.aplicarCustom = function () {
     const d = document.getElementById('customDesde').value;
     const h = document.getElementById('customHasta').value;
