@@ -661,7 +661,7 @@ sort($ingCategorias);
                           justify-content:space-between;align-items:center;cursor:pointer;transition:.1s"
                    onmouseover="if(!this.classList.contains('ch-sel'))this.style.background='#FAF5FF'"
                    onmouseout="if(!this.classList.contains('ch-sel'))this.style.background=''"
-                   onclick="seleccionarCarniHubEdit(<?= $pc['id'] ?>, '<?= htmlspecialchars($pc['nombre'], ENT_QUOTES) ?>', <?= (float)($pc['precio'] ?? 0) ?>, '<?= htmlspecialchars($pc['categoria'] ?? '', ENT_QUOTES) ?>', this)">
+                   onclick="seleccionarCarniHubEdit(<?= $pc['id'] ?>, '<?= htmlspecialchars($pc['nombre'], ENT_QUOTES) ?>', '<?= htmlspecialchars($pc['unidad'] ?? 'kg', ENT_QUOTES) ?>', <?= (float)($pc['precio'] ?? 0) ?>, '<?= htmlspecialchars($pc['categoria'] ?? '', ENT_QUOTES) ?>', this)">
                 <div>
                   <div style="font-weight:600;font-size:.85rem"><?= htmlspecialchars($pc['nombre']) ?></div>
                   <div style="font-size:.72rem;color:#9CA3AF">
@@ -784,7 +784,13 @@ async function syncPrecioCarniHub(productId, modo) {
       }
       if (unidad) {
         const u = document.getElementById('modifEditUnidad');
-        if (u) u.value = unidad;
+        if (u) {
+          let opt = [...u.options].find(o => o.value === unidad);
+          if (!opt) { opt = new Option(unidad, unidad); u.appendChild(opt); }
+          u.value = unidad;
+          const lbl = document.getElementById('modifEditUnidadLabel');
+          if (lbl) lbl.textContent = unidad;
+        }
       }
       if (precio > 0) {
         const costoEdit = document.getElementById('modifEditCosto');
@@ -993,7 +999,7 @@ function switchModifProv(tipo) {
   }
 }
 
-function seleccionarCarniHubEdit(id, nombre, precio, categoria = '', rowEl = null) {
+function seleccionarCarniHubEdit(id, nombre, unidad, precio, categoria = '', rowEl = null) {
   document.getElementById('modifEditCarnihubId').value = id;
   document.querySelectorAll('.modif-ch-prod-row').forEach(r => { r.style.background=''; r.classList.remove('ch-sel'); });
   const row = rowEl || document.querySelector(`.modif-ch-prod-row[data-id="${id}"]`);
@@ -1003,6 +1009,15 @@ function seleccionarCarniHubEdit(id, nombre, precio, categoria = '', rowEl = nul
   const costo = parseFloat(precio || 0);
   if (costo > 0) {
     document.getElementById('modifEditCosto').value = costo.toFixed(4);
+  }
+  // Auto-rellenar unidad de medida del producto CarniHub
+  const selUnidad = document.getElementById('modifEditUnidad');
+  if (selUnidad && unidad) {
+    let opt = [...selUnidad.options].find(o => o.value === unidad);
+    if (!opt) { opt = new Option(unidad, unidad); selUnidad.appendChild(opt); }
+    selUnidad.value = unidad;
+    const lbl = document.getElementById('modifEditUnidadLabel');
+    if (lbl) lbl.textContent = unidad;
   }
   // Auto-rellenar categoría del producto CarniHub
   const catEdit = document.getElementById('modifEditCategoria');
