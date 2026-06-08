@@ -475,7 +475,7 @@
                   padding:16px 18px;margin-bottom:20px">
         <div class="form-group">
           <label class="form-label" style="font-size:.8rem">URL de la API Amare-App</label>
-          <input type="url" name="amare_api_url" class="form-input"
+          <input type="url" name="amare_api_url" id="amareApiUrl" class="form-input"
                  value="<?= htmlspecialchars($cfgPagos['amare_api_url'] ?? '') ?>"
                  placeholder="https://api.turestaurante.com/api"
                  style="font-family:monospace;font-size:.8rem">
@@ -483,18 +483,170 @@
             Ej: https://tudominio.com/api (sin slash final)
           </div>
         </div>
-        <div class="form-group" style="margin-bottom:0">
-          <label class="form-label" style="font-size:.8rem">Token de autenticación (JWT Bearer)</label>
-          <input type="password" name="amare_api_token" class="form-input"
-                 value="<?= !empty($cfgPagos['amare_api_token'] ?? '') ? '••••••••••••' : '' ?>"
-                 placeholder="eyJhbGciOiJIUzI1NiIs..."
-                 style="font-family:monospace;font-size:.8rem"
-                 autocomplete="new-password">
-          <div style="font-size:.72rem;color:#9CA3AF;margin-top:4px">
-            Token JWT de la API de Amare-App. Déjalo vacío para no cambiarlo. Se envía como <code>Authorization: Bearer {token}</code>.
+
+        <?php $yaConectado = !empty($cfgPagos['amare_api_token'] ?? '') && !empty($cfgPagos['amare_api_url'] ?? ''); ?>
+        <input type="hidden" name="amare_api_token" id="amareApiToken" value="<?= $yaConectado ? '••••••••••••' : '' ?>">
+
+        <?php if ($yaConectado): ?>
+        <!-- Estado: Conectado -->
+        <div id="amareStatusConnected" style="background:#F0FDF4;border:1.5px solid #BBF7D0;border-radius:10px;padding:12px 14px;margin-bottom:14px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <span style="font-size:1.1rem">✅</span>
+            <span style="font-weight:700;color:#065F46;font-size:.88rem">Conectado a la App Móvil</span>
           </div>
+          <div style="font-size:.76rem;color:#166534;margin-bottom:8px">
+            La configuración se sincroniza automáticamente al guardar.
+          </div>
+          <button type="button" onclick="desconectarAmare()"
+                  style="font-size:.76rem;color:#DC2626;background:#FEF2F2;border:1px solid #FECACA;border-radius:6px;padding:4px 12px;cursor:pointer">
+            Desconectar
+          </button>
+        </div>
+        <?php endif; ?>
+
+        <!-- Formulario de registro/login -->
+        <div id="amareRegisterForm" style="<?= $yaConectado ? 'display:none' : '' ?>">
+          <div style="font-weight:600;color:#0C4A6E;font-size:.85rem;margin-bottom:10px">
+            <?= $yaConectado ? '' : '📝 Crea tu cuenta en la App Móvil' ?>
+          </div>
+          <div style="font-size:.76rem;color:#0369A1;margin-bottom:14px">
+            <?= $yaConectado ? '' : 'Ingresa un email y contraseña para crear tu cuenta automáticamente en la app móvil y conectar el panel.' ?>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label" style="font-size:.75rem">Email</label>
+              <input type="email" id="amareEmail" class="form-input"
+                     placeholder="admin@turestaurante.com"
+                     style="font-size:.82rem">
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label" style="font-size:.75rem">Contraseña</label>
+              <input type="password" id="amarePassword" class="form-input"
+                     placeholder="Mínimo 8 caracteres"
+                     style="font-size:.82rem" autocomplete="new-password">
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom:12px">
+            <label class="form-label" style="font-size:.75rem">Nombre del administrador</label>
+            <input type="text" id="amareNombre" class="form-input"
+                   value="<?= htmlspecialchars(($restaurante['nombre'] ?? '') . ' Admin') ?>"
+                   placeholder="Admin Restaurante"
+                   style="font-size:.82rem">
+          </div>
+
+          <div id="amareMsg" style="font-size:.78rem;margin-bottom:10px;display:none"></div>
+
+          <button type="button" id="amareBtnRegistrar" onclick="registrarEnAmare()"
+                  style="background:#0369A1;color:#fff;border:none;border-radius:8px;padding:8px 18px;
+                         font-size:.84rem;font-weight:600;cursor:pointer;transition:.15s"
+                  onmouseover="this.style.background='#0284C7'" onmouseout="this.style.background='#0369A1'">
+            🚀 Registrar y Conectar
+          </button>
+          <span id="amareSpinner" style="display:none;margin-left:8px;font-size:.82rem;color:#6B7280">Conectando...</span>
         </div>
       </div>
+
+      <script>
+      async function registrarEnAmare() {
+        const url     = document.getElementById('amareApiUrl').value.trim();
+        const email   = document.getElementById('amareEmail').value.trim();
+        const pass    = document.getElementById('amarePassword').value;
+        const nombre  = document.getElementById('amareNombre').value.trim();
+        const btn     = document.getElementById('amareBtnRegistrar');
+        const spinner = document.getElementById('amareSpinner');
+        const msg     = document.getElementById('amareMsg');
+
+        msg.style.display = 'none';
+
+        if (!url)   { mostrarMsg('error', 'Primero ingresa la URL de la API'); return; }
+        if (!email) { mostrarMsg('error', 'Ingresa un email'); return; }
+        if (pass.length < 6) { mostrarMsg('error', 'La contraseña debe tener al menos 6 caracteres'); return; }
+
+        btn.disabled = true; spinner.style.display = 'inline';
+
+        try {
+          // 1. Intentar registrar
+          let res = await fetch(url + '/auth/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nombre: nombre || 'Admin', email, password: pass })
+          });
+          let data = await res.json();
+
+          // Si ya existe (409 Conflict u otro), no es error — seguimos al login
+          if (!res.ok && res.status !== 409 && res.status !== 422) {
+            throw new Error(data.message || data.error || 'Error al registrar');
+          }
+
+          // 2. Hacer login para obtener el token
+          res = await fetch(url + '/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password: pass })
+          });
+          data = await res.json();
+
+          if (!res.ok || !data.success) {
+            throw new Error(data.message || data.error || 'Error al iniciar sesión');
+          }
+
+          const token = data.data?.token || data.token;
+          if (!token) throw new Error('No se recibió el token');
+
+          // 3. Guardar token en el campo oculto
+          document.getElementById('amareApiToken').value = token;
+
+          // 4. Mostrar estado conectado
+          document.getElementById('amareRegisterForm').style.display = 'none';
+          const statusDiv = document.getElementById('amareStatusConnected');
+          if (statusDiv) {
+            statusDiv.style.display = '';
+          } else {
+            document.getElementById('amareRegisterForm').insertAdjacentHTML('beforebegin',
+              '<div id="amareStatusConnected" style="background:#F0FDF4;border:1.5px solid #BBF7D0;border-radius:10px;padding:12px 14px;margin-bottom:14px">' +
+              '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
+              '<span style="font-size:1.1rem">✅</span>' +
+              '<span style="font-weight:700;color:#065F46;font-size:.88rem">Conectado a la App Móvil</span>' +
+              '</div>' +
+              '<div style="font-size:.76rem;color:#166534;margin-bottom:8px">' +
+              'La configuración se sincroniza automáticamente al guardar.' +
+              '</div>' +
+              '<button type="button" onclick="desconectarAmare()" ' +
+              'style="font-size:.76rem;color:#DC2626;background:#FEF2F2;border:1px solid #FECACA;border-radius:6px;padding:4px 12px;cursor:pointer">' +
+              'Desconectar</button></div>');
+          }
+
+          mostrarMsg('success', '✅ ¡Conectado! Guarda la configuración para sincronizar.');
+
+        } catch (err) {
+          mostrarMsg('error', '❌ ' + (err instanceof Error ? err.message : 'Error de conexión'));
+        } finally {
+          btn.disabled = false; spinner.style.display = 'none';
+        }
+      }
+
+      function desconectarAmare() {
+        document.getElementById('amareApiToken').value = '';
+        document.getElementById('amareRegisterForm').style.display = '';
+        const status = document.getElementById('amareStatusConnected');
+        if (status) status.style.display = 'none';
+        const msg = document.getElementById('amareMsg');
+        msg.style.display = 'none';
+      }
+
+      function mostrarMsg(tipo, texto) {
+        const msg = document.getElementById('amareMsg');
+        msg.style.display = 'block';
+        msg.style.color = tipo === 'success' ? '#065F46' : '#DC2626';
+        msg.style.background = tipo === 'success' ? '#F0FDF4' : '#FEF2F2';
+        msg.style.border = '1px solid ' + (tipo === 'success' ? '#BBF7D0' : '#FECACA');
+        msg.style.borderRadius = '8px';
+        msg.style.padding = '8px 12px';
+        msg.textContent = texto;
+      }
+      </script>
 
       <!-- ══════════════════════════════════════════════════════════
            SECCIÓN: PAGOS DE COMENSALES
