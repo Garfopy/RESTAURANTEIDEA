@@ -358,6 +358,145 @@
       </div>
 
       <!-- ══════════════════════════════════════════════════════════
+           SECCIÓN: TIPOS DE ENTREGA (APP MÓVIL)
+           ═════════════════════════════════════════════════════════ -->
+      <hr style="border:none;border-top:1.5px solid #F3F4F6;margin:24px 0">
+      <div style="font-weight:700;font-size:.95rem;color:#111827;margin-bottom:6px;
+                  display:flex;align-items:center;gap:8px">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        🛵 Tipos de entrega (App Móvil)
+      </div>
+      <div style="font-size:.8rem;color:#6B7280;margin-bottom:14px">
+        Controla cómo los clientes pueden recibir sus pedidos desde la app móvil (CarniHub / Amare).
+      </div>
+
+      <?php
+        $tiposEntregaConfig = json_decode($cfgPagos['tipos_entrega_habilitados'] ?? '["delivery","pickup"]', true) ?: ['delivery','pickup'];
+        $tiposEntregaOpts = [
+          'delivery' => '🛵 A domicilio',
+          'pickup'   => '🛍️ Para llevar (recoger en tienda)',
+          'eat_in'   => '🍽️ Comer en el restaurante',
+        ];
+      ?>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
+        <?php foreach ($tiposEntregaOpts as $val => $label): ?>
+        <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;
+                      border:1.5px solid #E5E7EB;border-radius:10px;cursor:pointer;
+                      background:#F9FAFB;font-size:.88rem;font-weight:500">
+          <input type="checkbox"
+                 name="tipos_entrega_habilitados[]"
+                 value="<?= $val ?>"
+                 <?= in_array($val, $tiposEntregaConfig) ? 'checked' : '' ?>
+                 style="width:16px;height:16px;accent-color:#C8102E">
+          <?= $label ?>
+        </label>
+        <?php endforeach; ?>
+      </div>
+      <div style="font-size:.75rem;color:#9CA3AF;margin-bottom:20px">
+        Solo los tipos marcados aparecerán en la app móvil. Al menos uno debe estar habilitado.
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════
+           SECCIÓN: MÉTODOS DE PAGO (APP MÓVIL)
+           ═════════════════════════════════════════════════════════ -->
+      <hr style="border:none;border-top:1.5px solid #F3F4F6;margin:24px 0">
+      <div style="font-weight:700;font-size:.95rem;color:#111827;margin-bottom:6px;
+                  display:flex;align-items:center;gap:8px">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+        💳 Métodos de pago (App Móvil)
+      </div>
+      <div style="font-size:.8rem;color:#6B7280;margin-bottom:14px">
+        Controla qué métodos de pago estarán disponibles en la app móvil (CarniHub / Amare).
+      </div>
+
+      <?php
+        $metodosAppConfig = json_decode($cfgPagos['metodos_pago_app_habilitados'] ?? '["card","cash"]', true) ?: ['card','cash'];
+        $metodosAppOpts = [
+          'card'      => '💳 Tarjeta (Stripe)',
+          'cash'      => '💵 Efectivo',
+          'apple_pay' => '🍎 Apple Pay',
+          'google_pay'=> '🤖 Google Pay',
+        ];
+      ?>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
+        <?php foreach ($metodosAppOpts as $val => $label): ?>
+        <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;
+                      border:1.5px solid #E5E7EB;border-radius:10px;cursor:pointer;
+                      background:#F9FAFB;font-size:.88rem;font-weight:500">
+          <input type="checkbox"
+                 name="metodos_pago_app_habilitados[]"
+                 value="<?= $val ?>"
+                 <?= in_array($val, $metodosAppConfig) ? 'checked' : '' ?>
+                 style="width:16px;height:16px;accent-color:#C8102E">
+          <?= $label ?>
+        </label>
+        <?php endforeach; ?>
+      </div>
+      <div style="font-size:.75rem;color:#9CA3AF;margin-bottom:8px">
+        Solo los métodos marcados aparecerán en la app móvil. Al menos uno debe estar habilitado.
+      </div>
+
+      <!-- Costo de envío y pedido mínimo -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">💰 Costo de envío (MXN)</label>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="color:#6B7280;font-weight:600">$</span>
+            <input type="number" name="costo_envio_app" class="form-input"
+                   value="<?= htmlspecialchars($cfgPagos['costo_envio_app'] ?? '0') ?>"
+                   min="0" step="0.01" placeholder="0.00">
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">📦 Pedido mínimo (MXN)</label>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="color:#6B7280;font-weight:600">$</span>
+            <input type="number" name="pedido_minimo_app" class="form-input"
+                   value="<?= htmlspecialchars($cfgPagos['pedido_minimo_app'] ?? '0') ?>"
+                   min="0" step="0.01" placeholder="0.00">
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════
+           SECCIÓN: CONEXIÓN API AMARE-APP
+           ═════════════════════════════════════════════════════════ -->
+      <hr style="border:none;border-top:1.5px solid #F3F4F6;margin:24px 0">
+      <div style="font-weight:700;font-size:.95rem;color:#111827;margin-bottom:6px;
+                  display:flex;align-items:center;gap:8px">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg>
+        🔗 Conexión con API Amare-App
+      </div>
+      <div style="font-size:.8rem;color:#6B7280;margin-bottom:14px">
+        Configura la URL y el token de la API de Amare-App para sincronizar automáticamente métodos de pago y tipos de entrega. Al guardar, se enviarán los cambios a la app móvil.
+      </div>
+
+      <div style="background:#F0F9FF;border:1.5px solid #BAE6FD;border-radius:12px;
+                  padding:16px 18px;margin-bottom:20px">
+        <div class="form-group">
+          <label class="form-label" style="font-size:.8rem">URL de la API Amare-App</label>
+          <input type="url" name="amare_api_url" class="form-input"
+                 value="<?= htmlspecialchars($cfgPagos['amare_api_url'] ?? '') ?>"
+                 placeholder="https://api.turestaurante.com/api"
+                 style="font-family:monospace;font-size:.8rem">
+          <div style="font-size:.72rem;color:#9CA3AF;margin-top:4px">
+            Ej: https://tudominio.com/api (sin slash final)
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label" style="font-size:.8rem">Token de autenticación (JWT Bearer)</label>
+          <input type="password" name="amare_api_token" class="form-input"
+                 value="<?= !empty($cfgPagos['amare_api_token'] ?? '') ? '••••••••••••' : '' ?>"
+                 placeholder="eyJhbGciOiJIUzI1NiIs..."
+                 style="font-family:monospace;font-size:.8rem"
+                 autocomplete="new-password">
+          <div style="font-size:.72rem;color:#9CA3AF;margin-top:4px">
+            Token JWT de la API de Amare-App. Déjalo vacío para no cambiarlo. Se envía como <code>Authorization: Bearer {token}</code>.
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════
            SECCIÓN: PAGOS DE COMENSALES
            ═════════════════════════════════════════════════════════ -->
       <hr style="border:none;border-top:1.5px solid #F3F4F6;margin:24px 0">

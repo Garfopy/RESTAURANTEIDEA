@@ -167,9 +167,12 @@ class RestConfigController extends BaseController
             $row = $stmt->fetch(\PDO::FETCH_ASSOC);
             $mapsApiKey = $row['valor'] ?? '';
 
-            // Pagos
+            // Pagos (comensales + app móvil)
             $clavesPagos = ['stripe_public_key','stripe_secret_key','metodos_pago_habilitados',
-                            'notif_email_pago','notif_email_pago_destino'];
+                            'notif_email_pago','notif_email_pago_destino',
+                            'tipos_entrega_habilitados','metodos_pago_app_habilitados',
+                            'costo_envio_app','pedido_minimo_app',
+                            'amare_api_url','amare_api_token'];
             foreach ($clavesPagos as $clave) {
                 $s2 = $db->prepare("SELECT valor FROM global_settings WHERE clave = :c LIMIT 1");
                 $s2->execute([':c' => $clave]);
@@ -324,6 +327,82 @@ class RestConfigController extends BaseController
             }
         } catch (\Exception $e) { /* global_settings may not have pagos cols yet */ }
 
+        // ── Config App Móvil (tipos de entrega + métodos de pago) ──
+        try {
+            $db = \Database::getInstance();
+
+            // Tipos de entrega
+            $tiposEntregaPost = $this->post('tipos_entrega_habilitados', []);
+            if (!is_array($tiposEntregaPost)) $tiposEntregaPost = [];
+            $tiposValidos = ['delivery','pickup','eat_in'];
+            $tiposEntregaPost = array_values(array_filter($tiposEntregaPost, fn($t) => in_array($t, $tiposValidos)));
+            if (empty($tiposEntregaPost)) $tiposEntregaPost = ['delivery','pickup'];
+
+            $upsertTipos = $db->prepare(
+                "INSERT INTO global_settings (clave, valor, grupo) VALUES ('tipos_entrega_habilitados', :v, 'pagos')
+                 ON DUPLICATE KEY UPDATE valor = :v2"
+            );
+            $upsertTipos->execute([':v' => json_encode($tiposEntregaPost), ':v2' => json_encode($tiposEntregaPost)]);
+
+            // Métodos de pago app móvil
+            $metodosAppPost = $this->post('metodos_pago_app_habilitados', []);
+            if (!is_array($metodosAppPost)) $metodosAppPost = [];
+            $metodosAppValidos = ['card','cash','apple_pay','google_pay'];
+            $metodosAppPost = array_values(array_filter($metodosAppPost, fn($m) => in_array($m, $metodosAppValidos)));
+            if (empty($metodosAppPost)) $metodosAppPost = ['card','cash'];
+
+            $upsertMetodosApp = $db->prepare(
+                "INSERT INTO global_settings (clave, valor, grupo) VALUES ('metodos_pago_app_habilitados', :v, 'pagos')
+                 ON DUPLICATE KEY UPDATE valor = :v2"
+            );
+            $upsertMetodosApp->execute([':v' => json_encode($metodosAppPost), ':v2' => json_encode($metodosAppPost)]);
+
+            // Costo de envío y pedido mínimo
+            $costoEnvio = trim((string)$this->post('costo_envio_app', '0'));
+            $pedidoMinimo = trim((string)$this->post('pedido_minimo_app', '0'));
+
+            $upsertCosto = $db->prepare(
+                "INSERT INTO global_settings (clave, valor, grupo) VALUES ('costo_envio_app', :v, 'pagos')
+                 ON DUPLICATE KEY UPDATE valor = :v2"
+            );
+            $upsertCosto->execute([':v' => $costoEnvio, ':v2' => $costoEnvio]);
+
+            $upsertMinimo = $db->prepare(
+                "INSERT INTO global_settings (clave, valor, grupo) VALUES ('pedido_minimo_app', :v, 'pagos')
+                 ON DUPLICATE KEY UPDATE valor = :v2"
+            );
+            $upsertMinimo->execute([':v' => $pedidoMinimo, ':v2' => $pedidoMinimo]);
+
+            // URL y token de Amare-App API
+            $amareUrl = trim((string)$this->post('amare_api_url', ''));
+            $amareToken = trim((string)$this->post('amare_api_token', ''));
+
+            if ($amareUrl !== '') {
+                $upsertUrl = $db->prepare(
+                    "INSERT INTO global_settings (clave, valor, grupo) VALUES ('amare_api_url', :v, 'pagos')
+                     ON DUPLICATE KEY UPDATE valor = :v2"
+                );
+                $upsertUrl->execute([':v' => $amareUrl, ':v2' => $amareUrl]);
+            }
+
+            if ($amareToken !== '') {
+                // No sobreescribir el token si se dejó enmascarado
+                $upsertToken = $db->prepare(
+                    "INSERT INTO global_settings (clave, valor, grupo) VALUES ('amare_api_token', :v, 'pagos')
+                     ON DUPLICATE KEY UPDATE valor = :v2"
+                );
+                $upsertToken->execute([':v' => $amareToken, ':v2' => $amareToken]);
+            }
+
+            // ── Sincronizar con API Amare-App ──
+            if ($amareUrl !== '' && $amareToken !== '') {
+                $this->syncConAmareApp($restauranteId, $amareUrl, $amareToken, $tiposEntregaPost, $metodosAppPost, $costoEnvio, $pedidoMinimo);
+            }
+        } catch (\Exception $e) {
+            // No bloquear si falla la sincronización con Amare
+            error_log('[RestConfig] Error guardando config app móvil: ' . $e->getMessage());
+        }
+
         // ── CarniHub API config ────────────────────────────────────
         $chMetodoPago    = $this->post('ch_metodo_pago', 'transferencia');
         $chMetodoPago    = in_array($chMetodoPago, ['stripe','paypal','transferencia'], true) ? $chMetodoPago : 'transferencia';
@@ -436,6 +515,62 @@ class RestConfigController extends BaseController
         } catch (\Throwable $e) {
             $this->json(['ok' => false, 'error' => $e->getMessage()]);
         }
+    }
+
+    /**
+     * Sincroniza la configuración de app móvil con la API de Amare-App.
+     * Llama PUT /branches/{id}/config con el token Bearer.
+     */
+    private function syncConAmareApp(
+        int $restauranteId,
+        string $apiUrl,
+        string $token,
+        array $tiposEntrega,
+        array $metodosPago,
+        string $costoEnvio,
+        string $pedidoMinimo
+    ): void {
+        $url = rtrim($apiUrl, '/') . '/branches/' . $restauranteId . '/config';
+
+        $payload = json_encode([
+            'tipos_entrega' => $tiposEntrega,
+            'metodos_pago'  => $metodosPago,
+            'costo_envio'   => (float)$costoEnvio,
+            'pedido_minimo' => (float)$pedidoMinimo,
+        ]);
+
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_CUSTOMREQUEST  => 'PUT',
+            CURLOPT_POSTFIELDS     => $payload,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 10,
+            CURLOPT_CONNECTTIMEOUT => 5,
+            CURLOPT_HTTPHEADER     => [
+                'Content-Type: application/json',
+                'Authorization: Bearer ' . $token,
+                'Accept: application/json',
+            ],
+        ]);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error    = curl_error($ch);
+        curl_close($ch);
+
+        if ($error) {
+            error_log('[syncConAmareApp] cURL error: ' . $error);
+            $this->flash('error', 'Configuración guardada localmente, pero no se pudo sincronizar con la app móvil. Verifica la URL y el token.');
+            return;
+        }
+
+        if ($httpCode < 200 || $httpCode >= 300) {
+            error_log('[syncConAmareApp] HTTP ' . $httpCode . ' — ' . $response);
+            $this->flash('error', 'Configuración guardada localmente, pero la app móvil respondió con error HTTP ' . $httpCode . '.');
+            return;
+        }
+
+        $this->flash('success', 'Configuración guardada y sincronizada con la app móvil.');
     }
 
     public function qr(?string $p = null): void
