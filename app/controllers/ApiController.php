@@ -3,7 +3,8 @@ require_once ROOT_PATH . '/app/controllers/BaseController.php';
 
 /**
  * ApiController — Endpoints AJAX (sin layout HTML)
- * Maneja: precios escalonados, GPS tracking
+ * Maneja: precios escalonados, GPS tracking, API v1 (CapiRest),
+ *         Admin API v1 (JWT Bearer para el sitio web admin)
  */
 class ApiController extends BaseController
 {
@@ -536,23 +537,13 @@ class ApiController extends BaseController
 
     // =========================================================
     // REST API v1  —  para CapiRest (Bearer token, sin sesión)
-    // URL: /api/v1/{resource}/{id?}
-    //   ctrlSlug='api'  action='v1'  param='{resource}'
-    //   El {id} (4° segmento) se extrae de REQUEST_URI / ?url=
     // =========================================================
 
     /**
      * Sub-router principal.
-     * Rutas soportadas:
-     *   POST   /api/v1/pedidos          → v1CrearPedido
-     *   GET    /api/v1/pedidos/{id}     → v1ConsultarPedido
-     *   GET    /api/v1/productos        → v1BuscarProductos
-     *   GET    /api/v1/productos/{id}   → v1DetalleProducto
-     *   GET|POST /api/v1/ping          → health-check
      */
     public function v1(?string $resource = null): void
     {
-        // CORS preflight
         if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
             header('Access-Control-Allow-Origin: *');
             header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
@@ -564,11 +555,8 @@ class ApiController extends BaseController
         header('Content-Type: application/json; charset=utf-8');
         header('Access-Control-Allow-Origin: *');
 
-        // Extraer el ID del 4° segmento de la URL
-        // Funciona tanto con clean URLs como con ?url=api/v1/pedidos/123
         $urlParam = trim($_GET['url'] ?? '', '/');
         $segs     = array_values(array_filter(explode('/', $urlParam)));
-        // fallback: REQUEST_URI
         if (count($segs) < 4) {
             $path = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
             $segs = array_values(array_filter(explode('/', trim($path, '/'))));
@@ -576,7 +564,6 @@ class ApiController extends BaseController
         $id     = (isset($segs[3]) && ctype_digit((string)$segs[3])) ? (int)$segs[3] : null;
         $method = $_SERVER['REQUEST_METHOD'];
 
-        // Routing por recurso + método + presencia de id
         $route = strtoupper($method) . ':' . ($resource ?? '') . ($id ? ':id' : '');
 
         switch ($route) {
@@ -613,14 +600,12 @@ class ApiController extends BaseController
 
     // ── Helpers de la API v1 ───────────────────────────────────
 
-    /** Respuesta de éxito de la API v1 */
     private function apiOk(array $data): void
     {
         echo json_encode(['ok' => true, 'data' => $data]);
         exit;
     }
 
-    /** Respuesta de error de la API v1 (termina la ejecución) */
     private function apiError(string $message, int $code = 400): void
     {
         http_response_code($code);
@@ -628,11 +613,6 @@ class ApiController extends BaseController
         exit;
     }
 
-    /**
-     * Valida el Bearer token contra api_tokens, verifica scopes
-     * y registra la llamada en api_access_log.
-     * Devuelve la fila del token si es válido; llama apiError() si no.
-     */
     private function requireApiToken(array $scopesRequired): array
     {
         $header = $_SERVER['HTTP_AUTHORIZATION']
@@ -663,7 +643,6 @@ class ApiController extends BaseController
             $this->apiError('Token inválido o desactivado', 401);
         }
 
-        // Verificar scopes
         $tokenScopes = json_decode($token['scopes'], true) ?? [];
         foreach ($scopesRequired as $scope) {
             if (!in_array($scope, $tokenScopes, true)) {
@@ -671,7 +650,6 @@ class ApiController extends BaseController
             }
         }
 
-        // Auditoría y actualización de último uso (no crítico)
         try {
             $db->prepare(
                 "INSERT INTO api_access_log (token_id, endpoint, metodo, ip, status)
@@ -684,20 +662,11 @@ class ApiController extends BaseController
             ]);
             $db->prepare("UPDATE api_tokens SET ultimo_uso = NOW() WHERE id = ?")
                ->execute([$token['id']]);
-        } catch (\Throwable) {
-            // No bloquear la petición por un fallo de auditoría
-        }
+        } catch (\Throwable) {}
 
         return $token;
     }
 
-    // ── Implementaciones de endpoints ──────────────────────────
-
-    /**
-     * POST /api/v1/pedidos
-     * Body JSON: { "items": [{"producto_id":1,"cantidad":5.0}], "notas":"..." }
-     * Crea un pedido B2B a nombre del comprador vinculado al token.
-     */
     private function v1CrearPedido(array $token): void
     {
         $body  = json_decode(file_get_contents('php://input'), true) ?? [];
@@ -712,7 +681,6 @@ class ApiController extends BaseController
         $compradorId = (int)$token['comprador_id'];
         $db          = Database::getInstance();
 
-        // Validar y preparar líneas
         $lineas   = [];
         $subtotal = 0.0;
 
@@ -748,7 +716,7 @@ class ApiController extends BaseController
             ];
         }
 
-        $total = $subtotal; // sin impuestos adicionales en pedidos API
+        $total = $subtotal;
         $folio = 'API-' . $empresaId . '-' . date('YmdHis') . '-' . rand(100, 999);
 
         try {
@@ -792,10 +760,6 @@ class ApiController extends BaseController
         ]);
     }
 
-    /**
-     * GET /api/v1/pedidos/{id}
-     * Devuelve estado y detalle del pedido, restringido a la empresa del token.
-     */
     private function v1ConsultarPedido(array $token, int $pedidoId): void
     {
         $empresaId = (int)$token['empresa_id'];
@@ -842,10 +806,6 @@ class ApiController extends BaseController
         ]);
     }
 
-    /**
-     * GET /api/v1/productos?q=ribeye&categoria_id=2&limit=20
-     * Busca en el catálogo de la empresa del token.
-     */
     private function v1BuscarProductos(array $token): void
     {
         $empresaId = (int)$token['empresa_id'];
@@ -888,10 +848,6 @@ class ApiController extends BaseController
         $this->apiOk(['productos' => $productos, 'total' => count($productos)]);
     }
 
-    /**
-     * GET /api/v1/productos/{id}
-     * Devuelve el detalle completo de un producto de la empresa del token.
-     */
     private function v1DetalleProducto(array $token, int $productoId): void
     {
         $empresaId = (int)$token['empresa_id'];
@@ -915,7 +871,6 @@ class ApiController extends BaseController
             $this->apiError('Producto no encontrado', 404);
         }
 
-        // Precios escalonados
         $stmtEsc = $db->prepare(
             "SELECT cantidad_min, cantidad_max, precio
                FROM precios_escalonados
@@ -943,15 +898,11 @@ class ApiController extends BaseController
     }
 
     // ══════════════════════════════════════════════════════════════════
-    // API v1 — Integración CapiRest (Bearer token, sin sesión PHP)
-    // Rutas públicas: api/pedidos  api/productos
-    // Autenticación: Authorization: Bearer {raw_token}
-    //   → SHA2(raw_token,256) se compara con api_tokens.token
+    // API — Integración CapiRest (Bearer token, sin sesión PHP)
     // ══════════════════════════════════════════════════════════════════
 
     /**
      * Valida el Bearer token de la cabecera Authorization.
-     * Retorna la fila de api_tokens o termina con HTTP 401.
      */
     private function requireBearer(): array
     {
@@ -960,7 +911,6 @@ class ApiController extends BaseController
                   ?? $_SERVER['REDIRECT_REDIRECT_HTTP_AUTHORIZATION']
                   ?? '';
 
-        // Diagnóstico: registrar siempre qué recibió PHP (visible en error_log del servidor)
         error_log('[CarniHub API] requireBearer'
             . ' | URI='    . ($_SERVER['REQUEST_URI']    ?? '')
             . ' | METHOD=' . ($_SERVER['REQUEST_METHOD'] ?? '')
@@ -1001,11 +951,9 @@ class ApiController extends BaseController
             exit;
         }
 
-        // Actualizar último uso
         $db->prepare('UPDATE api_tokens SET ultimo_uso = NOW() WHERE id = ?')
            ->execute([$tokenRow['id']]);
 
-        // Auditoría
         try {
             $db->prepare(
                 'INSERT INTO api_access_log (token_id, endpoint, metodo, ip, status) VALUES (?, ?, ?, ?, ?)'
@@ -1016,13 +964,12 @@ class ApiController extends BaseController
                 $_SERVER['REMOTE_ADDR'] ?? '',
                 200,
             ]);
-        } catch (\Throwable $_) { /* tabla aún no migrada — no bloquear */ }
+        } catch (\Throwable $_) {}
 
         $tokenRow['scopes'] = json_decode($tokenRow['scopes'] ?? '[]', true) ?? [];
         return $tokenRow;
     }
 
-    /** Verifica que el token tenga el scope requerido */
     private function requireScope(array $tokenRow, string $scope): void
     {
         if (!in_array($scope, $tokenRow['scopes'], true)) {
@@ -1042,7 +989,6 @@ class ApiController extends BaseController
         $compradorId = (int)$tokenRow['comprador_id'];
         $method    = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
 
-        // GET /api/pedidos/{id} — consultar estado
         if ($method === 'GET') {
             $this->requireScope($tokenRow, 'pedidos:leer');
             $pedidoId = (int)$id;
@@ -1051,7 +997,6 @@ class ApiController extends BaseController
             }
 
             $db = Database::getInstance();
-            // Fallback: si updated_at no existe todavía (migración pendiente), hacer query sin ella
             try {
                 $stmt = $db->prepare(
                     'SELECT id, capirest_pedido_id, folio, estado, subtotal, iva, total, created_at, updated_at
@@ -1092,7 +1037,6 @@ class ApiController extends BaseController
             ]]);
         }
 
-        // POST /api/pedidos — crear pedido
         if ($method === 'POST') {
             $this->requireScope($tokenRow, 'pedidos:crear');
 
@@ -1105,7 +1049,6 @@ class ApiController extends BaseController
             $capirestPedidoId   = isset($body['capirest_pedido_id']) ? (int)$body['capirest_pedido_id'] : null;
             $fechaEntrega       = !empty($body['fecha_entrega']) ? $body['fecha_entrega'] : null;
             $notas              = isset($body['notas']) ? substr(trim($body['notas']), 0, 500) : null;
-            // Datos de ubicación del comprador (restaurante) enviados por CapiRest
             $compradorNombre    = isset($body['comprador_nombre'])    ? substr(trim((string)$body['comprador_nombre']), 0, 200)    : null;
             $compradorDireccion = isset($body['comprador_direccion']) ? substr(trim((string)$body['comprador_direccion']), 0, 500) : null;
             $compradorTelefono  = isset($body['comprador_telefono'])  ? substr(trim((string)$body['comprador_telefono']), 0, 30)   : null;
@@ -1116,7 +1059,6 @@ class ApiController extends BaseController
                 $this->json(['ok' => false, 'error' => 'Se requiere al menos un item'], 422);
             }
 
-            // Validar y preparar líneas del pedido
             $db     = Database::getInstance();
             $lineas = [];
             foreach ($items as $item) {
@@ -1128,7 +1070,6 @@ class ApiController extends BaseController
                     $this->json(['ok' => false, 'error' => "Item inválido: producto_id=$productoId cantidad=$cantidad precio_unit=$precioUnit"], 422);
                 }
 
-                // Verificar que el producto pertenece a la empresa
                 $stmt = $db->prepare(
                     'SELECT id FROM productos WHERE id = ? AND empresa_id = ? AND activo = 1 LIMIT 1'
                 );
@@ -1145,7 +1086,6 @@ class ApiController extends BaseController
                 ];
             }
 
-            // Crear el pedido
             $model = new PedidoModel();
             try {
                 $pedidoId = $model->crear(
@@ -1184,7 +1124,6 @@ class ApiController extends BaseController
 
         $empresaId = (int)$tokenRow['empresa_id'];
 
-        // Acepta tanto "buscar" (nombre histórico) como "q" (enviado por CarniHubApiService)
         $buscar = substr(trim($this->get('buscar', $this->get('q', ''))), 0, 100);
         $page   = max(1, (int)$this->get('page', 1));
         $limit  = min(100, max(1, (int)$this->get('limit', 20)));
@@ -1225,5 +1164,377 @@ class ApiController extends BaseController
         ], $rows);
 
         $this->json(['ok' => true, 'page' => $page, 'limit' => $limit, 'productos' => $productos]);
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // Admin API v1 — Endpoints para el sitio web admin (JWT Bearer)
+    // Autenticación: POST /api/auth/login devuelve JWT
+    // Todas las demás requieren Authorization: Bearer <jwt>
+    // Respuesta estándar: { success: true|false, message: "...", data: {...} }
+    // ══════════════════════════════════════════════════════════════════
+
+    private string $jwtSecret = 'CarniHub_JWT_S3cr3t_K3y_2024_Rest4ur4nt3';
+
+    /** POST /api/auth/login */
+    public function auth(?string $subAction = null): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        header('Access-Control-Allow-Origin: *');
+        if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+            header('Access-Control-Allow-Methods: POST, OPTIONS');
+            header('Access-Control-Allow-Headers: Authorization, Content-Type');
+            http_response_code(204); exit;
+        }
+        if ($subAction !== 'login' || $_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->adminApiError('Ruta no encontrada', 404);
+        }
+        $body     = json_decode(file_get_contents('php://input'), true) ?? [];
+        $email    = trim($body['email'] ?? '');
+        $password = $body['password'] ?? '';
+        if (!$email || !$password) {
+            $this->adminApiError('Email y contraseña son requeridos', 422);
+        }
+        $db   = Database::getInstance();
+        $stmt = $db->prepare("SELECT * FROM usuarios WHERE email = ? AND activo = 1 LIMIT 1");
+        $stmt->execute([$email]);
+        $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$usuario || !password_verify($password, $usuario['password'] ?? '')) {
+            $this->adminApiError('Credenciales incorrectas', 401);
+        }
+        if ($usuario['rol'] !== 'admin') {
+            $this->adminApiError('Acceso denegado. Se requiere rol de administrador.', 403);
+        }
+        $token = $this->generateJWT($usuario);
+        $this->adminApiOk('Login exitoso', [
+            'user'  => ['id' => (int)$usuario['id'], 'nombre' => $usuario['nombre'], 'email' => $usuario['email'], 'rol' => $usuario['rol']],
+            'token' => $token,
+        ]);
+    }
+
+    /** Sub-router /api/admin/{resource} */
+    public function admin(?string $resource = null): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        header('Access-Control-Allow-Origin: *');
+        if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+            header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+            header('Access-Control-Allow-Headers: Authorization, Content-Type');
+            http_response_code(204); exit;
+        }
+        $jwtUser = $this->requireAdminJWT();
+        $method  = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
+
+        // Parsear resource compuesto: ej. "promotions/123/deactivate"
+        $parts    = $resource ? array_values(array_filter(explode('/', $resource))) : [];
+        $resType  = $parts[0] ?? null;
+        $id       = (isset($parts[1]) && ctype_digit((string)$parts[1])) ? (int)$parts[1] : null;
+        $subAct   = $parts[2] ?? null;
+
+        switch ($resType) {
+            case 'users':
+                if ($method === 'GET') $this->adminListUsers($jwtUser);
+                else $this->adminApiError('Método no permitido', 405);
+                break;
+            case 'promotions':
+                $this->adminPromotionsRouter($method, $id, $subAct, $jwtUser);
+                break;
+            default:
+                $this->adminApiError('Recurso no encontrado: ' . ($resType ?? 'null'), 404);
+        }
+    }
+
+    /** PUT /api/branches/{id}/config */
+    public function branches(?string $branchId = null): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        header('Access-Control-Allow-Origin: *');
+        if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+            header('Access-Control-Allow-Methods: PUT, OPTIONS');
+            header('Access-Control-Allow-Headers: Authorization, Content-Type');
+            http_response_code(204); exit;
+        }
+        $urlParam = trim($_GET['url'] ?? '', '/');
+        $segs     = array_values(array_filter(explode('/', $urlParam)));
+        $branchId = (isset($segs[2]) && ctype_digit((string)$segs[2])) ? (int)$segs[2] : null;
+        $subAct   = $segs[3] ?? null;
+        if (!$branchId || $subAct !== 'config' || $_SERVER['REQUEST_METHOD'] !== 'PUT') {
+            $this->adminApiError('Ruta no encontrada', 404);
+        }
+        $jwtUser = $this->requireAdminJWT(false);
+        $body    = json_decode(file_get_contents('php://input'), true) ?? [];
+        $db      = Database::getInstance();
+        $stmt = $db->prepare("SELECT id, empresa_id FROM sucursales WHERE id = ? LIMIT 1");
+        $stmt->execute([$branchId]);
+        $branch = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$branch) { $this->adminApiError('Sucursal no encontrada', 404); }
+        if ((int)$branch['empresa_id'] !== (int)$jwtUser['empresa_id']) {
+            $this->adminApiError('No tienes permiso para modificar esta sucursal', 403);
+        }
+        try {
+            $sets = []; $params = [];
+            if (isset($body['metodos_pago']))  { $sets[] = 'metodos_pago = ?';  $params[] = json_encode($body['metodos_pago']); }
+            if (isset($body['tipos_entrega'])) { $sets[] = 'tipos_entrega = ?'; $params[] = json_encode($body['tipos_entrega']); }
+            if (isset($body['costo_envio']))   { $sets[] = 'costo_envio = ?';   $params[] = (float)$body['costo_envio']; }
+            if (isset($body['pedido_minimo'])) { $sets[] = 'pedido_minimo = ?'; $params[] = (float)$body['pedido_minimo']; }
+            if (isset($body['activo']))        { $sets[] = 'activo = ?';        $params[] = $body['activo'] ? 1 : 0; }
+            if (!empty($sets)) { $params[] = $branchId; $db->prepare("UPDATE sucursales SET " . implode(', ', $sets) . " WHERE id = ?")->execute($params); }
+            $this->adminApiOk('Configuración de sucursal actualizada correctamente');
+        } catch (\Throwable $e) { $this->adminApiError('Error al actualizar: ' . $e->getMessage(), 500); }
+    }
+
+    // ── Admin API Helpers ────────────────────────────────────────
+
+    private function adminApiOk(string $message, mixed $data = null): void
+    {
+        $resp = ['success' => true, 'message' => $message];
+        if ($data !== null) $resp['data'] = $data;
+        echo json_encode($resp); exit;
+    }
+
+    private function adminApiError(string $message, int $code = 400, ?array $errors = null): void
+    {
+        http_response_code($code);
+        $resp = ['success' => false, 'message' => $message];
+        if ($errors !== null) $resp['errors'] = $errors;
+        echo json_encode($resp); exit;
+    }
+
+    private function requireAdminJWT(bool $requireAdmin = true): array
+    {
+        $header = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
+        if (!preg_match('/^Bearer\s+(\S+)$/i', trim($header), $m)) {
+            $this->adminApiError('Token de autenticación requerido', 401);
+        }
+        $payload = $this->validateJWT($m[1]);
+        if (!$payload) { $this->adminApiError('Token inválido o expirado', 401); }
+        if ($requireAdmin && ($payload['rol'] ?? '') !== 'admin') {
+            $this->adminApiError('Acceso denegado. Se requiere rol de administrador.', 403);
+        }
+        return $payload;
+    }
+
+    private function generateJWT(array $user): string
+    {
+        $header  = self::b64e(json_encode(['alg' => 'HS256', 'typ' => 'JWT']));
+        $now     = time();
+        $payload = self::b64e(json_encode([
+            'sub' => (int)$user['id'], 'nombre' => $user['nombre'], 'email' => $user['email'],
+            'rol' => $user['rol'], 'empresa_id' => (int)($user['empresa_id'] ?? 0),
+            'iat' => $now, 'exp' => $now + 86400,
+        ]));
+        $sig = self::b64e(hash_hmac('sha256', "$header.$payload", $this->jwtSecret, true));
+        return "$header.$payload.$sig";
+    }
+
+    private function validateJWT(string $token): ?array
+    {
+        $parts = explode('.', $token);
+        if (count($parts) !== 3) return null;
+        [$header, $payload, $signature] = $parts;
+        $expected = self::b64e(hash_hmac('sha256', "$header.$payload", $this->jwtSecret, true));
+        if (!hash_equals($expected, $signature)) return null;
+        $data = json_decode(self::b64d($payload), true);
+        if (!$data || ($data['exp'] ?? 0) < time()) return null;
+        return $data;
+    }
+
+    private static function b64e(string $d): string { return rtrim(strtr(base64_encode($d), '+/', '-_'), '='); }
+    private static function b64d(string $d): string { return base64_decode(strtr($d, '-_', '+/')); }
+
+    // ── Admin: Users ─────────────────────────────────────────────
+
+    private function adminListUsers(array $jwtUser): void
+    {
+        $search  = trim($this->get('search', ''));
+        $page    = max(1, (int)$this->get('page', 1));
+        $perPage = min(100, max(1, (int)$this->get('per_page', 50)));
+        $offset  = ($page - 1) * $perPage;
+        $db      = Database::getInstance();
+        $where   = ['activo = 1']; $params = [];
+        if ($search !== '') { $where[] = '(nombre LIKE ? OR email LIKE ?)'; $t = '%' . $search . '%'; array_push($params, $t, $t); }
+        $wc   = implode(' AND ', $where);
+        $stmt = $db->prepare("SELECT COUNT(*) FROM usuarios WHERE $wc"); $stmt->execute($params);
+        $total = (int)$stmt->fetchColumn();
+        $stmt = $db->prepare("SELECT id, nombre, email, rol, activo, created_at FROM usuarios WHERE $wc ORDER BY nombre ASC LIMIT $perPage OFFSET $offset");
+        $stmt->execute($params);
+        $users = array_map(static fn($u) => [
+            'id' => (int)$u['id'], 'nombre' => $u['nombre'], 'email' => $u['email'],
+            'rol' => $u['rol'], 'activo' => (bool)$u['activo'], 'created_at' => $u['created_at'],
+        ], $stmt->fetchAll(PDO::FETCH_ASSOC));
+        $this->adminApiOk('Usuarios obtenidos correctamente', [
+            'users' => $users,
+            'pagination' => ['total' => $total, 'page' => $page, 'per_page' => $perPage, 'pages' => (int)ceil($total / $perPage)],
+        ]);
+    }
+
+    // ── Admin: Promotions CRUD ───────────────────────────────────
+
+    private function adminPromotionsRouter(string $method, ?int $id, ?string $subAction, array $jwtUser): void
+    {
+        if ($id === null) {
+            match ($method) {
+                'GET'  => $this->adminListPromotions($jwtUser),
+                'POST' => $this->adminCreatePromotion($jwtUser),
+                default => $this->adminApiError('Método no permitido', 405),
+            };
+            return;
+        }
+        match (true) {
+            $method === 'GET'                               => $this->adminGetPromotion($id, $jwtUser),
+            $method === 'PUT' && $subAction === 'deactivate' => $this->adminDeactivatePromotion($id, $jwtUser),
+            $method === 'PUT'                               => $this->adminUpdatePromotion($id, $jwtUser),
+            $method === 'DELETE'                            => $this->adminDeletePromotion($id, $jwtUser),
+            default => $this->adminApiError('Método no permitido', 405),
+        };
+    }
+
+    private function adminListPromotions(array $jwtUser): void
+    {
+        $page      = max(1, (int)$this->get('page', 1));
+        $perPage   = min(100, max(1, (int)$this->get('per_page', 20)));
+        $usuarioId = $this->get('usuario_id') ? (int)$this->get('usuario_id') : null;
+        $offset    = ($page - 1) * $perPage;
+        $db        = Database::getInstance();
+        $where     = ['1=1']; $params = [];
+        if ($usuarioId) { $where[] = 'p.usuario_id = ?'; $params[] = $usuarioId; }
+        $wc   = implode(' AND ', $where);
+        $stmt = $db->prepare("SELECT COUNT(*) FROM rest_promociones p WHERE $wc"); $stmt->execute($params);
+        $total = (int)$stmt->fetchColumn();
+        $stmt = $db->prepare("SELECT p.*, u.nombre AS usuario_nombre, u.email AS usuario_email FROM rest_promociones p LEFT JOIN usuarios u ON u.id = p.usuario_id WHERE $wc ORDER BY p.created_at DESC LIMIT $perPage OFFSET $offset");
+        $stmt->execute($params);
+        $promotions = array_map(static fn($p) => [
+            'id' => (int)$p['id'], 'usuario_id' => (int)$p['usuario_id'],
+            'usuario_nombre' => $p['usuario_nombre'] ?? null, 'usuario_email' => $p['usuario_email'] ?? null,
+            'titulo' => $p['titulo'], 'descripcion' => $p['descripcion'],
+            'imagen' => $p['imagen'] ?? null, 'deep_link' => $p['deep_link'] ?? null,
+            'code' => $p['code'] ?? null, 'activo' => (int)$p['activo'],
+            'expires_at' => $p['expires_at'] ?? null, 'created_at' => $p['created_at'] ?? null,
+        ], $stmt->fetchAll(PDO::FETCH_ASSOC));
+        $this->adminApiOk('Promociones obtenidas correctamente', [
+            'promotions' => $promotions,
+            'pagination' => ['total' => $total, 'page' => $page, 'per_page' => $perPage, 'pages' => (int)ceil($total / $perPage)],
+        ]);
+    }
+
+    private function adminGetPromotion(int $id, array $jwtUser): void
+    {
+        $db   = Database::getInstance();
+        $stmt = $db->prepare("SELECT p.*, u.nombre AS usuario_nombre, u.email AS usuario_email FROM rest_promociones p LEFT JOIN usuarios u ON u.id = p.usuario_id WHERE p.id = ? LIMIT 1");
+        $stmt->execute([$id]); $p = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$p) { $this->adminApiError('Promoción no encontrada', 404); }
+        $this->adminApiOk('Promoción obtenida correctamente', [
+            'id' => (int)$p['id'], 'usuario_id' => (int)$p['usuario_id'],
+            'usuario_nombre' => $p['usuario_nombre'] ?? null, 'usuario_email' => $p['usuario_email'] ?? null,
+            'titulo' => $p['titulo'], 'descripcion' => $p['descripcion'],
+            'imagen' => $p['imagen'] ?? null, 'deep_link' => $p['deep_link'] ?? null,
+            'code' => $p['code'] ?? null, 'activo' => (int)$p['activo'],
+            'expires_at' => $p['expires_at'] ?? null, 'created_at' => $p['created_at'] ?? null,
+        ]);
+    }
+
+    private function adminCreatePromotion(array $jwtUser): void
+    {
+        $body   = json_decode(file_get_contents('php://input'), true) ?? [];
+        $errors = $this->validatePromotionData($body, null);
+        if (!empty($errors)) { $this->adminApiError('Error de validación', 422, $errors); }
+        $db = Database::getInstance();
+        try {
+            $stmt = $db->prepare("INSERT INTO rest_promociones (usuario_id, titulo, descripcion, code, activo, expires_at) VALUES (?, ?, ?, ?, ?, ?)");
+            $stmt->execute([
+                (int)$body['usuario_id'], trim($body['titulo']),
+                isset($body['descripcion']) ? trim($body['descripcion']) : null,
+                !empty($body['code']) ? trim($body['code']) : null,
+                isset($body['activo']) ? ((int)$body['activo'] ? 1 : 0) : 1,
+                !empty($body['expires_at']) ? $body['expires_at'] : null,
+            ]);
+            $id    = (int)$db->lastInsertId();
+            $stmt2 = $db->prepare("SELECT * FROM rest_promociones WHERE id = ?"); $stmt2->execute([$id]); $p = $stmt2->fetch(PDO::FETCH_ASSOC);
+            $this->adminApiOk('Promoción creada correctamente', [
+                'id' => (int)$p['id'], 'usuario_id' => (int)$p['usuario_id'],
+                'titulo' => $p['titulo'], 'descripcion' => $p['descripcion'],
+                'code' => $p['code'], 'activo' => (int)$p['activo'],
+                'expires_at' => $p['expires_at'] ?? null, 'created_at' => $p['created_at'] ?? null,
+            ]);
+        } catch (\Throwable $e) {
+            $msg = $e->getMessage();
+            if (str_contains($msg, 'Duplicate entry') && str_contains($msg, 'code')) {
+                $this->adminApiError('Error de validación', 422, ['code' => ['El código ya está en uso por otra promoción.']]);
+            }
+            $this->adminApiError('Error al crear la promoción: ' . $msg, 500);
+        }
+    }
+
+    private function adminUpdatePromotion(int $id, array $jwtUser): void
+    {
+        $body = json_decode(file_get_contents('php://input'), true) ?? [];
+        $db   = Database::getInstance();
+        $stmt = $db->prepare("SELECT * FROM rest_promociones WHERE id = ?"); $stmt->execute([$id]);
+        if (!$stmt->fetch()) { $this->adminApiError('Promoción no encontrada', 404); }
+        $errors = $this->validatePromotionData($body, $id);
+        if (!empty($errors)) { $this->adminApiError('Error de validación', 422, $errors); }
+        try {
+            $sets = []; $params = [];
+            if (isset($body['usuario_id']))          { $sets[]='usuario_id=?'; $params[]=(int)$body['usuario_id']; }
+            if (isset($body['titulo']))              { $sets[]='titulo=?'; $params[]=trim($body['titulo']); }
+            if (array_key_exists('descripcion', $body)) { $sets[]='descripcion=?'; $params[]=isset($body['descripcion'])?trim($body['descripcion']):null; }
+            if (array_key_exists('code', $body))        { $sets[]='code=?'; $params[]=!empty($body['code'])?trim($body['code']):null; }
+            if (isset($body['activo']))              { $sets[]='activo=?'; $params[]=$body['activo']?1:0; }
+            if (array_key_exists('expires_at', $body))  { $sets[]='expires_at=?'; $params[]=!empty($body['expires_at'])?$body['expires_at']:null; }
+            if (!empty($sets)) { $params[]=$id; $db->prepare("UPDATE rest_promociones SET ".implode(', ',$sets)." WHERE id = ?")->execute($params); }
+            $stmt2 = $db->prepare("SELECT p.*, u.nombre AS usuario_nombre, u.email AS usuario_email FROM rest_promociones p LEFT JOIN usuarios u ON u.id = p.usuario_id WHERE p.id = ?");
+            $stmt2->execute([$id]); $p = $stmt2->fetch(PDO::FETCH_ASSOC);
+            $this->adminApiOk('Promoción actualizada correctamente', [
+                'id' => (int)$p['id'], 'usuario_id' => (int)$p['usuario_id'],
+                'usuario_nombre' => $p['usuario_nombre'] ?? null, 'usuario_email' => $p['usuario_email'] ?? null,
+                'titulo' => $p['titulo'], 'descripcion' => $p['descripcion'],
+                'code' => $p['code'], 'activo' => (int)$p['activo'],
+                'expires_at' => $p['expires_at'] ?? null, 'created_at' => $p['created_at'] ?? null,
+            ]);
+        } catch (\Throwable $e) {
+            $msg = $e->getMessage();
+            if (str_contains($msg, 'Duplicate entry') && str_contains($msg, 'code')) {
+                $this->adminApiError('Error de validación', 422, ['code' => ['El código ya está en uso por otra promoción.']]);
+            }
+            $this->adminApiError('Error al actualizar la promoción: ' . $msg, 500);
+        }
+    }
+
+    private function adminDeletePromotion(int $id, array $jwtUser): void
+    {
+        $db   = Database::getInstance();
+        $stmt = $db->prepare("SELECT id FROM rest_promociones WHERE id = ?"); $stmt->execute([$id]);
+        if (!$stmt->fetch()) { $this->adminApiError('Promoción no encontrada', 404); }
+        $db->prepare("DELETE FROM rest_promociones WHERE id = ?")->execute([$id]);
+        $this->adminApiOk('Promoción eliminada correctamente');
+    }
+
+    private function adminDeactivatePromotion(int $id, array $jwtUser): void
+    {
+        $db   = Database::getInstance();
+        $stmt = $db->prepare("SELECT id FROM rest_promociones WHERE id = ?"); $stmt->execute([$id]);
+        if (!$stmt->fetch()) { $this->adminApiError('Promoción no encontrada', 404); }
+        $db->prepare("UPDATE rest_promociones SET activo = 0 WHERE id = ?")->execute([$id]);
+        $this->adminApiOk('Promoción desactivada correctamente');
+    }
+
+    private function validatePromotionData(array $data, ?int $excludeId): array
+    {
+        $errors = [];
+        if (empty($data['usuario_id']) && $excludeId === null) { $errors['usuario_id'] = ['El usuario es obligatorio.']; }
+        elseif (isset($data['usuario_id']) && empty($data['usuario_id'])) { $errors['usuario_id'] = ['El usuario es obligatorio.']; }
+        if ($excludeId === null && empty(trim($data['titulo'] ?? ''))) { $errors['titulo'] = ['El título es obligatorio.']; }
+        elseif (isset($data['titulo']) && empty(trim($data['titulo']))) { $errors['titulo'] = ['El título no puede estar vacío.']; }
+        elseif (isset($data['titulo']) && strlen(trim($data['titulo'])) > 255) { $errors['titulo'] = ['El título no puede exceder los 255 caracteres.']; }
+        if (!empty($data['code'])) {
+            $db     = Database::getInstance();
+            $sql    = "SELECT COUNT(*) FROM rest_promociones WHERE code = ?"; $params = [trim($data['code'])];
+            if ($excludeId !== null) { $sql .= " AND id != ?"; $params[] = $excludeId; }
+            $stmt = $db->prepare($sql); $stmt->execute($params);
+            if ((int)$stmt->fetchColumn() > 0) { $errors['code'] = ['El código ya está en uso por otra promoción.']; }
+        }
+        if (!empty($data['expires_at']) && !preg_match('/^\d{4}-\d{2}-\d{2}( \d{2}:\d{2}:\d{2})?$/', $data['expires_at'])) {
+            $errors['expires_at'] = ['Formato inválido. Use YYYY-MM-DD o YYYY-MM-DD HH:MM:SS.'];
+        }
+        return $errors;
     }
 }

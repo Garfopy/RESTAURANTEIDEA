@@ -260,6 +260,7 @@ $_isMesero = in_array($_rol, ['mesero', 'comprador'], true);            // opera
   </div>
 </div>
 
+<script src="<?= BASE_URL ?>public/js/api-client.js?v=<?= @filemtime(ROOT_PATH . '/public/js/api-client.js') ?: time() ?>"></script>
 <script>
 // Mobile: muestra toggle en pantallas pequeñas
 if (window.innerWidth <= 768) {

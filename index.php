@@ -91,6 +91,14 @@ if (in_array($ctrlSlug, ['menu', 'acceso'], true)) {
     }
 }
 
+// ── API Routing: concatenar segmentos extra como param ─────────────────────
+// /api/auth/login → ctrl=api, action=auth, param=login
+// /api/admin/promotions/123/deactivate → ctrl=api, action=admin, param=promotions/123/deactivate
+if ($ctrlSlug === 'api' && $action !== 'index') {
+    $rest  = array_slice($segments, 1);
+    $action = array_shift($rest);
+    $param  = $rest ? implode('/', $rest) : null;
+}
 // ── Ruta raíz → login ────────────────────────────────────────────────────────
 if ($path === '') {
     $ctrlSlug = 'auth';
@@ -162,11 +170,37 @@ $publicPaths = [
     'acceso/entrarComensal',
     // Webhook entrante de CarniHub (autenticación por Bearer, no por sesión)
     'carnihub/webhook',
-    // API v1 REST (autenticación por Bearer token, sin sesión PHP)
+// API v1 REST (autenticación por Bearer token, sin sesión PHP)
     'api/v1',
     'api/v1/ping',
     'api/v1/pedidos',
     'api/v1/productos',
+    'api/v1/promociones',
+    // Admin API (JWT Bearer — el guard de sesión no aplica, el controller maneja auth)
+    'api/auth',
+    'api/auth/login',
+    'api/admin',
+    'api/admin/users',
+    'api/admin/promotions',
+    'api/branches',
+    'api/branches/config',
+    // API genérica (pedidos, productos, etc.)
+    'api/pedidos',
+    'api/pedidosconfirmados',
+    'api/productos',
+    'api/precios',
+    'api/chat',
+    'api/tracking',
+    'api/guardarposicion',
+    'api/historialtracking',
+    'api/actualizartracking',
+    'api/iniciartracking',
+    'api/finalizartracking',
+    'api/planes',
+    'api/staff',
+    'api/staff/pedidos',
+    'api/staff/mesas',
+    'api/comensales',
 ];
 
 $currentPath = strtolower($ctrlSlug . '/' . $action);
