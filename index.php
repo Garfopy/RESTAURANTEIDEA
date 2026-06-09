@@ -111,6 +111,7 @@ $routes = [
     'rest-finanzas' => 'RestFinanzasController',
     'rest-cliente'  => 'RestClienteController',
     'rest-reserva'  => 'RestReservaController',
+    'rest-promocion'=> 'RestPromocionController',
     'rest-ticket'   => 'RestTicketController',
     // Portales staff
     'rest-mesero'   => 'RestMeseroController',
