@@ -88,13 +88,13 @@
     },
 
     /**
-     * GET /api/auth/token — Obtener JWT si ya tienes sesión PHP
+     * GET /api/auth/token.php — Obtener JWT si ya tienes sesión PHP
      * Uso: Después de login en /restaurante/, llama esto para obtener JWT
      * @returns {Promise<boolean>} true si obtuvo token, false si no
      */
     getTokenFromSession: async function() {
       try {
-        var resp = await fetch(BASE_URL + 'api/auth/token', {
+        var resp = await fetch(BASE_URL + 'api/auth/token.php', {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include'  // Enviar cookies de sesión PHP
