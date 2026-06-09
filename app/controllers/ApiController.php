@@ -1215,12 +1215,23 @@ class ApiController extends BaseController
     public function admin(?string $resource = null): void
     {
         header('Content-Type: application/json; charset=utf-8');
-        header('Access-Control-Allow-Origin: *');
+        
+        // CORS: Permitir credenciales desde el origen actual
+        $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+        if ($origin) {
+            header('Access-Control-Allow-Origin: ' . $origin);
+            header('Access-Control-Allow-Credentials: true');
+        }
+        
         if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
             header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
             header('Access-Control-Allow-Headers: Authorization, Content-Type');
             http_response_code(204); exit;
         }
+        
+        // DEBUG: Log incoming request
+        error_log('[admin] ' . $_SERVER['REQUEST_METHOD'] . ' ' . ($resource ?? 'null') . ' | Session: ' . (isset($_SESSION['usuario']) ? 'YES' : 'NO') . ' | Auth header: ' . (isset($_SERVER['HTTP_AUTHORIZATION']) ? 'YES' : 'NO'));
+        
         $jwtUser = $this->requireAdminJWT();
         $method  = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
 

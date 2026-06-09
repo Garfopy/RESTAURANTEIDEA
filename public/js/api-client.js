@@ -158,7 +158,7 @@
         headers['Authorization'] = 'Bearer ' + token;
       }
 
-      var opts = { method: method, headers: headers };
+      var opts = { method: method, headers: headers, credentials: 'include' };
       if (body && (method === 'POST' || method === 'PUT')) {
         opts.body = JSON.stringify(body);
       }
