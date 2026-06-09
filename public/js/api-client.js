@@ -30,17 +30,20 @@
   const STORAGE_USER = 'carnihub_admin_user';
 
   const BASE_URL = (function () {
-    // Detectar la URL base de la app
+    // Usar variable global inyectada por PHP si existe (más confiable)
+    if (typeof window.CARNIHUB_BASE_URL !== 'undefined' && window.CARNIHUB_BASE_URL) {
+      var u = window.CARNIHUB_BASE_URL;
+      if (u.substr(-1) !== '/') u += '/';
+      return u;
+    }
+    // Fallback: auto-detectar la URL base de la app
     var path = window.location.pathname;
-    // Quitar segmentos después del dominio base
-    // Ej: /capirest/restaurante/dashboard -> /capirest/
     var base = path.replace(/\/restaurante\/.*$/, '/')
                    .replace(/\/rest-promocion\/.*$/, '/')
                    .replace(/\/rest-config\/.*$/, '/')
                    .replace(/\/rest-menu\/.*$/, '/')
                    .replace(/\/rest-.*\/.*$/, '/')
                    .replace(/\/auth\/.*$/, '/');
-    // Asegurar que termina en /
     if (base.substr(-1) !== '/') base += '/';
     return base;
   })();

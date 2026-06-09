@@ -16,19 +16,11 @@ class RestPromocionController extends BaseController
 
     public function index(?string $p = null): void
     {
-        $restauranteId = $this->restauranteId();
-        $page          = max(1, (int)($this->get('page', 1)));
-        $promociones   = $this->model->listar($restauranteId, $page);
-
-        $hoy = date('Y-m-d');
-        foreach ($promociones as &$promo) {
-            $promo['estado_visual'] = $this->calcularEstado($promo, $hoy);
-        }
-        unset($promo);
-
+        // La vista ahora carga datos vía JS/ApiClient.
+        // Solo renderizamos la vista sin datos del servidor.
         $pageTitle  = 'Promociones';
         $activeMenu = 'rest_promociones';
-        $this->render('restaurante/promociones/index', compact('promociones', 'pageTitle', 'activeMenu'));
+        $this->render('restaurante/promociones/index', compact('pageTitle', 'activeMenu'));
     }
 
     // ── Formulario crear / editar ────────────────────────────────

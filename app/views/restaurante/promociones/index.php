@@ -74,7 +74,7 @@
 
     if (!resp.success) {
       statusEl.innerHTML = '<div style="color:#DC2626">Error al cargar: ' + ApiClient._esc(resp.message || 'Error desconocido') + '</div>'
-        + '<button onclick="cargarPromociones()" style="margin-top:12px;background:var(--cp);color:#fff;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;font-weight:500">Reintentar</button>';
+        + '<button onclick="adminRecargarPromociones()" style="margin-top:12px;background:var(--cp);color:#fff;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;font-weight:500">Reintentar</button>';
       return;
     }
 

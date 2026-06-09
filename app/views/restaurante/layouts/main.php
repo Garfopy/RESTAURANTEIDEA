@@ -34,6 +34,8 @@ $_isMesero = in_array($_rol, ['mesero', 'comprador'], true);            // opera
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="<?= BASE_URL ?>public/css/restaurant.css?v=<?= @filemtime(ROOT_PATH . '/public/css/restaurant.css') ?: time() ?>">
   <style>.rst-modal-backdrop{display:none}.rst-modal-backdrop.open{display:flex}</style>
+  <script>var CARNIHUB_BASE_URL = '<?= BASE_URL ?>';</script>
+  <script src="<?= BASE_URL ?>public/js/api-client.js?v=<?= @filemtime(ROOT_PATH . '/public/js/api-client.js') ?: time() ?>"></script>
   <script src="<?= BASE_URL ?>public/js/chart.umd.min.js"></script>
   <style>
     :root {
@@ -260,7 +262,6 @@ $_isMesero = in_array($_rol, ['mesero', 'comprador'], true);            // opera
   </div>
 </div>
 
-<script src="<?= BASE_URL ?>public/js/api-client.js?v=<?= @filemtime(ROOT_PATH . '/public/js/api-client.js') ?: time() ?>"></script>
 <script>
 // Mobile: muestra toggle en pantallas pequeñas
 if (window.innerWidth <= 768) {
