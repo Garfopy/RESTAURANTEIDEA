@@ -34,6 +34,14 @@
     if (typeof window.CARNIHUB_BASE_URL !== 'undefined' && window.CARNIHUB_BASE_URL) {
       var u = window.CARNIHUB_BASE_URL;
       if (u.substr(-1) !== '/') u += '/';
+      // IMPORTANTE: Limpiar prefijos de módulos que PHP incluye en BASE_URL
+      // Esto asegura que las llamadas a /api/admin/... se resuelvan correctamente
+      u = u.replace(/\/restaurante\/+$/, '/')
+            .replace(/\/rest-promocion\/+$/, '/')
+            .replace(/\/rest-config\/+$/, '/')
+            .replace(/\/rest-menu\/+$/, '/')
+            .replace(/\/rest-.*\/+$/, '/')
+            .replace(/\/auth\/+$/, '/');
       return u;
     }
     // Fallback: auto-detectar la URL base de la app
