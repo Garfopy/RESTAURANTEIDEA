@@ -1175,16 +1175,41 @@ class ApiController extends BaseController
 
     private string $jwtSecret = 'CarniHub_JWT_S3cr3t_K3y_2024_Rest4ur4nt3';
 
-    /** POST /api/auth/login */
+    /** POST /api/auth/login | GET /api/auth/token */
     public function auth(?string $subAction = null): void
     {
         header('Content-Type: application/json; charset=utf-8');
         header('Access-Control-Allow-Origin: *');
         if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-            header('Access-Control-Allow-Methods: POST, OPTIONS');
+            header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
             header('Access-Control-Allow-Headers: Authorization, Content-Type');
             http_response_code(204); exit;
         }
+
+        // GET /api/auth/token — Generar JWT si tienes sesión PHP activa
+        if ($subAction === 'token' && $_SERVER['REQUEST_METHOD'] === 'GET') {
+            // Verificar que hay sesión PHP activa con usuario logueado
+            if (empty($_SESSION['usuario'])) {
+                $this->adminApiError('No hay sesión activa. Por favor inicia sesión primero.', 401);
+            }
+
+            $usuario = $_SESSION['usuario'];
+            
+            // Solo admin puede generar JWT para APIs
+            if ($usuario['rol'] !== 'admin') {
+                $this->adminApiError('Acceso denegado. Se requiere rol de administrador.', 403);
+            }
+
+            // Generar JWT y devolverlo
+            $token = $this->generateJWT($usuario);
+            $this->adminApiOk('Token generado', [
+                'user'  => ['id' => (int)$usuario['id'], 'nombre' => $usuario['nombre'], 'email' => $usuario['email'], 'rol' => $usuario['rol']],
+                'token' => $token,
+            ]);
+            return;
+        }
+
+        // POST /api/auth/login — Login con credenciales
         if ($subAction !== 'login' || $_SERVER['REQUEST_METHOD'] !== 'POST') {
             $this->adminApiError('Ruta no encontrada', 404);
         }

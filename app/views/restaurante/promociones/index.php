@@ -251,6 +251,11 @@
   // Exponer recarga para que pueda llamarse desde fuera
   window.adminRecargarPromociones = cargarPromociones;
 
+  // Obtener JWT automáticamente si ya estamos logueados (sesión PHP)
+  if (!ApiClient.isLoggedIn()) {
+    ApiClient.getTokenFromSession();
+  }
+
   // Cargar al iniciar
   cargarPromociones();
 })();

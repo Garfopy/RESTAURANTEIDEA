@@ -179,6 +179,7 @@ $publicPaths = [
     // Admin API (JWT Bearer — el guard de sesión no aplica, el controller maneja auth)
     'api/auth',
     'api/auth/login',
+    'api/auth/token',
     'api/admin',
     'api/admin/users',
     'api/admin/promotions',

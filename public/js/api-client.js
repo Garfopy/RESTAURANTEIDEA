@@ -88,6 +88,32 @@
     },
 
     /**
+     * GET /api/auth/token — Obtener JWT si ya tienes sesión PHP
+     * Uso: Después de login en /restaurante/, llama esto para obtener JWT
+     * @returns {Promise<boolean>} true si obtuvo token, false si no
+     */
+    getTokenFromSession: async function() {
+      try {
+        var resp = await fetch(BASE_URL + 'api_restaurante/auth/token', {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include'  // Enviar cookies de sesión PHP
+        });
+        var data = await resp.json();
+
+        if (data.success && data.data && data.data.token) {
+          localStorage.setItem(STORAGE_KEY, data.data.token);
+          localStorage.setItem(STORAGE_USER, JSON.stringify(data.data.user));
+          return true;
+        }
+        return false;
+      } catch (err) {
+        console.error('Error obteniendo token:', err.message);
+        return false;
+      }
+    },
+
+    /**
      * POST /api/auth/login
      * @param {string} email
      * @param {string} password
@@ -163,13 +189,14 @@
         opts.body = JSON.stringify(body);
       }
 
-      // Asegurar que el endpoint empieza con /api/ si no se pasó completo
+      // Usar /api_restaurante/ que ya funciona en el servidor (mod_rewrite no está habilitado)
+      // Endpoints como /admin/promotions se construirán como /api_restaurante/admin/promotions
       var url = endpoint;
-      if (url.indexOf('api/') !== 0 && url.indexOf('/api/') !== 0) {
-        url = BASE_URL + 'api' + (url.substr(0,1) === '/' ? url : '/' + url);
-      } else if (url.indexOf('/api/') === 0) {
+      if (url.indexOf('api_restaurante/') !== 0 && url.indexOf('/api_restaurante/') !== 0) {
+        url = BASE_URL + 'api_restaurante' + (url.substr(0,1) === '/' ? url : '/' + url);
+      } else if (url.indexOf('/api_restaurante/') === 0) {
         url = BASE_URL + url.substr(1);
-      } else if (url.indexOf('api/') === 0) {
+      } else if (url.indexOf('api_restaurante/') === 0) {
         url = BASE_URL + url;
       }
 

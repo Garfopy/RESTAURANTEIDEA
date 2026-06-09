@@ -243,6 +243,11 @@ $promoId     = (int)($promo['id'] ?? 0);
 
   // Inicializar usuario al cargar la página
   inicializarUsuario();
+
+  // Obtener JWT automáticamente si ya estamos logueados (sesión PHP)
+  if (!ApiClient.isLoggedIn()) {
+    ApiClient.getTokenFromSession();
+  }
 })();
 </script>
 
