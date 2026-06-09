@@ -78,14 +78,16 @@ $promoId     = (int)($promo['id'] ?? 0);
         </div>
       </div>
 
-      <!-- Usuario -->
+      <!-- Usuario (auto-filled desde JWT) -->
       <div class="form-group">
         <label class="form-label">Usuario *</label>
-        <select name="usuario_id" class="form-input" id="inpUsuario" required>
-          <option value="">— Seleccionar usuario —</option>
-        </select>
+        <input type="hidden" name="usuario_id" id="inpUsuario" value="">
+        <div id="usuarioDisplay" style="padding:10px 12px;background:#F3F4F6;border:1px solid #E5E7EB;border-radius:6px;
+                                       font-size:.88rem;color:#374151;font-weight:500">
+          Cargando usuario...
+        </div>
         <div style="font-size:.73rem;color:#9CA3AF;margin-top:2px">
-          Selecciona el usuario al que se asignará esta promoción.
+          La promoción será asignada automáticamente al usuario actual.
         </div>
       </div>
 
@@ -123,32 +125,35 @@ $promoId     = (int)($promo['id'] ?? 0);
 
   var isEdit = <?= $isEdit ? 'true' : 'false' ?>;
   var promoId = <?= $promoId ?>;
-  var currentUsuarioId = <?= (int)($promo['usuario_id'] ?? 0) ?>;
 
   /**
-   * Cargar usuarios para el dropdown
+   * Inicializar usuario_id desde JWT y mostrar en UI
    */
-  async function cargarUsuarios() {
-    var select = document.getElementById('inpUsuario');
-    select.innerHTML = '<option value="">Cargando usuarios...</option>';
-
-    var resp = await ApiClient.get('/admin/users?per_page=100');
-
-    if (!resp.success) {
-      select.innerHTML = '<option value="">Error al cargar usuarios</option>';
+  async function inicializarUsuario() {
+    // Obtener usuario_id del JWT (disponible en ApiClient.usuario_id o decodificado del token)
+    var usuarioId = ApiClient.usuario_id || ApiClient.getJwtUser()?.id;
+    
+    if (!usuarioId) {
+      document.getElementById('usuarioDisplay').innerHTML = 
+        '<div style="color:#DC2626">Error: No se pudo obtener tu usuario. Vuelve a iniciar sesión.</div>';
+      document.getElementById('inpUsuario').value = '';
       return;
     }
 
-    var users = resp.data && resp.data.users ? resp.data.users : [];
-    var html = '<option value="">— Seleccionar usuario —</option>';
+    // Guardar usuario_id en el input hidden
+    document.getElementById('inpUsuario').value = usuarioId;
 
-    for (var i = 0; i < users.length; i++) {
-      var u = users[i];
-      var sel = u.id === currentUsuarioId ? ' selected' : '';
-      html += '<option value="' + u.id + '"' + sel + '>' + esc(u.nombre) + ' (' + esc(u.email) + ')</option>';
+    // Obtener nombre de usuario desde la API o JWT
+    var jwtUser = ApiClient.getJwtUser && ApiClient.getJwtUser() ? ApiClient.getJwtUser() : null;
+    var displayName = jwtUser?.nombre || jwtUser?.name || 'Usuario actual';
+    var displayEmail = jwtUser?.email || '';
+
+    var displayText = esc(displayName);
+    if (displayEmail) {
+      displayText += ' <span style="color:#6B7280">(' + esc(displayEmail) + ')</span>';
     }
 
-    select.innerHTML = html;
+    document.getElementById('usuarioDisplay').innerHTML = displayText;
   }
 
   /**
@@ -163,8 +168,18 @@ $promoId     = (int)($promo['id'] ?? 0);
     btn.textContent = 'Guardando...';
     errorsContainer.style.display = 'none';
 
+    var usuarioId = parseInt(document.getElementById('inpUsuario').value) || 0;
+    
+    if (!usuarioId) {
+      btn.disabled = false;
+      btn.textContent = isEdit ? 'Guardar cambios' : 'Crear promoción';
+      errorsContainer.innerHTML = '<div class="api-error">Error: Usuario no configurado. Vuelve a cargar la página.</div>';
+      errorsContainer.style.display = 'block';
+      return;
+    }
+
     var data = {
-      usuario_id: parseInt(document.getElementById('inpUsuario').value) || 0,
+      usuario_id: usuarioId,
       titulo: document.getElementById('inpTitulo').value.trim(),
       descripcion: document.getElementById('inpDescripcion').value.trim() || null,
       code: document.getElementById('inpCode').value.trim() || null,
@@ -187,24 +202,47 @@ $promoId     = (int)($promo['id'] ?? 0);
       btn.disabled = false;
       btn.textContent = isEdit ? 'Guardar cambios' : 'Crear promoción';
 
-      // Mostrar errores de validación
-      if (resp.errors) {
-        ApiClient.showErrors(resp, '#form-errors');
+      var errorHtml = '';
+
+      // Manejo de errores específicos de Amare-App
+      if (resp.httpCode === 401) {
+        errorHtml = '<div class="api-error" style="color:#DC2626"><strong>Conexión expirada:</strong> El token de la API Amare ha expirado. ' +
+                    'Vuelve a conectar en <strong>Configuración > Conexión API Amare-App</strong></div>';
+      } else if (resp.httpCode === 409) {
+        // Código duplicado
+        errorHtml = '<div class="api-error" style="color:#DC2626"><strong>Código duplicado:</strong> El código "' + esc(data.code) + 
+                    '" ya está en uso por otra promoción. Elige un código único.</div>';
+      } else if (resp.errors) {
+        // Errores de validación por campo
+        var errorsList = [];
+        for (var field in resp.errors) {
+          var msgs = resp.errors[field];
+          if (Array.isArray(msgs)) {
+            errorsList.push('<strong>' + esc(field) + ':</strong> ' + msgs.map(esc).join(', '));
+          }
+        }
+        errorHtml = errorsList.map(function(e) { 
+          return '<div class="api-error">' + e + '</div>'; 
+        }).join('');
       } else {
-        errorsContainer.innerHTML = '<div class="api-error">' + esc(resp.message || 'Error desconocido') + '</div>';
-        errorsContainer.style.display = 'block';
+        // Error genérico
+        errorHtml = '<div class="api-error">' + esc(resp.message || 'Error desconocido al guardar la promoción') + '</div>';
       }
+
+      errorsContainer.innerHTML = errorHtml;
+      errorsContainer.style.display = 'block';
     }
   };
 
   function esc(str) {
+    if (typeof str !== 'string') return str;
     var div = document.createElement('div');
     div.appendChild(document.createTextNode(str));
     return div.innerHTML;
   }
 
-  // Cargar usuarios al iniciar
-  cargarUsuarios();
+  // Inicializar usuario al cargar la página
+  inicializarUsuario();
 })();
 </script>
 

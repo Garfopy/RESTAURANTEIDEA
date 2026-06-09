@@ -1497,6 +1497,12 @@ class ApiController extends BaseController
         }
 
         $body   = json_decode(file_get_contents('php://input'), true) ?? [];
+        
+        // Auto-llenar usuario_id desde JWT si no viene en el request
+        if (empty($body['usuario_id'])) {
+            $body['usuario_id'] = $jwtUser['id'] ?? null;
+        }
+        
         $errors = $this->validatePromotionData($body, null);
         if (!empty($errors)) { $this->adminApiError('Error de validación', 422, $errors); }
 
@@ -1603,18 +1609,34 @@ class ApiController extends BaseController
     private function validatePromotionData(array $data, ?int $excludeId): array
     {
         $errors = [];
-        if (empty($data['usuario_id']) && $excludeId === null) { $errors['usuario_id'] = ['El usuario es obligatorio.']; }
-        elseif (isset($data['usuario_id']) && empty($data['usuario_id'])) { $errors['usuario_id'] = ['El usuario es obligatorio.']; }
-        if ($excludeId === null && empty(trim($data['titulo'] ?? ''))) { $errors['titulo'] = ['El título es obligatorio.']; }
-        elseif (isset($data['titulo']) && empty(trim($data['titulo']))) { $errors['titulo'] = ['El título no puede estar vacío.']; }
-        elseif (isset($data['titulo']) && strlen(trim($data['titulo'])) > 255) { $errors['titulo'] = ['El título no puede exceder los 255 caracteres.']; }
-        if (!empty($data['code'])) {
-            // Validación delegada a la API Amare (BD remota).
-            // Solo validamos formato local básico; la unicidad la valida Amare.
+        
+        // usuario_id es obligatorio en creación y edición (auto-llenado desde JWT en creación)
+        if (empty($data['usuario_id'])) { 
+            $errors['usuario_id'] = ['El usuario es obligatorio.']; 
         }
+        
+        // titulo es obligatorio en creación; en edición, es opcional (PUT permite actualización parcial)
+        if ($excludeId === null && empty(trim($data['titulo'] ?? ''))) { 
+            $errors['titulo'] = ['El título es obligatorio.']; 
+        }
+        elseif (isset($data['titulo']) && empty(trim($data['titulo']))) { 
+            $errors['titulo'] = ['El título no puede estar vacío.']; 
+        }
+        elseif (isset($data['titulo']) && strlen(trim($data['titulo'])) > 255) { 
+            $errors['titulo'] = ['El título no puede exceder los 255 caracteres.']; 
+        }
+        
+        // code: validación de unicidad delegada a la API Amare (BD remota, validación 409)
+        // Aquí solo validamos formato básico si es necesario. Amare retorna 409 si duplicado.
+        if (!empty($data['code']) && !is_string($data['code'])) {
+            $errors['code'] = ['El código debe ser una cadena de texto.'];
+        }
+        
+        // expires_at: validar formato si viene (YYYY-MM-DD o YYYY-MM-DD HH:MM:SS)
         if (!empty($data['expires_at']) && !preg_match('/^\d{4}-\d{2}-\d{2}( \d{2}:\d{2}:\d{2})?$/', $data['expires_at'])) {
             $errors['expires_at'] = ['Formato inválido. Use YYYY-MM-DD o YYYY-MM-DD HH:MM:SS.'];
         }
+        
         return $errors;
     }
 

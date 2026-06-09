@@ -73,7 +73,18 @@
     var resp = await ApiClient.get('/admin/promotions?page=1&per_page=100');
 
     if (!resp.success) {
-      statusEl.innerHTML = '<div style="color:#DC2626">Error al cargar: ' + ApiClient._esc(resp.message || 'Error desconocido') + '</div>'
+      var errorMsg = resp.message || 'Error desconocido';
+      
+      // Mensajes específicos según el código HTTP
+      if (resp.httpCode === 401) {
+        errorMsg = 'Token de conexión con Amare expirado. Reconecta en <strong>Configuración > Conexión API Amare-App</strong>.';
+      } else if (resp.httpCode === 404) {
+        errorMsg = 'Restaurante no vinculado a Amare. Verifica la configuración en el panel de administración.';
+      } else if (resp.httpCode >= 500) {
+        errorMsg = 'Error de conexión con la app móvil. Intenta más tarde.';
+      }
+      
+      statusEl.innerHTML = '<div style="color:#DC2626">' + errorMsg + '</div>'
         + '<button onclick="adminRecargarPromociones()" style="margin-top:12px;background:var(--cp);color:#fff;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;font-weight:500">Reintentar</button>';
       return;
     }
@@ -113,6 +124,18 @@
     var badgeBg    = estadoInfo.bg;
     var badgeText  = estadoInfo.label;
 
+    // Botones de acción: Editar y Eliminar siempre; Desactivar solo si activa y no expirada
+    var btnDesactivar = '';
+    var activo = parseInt(p.activo) === 1;
+    if (activo && p.expires_at) {
+      var expiraDate = new Date(p.expires_at.replace(' ', 'T'));
+      if (expiraDate >= new Date()) {
+        btnDesactivar = '<button onclick="desactivarPromocion(' + p.id + ',\'' + titulo.replace(/'/g, "\\'") + '\')" ' +
+                        'style="background:none;border:none;color:#D97706;font-size:.82rem;font-weight:500;cursor:pointer;padding:0;margin-right:12px">' +
+                        'Desactivar</button>';
+      }
+    }
+
     return '<tr style="border-bottom:1px solid #F3F4F6">'
       + '<td style="padding:12px 16px">'
       +   '<div style="font-weight:600;color:#111827">' + titulo + '</div>'
@@ -125,6 +148,7 @@
       +   '<span style="display:inline-block;padding:4px 10px;border-radius:99px;font-size:.75rem;font-weight:600;background:' + badgeBg + ';color:' + badgeColor + '">' + badgeText + '</span>'
       + '</td>'
       + '<td style="padding:12px 16px;text-align:right;white-space:nowrap">'
+      +   btnDesactivar
       +   '<a href="<?= BASE_URL ?>rest-promocion/editar/' + p.id + '" style="font-size:.82rem;color:var(--cp);font-weight:500;text-decoration:none;margin-right:12px">Editar</a>'
       +   '<button onclick="eliminarPromocion(' + p.id + ',\'' + titulo.replace(/'/g, "\\'") + '\')" style="background:none;border:none;color:#EF4444;font-size:.82rem;font-weight:500;cursor:pointer;padding:0">Eliminar</button>'
       + '</td>'
@@ -133,26 +157,40 @@
 
   /**
    * Determina el estado visual de una promoción
+   * Estados: Activa, Expirada, Inactiva, Programada
    */
   function getEstadoInfo(p) {
     var activo = parseInt(p.activo) === 1;
-    if (!activo) return { color: '#EF4444', bg: '#FEF2F2', label: 'Inactiva' };
+    
+    // Inactiva: si está desactivada explícitamente
+    if (!activo) {
+      return { color: '#EF4444', bg: '#FEF2F2', label: 'Inactiva' };
+    }
 
+    // Si tiene fecha de expiración
     if (p.expires_at) {
-      var expiraDate = new Date(p.expires_at.replace(' ', 'T'));
-      var ahora = new Date();
-      if (expiraDate < ahora) {
-        return { color: '#9CA3AF', bg: '#F3F4F6', label: 'Expirada' };
-      }
-      // Si se creó en el futuro (programada)
-      if (p.created_at) {
-        var creada = new Date(p.created_at.replace(' ', 'T'));
-        if (creada > ahora) {
-          return { color: '#D97706', bg: '#FFFBEB', label: 'Programada' };
+      try {
+        var expiraDate = new Date(p.expires_at.replace(' ', 'T'));
+        var ahora = new Date();
+        
+        // Expirada: si la fecha de expiración ya pasó
+        if (expiraDate < ahora) {
+          return { color: '#9CA3AF', bg: '#F3F4F6', label: 'Expirada' };
         }
+        
+        // Programada: si se creó en el futuro
+        if (p.created_at) {
+          var creada = new Date(p.created_at.replace(' ', 'T'));
+          if (creada > ahora) {
+            return { color: '#D97706', bg: '#FFFBEB', label: 'Programada' };
+          }
+        }
+      } catch (e) {
+        // Si hay error al parsear fechas, asumir activa
       }
     }
 
+    // Activa: en todos los otros casos
     return { color: '#059669', bg: '#ECFDF5', label: 'Activa' };
   }
 
@@ -185,6 +223,28 @@
       cargarPromociones();
     } else {
       ApiClient.flash('error', 'Error al eliminar: ' + (resp.message || 'Error desconocido'));
+    }
+  };
+
+  /**
+   * Desactivar promoción vía API (PUT /admin/promotions/{id}/deactivate)
+   */
+  window.desactivarPromocion = async function(id, titulo) {
+    if (!confirm('¿Desactivar la promoción "' + titulo + '"?\nSeguirá existiendo pero no se mostrará en la app.')) return;
+
+    var resp = await ApiClient.put('/admin/promotions/' + id + '/deactivate', {});
+
+    if (resp.success) {
+      ApiClient.flash('success', 'Promoción desactivada correctamente.');
+      cargarPromociones();
+    } else {
+      var errorMsg = resp.message || 'Error desconocido';
+      if (resp.httpCode === 404) {
+        errorMsg = 'Promoción no encontrada.';
+      } else if (resp.httpCode === 401) {
+        errorMsg = 'Token de Amare expirado. Reconecta en Configuración.';
+      }
+      ApiClient.flash('error', 'Error al desactivar: ' + errorMsg);
     }
   };
 
