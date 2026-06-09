@@ -1203,7 +1203,8 @@ class ApiController extends BaseController
             $usuario = $_SESSION['usuario'];
             
             // Solo admin puede generar JWT para APIs
-            if ($usuario['rol'] !== 'admin') {
+            $rolValido = ($usuario['rol'] === 'admin' || ($usuario['rol_slug'] ?? '') === 'admin_restaurante');
+            if (!$rolValido) {
                 $this->adminApiError('Acceso denegado. Se requiere rol de administrador.', 403);
             }
 
@@ -1233,7 +1234,8 @@ class ApiController extends BaseController
         if (!$usuario || !password_verify($password, $usuario['password'] ?? '')) {
             $this->adminApiError('Credenciales incorrectas', 401);
         }
-        if ($usuario['rol'] !== 'admin') {
+        $rolValido = ($usuario['rol'] === 'admin' || ($usuario['rol_slug'] ?? '') === 'admin_restaurante');
+        if (!$rolValido) {
             $this->adminApiError('Acceso denegado. Se requiere rol de administrador.', 403);
         }
         $token = $this->generateJWT($usuario);
@@ -1373,13 +1375,13 @@ class ApiController extends BaseController
         return $payload;
     }
 
-    private function generateJWT(array $user): string
+    public function generateJWT(array $user): string
     {
         $header  = self::b64e(json_encode(['alg' => 'HS256', 'typ' => 'JWT']));
         $now     = time();
         $payload = self::b64e(json_encode([
             'sub' => (int)$user['id'], 'nombre' => $user['nombre'], 'email' => $user['email'],
-            'rol' => $user['rol'], 'empresa_id' => (int)($user['empresa_id'] ?? 0),
+            'rol' => $user['rol'] ?? $user['rol_slug'] ?? 'unknown', 'empresa_id' => (int)($user['empresa_id'] ?? 0),
             'iat' => $now, 'exp' => $now + 86400,
         ]));
         $sig = self::b64e(hash_hmac('sha256', "$header.$payload", $this->jwtSecret, true));
