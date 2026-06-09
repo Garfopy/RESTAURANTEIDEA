@@ -1301,6 +1301,23 @@ class ApiController extends BaseController
 
     private function requireAdminJWT(bool $requireAdmin = true): array
     {
+        // 1) Si hay sesión PHP activa, usarla directamente (el usuario ya se autenticó via web)
+        if (!empty($_SESSION['usuario'])) {
+            $user = $_SESSION['usuario'];
+            $rol = $user['rol'] ?? $user['rol_slug'] ?? '';
+            if ($requireAdmin && !in_array($rol, ['admin', 'admin_restaurante', 'comprador', 'admin_local', 'superadmin'], true)) {
+                $this->adminApiError('Acceso denegado. Se requiere rol de administrador.', 403);
+            }
+            return [
+                'sub'        => (int)($user['id'] ?? 0),
+                'nombre'     => $user['nombre'] ?? '',
+                'email'      => $user['email'] ?? '',
+                'rol'        => $rol,
+                'empresa_id' => (int)($user['empresa_id'] ?? 0),
+            ];
+        }
+
+        // 2) Fallback: validar JWT Bearer token
         $header = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
         if (!preg_match('/^Bearer\s+(\S+)$/i', trim($header), $m)) {
             $this->adminApiError('Token de autenticación requerido', 401);
@@ -1345,25 +1362,40 @@ class ApiController extends BaseController
 
     private function adminListUsers(array $jwtUser): void
     {
+        $empresaId = (int)$jwtUser['empresa_id'];
+        $branchId  = $this->getAmareBranchId($empresaId);
+
+        if (!$branchId) {
+            $this->adminApiError('No se encontró la sucursal vinculada para tu empresa en la API Amare.', 404);
+        }
+
         $search  = trim($this->get('search', ''));
         $page    = max(1, (int)$this->get('page', 1));
         $perPage = min(100, max(1, (int)$this->get('per_page', 50)));
-        $offset  = ($page - 1) * $perPage;
-        $db      = Database::getInstance();
-        $where   = ['activo = 1']; $params = [];
-        if ($search !== '') { $where[] = '(nombre LIKE ? OR email LIKE ?)'; $t = '%' . $search . '%'; array_push($params, $t, $t); }
-        $wc   = implode(' AND ', $where);
-        $stmt = $db->prepare("SELECT COUNT(*) FROM usuarios WHERE $wc"); $stmt->execute($params);
-        $total = (int)$stmt->fetchColumn();
-        $stmt = $db->prepare("SELECT id, nombre, email, rol, activo, created_at FROM usuarios WHERE $wc ORDER BY nombre ASC LIMIT $perPage OFFSET $offset");
-        $stmt->execute($params);
-        $users = array_map(static fn($u) => [
-            'id' => (int)$u['id'], 'nombre' => $u['nombre'], 'email' => $u['email'],
-            'rol' => $u['rol'], 'activo' => (bool)$u['activo'], 'created_at' => $u['created_at'],
-        ], $stmt->fetchAll(PDO::FETCH_ASSOC));
+
+        // Proxy: llamar a la API Amare para obtener usuarios móviles de esa sucursal
+        $endpoint = "branches/{$branchId}/users?" . http_build_query([
+            'search'   => $search,
+            'page'     => $page,
+            'per_page' => $perPage,
+        ]);
+
+        $result = $this->callAmareApi('GET', $endpoint);
+
+        if (!$result['success']) {
+            error_log('[adminListUsers] Falló API Amare: ' . ($result['error'] ?? 'Desconocido'));
+            $this->adminApiError('No se pudieron obtener los usuarios de la app móvil: ' . ($result['error'] ?? 'Error de conexión'), 502);
+        }
+
+        $data = $result['data'];
+        // La API Amare responde { ok: true, data: { users: [...], pagination: {...} } }
+        // o puede responder { ok: true, users: [...], pagination: {...} }
+        $users      = $data['data']['users'] ?? $data['users'] ?? [];
+        $pagination = $data['data']['pagination'] ?? $data['pagination'] ?? [];
+
         $this->adminApiOk('Usuarios obtenidos correctamente', [
-            'users' => $users,
-            'pagination' => ['total' => $total, 'page' => $page, 'per_page' => $perPage, 'pages' => (int)ceil($total / $perPage)],
+            'users'      => $users,
+            'pagination' => $pagination,
         ]);
     }
 
@@ -1390,130 +1422,181 @@ class ApiController extends BaseController
 
     private function adminListPromotions(array $jwtUser): void
     {
+        $empresaId = (int)$jwtUser['empresa_id'];
+        $branchId  = $this->getAmareBranchId($empresaId);
+
+        if (!$branchId) {
+            $this->adminApiError('No se encontró la sucursal vinculada para tu empresa en la API Amare.', 404);
+        }
+
         $page      = max(1, (int)$this->get('page', 1));
         $perPage   = min(100, max(1, (int)$this->get('per_page', 20)));
         $usuarioId = $this->get('usuario_id') ? (int)$this->get('usuario_id') : null;
-        $offset    = ($page - 1) * $perPage;
-        $db        = Database::getInstance();
-        $where     = ['1=1']; $params = [];
-        if ($usuarioId) { $where[] = 'p.usuario_id = ?'; $params[] = $usuarioId; }
-        $wc   = implode(' AND ', $where);
-        $stmt = $db->prepare("SELECT COUNT(*) FROM rest_promociones p WHERE $wc"); $stmt->execute($params);
-        $total = (int)$stmt->fetchColumn();
-        $stmt = $db->prepare("SELECT p.*, u.nombre AS usuario_nombre, u.email AS usuario_email FROM rest_promociones p LEFT JOIN usuarios u ON u.id = p.usuario_id WHERE $wc ORDER BY p.created_at DESC LIMIT $perPage OFFSET $offset");
-        $stmt->execute($params);
-        $promotions = array_map(static fn($p) => [
-            'id' => (int)$p['id'], 'usuario_id' => (int)$p['usuario_id'],
-            'usuario_nombre' => $p['usuario_nombre'] ?? null, 'usuario_email' => $p['usuario_email'] ?? null,
-            'titulo' => $p['titulo'], 'descripcion' => $p['descripcion'],
-            'imagen' => $p['imagen'] ?? null, 'deep_link' => $p['deep_link'] ?? null,
-            'code' => $p['code'] ?? null, 'activo' => (int)$p['activo'],
-            'expires_at' => $p['expires_at'] ?? null, 'created_at' => $p['created_at'] ?? null,
-        ], $stmt->fetchAll(PDO::FETCH_ASSOC));
+
+        // Proxy: llamar a la API Amare para obtener promociones de esa sucursal
+        $queryParams = [
+            'page'     => $page,
+            'per_page' => $perPage,
+        ];
+        if ($usuarioId) {
+            $queryParams['usuario_id'] = $usuarioId;
+        }
+
+        $endpoint = "branches/{$branchId}/promotions?" . http_build_query($queryParams);
+
+        $result = $this->callAmareApi('GET', $endpoint);
+
+        if (!$result['success']) {
+            error_log('[adminListPromotions] Falló API Amare: ' . ($result['error'] ?? 'Desconocido'));
+            $this->adminApiError('No se pudieron obtener las promociones de la app móvil: ' . ($result['error'] ?? 'Error de conexión'), 502);
+        }
+
+        $data = $result['data'];
+        // La API Amare responde { ok: true, data: { promotions: [...], pagination: {...} } }
+        $promotions = $data['data']['promotions'] ?? $data['promotions'] ?? [];
+        $pagination = $data['data']['pagination'] ?? $data['pagination'] ?? [];
+
         $this->adminApiOk('Promociones obtenidas correctamente', [
             'promotions' => $promotions,
-            'pagination' => ['total' => $total, 'page' => $page, 'per_page' => $perPage, 'pages' => (int)ceil($total / $perPage)],
+            'pagination' => $pagination,
         ]);
     }
 
     private function adminGetPromotion(int $id, array $jwtUser): void
     {
-        $db   = Database::getInstance();
-        $stmt = $db->prepare("SELECT p.*, u.nombre AS usuario_nombre, u.email AS usuario_email FROM rest_promociones p LEFT JOIN usuarios u ON u.id = p.usuario_id WHERE p.id = ? LIMIT 1");
-        $stmt->execute([$id]); $p = $stmt->fetch(PDO::FETCH_ASSOC);
-        if (!$p) { $this->adminApiError('Promoción no encontrada', 404); }
-        $this->adminApiOk('Promoción obtenida correctamente', [
-            'id' => (int)$p['id'], 'usuario_id' => (int)$p['usuario_id'],
-            'usuario_nombre' => $p['usuario_nombre'] ?? null, 'usuario_email' => $p['usuario_email'] ?? null,
-            'titulo' => $p['titulo'], 'descripcion' => $p['descripcion'],
-            'imagen' => $p['imagen'] ?? null, 'deep_link' => $p['deep_link'] ?? null,
-            'code' => $p['code'] ?? null, 'activo' => (int)$p['activo'],
-            'expires_at' => $p['expires_at'] ?? null, 'created_at' => $p['created_at'] ?? null,
-        ]);
+        $empresaId = (int)$jwtUser['empresa_id'];
+        $branchId  = $this->getAmareBranchId($empresaId);
+
+        if (!$branchId) {
+            $this->adminApiError('No se encontró la sucursal vinculada para tu empresa en la API Amare.', 404);
+        }
+
+        $endpoint = "branches/{$branchId}/promotions/{$id}";
+        $result = $this->callAmareApi('GET', $endpoint);
+
+        if (!$result['success']) {
+            if ($result['httpCode'] === 404) {
+                $this->adminApiError('Promoción no encontrada', 404);
+            }
+            $this->adminApiError('No se pudo obtener la promoción de la app móvil: ' . ($result['error'] ?? 'Error de conexión'), 502);
+        }
+
+        $data = $result['data'];
+        $promotion = $data['data']['promotion'] ?? $data['promotion'] ?? $data;
+
+        $this->adminApiOk('Promoción obtenida correctamente', $promotion);
     }
 
     private function adminCreatePromotion(array $jwtUser): void
     {
+        $empresaId = (int)$jwtUser['empresa_id'];
+        $branchId  = $this->getAmareBranchId($empresaId);
+
+        if (!$branchId) {
+            $this->adminApiError('No se encontró la sucursal vinculada para tu empresa en la API Amare.', 404);
+        }
+
         $body   = json_decode(file_get_contents('php://input'), true) ?? [];
         $errors = $this->validatePromotionData($body, null);
         if (!empty($errors)) { $this->adminApiError('Error de validación', 422, $errors); }
-        $db = Database::getInstance();
-        try {
-            $stmt = $db->prepare("INSERT INTO rest_promociones (usuario_id, titulo, descripcion, code, activo, expires_at) VALUES (?, ?, ?, ?, ?, ?)");
-            $stmt->execute([
-                (int)$body['usuario_id'], trim($body['titulo']),
-                isset($body['descripcion']) ? trim($body['descripcion']) : null,
-                !empty($body['code']) ? trim($body['code']) : null,
-                isset($body['activo']) ? ((int)$body['activo'] ? 1 : 0) : 1,
-                !empty($body['expires_at']) ? $body['expires_at'] : null,
-            ]);
-            $id    = (int)$db->lastInsertId();
-            $stmt2 = $db->prepare("SELECT * FROM rest_promociones WHERE id = ?"); $stmt2->execute([$id]); $p = $stmt2->fetch(PDO::FETCH_ASSOC);
-            $this->adminApiOk('Promoción creada correctamente', [
-                'id' => (int)$p['id'], 'usuario_id' => (int)$p['usuario_id'],
-                'titulo' => $p['titulo'], 'descripcion' => $p['descripcion'],
-                'code' => $p['code'], 'activo' => (int)$p['activo'],
-                'expires_at' => $p['expires_at'] ?? null, 'created_at' => $p['created_at'] ?? null,
-            ]);
-        } catch (\Throwable $e) {
-            $msg = $e->getMessage();
-            if (str_contains($msg, 'Duplicate entry') && str_contains($msg, 'code')) {
+
+        $endpoint = "branches/{$branchId}/promotions";
+        $result = $this->callAmareApi('POST', $endpoint, $body);
+
+        if (!$result['success']) {
+            $data = $result['data'];
+            if ($result['httpCode'] === 422 && !empty($data['errors'])) {
+                $this->adminApiError($data['message'] ?? 'Error de validación', 422, $data['errors']);
+            }
+            if ($result['httpCode'] === 409 && str_contains($data['error'] ?? '', 'code')) {
                 $this->adminApiError('Error de validación', 422, ['code' => ['El código ya está en uso por otra promoción.']]);
             }
-            $this->adminApiError('Error al crear la promoción: ' . $msg, 500);
+            $this->adminApiError('No se pudo crear la promoción en la app móvil: ' . ($result['error'] ?? 'Error de conexión'), 502);
         }
+
+        $data = $result['data'];
+        $promotion = $data['data']['promotion'] ?? $data['promotion'] ?? $data;
+
+        $this->adminApiOk('Promoción creada correctamente', $promotion);
     }
 
     private function adminUpdatePromotion(int $id, array $jwtUser): void
     {
-        $body = json_decode(file_get_contents('php://input'), true) ?? [];
-        $db   = Database::getInstance();
-        $stmt = $db->prepare("SELECT * FROM rest_promociones WHERE id = ?"); $stmt->execute([$id]);
-        if (!$stmt->fetch()) { $this->adminApiError('Promoción no encontrada', 404); }
+        $empresaId = (int)$jwtUser['empresa_id'];
+        $branchId  = $this->getAmareBranchId($empresaId);
+
+        if (!$branchId) {
+            $this->adminApiError('No se encontró la sucursal vinculada para tu empresa en la API Amare.', 404);
+        }
+
+        $body   = json_decode(file_get_contents('php://input'), true) ?? [];
         $errors = $this->validatePromotionData($body, $id);
         if (!empty($errors)) { $this->adminApiError('Error de validación', 422, $errors); }
-        try {
-            $sets = []; $params = [];
-            if (isset($body['usuario_id']))          { $sets[]='usuario_id=?'; $params[]=(int)$body['usuario_id']; }
-            if (isset($body['titulo']))              { $sets[]='titulo=?'; $params[]=trim($body['titulo']); }
-            if (array_key_exists('descripcion', $body)) { $sets[]='descripcion=?'; $params[]=isset($body['descripcion'])?trim($body['descripcion']):null; }
-            if (array_key_exists('code', $body))        { $sets[]='code=?'; $params[]=!empty($body['code'])?trim($body['code']):null; }
-            if (isset($body['activo']))              { $sets[]='activo=?'; $params[]=$body['activo']?1:0; }
-            if (array_key_exists('expires_at', $body))  { $sets[]='expires_at=?'; $params[]=!empty($body['expires_at'])?$body['expires_at']:null; }
-            if (!empty($sets)) { $params[]=$id; $db->prepare("UPDATE rest_promociones SET ".implode(', ',$sets)." WHERE id = ?")->execute($params); }
-            $stmt2 = $db->prepare("SELECT p.*, u.nombre AS usuario_nombre, u.email AS usuario_email FROM rest_promociones p LEFT JOIN usuarios u ON u.id = p.usuario_id WHERE p.id = ?");
-            $stmt2->execute([$id]); $p = $stmt2->fetch(PDO::FETCH_ASSOC);
-            $this->adminApiOk('Promoción actualizada correctamente', [
-                'id' => (int)$p['id'], 'usuario_id' => (int)$p['usuario_id'],
-                'usuario_nombre' => $p['usuario_nombre'] ?? null, 'usuario_email' => $p['usuario_email'] ?? null,
-                'titulo' => $p['titulo'], 'descripcion' => $p['descripcion'],
-                'code' => $p['code'], 'activo' => (int)$p['activo'],
-                'expires_at' => $p['expires_at'] ?? null, 'created_at' => $p['created_at'] ?? null,
-            ]);
-        } catch (\Throwable $e) {
-            $msg = $e->getMessage();
-            if (str_contains($msg, 'Duplicate entry') && str_contains($msg, 'code')) {
+
+        $endpoint = "branches/{$branchId}/promotions/{$id}";
+        $result = $this->callAmareApi('PUT', $endpoint, $body);
+
+        if (!$result['success']) {
+            if ($result['httpCode'] === 404) {
+                $this->adminApiError('Promoción no encontrada', 404);
+            }
+            $data = $result['data'];
+            if ($result['httpCode'] === 422 && !empty($data['errors'])) {
+                $this->adminApiError($data['message'] ?? 'Error de validación', 422, $data['errors']);
+            }
+            if ($result['httpCode'] === 409 && str_contains($data['error'] ?? '', 'code')) {
                 $this->adminApiError('Error de validación', 422, ['code' => ['El código ya está en uso por otra promoción.']]);
             }
-            $this->adminApiError('Error al actualizar la promoción: ' . $msg, 500);
+            $this->adminApiError('No se pudo actualizar la promoción en la app móvil: ' . ($result['error'] ?? 'Error de conexión'), 502);
         }
+
+        $data = $result['data'];
+        $promotion = $data['data']['promotion'] ?? $data['promotion'] ?? $data;
+
+        $this->adminApiOk('Promoción actualizada correctamente', $promotion);
     }
 
     private function adminDeletePromotion(int $id, array $jwtUser): void
     {
-        $db   = Database::getInstance();
-        $stmt = $db->prepare("SELECT id FROM rest_promociones WHERE id = ?"); $stmt->execute([$id]);
-        if (!$stmt->fetch()) { $this->adminApiError('Promoción no encontrada', 404); }
-        $db->prepare("DELETE FROM rest_promociones WHERE id = ?")->execute([$id]);
+        $empresaId = (int)$jwtUser['empresa_id'];
+        $branchId  = $this->getAmareBranchId($empresaId);
+
+        if (!$branchId) {
+            $this->adminApiError('No se encontró la sucursal vinculada para tu empresa en la API Amare.', 404);
+        }
+
+        $endpoint = "branches/{$branchId}/promotions/{$id}";
+        $result = $this->callAmareApi('DELETE', $endpoint);
+
+        if (!$result['success']) {
+            if ($result['httpCode'] === 404) {
+                $this->adminApiError('Promoción no encontrada', 404);
+            }
+            $this->adminApiError('No se pudo eliminar la promoción en la app móvil: ' . ($result['error'] ?? 'Error de conexión'), 502);
+        }
+
         $this->adminApiOk('Promoción eliminada correctamente');
     }
 
     private function adminDeactivatePromotion(int $id, array $jwtUser): void
     {
-        $db   = Database::getInstance();
-        $stmt = $db->prepare("SELECT id FROM rest_promociones WHERE id = ?"); $stmt->execute([$id]);
-        if (!$stmt->fetch()) { $this->adminApiError('Promoción no encontrada', 404); }
-        $db->prepare("UPDATE rest_promociones SET activo = 0 WHERE id = ?")->execute([$id]);
+        $empresaId = (int)$jwtUser['empresa_id'];
+        $branchId  = $this->getAmareBranchId($empresaId);
+
+        if (!$branchId) {
+            $this->adminApiError('No se encontró la sucursal vinculada para tu empresa en la API Amare.', 404);
+        }
+
+        $endpoint = "branches/{$branchId}/promotions/{$id}/deactivate";
+        $result = $this->callAmareApi('PUT', $endpoint);
+
+        if (!$result['success']) {
+            if ($result['httpCode'] === 404) {
+                $this->adminApiError('Promoción no encontrada', 404);
+            }
+            $this->adminApiError('No se pudo desactivar la promoción en la app móvil: ' . ($result['error'] ?? 'Error de conexión'), 502);
+        }
+
         $this->adminApiOk('Promoción desactivada correctamente');
     }
 
@@ -1526,15 +1609,134 @@ class ApiController extends BaseController
         elseif (isset($data['titulo']) && empty(trim($data['titulo']))) { $errors['titulo'] = ['El título no puede estar vacío.']; }
         elseif (isset($data['titulo']) && strlen(trim($data['titulo'])) > 255) { $errors['titulo'] = ['El título no puede exceder los 255 caracteres.']; }
         if (!empty($data['code'])) {
-            $db     = Database::getInstance();
-            $sql    = "SELECT COUNT(*) FROM rest_promociones WHERE code = ?"; $params = [trim($data['code'])];
-            if ($excludeId !== null) { $sql .= " AND id != ?"; $params[] = $excludeId; }
-            $stmt = $db->prepare($sql); $stmt->execute($params);
-            if ((int)$stmt->fetchColumn() > 0) { $errors['code'] = ['El código ya está en uso por otra promoción.']; }
+            // Validación delegada a la API Amare (BD remota).
+            // Solo validamos formato local básico; la unicidad la valida Amare.
         }
         if (!empty($data['expires_at']) && !preg_match('/^\d{4}-\d{2}-\d{2}( \d{2}:\d{2}:\d{2})?$/', $data['expires_at'])) {
             $errors['expires_at'] = ['Formato inválido. Use YYYY-MM-DD o YYYY-MM-DD HH:MM:SS.'];
         }
         return $errors;
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // Helpers para API Amare (App Móvil) — Proxy HTTP
+    // ══════════════════════════════════════════════════════════════════
+
+    /**
+     * Obtiene la configuración de conexión con la API Amare.
+     * @return array{url: string, token: string}|null null si no está configurada
+     */
+    private function getAmareConfig(): ?array
+    {
+        $db = Database::getInstance();
+        $stmt = $db->prepare(
+            "SELECT clave, valor FROM global_settings WHERE clave IN ('amare_api_url','amare_api_token') AND grupo = 'pagos'"
+        );
+        $stmt->execute();
+        $settings = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $settings[$row['clave']] = $row['valor'] ?? '';
+        }
+
+        $url   = rtrim($settings['amare_api_url'] ?? '', '/');
+        $token = $settings['amare_api_token'] ?? '';
+
+        if (empty($url) || empty($token)) {
+            return null;
+        }
+
+        return ['url' => $url, 'token' => $token];
+    }
+
+    /**
+     * Obtiene el branch_id (sucursal) de Amare correspondiente al restaurante.
+     */
+    private function getAmareBranchId(int $empresaId): ?int
+    {
+        $db = Database::getInstance();
+
+        // Intentar columna sucursal_id primero, luego sucursal_carnihub_id
+        try {
+            $stmt = $db->prepare("SHOW COLUMNS FROM `rest_restaurantes` LIKE 'sucursal_id'");
+            $stmt->execute();
+            $col = 'sucursal_id';
+            if (!$stmt->fetch()) {
+                $stmt2 = $db->prepare("SHOW COLUMNS FROM `rest_restaurantes` LIKE 'sucursal_carnihub_id'");
+                $stmt2->execute();
+                if ($stmt2->fetch()) {
+                    $col = 'sucursal_carnihub_id';
+                } else {
+                    return null;
+                }
+            }
+        } catch (\Throwable $e) {
+            return null;
+        }
+
+        $stmt = $db->prepare("SELECT {$col} FROM rest_restaurantes WHERE empresa_id = ? AND activo = 1 LIMIT 1");
+        $stmt->execute([$empresaId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return $row ? (int)($row[$col] ?? 0) : null;
+    }
+
+    /**
+     * Realiza una llamada HTTP a la API Amare.
+     * @return array{success: bool, httpCode: int, data: array|null, error: string|null}
+     */
+    private function callAmareApi(string $method, string $endpoint, ?array $body = null): array
+    {
+        $config = $this->getAmareConfig();
+        if (!$config) {
+            return ['success' => false, 'httpCode' => 0, 'data' => null, 'error' => 'API Amare no configurada. Configura amare_api_url y amare_api_token en Configuración.'];
+        }
+
+        $url = $config['url'] . '/' . ltrim($endpoint, '/');
+
+        $ch = curl_init($url);
+        $headers = [
+            'Content-Type: application/json',
+            'Authorization: Bearer ' . $config['token'],
+            'Accept: application/json',
+        ];
+
+        $opts = [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 15,
+            CURLOPT_CONNECTTIMEOUT => 5,
+            CURLOPT_HTTPHEADER     => $headers,
+        ];
+
+        if ($method === 'POST' || $method === 'PUT') {
+            $opts[CURLOPT_CUSTOMREQUEST] = $method;
+            if ($body !== null) {
+                $opts[CURLOPT_POSTFIELDS] = json_encode($body);
+            }
+        } elseif ($method === 'DELETE') {
+            $opts[CURLOPT_CUSTOMREQUEST] = 'DELETE';
+        }
+
+        curl_setopt_array($ch, $opts);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error    = curl_error($ch);
+        curl_close($ch);
+
+        if ($error) {
+            error_log('[callAmareApi] cURL error: ' . $error . ' | URL: ' . $url);
+            return ['success' => false, 'httpCode' => 0, 'data' => null, 'error' => 'Error de conexión con la API Amare: ' . $error];
+        }
+
+        $decoded = json_decode($response, true);
+        if (!is_array($decoded)) {
+            return ['success' => false, 'httpCode' => $httpCode, 'data' => null, 'error' => 'Respuesta inválida de la API Amare (HTTP ' . $httpCode . ')'];
+        }
+
+        if ($httpCode >= 200 && $httpCode < 300) {
+            return ['success' => true, 'httpCode' => $httpCode, 'data' => $decoded, 'error' => null];
+        }
+
+        return ['success' => false, 'httpCode' => $httpCode, 'data' => $decoded, 'error' => $decoded['error'] ?? $decoded['message'] ?? 'Error HTTP ' . $httpCode];
     }
 }
