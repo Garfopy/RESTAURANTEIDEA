@@ -22,10 +22,11 @@ class RestPromocionModel extends BaseModel
     /**
      * Obtiene una promoción por ID, restringida al restaurante.
      */
-    public function find(int $id, int $restauranteId): ?array
+    public function findByRestaurant(int $id, int $restauranteId): ?array
     {
         return $this->queryOne(
-            "SELECT * FROM rest_promociones WHERE id = ? AND restaurante_id = ?",
+            "SELECT * FROM rest_promociones
+            WHERE id = ? AND restaurante_id = ?",
             [$id, $restauranteId]
         );
     }

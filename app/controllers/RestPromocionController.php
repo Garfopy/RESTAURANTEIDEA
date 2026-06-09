@@ -42,7 +42,7 @@ class RestPromocionController extends BaseController
 
         if ($id !== null && is_numeric($id)) {
             $editando  = true;
-            $promocion = $this->model->find((int)$id, $restauranteId);
+            $promocion = $this->model->findByRestaurant((int)$id, $restauranteId);
             if (!$promocion) {
                 $this->flash('error', 'Promocion no encontrada.');
                 $this->redirect('rest-promocion/index');
