@@ -1179,7 +1179,14 @@ class ApiController extends BaseController
     public function auth(?string $subAction = null): void
     {
         header('Content-Type: application/json; charset=utf-8');
-        header('Access-Control-Allow-Origin: *');
+        
+        // CORS: Permitir credenciales con origen específico
+        $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+        if ($origin) {
+            header('Access-Control-Allow-Origin: ' . $origin);
+            header('Access-Control-Allow-Credentials: true');
+        }
+        
         if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
             header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
             header('Access-Control-Allow-Headers: Authorization, Content-Type');

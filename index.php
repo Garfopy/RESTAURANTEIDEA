@@ -206,6 +206,14 @@ $publicPaths = [
 
 $currentPath = strtolower($ctrlSlug . '/' . $action);
 
+// DEBUG: Log para /api/auth/token
+if (strpos($_SERVER['REQUEST_URI'] ?? '', 'api/auth/token') !== false) {
+    error_log('[DEBUG] /api/auth/token request detected');
+    error_log('[DEBUG] ctrlSlug=' . $ctrlSlug . ', action=' . $action . ', param=' . ($param ?? 'NULL'));
+    error_log('[DEBUG] currentPath=' . $currentPath);
+    error_log('[DEBUG] in_array check: ' . (in_array($currentPath, $publicPaths, true) ? 'TRUE' : 'FALSE'));
+}
+
 if (!isset($_SESSION['usuario']) && !in_array($currentPath, $publicPaths, true) && $ctrlSlug !== 'menu' && $ctrlSlug !== 'acceso') {
     header('Location: ' . BASE_URL . 'auth/login');
     exit;
