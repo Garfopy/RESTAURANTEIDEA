@@ -550,7 +550,9 @@
 
       <script>
       async function registrarEnAmare() {
-        const url     = document.getElementById('amareApiUrl').value.trim();
+        const urlRaw  = document.getElementById('amareApiUrl').value.trim();
+        // Sanitizar URL: quitar slash final para evitar doble slash
+        const url     = urlRaw.replace(/\/+$/, '');
         const email   = document.getElementById('amareEmail').value.trim();
         const pass    = document.getElementById('amarePassword').value;
         const nombre  = document.getElementById('amareNombre').value.trim();
@@ -560,18 +562,25 @@
 
         msg.style.display = 'none';
 
-        if (!url)   { mostrarMsg('error', 'Primero ingresa la URL de la API'); return; }
+        if (!url)   { mostrarMsg('error', 'Primero ingresa la URL de la API (ej: https://idactivos.digital/api_restaurante)'); return; }
         if (!email) { mostrarMsg('error', 'Ingresa un email'); return; }
+        const nameVal = nombre || 'Admin';
+        if (nameVal.length < 3) { mostrarMsg('error', 'El nombre debe tener al menos 3 caracteres'); return; }
         if (pass.length < 6) { mostrarMsg('error', 'La contraseña debe tener al menos 6 caracteres'); return; }
+
+        // Guardar URL sanitizada en el input
+        document.getElementById('amareApiUrl').value = url;
 
         btn.disabled = true; spinner.style.display = 'inline';
 
         try {
-          // 1. Intentar registrar
-          let res = await fetch(url + '/auth/register', {
+          // 1. Intentar registrar (Amare-App espera "name", no "nombre")
+          const registerUrl = url + '/auth/register';
+          console.log('[Amare] Registrando en:', registerUrl);
+          let res = await fetch(registerUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ nombre: nombre || 'Admin', email, password: pass })
+            body: JSON.stringify({ name: nameVal, email, password: pass })
           });
           let data = await res.json();
 
