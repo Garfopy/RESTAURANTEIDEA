@@ -172,7 +172,7 @@ class RestConfigController extends BaseController
                             'notif_email_pago','notif_email_pago_destino',
                             'tipos_entrega_habilitados','metodos_pago_app_habilitados',
                             'costo_envio_app','pedido_minimo_app',
-                            'amare_api_url','amare_api_token'];
+                            'amare_api_url','amare_api_token','amare_token_expirado','amare_email'];
             foreach ($clavesPagos as $clave) {
                 $s2 = $db->prepare("SELECT valor FROM global_settings WHERE clave = :c LIMIT 1");
                 $s2->execute([':c' => $clave]);
@@ -385,18 +385,31 @@ class RestConfigController extends BaseController
                 $upsertUrl->execute([':v' => $amareUrl, ':v2' => $amareUrl]);
             }
 
-            if ($amareToken !== '') {
-                // No sobreescribir el token si se dejó enmascarado
+            if ($amareToken !== '' && !str_starts_with($amareToken, '•') && $amareToken !== '••••••••••••') {
+                // No sobreescribir el token si se dejó enmascarado (bullets)
                 $upsertToken = $db->prepare(
                     "INSERT INTO global_settings (clave, valor, grupo) VALUES ('amare_api_token', :v, 'pagos')
                      ON DUPLICATE KEY UPDATE valor = :v2"
                 );
                 $upsertToken->execute([':v' => $amareToken, ':v2' => $amareToken]);
+
+                // Limpiar flag de expiración al guardar token nuevo
+                $clearExp = $db->prepare(
+                    "DELETE FROM global_settings WHERE clave = 'amare_token_expirado' AND grupo = 'pagos'"
+                );
+                $clearExp->execute();
             }
 
             // ── Sincronizar con API Amare-App ──
-            if ($amareUrl !== '' && $amareToken !== '') {
-                $this->syncConAmareApp($restauranteId, $amareUrl, $amareToken, $tiposEntregaPost, $metodosAppPost, $costoEnvio, $pedidoMinimo);
+            // Obtener token real de BD (no el valor enmascarado del form)
+            $tokenReal = $amareToken;
+            if ($amareToken === '' || str_starts_with($amareToken, '•') || $amareToken === '••••••••••••') {
+                $stmtTok = $db->prepare("SELECT valor FROM global_settings WHERE clave = 'amare_api_token' AND grupo = 'pagos' LIMIT 1");
+                $stmtTok->execute();
+                $tokenReal = $stmtTok->fetchColumn() ?: '';
+            }
+            if ($amareUrl !== '' && $tokenReal !== '') {
+                $this->syncConAmareApp($restauranteId, $amareUrl, $tokenReal, $tiposEntregaPost, $metodosAppPost, $costoEnvio, $pedidoMinimo);
             }
         } catch (\Exception $e) {
             // No bloquear si falla la sincronización con Amare
@@ -566,8 +579,33 @@ class RestConfigController extends BaseController
 
         if ($httpCode < 200 || $httpCode >= 300) {
             error_log('[syncConAmareApp] HTTP ' . $httpCode . ' — ' . $response);
-            $this->flash('error', 'Configuración guardada localmente, pero la app móvil respondió con error HTTP ' . $httpCode . '.');
+
+            // Si es 401, el token expiró o es inválido — marcar en BD
+            if ($httpCode === 401) {
+                try {
+                    $db = \Database::getInstance();
+                    $db->prepare(
+                        "INSERT INTO global_settings (clave, valor, grupo) VALUES ('amare_token_expirado', '1', 'pagos')
+                         ON DUPLICATE KEY UPDATE valor = '1'"
+                    )->execute();
+                } catch (\Throwable $e) {
+                    error_log('[syncConAmareApp] No se pudo marcar token como expirado: ' . $e->getMessage());
+                }
+                $this->flash('error', 'El token de conexión con la app móvil ha expirado. Vuelve a conectar en la sección "Conexión con API Amare-App".');
+            } else {
+                $this->flash('error', 'Configuración guardada localmente, pero la app móvil respondió con error HTTP ' . $httpCode . '.');
+            }
             return;
+        }
+
+        // Sincronización exitosa — limpiar flag de expiración si existía
+        try {
+            $db = \Database::getInstance();
+            $db->prepare(
+                "DELETE FROM global_settings WHERE clave = 'amare_token_expirado' AND grupo = 'pagos'"
+            )->execute();
+        } catch (\Throwable $e) {
+            // no crítico
         }
 
         $this->flash('success', 'Configuración guardada y sincronizada con la app móvil.');

@@ -484,10 +484,15 @@
           </div>
         </div>
 
-        <?php $yaConectado = !empty($cfgPagos['amare_api_token'] ?? '') && !empty($cfgPagos['amare_api_url'] ?? ''); ?>
+        <?php
+          $yaConectado = !empty($cfgPagos['amare_api_token'] ?? '') && !empty($cfgPagos['amare_api_url'] ?? '');
+          $tokenExpirado = ($cfgPagos['amare_token_expirado'] ?? '') === '1';
+          $amareEmailGuardado = htmlspecialchars($cfgPagos['amare_email'] ?? '', ENT_QUOTES);
+        ?>
         <input type="hidden" name="amare_api_token" id="amareApiToken" value="<?= $yaConectado ? '••••••••••••' : '' ?>">
+        <input type="hidden" name="amare_email" id="amareEmailHidden" value="<?= $amareEmailGuardado ?>">
 
-        <?php if ($yaConectado): ?>
+        <?php if ($yaConectado && !$tokenExpirado): ?>
         <!-- Estado: Conectado -->
         <div id="amareStatusConnected" style="background:#F0FDF4;border:1.5px solid #BBF7D0;border-radius:10px;padding:12px 14px;margin-bottom:14px">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
@@ -504,26 +509,45 @@
         </div>
         <?php endif; ?>
 
+        <?php if ($tokenExpirado): ?>
+        <!-- Estado: Token expirado -->
+        <div id="amareStatusExpired" style="background:#FFFBEB;border:1.5px solid #FDE68A;border-radius:10px;padding:12px 14px;margin-bottom:14px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <span style="font-size:1.1rem">⚠️</span>
+            <span style="font-weight:700;color:#92400E;font-size:.88rem">La conexión con la app móvil ha expirado</span>
+          </div>
+          <div style="font-size:.76rem;color:#92400E;margin-bottom:8px">
+            El token de acceso venció. Ingresa tu email y contraseña para renovar la conexión.
+          </div>
+          <button type="button" onclick="desconectarAmare()"
+                  style="font-size:.76rem;color:#DC2626;background:#FEF2F2;border:1px solid #FECACA;border-radius:6px;padding:4px 12px;cursor:pointer">
+            Desconectar
+          </button>
+        </div>
+        <?php endif; ?>
+
         <!-- Formulario de registro/login -->
-        <div id="amareRegisterForm" style="<?= $yaConectado ? 'display:none' : '' ?>">
+        <?php $mostrarForm = !$yaConectado || $tokenExpirado; ?>
+        <div id="amareRegisterForm" style="<?= $mostrarForm ? '' : 'display:none' ?>">
           <div style="font-weight:600;color:#0C4A6E;font-size:.85rem;margin-bottom:10px">
-            <?= $yaConectado ? '' : '📝 Crea tu cuenta en la App Móvil' ?>
+            <?= $tokenExpirado ? '🔄 Renovar conexión con la App Móvil' : '📝 Crea tu cuenta en la App Móvil' ?>
           </div>
           <div style="font-size:.76rem;color:#0369A1;margin-bottom:14px">
-            <?= $yaConectado ? '' : 'Ingresa un email y contraseña para crear tu cuenta automáticamente en la app móvil y conectar el panel.' ?>
+            <?= $tokenExpirado ? 'Tu sesión expiró. Ingresa tu contraseña para renovar el token de acceso.' : 'Ingresa un email y contraseña para crear tu cuenta automáticamente en la app móvil y conectar el panel.' ?>
           </div>
 
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
             <div class="form-group" style="margin-bottom:0">
               <label class="form-label" style="font-size:.75rem">Email</label>
               <input type="email" id="amareEmail" class="form-input"
+                     value="<?= $amareEmailGuardado ?>"
                      placeholder="admin@turestaurante.com"
                      style="font-size:.82rem">
             </div>
             <div class="form-group" style="margin-bottom:0">
               <label class="form-label" style="font-size:.75rem">Contraseña</label>
               <input type="password" id="amarePassword" class="form-input"
-                     placeholder="Mínimo 8 caracteres"
+                     placeholder="<?= $tokenExpirado ? 'Tu contraseña' : 'Mínimo 8 caracteres' ?>"
                      style="font-size:.82rem" autocomplete="new-password">
             </div>
           </div>
@@ -604,8 +628,13 @@
           const token = data.data?.token || data.token;
           if (!token) throw new Error('No se recibió el token');
 
-          // 3. Guardar token en el campo oculto
+          // 3. Guardar token y email en campos ocultos
           document.getElementById('amareApiToken').value = token;
+          document.getElementById('amareEmailHidden').value = email;
+
+          // Ocultar aviso de expiración si está visible
+          const expiredDiv = document.getElementById('amareStatusExpired');
+          if (expiredDiv) expiredDiv.style.display = 'none';
 
           // 4. Mostrar estado conectado
           document.getElementById('amareRegisterForm').style.display = 'none';
@@ -641,6 +670,8 @@
         document.getElementById('amareRegisterForm').style.display = '';
         const status = document.getElementById('amareStatusConnected');
         if (status) status.style.display = 'none';
+        const expired = document.getElementById('amareStatusExpired');
+        if (expired) expired.style.display = 'none';
         const msg = document.getElementById('amareMsg');
         msg.style.display = 'none';
       }
