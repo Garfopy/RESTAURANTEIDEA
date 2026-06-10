@@ -1173,7 +1173,7 @@ class ApiController extends BaseController
     // Respuesta estándar: { success: true|false, message: "...", data: {...} }
     // ══════════════════════════════════════════════════════════════════
 
-    private string $jwtSecret = 'CarniHub_JWT_S3cr3t_K3y_2024_Rest4ur4nt3';
+    private string $jwtSecret = 'amare_api_secret_key_2024_change_this_in_production_use_a_longer_random_string';
 
     /** POST /api/auth/login | GET /api/auth/token */
     public function auth(?string $subAction = null): void
@@ -1369,7 +1369,7 @@ class ApiController extends BaseController
         }
         $payload = $this->validateJWT($m[1]);
         if (!$payload) { $this->adminApiError('Token inválido o expirado', 401); }
-        if ($requireAdmin && ($payload['rol'] ?? '') !== 'admin') {
+        if ($requireAdmin && !in_array($payload['rol'] ?? '', ['admin', 'admin_restaurante'], true)) {
             $this->adminApiError('Acceso denegado. Se requiere rol de administrador.', 403);
         }
         return $payload;
@@ -1377,6 +1377,7 @@ class ApiController extends BaseController
 
     public function generateJWT(array $user): string
     {
+        error_log('WEB JWT SECRET=' . $this->jwtSecret);
         $header  = self::b64e(json_encode(['alg' => 'HS256', 'typ' => 'JWT']));
         $now     = time();
         $payload = self::b64e(json_encode([

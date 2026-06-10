@@ -49,6 +49,17 @@ $promoId     = (int)($promo['id'] ?? 0);
                required maxlength="255">
       </div>
 
+      <!-- Imagen -->
+      <div class="form-group">
+        <label class="form-label">Imagen</label>
+        <input type="file" name="imagen" class="form-input" id="inpImagen">
+        <?php if (!empty($promo['imagen'])): ?>
+        <div style="margin-top:8px">
+          <img src="<?= htmlspecialchars($promo['imagen']) ?>" alt="Imagen de la promoción" style="max-width:100px;max-height:100px;border-radius:8px">
+        </div>
+        <?php endif; ?>
+      </div>
+
       <!-- Descripción -->
       <div class="form-group">
         <label class="form-label">Descripción</label>
@@ -81,13 +92,15 @@ $promoId     = (int)($promo['id'] ?? 0);
       <!-- Usuario (auto-filled desde JWT) -->
       <div class="form-group">
         <label class="form-label">Usuario *</label>
-        <input type="hidden" name="usuario_id" id="inpUsuario" value="">
-        <div id="usuarioDisplay" style="padding:10px 12px;background:#F3F4F6;border:1px solid #E5E7EB;border-radius:6px;
-                                       font-size:.88rem;color:#374151;font-weight:500">
-          Cargando usuario...
-        </div>
+                <select id="inpUsuario"
+                name="usuario_id"
+                class="form-input"
+                required>
+            <option value="">Cargando usuarios...</option>
+        </select>
+
         <div style="font-size:.73rem;color:#9CA3AF;margin-top:2px">
-          La promoción será asignada automáticamente al usuario actual.
+          Selecciona el usuario que recibirá la promoción.
         </div>
       </div>
 
@@ -126,128 +139,209 @@ $promoId     = (int)($promo['id'] ?? 0);
   var isEdit = <?= $isEdit ? 'true' : 'false' ?>;
   var promoId = <?= $promoId ?>;
 
-  /**
-   * Inicializar usuario_id desde JWT y mostrar en UI
-   */
-  async function inicializarUsuario() {
-    // Obtener usuario_id del JWT (disponible en ApiClient.usuario_id o decodificado del token)
-    var usuarioId = ApiClient.usuario_id || ApiClient.getJwtUser()?.id;
-    
-    if (!usuarioId) {
-      document.getElementById('usuarioDisplay').innerHTML = 
-        '<div style="color:#DC2626">Error: No se pudo obtener tu usuario. Vuelve a iniciar sesión.</div>';
-      document.getElementById('inpUsuario').value = '';
-      return;
+  async function cargarUsuarios() {
+
+    var select = document.getElementById('inpUsuario');
+
+    try {
+
+      var resp = await ApiClient.get('/admin/users');
+
+      if (!resp.success) {
+        select.innerHTML = '<option value="">Error cargando usuarios</option>';
+        return;
+      }
+
+      var users = resp.data.users || [];
+
+      select.innerHTML =
+        '<option value="">Selecciona un usuario</option>';
+
+      users.forEach(function(user) {
+
+        var option = document.createElement('option');
+
+        option.value = user.id;
+        option.textContent = user.nombre + ' (' + user.email + ')';
+
+        select.appendChild(option);
+
+      });
+
+    } catch (e) {
+
+      select.innerHTML =
+        '<option value="">Error cargando usuarios</option>';
+
     }
-
-    // Guardar usuario_id en el input hidden
-    document.getElementById('inpUsuario').value = usuarioId;
-
-    // Obtener nombre de usuario desde la API o JWT
-    var jwtUser = ApiClient.getJwtUser && ApiClient.getJwtUser() ? ApiClient.getJwtUser() : null;
-    var displayName = jwtUser?.nombre || jwtUser?.name || 'Usuario actual';
-    var displayEmail = jwtUser?.email || '';
-
-    var displayText = esc(displayName);
-    if (displayEmail) {
-      displayText += ' <span style="color:#6B7280">(' + esc(displayEmail) + ')</span>';
-    }
-
-    document.getElementById('usuarioDisplay').innerHTML = displayText;
   }
 
-  /**
-   * Guardar promoción vía API
-   */
   window.guardarPromocion = async function(event) {
+
     event.preventDefault();
 
     var btn = document.getElementById('btnSubmit');
     var errorsContainer = document.getElementById('form-errors');
+
     btn.disabled = true;
     btn.textContent = 'Guardando...';
-    errorsContainer.style.display = 'none';
 
-    var usuarioId = parseInt(document.getElementById('inpUsuario').value) || 0;
-    
+    errorsContainer.style.display = 'none';
+    errorsContainer.innerHTML = '';
+
+    var usuarioId =
+      parseInt(document.getElementById('inpUsuario').value) || 0;
+
     if (!usuarioId) {
+
       btn.disabled = false;
-      btn.textContent = isEdit ? 'Guardar cambios' : 'Crear promoción';
-      errorsContainer.innerHTML = '<div class="api-error">Error: Usuario no configurado. Vuelve a cargar la página.</div>';
+      btn.textContent =
+        isEdit ? 'Guardar cambios' : 'Crear promoción';
+
+      errorsContainer.innerHTML =
+        '<div class="api-error">Selecciona un usuario.</div>';
+
       errorsContainer.style.display = 'block';
+
       return;
     }
 
-    var data = {
-      usuario_id: usuarioId,
-      titulo: document.getElementById('inpTitulo').value.trim(),
-      descripcion: document.getElementById('inpDescripcion').value.trim() || null,
-      code: document.getElementById('inpCode').value.trim() || null,
-      expires_at: document.getElementById('inpExpira').value.replace('T', ' ') || null,
-      activo: document.getElementById('inpActivo').checked ? 1 : 0,
-    };
+    var expiresAt = document.getElementById('inpExpira').value;
+
+    if (expiresAt) {
+
+      expiresAt = expiresAt.replace('T', ' ');
+
+      if (expiresAt.length === 16) {
+        expiresAt += ':00';
+      }
+
+    }
+
+    // FormData para soportar imágenes
+    var data = new FormData();
+
+    data.append(
+      'usuario_id',
+      usuarioId
+    );
+
+    data.append(
+      'titulo',
+      document.getElementById('inpTitulo').value.trim()
+    );
+
+    data.append(
+      'descripcion',
+      document.getElementById('inpDescripcion').value.trim()
+    );
+
+    data.append(
+      'code',
+      document.getElementById('inpCode').value.trim()
+    );
+
+    data.append(
+      'activo',
+      document.getElementById('inpActivo').checked ? 1 : 0
+    );
+
+    if (expiresAt) {
+      data.append('expires_at', expiresAt);
+    }
+
+    var imagen =
+      document.getElementById('inpImagen').files[0];
+
+    if (imagen) {
+      data.append('imagen', imagen);
+    }
 
     var resp;
+
     if (isEdit && promoId > 0) {
-      resp = await ApiClient.put('/admin/promotions/' + promoId, data);
+
+      resp = await ApiClient.put(
+        '/admin/promotions/' + promoId,
+        data
+      );
+
     } else {
-      resp = await ApiClient.post('/admin/promotions', data);
+
+      resp = await ApiClient.post(
+        '/admin/promotions',
+        data
+      );
+
     }
 
     if (resp.success) {
-      ApiClient.flash('success', resp.message || 'Promoción guardada correctamente.');
-      // Redirigir al listado
-      window.location.href = '<?= BASE_URL ?>rest-promocion/index';
-    } else {
-      btn.disabled = false;
-      btn.textContent = isEdit ? 'Guardar cambios' : 'Crear promoción';
 
-      var errorHtml = '';
+      ApiClient.flash(
+        'success',
+        resp.message || 'Promoción guardada correctamente.'
+      );
 
-      // Manejo de errores específicos de Amare-App
-      if (resp.httpCode === 401) {
-        errorHtml = '<div class="api-error" style="color:#DC2626"><strong>Conexión expirada:</strong> El token de la API Amare ha expirado. ' +
-                    'Vuelve a conectar en <strong>Configuración > Conexión API Amare-App</strong></div>';
-      } else if (resp.httpCode === 409) {
-        // Código duplicado
-        errorHtml = '<div class="api-error" style="color:#DC2626"><strong>Código duplicado:</strong> El código "' + esc(data.code) + 
-                    '" ya está en uso por otra promoción. Elige un código único.</div>';
-      } else if (resp.errors) {
-        // Errores de validación por campo
-        var errorsList = [];
-        for (var field in resp.errors) {
-          var msgs = resp.errors[field];
-          if (Array.isArray(msgs)) {
-            errorsList.push('<strong>' + esc(field) + ':</strong> ' + msgs.map(esc).join(', '));
-          }
-        }
-        errorHtml = errorsList.map(function(e) { 
-          return '<div class="api-error">' + e + '</div>'; 
-        }).join('');
-      } else {
-        // Error genérico
-        errorHtml = '<div class="api-error">' + esc(resp.message || 'Error desconocido al guardar la promoción') + '</div>';
+      window.location.href =
+        '<?= BASE_URL ?>restaurante/promociones/index';
+
+      return;
+    }
+
+    btn.disabled = false;
+
+    btn.textContent =
+      isEdit ? 'Guardar cambios' : 'Crear promoción';
+
+    var html = '';
+
+    if (resp.errors) {
+
+      for (var campo in resp.errors) {
+
+        var msgs = resp.errors[campo];
+
+        html +=
+          '<div class="api-error"><strong>' +
+          esc(campo) +
+          ':</strong> ' +
+          msgs.join(', ') +
+          '</div>';
+
       }
 
-      errorsContainer.innerHTML = errorHtml;
-      errorsContainer.style.display = 'block';
+    } else {
+
+      html =
+        '<div class="api-error">' +
+        esc(resp.message || 'Error al guardar') +
+        '</div>';
+
     }
+
+    errorsContainer.innerHTML = html;
+    errorsContainer.style.display = 'block';
   };
 
   function esc(str) {
-    if (typeof str !== 'string') return str;
+
+    if (typeof str !== 'string') {
+      return str;
+    }
+
     var div = document.createElement('div');
+
     div.appendChild(document.createTextNode(str));
+
     return div.innerHTML;
   }
 
-  // Inicializar usuario al cargar la página
-  inicializarUsuario();
+  cargarUsuarios();
 
-  // Obtener JWT automáticamente si ya estamos logueados (sesión PHP)
   if (!ApiClient.isLoggedIn()) {
     ApiClient.getTokenFromSession();
   }
+
 })();
 </script>
 
