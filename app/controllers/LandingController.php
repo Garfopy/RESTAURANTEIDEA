@@ -1,11 +1,18 @@
 <?php
-require_once ROOT_PATH . '/app/controllers/BaseController.php';
 
-class LandingController extends BaseController
+class LandingController
 {
     public function index(): void
     {
-        $pageTitle = 'AMARE | Restaurant Connecting Club';
-        $this->render('public/landing_amare', compact('pageTitle'));
+        $filePath = ROOT_PATH . '/app/views/public/landing_amare.html';
+        
+        if (!file_exists($filePath)) {
+            http_response_code(404);
+            echo "Landing page not found";
+            return;
+        }
+        
+        header('Content-Type: text/html; charset=utf-8');
+        readfile($filePath);
     }
 }
