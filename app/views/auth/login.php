@@ -161,30 +161,7 @@ if ($_isRest) { $_appName = 'Restaurante'; }
       margin-bottom: 18px;
       box-shadow: 0 2px 12px rgba(212,175,55,.4);
     }
-    .login-stats {
-      display: flex; gap: 10px;
-      margin-top: 28px;
-      width: 100%;
-    }
-    .login-stat {
-      flex: 1;
-      background: rgba(255,255,255,.03);
-      border: 1px solid rgba(212,175,55,.15);
-      border-radius: 12px;
-      padding: 14px 8px;
-      text-align: center;
-      backdrop-filter: blur(6px);
-    }
-    .login-stat-num {
-      font-size: 1.1rem; font-weight: 800;
-      color: var(--gold-light); line-height: 1;
-      margin-bottom: 5px;
-    }
-    .login-stat-label {
-      font-size: .6rem; font-weight: 600;
-      color: rgba(255,255,255,.5);
-      text-transform: uppercase; letter-spacing: .07em;
-    }
+
     .login-features {
       display: flex; flex-direction: column;
       gap: 14px; width: 100%;
@@ -374,7 +351,7 @@ if ($_isRest) { $_appName = 'Restaurante'; }
 
       <div class="login-accent-bar"></div>
 
-      <img src="<?= BASE_URL ?>public/img/logo-amare.svg" alt="AMARE" style="height:90px;margin-bottom:20px;object-fit:contain">
+      <img src="<?= BASE_URL ?>public/img/fondo-amare.png" alt="AMARE" style="height:200px;margin-bottom:20px;object-fit:contain">
 
       <h2 class="shimmer-heading" style="font-size:1.5rem;font-weight:800;margin-bottom:12px;text-align:center;line-height:1.25">
         <?php if ($_isRest): ?>
@@ -390,21 +367,6 @@ if ($_isRest) { $_appName = 'Restaurante'; }
           La plataforma B2B que conecta tu negocio con el mejor abasto cárnico.
         <?php endif; ?>
       </p>
-
-      <div class="login-stats">
-        <div class="login-stat">
-          <div class="login-stat-num">500+</div>
-          <div class="login-stat-label">Empresas</div>
-        </div>
-        <div class="login-stat">
-          <div class="login-stat-num">1M+</div>
-          <div class="login-stat-label">kg gestionados</div>
-        </div>
-        <div class="login-stat">
-          <div class="login-stat-num">99.9%</div>
-          <div class="login-stat-label">Uptime</div>
-        </div>
-      </div>
 
       <div class="login-features">
         <?php
