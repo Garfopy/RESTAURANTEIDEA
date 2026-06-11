@@ -107,13 +107,15 @@ if ($ctrlSlug === 'api' && $action !== 'index') {
     $action = array_shift($rest);
     $param  = $rest ? implode('/', $rest) : null;
 }
-// ── Ruta raíz → login ────────────────────────────────────────────────────────
+// ── Ruta raíz → landing AMARE ────────────────────────────────────────────────
 if ($path === '') {
-    $ctrlSlug = 'auth';
-    $action   = 'login';
+    $ctrlSlug = 'landing';
+    $action   = 'index';
 }
 // ── Route map: URL slug → Controller class ────────────────────────────────────
 $routes = [
+    // Landing AMARE (público)
+    'landing'       => 'LandingController',
     // Auth (público)
     'auth'          => 'AuthController',
     // Portal admin del restaurante
@@ -147,6 +149,7 @@ $routes = [
 
 // ── Auth guard ────────────────────────────────────────────────────────────────
 $publicPaths = [
+    'landing/index',
     'auth/login',
     'auth/dologin',
     'auth/index',
