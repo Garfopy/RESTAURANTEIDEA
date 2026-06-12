@@ -156,26 +156,51 @@ class RestConfigController extends BaseController
     {
         try {
             $db = \Database::getInstance();
-            $stmt = $db->prepare(
-                "INSERT INTO global_settings (clave, valor, tipo, grupo, etiqueta)
-                 VALUES (:clave, :valor, 'color', 'estilos', :etiqueta)
-                 ON DUPLICATE KEY UPDATE
-                   valor = VALUES(valor),
-                   tipo = VALUES(tipo),
-                   grupo = VALUES(grupo),
-                   etiqueta = VALUES(etiqueta)"
+            $hasGrupo = $this->hasColumn('global_settings', 'grupo');
+            $hasTipo = $this->hasColumn('global_settings', 'tipo');
+            $hasEtiqueta = $this->hasColumn('global_settings', 'etiqueta');
+
+            $settings = [
+                ['color_primary', '#C8102E', $colorPrimario, 'Color primario'],
+                ['color_secondary', '#1f2937', $colorSecundario, 'Color secundario'],
+                ['color_primario', '#C8102E', $colorPrimario, 'Color primario restaurante'],
+                ['color_secundario', '#1f2937', $colorSecundario, 'Color secundario restaurante'],
+            ];
+
+            $upsert = $db->prepare(
+                "INSERT INTO global_settings (clave, valor)
+                 VALUES (:clave, :valor)
+                 ON DUPLICATE KEY UPDATE valor = VALUES(valor)"
             );
 
-            $stmt->execute([
-                ':clave'    => 'color_primary',
-                ':valor'    => $colorPrimario,
-                ':etiqueta' => 'Color primario',
-            ]);
-            $stmt->execute([
-                ':clave'    => 'color_secondary',
-                ':valor'    => $colorSecundario,
-                ':etiqueta' => 'Color secundario',
-            ]);
+            foreach ($settings as [$clave, $default, $valor, $etiqueta]) {
+                if ($valor === '') {
+                    $valor = $default;
+                }
+                $upsert->execute([':clave' => $clave, ':valor' => $valor]);
+
+                $sets = [];
+                $params = [':clave' => $clave];
+                if ($hasGrupo) {
+                    $sets[] = 'grupo = :grupo';
+                    $params[':grupo'] = 'estilos';
+                }
+                if ($hasTipo) {
+                    $sets[] = 'tipo = :tipo';
+                    $params[':tipo'] = 'color';
+                }
+                if ($hasEtiqueta) {
+                    $sets[] = 'etiqueta = :etiqueta';
+                    $params[':etiqueta'] = $etiqueta;
+                }
+
+                if ($sets) {
+                    $meta = $db->prepare(
+                        'UPDATE global_settings SET ' . implode(', ', $sets) . ' WHERE clave = :clave'
+                    );
+                    $meta->execute($params);
+                }
+            }
         } catch (\Throwable $e) {
             error_log('[RestConfig] No se pudieron guardar colores en global_settings: ' . $e->getMessage());
         }
