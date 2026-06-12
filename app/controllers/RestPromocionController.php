@@ -14,13 +14,20 @@ class RestPromocionController extends BaseController
 
     // ── Listado ──────────────────────────────────────────────────
 
+// ── Listado ──────────────────────────────────────────────────
+
     public function index(?string $p = null): void
     {
-        // La vista ahora carga datos vía JS/ApiClient.
-        // Solo renderizamos la vista sin datos del servidor.
+        $restauranteId = $this->restauranteId();
+        
+        // Cargamos las promociones maestras locales de este restaurante
+        $promociones = $this->model->listar($restauranteId, 1); 
+
         $pageTitle  = 'Promociones';
         $activeMenu = 'rest_promociones';
-        $this->render('restaurante/promociones/index', compact('pageTitle', 'activeMenu'));
+        
+        // Pasamos las promociones a la vista
+        $this->render('restaurante/promociones/index', compact('pageTitle', 'activeMenu', 'promociones'));
     }
 
     // ── Formulario crear / editar ────────────────────────────────
