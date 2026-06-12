@@ -225,10 +225,16 @@ if (strpos($_SERVER['REQUEST_URI'] ?? '', 'api/auth/token') !== false) {
     error_log('[DEBUG] in_array check: ' . (in_array($currentPath, $publicPaths, true) ? 'TRUE' : 'FALSE'));
 }
 
-if (!isset($_SESSION['usuario']) && !in_array($currentPath, $publicPaths, true) && $ctrlSlug !== 'menu' && $ctrlSlug !== 'acceso') {
-    header('Location: ' . BASE_URL . 'auth/login');
-    exit;
-}
+    if (
+        !isset($_SESSION['usuario']) &&
+        $ctrlSlug !== 'api' &&
+        $ctrlSlug !== 'menu' &&
+        $ctrlSlug !== 'acceso' &&
+        !in_array($currentPath, $publicPaths, true)
+    ) {
+        header('Location: ' . BASE_URL . 'auth/login');
+        exit;
+    }
 
 // ── Redirect root to correct portal ──────────────────────────────────────────
 if ($ctrlSlug === 'auth' && $action === 'index' && isset($_SESSION['usuario'])) {

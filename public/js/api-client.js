@@ -94,7 +94,7 @@
      */
     getTokenFromSession: async function() {
       try {
-        var resp = await fetch(BASE_URL + 'restaurante/api/auth/token.php', {
+        var resp = await fetch(BASE_URL + 'api/auth/token.php', {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include'  // Enviar cookies de sesión PHP
@@ -225,7 +225,7 @@
           this.logout();
           // Redirigir al login si no estamos ya en la página de login
           if (window.location.pathname.indexOf('/auth/login') === -1) {
-            window.location.href = BASE_URL + 'restaurante/auth/login';
+            window.location.href = BASE_URL + 'auth/login';
           }
         }
 
