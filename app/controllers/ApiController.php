@@ -1268,6 +1268,12 @@ class ApiController extends BaseController
         
         $jwtUser = $this->requireAdminJWT();
         $method  = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
+        if ($method === 'POST' && isset($_POST['_method'])) {
+            $override = strtoupper((string)$_POST['_method']);
+            if (in_array($override, ['PUT', 'DELETE'], true)) {
+                $method = $override;
+            }
+        }
 
         // Parsear resource compuesto: ej. "promotions/123/deactivate"
         $parts    = $resource ? array_values(array_filter(explode('/', $resource))) : [];
@@ -1542,11 +1548,11 @@ class ApiController extends BaseController
             $this->adminApiError('No se encontró la sucursal vinculada para tu empresa en la API Amare.', 404);
         }
 
-        $body   = json_decode(file_get_contents('php://input'), true) ?? [];
+        $body   = $this->readAdminPromotionPayload();
         
         // Auto-llenar usuario_id desde JWT si no viene en el request
         if (empty($body['usuario_id'])) {
-            $body['usuario_id'] = $jwtUser['id'] ?? null;
+            $body['usuario_id'] = $jwtUser['sub'] ?? null;
         }
         
         $errors = $this->validatePromotionData($body, null);
@@ -1581,7 +1587,7 @@ class ApiController extends BaseController
             $this->adminApiError('No se encontró la sucursal vinculada para tu empresa en la API Amare.', 404);
         }
 
-        $body   = json_decode(file_get_contents('php://input'), true) ?? [];
+        $body   = $this->readAdminPromotionPayload();
         $errors = $this->validatePromotionData($body, $id);
         if (!empty($errors)) { $this->adminApiError('Error de validación', 422, $errors); }
 
@@ -1650,6 +1656,109 @@ class ApiController extends BaseController
         }
 
         $this->adminApiOk('Promoción desactivada correctamente');
+    }
+
+    private function readAdminPromotionPayload(): array
+    {
+        if (!empty($_POST) || !empty($_FILES)) {
+            $body = $_POST;
+            unset($body['_method']);
+
+            $imageValue = $this->handlePromotionImagePayload(
+                $_FILES['imagen'] ?? null,
+                !empty($body['remove_image'])
+            );
+            unset($body['remove_image']);
+
+            if ($imageValue !== false) {
+                $body['imagen'] = $imageValue;
+            }
+
+            return $this->normalizePromotionPayload($body);
+        }
+
+        $raw = file_get_contents('php://input');
+        $body = json_decode($raw, true);
+        return is_array($body) ? $this->normalizePromotionPayload($body) : [];
+    }
+
+    private function normalizePromotionPayload(array $body): array
+    {
+        foreach (['code', 'expires_at'] as $field) {
+            if (array_key_exists($field, $body) && trim((string)$body[$field]) === '') {
+                $body[$field] = null;
+            }
+        }
+
+        if (isset($body['usuario_id'])) {
+            $body['usuario_id'] = (int)$body['usuario_id'];
+        }
+        if (isset($body['activo'])) {
+            $body['activo'] = (int)$body['activo'] ? 1 : 0;
+        }
+
+        return $body;
+    }
+
+    private function handlePromotionImagePayload(?array $file, bool $removeImage): string|null|false
+    {
+        if ($removeImage) {
+            return null;
+        }
+
+        if (!$file || ($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+            return false;
+        }
+
+        if (($file['error'] ?? UPLOAD_ERR_OK) !== UPLOAD_ERR_OK) {
+            $this->adminApiError('No se pudo subir la imagen de la promoción.', 422, [
+                'imagen' => ['La carga del archivo falló. Intenta nuevamente.'],
+            ]);
+        }
+
+        if (($file['size'] ?? 0) > 5 * 1024 * 1024) {
+            $this->adminApiError('Error de validación', 422, [
+                'imagen' => ['La imagen no debe exceder 5MB.'],
+            ]);
+        }
+
+        $allowed = [
+            'jpg'  => 'image/jpeg',
+            'jpeg' => 'image/jpeg',
+            'png'  => 'image/png',
+            'webp' => 'image/webp',
+            'gif'  => 'image/gif',
+        ];
+
+        $ext = strtolower(pathinfo((string)($file['name'] ?? ''), PATHINFO_EXTENSION));
+        $tmp = (string)($file['tmp_name'] ?? '');
+        $mime = '';
+        if (function_exists('finfo_open')) {
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            if ($finfo) {
+                $mime = (string)finfo_file($finfo, $tmp);
+                finfo_close($finfo);
+            }
+        }
+
+        if (!isset($allowed[$ext]) || ($mime !== '' && $mime !== $allowed[$ext])) {
+            $this->adminApiError('Error de validación', 422, [
+                'imagen' => ['La imagen debe ser JPG, PNG, WEBP o GIF.'],
+            ]);
+        }
+
+        $uploadDir = ROOT_PATH . '/public/uploads/promociones';
+        if (!is_dir($uploadDir) && !mkdir($uploadDir, 0775, true) && !is_dir($uploadDir)) {
+            $this->adminApiError('No se pudo preparar el directorio de imágenes.', 500);
+        }
+
+        $filename = 'promo_' . date('Ymd_His') . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
+        $dest = $uploadDir . '/' . $filename;
+        if (!move_uploaded_file($tmp, $dest)) {
+            $this->adminApiError('No se pudo guardar la imagen de la promoción.', 500);
+        }
+
+        return rtrim(BASE_URL, '/') . '/public/uploads/promociones/' . $filename;
     }
 
     private function validatePromotionData(array $data, ?int $excludeId): array

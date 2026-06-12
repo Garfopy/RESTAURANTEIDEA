@@ -6,13 +6,13 @@ $promo     = $promocion ?? [];
 $formData  = $formData ?? null;
 
 // Valores por defecto o desde formData (tras error de validación) o desde BD
-$titulo      = htmlspecialchars($formData['titulo'] ?? $promo['titulo'] ?? '');
-$descripcion = htmlspecialchars($formData['descripcion'] ?? $promo['descripcion'] ?? '');
-$code        = htmlspecialchars($promo['code'] ?? '');
+$titulo      = htmlspecialchars($formData['titulo'] ?? $promo['titulo'] ?? '', ENT_QUOTES, 'UTF-8');
+$descripcion = htmlspecialchars($formData['descripcion'] ?? $promo['descripcion'] ?? '', ENT_QUOTES, 'UTF-8');
+$code        = htmlspecialchars($promo['code'] ?? '', ENT_QUOTES, 'UTF-8');
 $expiresAt   = !empty($promo['expires_at']) ? str_replace(' ', 'T', $promo['expires_at']) : '';
 $imagenUrl   = $promo['imagen'] ?? null;
 $activo      = ($formData['activo'] ?? $promo['activo'] ?? 1) ? true : false;
-$promoId     = (int)($promo['id'] ?? 0);
+$promoId     = (int)($promoId ?? $promo['id'] ?? 0);
 ?>
 
 <div style="max-width:800px;margin:0 auto;padding:20px">
@@ -39,7 +39,7 @@ $promoId     = (int)($promo['id'] ?? 0);
   <!-- Alertas -->
   <div id="promo-alerts" style="margin-bottom:24px"></div>
 
-  <form id="promo-form" onsubmit="return guardarPromocion(event)">
+  <form id="promo-form" onsubmit="return guardarPromocion(event)" enctype="multipart/form-data" accept-charset="UTF-8">
     <?php if ($isEdit): ?>
     <input type="hidden" name="id" value="<?= $promoId ?>">
     <?php endif; ?>
@@ -122,6 +122,7 @@ $promoId     = (int)($promo['id'] ?? 0);
 
       <input type="file" id="inpImagen" name="imagen" accept="image/*" style="display:none"
              onchange="manejarSeleccionImagen(this)">
+      <input type="hidden" id="inpRemoveImagen" name="remove_image" value="0">
 
       <div class="promo-error" style="display:none;font-size:.8rem;color:#EF4444;margin-top:8px"></div>
 
@@ -239,9 +240,12 @@ $promoId     = (int)($promo['id'] ?? 0);
 
   var isEdit = <?= $isEdit ? 'true' : 'false' ?>;
   var promoId = <?= $promoId ?>;
+  var currentImagen = <?= json_encode($imagenUrl ?? '', JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
+  var imagenQuitada = false;
+  var pendingUsuarioId = '';
 
   // ──────────────────────────────────────────────────────────────
-  // Manejo de Usuarios
+  // Carga inicial
   // ──────────────────────────────────────────────────────────────
 
   async function cargarUsuarios() {
@@ -262,9 +266,62 @@ $promoId     = (int)($promo['id'] ?? 0);
         option.textContent = user.nombre + ' (' + user.email + ')';
         select.appendChild(option);
       });
+
+      seleccionarUsuarioPendiente();
     } catch (e) {
       select.innerHTML = '<option value="">Error cargando usuarios</option>';
     }
+  }
+
+  async function cargarPromocionParaEditar() {
+    if (!isEdit || promoId <= 0) return;
+
+    setSubmitState(true, 'Cargando...', '⏳');
+    try {
+      var resp = await ApiClient.get('/admin/promotions/' + promoId);
+      if (!resp.success) {
+        mostrarError(resp.message || 'No se pudo cargar la promoción.');
+        return;
+      }
+
+      aplicarPromocion(resp.data || {});
+    } catch (e) {
+      mostrarError('Error de conexión al cargar la promoción: ' + e.message);
+    } finally {
+      setSubmitState(false, 'Guardar cambios', '💾');
+    }
+  }
+
+  function aplicarPromocion(p) {
+    document.getElementById('inpTitulo').value = p.titulo || '';
+    document.getElementById('inpDescripcion').value = p.descripcion || '';
+    document.getElementById('inpCode').value = p.code || '';
+    document.getElementById('inpActivo').checked = parseInt(p.activo) === 1 || p.activo === true;
+
+    if (p.expires_at) {
+      document.getElementById('inpExpira').value = formatearDatetimeLocal(p.expires_at);
+    } else {
+      document.getElementById('inpExpira').value = '';
+    }
+
+    pendingUsuarioId = String(p.usuario_id || p.user_id || (p.usuario && p.usuario.id) || '');
+    seleccionarUsuarioPendiente();
+
+    currentImagen = p.imagen || '';
+    imagenQuitada = false;
+    document.getElementById('inpRemoveImagen').value = '0';
+    if (currentImagen) {
+      mostrarPreviewImagen(currentImagen, true);
+    } else {
+      limpiarPreviewImagen();
+    }
+  }
+
+  function seleccionarUsuarioPendiente() {
+    if (!pendingUsuarioId) return;
+    var select = document.getElementById('inpUsuario');
+    if (!select || !select.options || select.options.length <= 1) return;
+    select.value = pendingUsuarioId;
   }
 
   // ──────────────────────────────────────────────────────────────
@@ -274,15 +331,14 @@ $promoId     = (int)($promo['id'] ?? 0);
   window.manejarSeleccionImagen = function(input) {
     if (!input.files || !input.files[0]) return;
     var file = input.files[0];
+    var allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
-    // Validar tipo
-    if (!file.type.startsWith('image/')) {
-      mostrarError('La imagen debe ser de tipo PNG, JPG o GIF');
+    if (allowed.indexOf(file.type) === -1) {
+      mostrarError('La imagen debe ser JPG, PNG, WEBP o GIF');
       input.value = '';
       return;
     }
 
-    // Validar tamaño (5MB)
     if (file.size > 5 * 1024 * 1024) {
       mostrarError('La imagen no debe exceder 5MB');
       input.value = '';
@@ -291,17 +347,19 @@ $promoId     = (int)($promo['id'] ?? 0);
 
     var reader = new FileReader();
     reader.onload = function(e) {
-      mostrarPreviewImagen(e.target.result);
+      imagenQuitada = false;
+      document.getElementById('inpRemoveImagen').value = '0';
+      mostrarPreviewImagen(e.target.result, false);
     };
     reader.readAsDataURL(file);
   };
 
-  window.mostrarPreviewImagen = function(dataUrl) {
+  window.mostrarPreviewImagen = function(src, existente) {
     var container = document.getElementById('image-preview-container');
     var uploadArea = document.getElementById('upload-area');
 
     var html = '<div style="position:relative;width:fit-content">' +
-               '<img id="image-preview" src="' + dataUrl + '" ' +
+               '<img id="image-preview" src="' + escAttr(src) + '" alt="Preview" ' +
                'style="max-width:160px;max-height:160px;border-radius:10px;object-fit:cover;border:2px solid #E5E7EB">' +
                '<button type="button" onclick="limpiarImagen()" ' +
                'style="position:absolute;top:-8px;right:-8px;background:#EF4444;color:#fff;border:none;' +
@@ -313,10 +371,17 @@ $promoId     = (int)($promo['id'] ?? 0);
   };
 
   window.limpiarImagen = function() {
+    imagenQuitada = true;
+    currentImagen = '';
+    document.getElementById('inpRemoveImagen').value = '1';
     document.getElementById('inpImagen').value = '';
+    limpiarPreviewImagen();
+  };
+
+  function limpiarPreviewImagen() {
     document.getElementById('image-preview-container').innerHTML = '';
     document.getElementById('upload-area').style.display = 'block';
-  };
+  }
 
   function handleDragOver(e) {
     e.preventDefault();
@@ -418,29 +483,19 @@ $promoId     = (int)($promo['id'] ?? 0);
   window.guardarPromocion = async function(event) {
     event.preventDefault();
 
-    var btn = document.getElementById('btnSubmit');
-    var btnText = document.getElementById('btn-text');
-    var btnIcon = document.getElementById('btn-icon');
-
-    btn.disabled = true;
-    btnText.textContent = 'Guardando...';
-    btnIcon.textContent = '⏳';
+    setSubmitState(true, 'Guardando...', '⏳');
 
     var titulo = document.getElementById('inpTitulo').value.trim();
     var usuarioId = parseInt(document.getElementById('inpUsuario').value) || 0;
 
     if (!titulo) {
-      btn.disabled = false;
-      btnText.textContent = isEdit ? 'Guardar cambios' : 'Crear promoción';
-      btnIcon.textContent = '💾';
+      setSubmitState(false, isEdit ? 'Guardar cambios' : 'Crear promoción', '💾');
       mostrarError('El título es requerido');
       return false;
     }
 
     if (!usuarioId) {
-      btn.disabled = false;
-      btnText.textContent = isEdit ? 'Guardar cambios' : 'Crear promoción';
-      btnIcon.textContent = '💾';
+      setSubmitState(false, isEdit ? 'Guardar cambios' : 'Crear promoción', '💾');
       mostrarError('Debes seleccionar un usuario');
       return false;
     }
@@ -453,27 +508,38 @@ $promoId     = (int)($promo['id'] ?? 0);
       }
     }
 
-    var data = new FormData();
-    data.append('usuario_id', usuarioId);
-    data.append('titulo', titulo);
-    data.append('descripcion', document.getElementById('inpDescripcion').value.trim());
-    data.append('code', document.getElementById('inpCode').value.trim());
-    data.append('activo', document.getElementById('inpActivo').checked ? 1 : 0);
-
-    if (expiresAt) {
-      data.append('expires_at', expiresAt);
-    }
-
+    var payload = {
+      usuario_id: usuarioId,
+      titulo: titulo,
+      descripcion: document.getElementById('inpDescripcion').value.trim(),
+      code: document.getElementById('inpCode').value.trim() || null,
+      expires_at: expiresAt || null,
+      activo: document.getElementById('inpActivo').checked ? 1 : 0
+    };
     var imagen = document.getElementById('inpImagen').files[0];
-    if (imagen) {
-      data.append('imagen', imagen);
-    }
+    var usarMultipart = !!imagen || imagenQuitada;
 
     var resp;
-    if (isEdit && promoId > 0) {
-      resp = await ApiClient.put('/admin/promotions/' + promoId, data);
-    } else {
-      resp = await ApiClient.post('/admin/promotions', data);
+    try {
+      if (usarMultipart) {
+        var data = new FormData();
+        appendPayload(data, payload);
+        if (imagenQuitada) data.append('remove_image', '1');
+        if (imagen) data.append('imagen', imagen);
+
+        if (isEdit && promoId > 0) {
+          data.append('_method', 'PUT');
+          resp = await ApiClient.post('/admin/promotions/' + promoId, data);
+        } else {
+          resp = await ApiClient.post('/admin/promotions', data);
+        }
+      } else if (isEdit && promoId > 0) {
+        resp = await ApiClient.put('/admin/promotions/' + promoId, payload);
+      } else {
+        resp = await ApiClient.post('/admin/promotions', payload);
+      }
+    } catch (e) {
+      resp = { success: false, message: 'Error de conexión: ' + e.message };
     }
 
     if (resp.success) {
@@ -484,9 +550,7 @@ $promoId     = (int)($promo['id'] ?? 0);
       return false;
     }
 
-    btn.disabled = false;
-    btnText.textContent = isEdit ? 'Guardar cambios' : 'Crear promoción';
-    btnIcon.textContent = '💾';
+    setSubmitState(false, isEdit ? 'Guardar cambios' : 'Crear promoción', '💾');
 
     var errorMsg = resp.message || 'Error al guardar';
     if (resp.errors) {
@@ -514,19 +578,51 @@ $promoId     = (int)($promo['id'] ?? 0);
 
   function esc(str) {
     var div = document.createElement('div');
-    div.appendChild(document.createTextNode(str));
+    div.appendChild(document.createTextNode(String(str == null ? '' : str)));
     return div.innerHTML;
+  }
+
+  function escAttr(str) {
+    return esc(str).replace(/"/g, '&quot;');
+  }
+
+  function appendPayload(fd, payload) {
+    for (var key in payload) {
+      if (!payload.hasOwnProperty(key)) continue;
+      fd.append(key, payload[key] == null ? '' : payload[key]);
+    }
+  }
+
+  function setSubmitState(disabled, text, icon) {
+    var btn = document.getElementById('btnSubmit');
+    var btnText = document.getElementById('btn-text');
+    var btnIcon = document.getElementById('btn-icon');
+    btn.disabled = disabled;
+    btnText.textContent = text;
+    btnIcon.textContent = icon;
+  }
+
+  function formatearDatetimeLocal(fechaStr) {
+    if (!fechaStr) return '';
+    var normalized = String(fechaStr).replace(' ', 'T');
+    if (normalized.length >= 16) return normalized.substring(0, 16);
+    return normalized;
   }
 
   // ──────────────────────────────────────────────────────────────
   // Inicialización
   // ──────────────────────────────────────────────────────────────
 
-  cargarUsuarios();
+  async function iniciar() {
+    if (!ApiClient.isLoggedIn()) {
+      await ApiClient.getTokenFromSession();
+    }
 
-  if (!ApiClient.isLoggedIn()) {
-    ApiClient.getTokenFromSession();
+    await cargarUsuarios();
+    await cargarPromocionParaEditar();
   }
+
+  iniciar();
 
 })();
 </script>

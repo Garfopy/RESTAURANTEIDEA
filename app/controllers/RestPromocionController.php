@@ -14,47 +14,42 @@ class RestPromocionController extends BaseController
 
     // ── Listado ──────────────────────────────────────────────────
 
-// ── Listado ──────────────────────────────────────────────────
-
     public function index(?string $p = null): void
     {
-        $restauranteId = $this->restauranteId();
-        
-        // Cargamos las promociones maestras locales de este restaurante
-        $promociones = $this->model->listar($restauranteId, 1); 
+        if (!headers_sent()) {
+            header('Content-Type: text/html; charset=utf-8');
+        }
 
+        // La vista ahora carga datos vía JS/ApiClient.
+        // Solo renderizamos la vista sin datos del servidor.
         $pageTitle  = 'Promociones';
         $activeMenu = 'rest_promociones';
-        
-        // Pasamos las promociones a la vista
-        $this->render('restaurante/promociones/index', compact('pageTitle', 'activeMenu', 'promociones'));
+        $this->render('restaurante/promociones/index', compact('pageTitle', 'activeMenu'));
     }
 
     // ── Formulario crear / editar ────────────────────────────────
 
     public function crear(?string $id = null): void
     {
-        $restauranteId = $this->restauranteId();
+        if (!headers_sent()) {
+            header('Content-Type: text/html; charset=utf-8');
+        }
+
         $promocion     = null;
         $editando      = false;
         $asignados     = [];
+        $comensales    = [];
+        $promoId       = 0;
 
         if ($id !== null && is_numeric($id)) {
             $editando  = true;
-            $promocion = $this->model->findByRestaurant((int)$id, $restauranteId);
-            if (!$promocion) {
-                $this->flash('error', 'Promocion no encontrada.');
-                $this->redirect('rest-promocion/index');
-                return;
-            }
-            $asignados = $this->model->getComensalesAsignados((int)$id);
+            $promoId   = (int)$id;
         }
 
-        $comensales = $this->model->listarComensales($restauranteId);
-        $pageTitle  = $editando ? 'Editar Promocion' : 'Nueva Promocion';
+        $pageTitle  = $editando ? 'Editar Promoción' : 'Nueva Promoción';
         $activeMenu = 'rest_promociones';
         $this->render('restaurante/promociones/form', compact(
-            'promocion', 'editando', 'comensales', 'asignados', 'pageTitle', 'activeMenu'
+            'promocion', 'editando', 'comensales', 'asignados', 'promoId', 'pageTitle', 'activeMenu'
         ));
     }
 
@@ -114,17 +109,17 @@ class RestPromocionController extends BaseController
             if ($editId) {
                 $existente = $this->model->find($editId, $restauranteId);
                 if (!$existente) {
-                    $this->flash('error', 'Promocion no encontrada.');
+                    $this->flash('error', 'Promoción no encontrada.');
                     $this->redirect('rest-promocion/index');
                     return;
                 }
                 $this->model->actualizar($editId, $data);
                 $promocionId = $editId;
-                $mensaje = 'Promocion actualizada correctamente.';
+                $mensaje = 'Promoción actualizada correctamente.';
             } else {
                 $data['restaurante_id'] = $restauranteId;
                 $promocionId = $this->model->crear($data);
-                $mensaje = 'Promocion creada correctamente.';
+                $mensaje = 'Promoción creada correctamente.';
             }
 
             $comensalesPost = $this->post('comensales', []);
@@ -164,7 +159,7 @@ class RestPromocionController extends BaseController
 
         $existente = $this->model->find($promocionId, $restauranteId);
         if (!$existente) {
-            $this->flash('error', 'Promocion no encontrada.');
+            $this->flash('error', 'Promoción no encontrada.');
             $this->redirect('rest-promocion/index');
             return;
         }
@@ -172,7 +167,7 @@ class RestPromocionController extends BaseController
         $this->model->eliminar($promocionId, $restauranteId);
         $this->syncPromocionesConApp($restauranteId);
 
-        $this->flash('success', 'Promocion eliminada correctamente.');
+        $this->flash('success', 'Promoción eliminada correctamente.');
         $this->redirect('rest-promocion/index');
     }
 
