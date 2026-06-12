@@ -142,6 +142,45 @@ class RestConfigController extends BaseController
         return $value;
     }
 
+    private function normalizeHexColor(?string $value, string $fallback): string
+    {
+        $value = trim((string)$value);
+        if ($value !== '' && $value[0] !== '#') {
+            $value = '#' . $value;
+        }
+
+        return preg_match('/^#[0-9a-fA-F]{6}$/', $value) ? strtoupper($value) : $fallback;
+    }
+
+    private function guardarColoresEnGlobalSettings(string $colorPrimario, string $colorSecundario): void
+    {
+        try {
+            $db = \Database::getInstance();
+            $stmt = $db->prepare(
+                "INSERT INTO global_settings (clave, valor, tipo, grupo, etiqueta)
+                 VALUES (:clave, :valor, 'color', 'estilos', :etiqueta)
+                 ON DUPLICATE KEY UPDATE
+                   valor = VALUES(valor),
+                   tipo = VALUES(tipo),
+                   grupo = VALUES(grupo),
+                   etiqueta = VALUES(etiqueta)"
+            );
+
+            $stmt->execute([
+                ':clave'    => 'color_primary',
+                ':valor'    => $colorPrimario,
+                ':etiqueta' => 'Color primario',
+            ]);
+            $stmt->execute([
+                ':clave'    => 'color_secondary',
+                ':valor'    => $colorSecundario,
+                ':etiqueta' => 'Color secundario',
+            ]);
+        } catch (\Throwable $e) {
+            error_log('[RestConfig] No se pudieron guardar colores en global_settings: ' . $e->getMessage());
+        }
+    }
+
     public function __construct()
     {
         parent::__construct();
@@ -227,14 +266,16 @@ class RestConfigController extends BaseController
         $descripcion = $this->normalizeUtf8Input($this->post('descripcion'));
         $telefono    = $this->normalizeUtf8Input($this->post('telefono'));
         $direccion   = $this->normalizeUtf8Input($this->post('direccion'));
+        $colorPrimario = $this->normalizeHexColor($this->post('color_primario'), '#C8102E');
+        $colorSecundario = $this->normalizeHexColor($this->post('color_secundario'), '#1F2937');
 
         $base = [
             'nombre'          => $nombre,
             'descripcion'     => $descripcion,
             'telefono'        => $telefono,
             'direccion'       => $direccion,
-            'color_primario'  => $this->post('color_primario', '#C8102E'),
-            'color_secundario'=> $this->post('color_secundario', '#1f2937'),
+            'color_primario'  => $colorPrimario,
+            'color_secundario'=> $colorSecundario,
             'horario_apertura'=> $this->post('horario_apertura') ?: null,
             'horario_cierre'  => $this->post('horario_cierre') ?: null,
         ];
@@ -278,11 +319,13 @@ class RestConfigController extends BaseController
 
         try {
             $this->model->update($restauranteId, $base);
+            $this->guardarColoresEnGlobalSettings($colorPrimario, $colorSecundario);
         } catch (PDOException $e) {
             $msg = $e->getMessage();
             if (isset($base['imagen_banner']) && stripos($msg, "Unknown column 'imagen_banner'") !== false) {
                 unset($base['imagen_banner']);
                 $this->model->update($restauranteId, $base);
+                $this->guardarColoresEnGlobalSettings($colorPrimario, $colorSecundario);
             } else {
                 throw $e;
             }
