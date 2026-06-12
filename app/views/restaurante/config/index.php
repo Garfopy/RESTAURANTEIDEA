@@ -410,6 +410,53 @@
       </div>
 
       <?php
+        $appBackgroundColor = $cfgPagos['app_background_color'] ?? '#FFFFFF';
+        $appButtonColor = $cfgPagos['app_button_color'] ?? ($restaurante['color_primario'] ?? '#C8102E');
+        $appButtonTextColor = $cfgPagos['app_button_text_color'] ?? '#FFFFFF';
+      ?>
+      <div style="background:#F9FAFB;border:1.5px solid #E5E7EB;border-radius:12px;padding:14px;margin-bottom:18px">
+        <div style="font-weight:700;font-size:.88rem;color:#111827;margin-bottom:6px">Colores de la app m&oacute;vil</div>
+        <div style="font-size:.76rem;color:#6B7280;margin-bottom:12px">
+          Ajusta el fondo y los botones principales que se sincronizan con Amare-App.
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px">
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Fondo de la app</label>
+            <div style="display:flex;gap:8px;align-items:center;margin-top:4px">
+              <input type="color" name="app_background_color" id="appBgPicker"
+                     value="<?= htmlspecialchars($appBackgroundColor) ?>"
+                     style="height:40px;width:48px;border:1px solid #D1D5DB;border-radius:6px;padding:2px;cursor:pointer">
+              <input type="text" id="txtAppBgColor"
+                     value="<?= htmlspecialchars($appBackgroundColor) ?>"
+                     class="form-input" style="flex:1;min-width:0">
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Botones de la app</label>
+            <div style="display:flex;gap:8px;align-items:center;margin-top:4px">
+              <input type="color" name="app_button_color" id="appBtnPicker"
+                     value="<?= htmlspecialchars($appButtonColor) ?>"
+                     style="height:40px;width:48px;border:1px solid #D1D5DB;border-radius:6px;padding:2px;cursor:pointer">
+              <input type="text" id="txtAppBtnColor"
+                     value="<?= htmlspecialchars($appButtonColor) ?>"
+                     class="form-input" style="flex:1;min-width:0">
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Texto de botones</label>
+            <div style="display:flex;gap:8px;align-items:center;margin-top:4px">
+              <input type="color" name="app_button_text_color" id="appBtnTextPicker"
+                     value="<?= htmlspecialchars($appButtonTextColor) ?>"
+                     style="height:40px;width:48px;border:1px solid #D1D5DB;border-radius:6px;padding:2px;cursor:pointer">
+              <input type="text" id="txtAppBtnTextColor"
+                     value="<?= htmlspecialchars($appButtonTextColor) ?>"
+                     class="form-input" style="flex:1;min-width:0">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <?php
         $metodosAppConfig = json_decode($cfgPagos['metodos_pago_app_habilitados'] ?? '["card","cash"]', true) ?: ['card','cash'];
         $metodosAppOpts = [
           'card'      => '💳 Tarjeta (Stripe)',
@@ -1057,18 +1104,26 @@ function actualizarHorariosJson() {
 }
 
 // ── Color pickers ────────────────────────────────────────────────────────────
-document.getElementById('cpicker').addEventListener('input', function() {
-  document.getElementById('txtColorPri').value = this.value;
-});
-document.getElementById('txtColorPri').addEventListener('input', function() {
-  document.getElementById('cpicker').value = this.value;
-});
-document.getElementById('spicker').addEventListener('input', function() {
-  document.getElementById('txtColorSec').value = this.value;
-});
-document.getElementById('txtColorSec').addEventListener('input', function() {
-  document.getElementById('spicker').value = this.value;
-});
+function bindColorPair(pickerId, textId) {
+  const picker = document.getElementById(pickerId);
+  const text = document.getElementById(textId);
+  if (!picker || !text) return;
+
+  picker.addEventListener('input', function() {
+    text.value = this.value.toUpperCase();
+  });
+  text.addEventListener('input', function() {
+    const value = this.value.trim();
+    if (/^#[0-9a-fA-F]{6}$/.test(value)) {
+      picker.value = value;
+    }
+  });
+}
+bindColorPair('cpicker', 'txtColorPri');
+bindColorPair('spicker', 'txtColorSec');
+bindColorPair('appBgPicker', 'txtAppBgColor');
+bindColorPair('appBtnPicker', 'txtAppBtnColor');
+bindColorPair('appBtnTextPicker', 'txtAppBtnTextColor');
 
 // ── Address autocomplete con Nominatim ──────────────────────────────────────
 (function() {

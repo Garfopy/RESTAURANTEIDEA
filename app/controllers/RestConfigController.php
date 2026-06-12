@@ -152,7 +152,13 @@ class RestConfigController extends BaseController
         return preg_match('/^#[0-9a-fA-F]{6}$/', $value) ? strtoupper($value) : $fallback;
     }
 
-    private function guardarColoresEnGlobalSettings(string $colorPrimario, string $colorSecundario): void
+    private function guardarColoresEnGlobalSettings(
+        string $colorPrimario,
+        string $colorSecundario,
+        ?string $appBackgroundColor = null,
+        ?string $appButtonColor = null,
+        ?string $appButtonTextColor = null
+    ): void
     {
         try {
             $db = \Database::getInstance();
@@ -164,6 +170,15 @@ class RestConfigController extends BaseController
                 ['color_primary', '#C8102E', $colorPrimario, 'Color primario'],
                 ['color_secondary', '#1f2937', $colorSecundario, 'Color secundario'],
             ];
+            if ($appBackgroundColor !== null) {
+                $settings[] = ['app_background_color', '#FFFFFF', $appBackgroundColor, 'Fondo de app'];
+            }
+            if ($appButtonColor !== null) {
+                $settings[] = ['app_button_color', '#C8102E', $appButtonColor, 'Botones de app'];
+            }
+            if ($appButtonTextColor !== null) {
+                $settings[] = ['app_button_text_color', '#FFFFFF', $appButtonTextColor, 'Texto de botones de app'];
+            }
 
             $upsert = $db->prepare(
                 "INSERT INTO global_settings (clave, valor)
@@ -239,6 +254,7 @@ class RestConfigController extends BaseController
                             'notif_email_pago','notif_email_pago_destino',
                             'tipos_entrega_habilitados','metodos_pago_app_habilitados',
                             'costo_envio_app','pedido_minimo_app',
+                            'app_background_color','app_button_color','app_button_text_color',
                             'amare_api_url','amare_api_token','amare_token_expirado','amare_email'];
             foreach ($clavesPagos as $clave) {
                 $s2 = $db->prepare("SELECT valor FROM global_settings WHERE clave = :c LIMIT 1");
@@ -296,6 +312,9 @@ class RestConfigController extends BaseController
         $direccion   = $this->normalizeUtf8Input($this->post('direccion'));
         $colorPrimario = $this->normalizeHexColor($this->post('color_primario'), '#C8102E');
         $colorSecundario = $this->normalizeHexColor($this->post('color_secundario'), '#1F2937');
+        $appBackgroundColor = $this->normalizeHexColor($this->post('app_background_color'), '#FFFFFF');
+        $appButtonColor = $this->normalizeHexColor($this->post('app_button_color'), $colorPrimario);
+        $appButtonTextColor = $this->normalizeHexColor($this->post('app_button_text_color'), '#FFFFFF');
 
         $base = [
             'nombre'          => $nombre,
@@ -347,13 +366,13 @@ class RestConfigController extends BaseController
 
         try {
             $this->model->update($restauranteId, $base);
-            $this->guardarColoresEnGlobalSettings($colorPrimario, $colorSecundario);
+            $this->guardarColoresEnGlobalSettings($colorPrimario, $colorSecundario, $appBackgroundColor, $appButtonColor, $appButtonTextColor);
         } catch (PDOException $e) {
             $msg = $e->getMessage();
             if (isset($base['imagen_banner']) && stripos($msg, "Unknown column 'imagen_banner'") !== false) {
                 unset($base['imagen_banner']);
                 $this->model->update($restauranteId, $base);
-                $this->guardarColoresEnGlobalSettings($colorPrimario, $colorSecundario);
+                $this->guardarColoresEnGlobalSettings($colorPrimario, $colorSecundario, $appBackgroundColor, $appButtonColor, $appButtonTextColor);
             } else {
                 throw $e;
             }
@@ -480,7 +499,20 @@ class RestConfigController extends BaseController
                 $tokenReal = $stmtTok->fetchColumn() ?: '';
             }
             if ($amareUrl !== '' && $tokenReal !== '') {
-                $this->syncConAmareApp($restauranteId, $amareUrl, $tokenReal, $tiposEntregaPost, $metodosAppPost, $costoEnvio, $pedidoMinimo);
+                $this->syncConAmareApp(
+                    $restauranteId,
+                    $amareUrl,
+                    $tokenReal,
+                    $tiposEntregaPost,
+                    $metodosAppPost,
+                    $costoEnvio,
+                    $pedidoMinimo,
+                    [
+                        'background_color' => $appBackgroundColor,
+                        'button_color' => $appButtonColor,
+                        'button_text_color' => $appButtonTextColor,
+                    ]
+                );
             }
         } catch (\Exception $e) {
             // No bloquear si falla la sincronización con Amare
@@ -612,7 +644,8 @@ class RestConfigController extends BaseController
         array $tiposEntrega,
         array $metodosPago,
         string $costoEnvio,
-        string $pedidoMinimo
+        string $pedidoMinimo,
+        array $appColors = []
     ): void {
         $url = rtrim($apiUrl, '/') . '/branches/' . $restauranteId . '/config';
 
@@ -621,6 +654,11 @@ class RestConfigController extends BaseController
             'metodos_pago'  => $metodosPago,
             'costo_envio'   => (float)$costoEnvio,
             'pedido_minimo' => (float)$pedidoMinimo,
+            'theme'         => [
+                'background_color' => $appColors['background_color'] ?? '#FFFFFF',
+                'button_color' => $appColors['button_color'] ?? '#C8102E',
+                'button_text_color' => $appColors['button_text_color'] ?? '#FFFFFF',
+            ],
         ]);
 
         $ch = curl_init($url);
