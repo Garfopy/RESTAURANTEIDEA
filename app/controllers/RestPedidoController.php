@@ -8,7 +8,11 @@ class RestPedidoController extends BaseController
     public function __construct()
     {
         parent::__construct();
-        $this->requireMesero();
+        if ($this->rolActual() === 'mesero') {
+            $this->requireMesero();
+        } else {
+            $this->requireRestaurante();
+        }
         $this->model = new RestPedidoModel();
     }
 
@@ -18,20 +22,37 @@ class RestPedidoController extends BaseController
         $estado        = $this->get('estado', '');
         $page          = (int)$this->get('page', 1);
         $resultado     = $this->model->listar($restauranteId, $page, $estado);
+        $soportaTipoOrigen = $this->model->soportaTipoOrigen();
         $flash         = $this->getFlash();
         $pageTitle     = 'Pedidos';
         $activeMenu    = 'rest_pedidos';
-        $this->render('restaurante/pedidos/index', array_merge($resultado, compact('flash','pageTitle','activeMenu','estado')));
+        $this->render('restaurante/pedidos/index', array_merge($resultado, compact('flash','pageTitle','activeMenu','estado','soportaTipoOrigen')));
+    }
+
+    public function ventasStore(?string $p = null): void
+    {
+        $restauranteId = $this->restauranteId();
+        $estado        = $this->get('estado', '');
+        $page          = (int)$this->get('page', 1);
+        $resultado     = $this->model->listarStore($restauranteId, $page, $estado);
+        $soportaTipoOrigen = $this->model->soportaTipoOrigen();
+        $flash         = $this->getFlash();
+        $pageTitle     = 'Ventas Store';
+        $activeMenu    = 'rest_ventas_store';
+        $this->render('restaurante/pedidos/store', array_merge($resultado, compact('flash','pageTitle','activeMenu','estado','soportaTipoOrigen')));
     }
 
     public function detalle(?string $id = null): void
     {
-        $pedido    = $this->model->getConItems((int)$id);
+        $pedido    = $this->model->getConItems((int)$id, (int)$this->restauranteId());
         if (!$pedido) { $this->flash('error', 'Pedido no encontrado.'); $this->redirect('rest-pedido/index'); }
         $flash     = $this->getFlash();
         $pageTitle = 'Pedido ' . $pedido['folio'];
-        $activeMenu = 'rest_pedidos';
-        $this->render('restaurante/pedidos/detalle', compact('pedido','flash','pageTitle','activeMenu'));
+        $esStore = strtolower((string)($pedido['tipo_origen'] ?? '')) === 'store';
+        $activeMenu = $esStore ? 'rest_ventas_store' : 'rest_pedidos';
+        $backUrl = $esStore ? BASE_URL . 'rest-pedido/ventasStore' : BASE_URL . 'rest-pedido/index';
+        $backLabel = $esStore ? 'Ventas Store' : 'Pedidos';
+        $this->render('restaurante/pedidos/detalle', compact('pedido','flash','pageTitle','activeMenu','backUrl','backLabel','esStore'));
     }
 
     public function nuevo(?string $mesaId = null): void
@@ -94,6 +115,23 @@ class RestPedidoController extends BaseController
         $this->json(['ok' => true]);
     }
 
+    public function actualizarVentaStore(?string $id = null): void
+    {
+        if (!$this->isPost()) {
+            $this->redirect('rest-pedido/ventasStore');
+        }
+
+        $estado = (string)$this->post('estado', '');
+        if (!in_array($estado, ['pendiente','en_preparacion','listo','reclamado','entregado','cancelado'], true)) {
+            $this->flash('error', 'Estado inválido.');
+            $this->redirect('rest-pedido/ventasStore');
+        }
+
+        $ok = $this->model->cambiarEstadoStore((int)$id, (int)$this->restauranteId(), $estado);
+        $this->flash($ok ? 'success' : 'error', $ok ? 'Venta actualizada.' : 'No se pudo actualizar la venta.');
+        $this->redirect('rest-pedido/ventasStore');
+    }
+
     public function cambiarEstadoItem(?string $id = null): void
     {
         $estado = $this->post('estado') ?? $this->get('estado');
@@ -103,8 +141,10 @@ class RestPedidoController extends BaseController
 
     public function cancelar(?string $id = null): void
     {
+        $pedido = $this->model->getConItems((int)$id, (int)$this->restauranteId());
         $this->model->cambiarEstadoPedido((int)$id, 'cancelado');
         $this->flash('success', 'Pedido cancelado.');
-        $this->redirect('rest-pedido/index');
+        $esStore = strtolower((string)($pedido['tipo_origen'] ?? '')) === 'store';
+        $this->redirect($esStore ? 'rest-pedido/ventasStore' : 'rest-pedido/index');
     }
 }

@@ -36,13 +36,18 @@ class RestChefController extends BaseController
             $db       = Database::getInstance();
             $stmtItem = $db->prepare(
                 "SELECT pi.platillo_id, pi.cantidad, pi.pedido_id, pi.estado,
-                        p.restaurante_id
+                        p.restaurante_id, p.tipo_origen
                  FROM rest_pedido_items pi
                  JOIN rest_pedidos p ON p.id = pi.pedido_id
                  WHERE pi.id = ? LIMIT 1"
             );
             $stmtItem->execute([$itemId]);
             $item = $stmtItem->fetch(\PDO::FETCH_ASSOC);
+
+            if ($item && strtolower((string)($item['tipo_origen'] ?? '')) === 'store') {
+                $this->json(['ok' => true, 'store_ignored' => true]);
+                return;
+            }
 
             // Si ya estaba en preparación, no descontar stock de nuevo
             if ($item && $item['estado'] === 'en_preparacion') {
@@ -138,9 +143,26 @@ class RestChefController extends BaseController
     public function marcarListo(?string $itemId = null): void
     {
         $itemId = (int)$itemId;
+        $db   = Database::getInstance();
+        try {
+            $stmtItem = $db->prepare(
+                "SELECT p.tipo_origen
+                   FROM rest_pedido_items pi
+                   JOIN rest_pedidos p ON p.id = pi.pedido_id
+                  WHERE pi.id = ? LIMIT 1"
+            );
+            $stmtItem->execute([$itemId]);
+            $item = $stmtItem->fetch(\PDO::FETCH_ASSOC);
+            if ($item && strtolower((string)($item['tipo_origen'] ?? '')) === 'store') {
+                $this->json(['ok' => true, 'store_ignored' => true]);
+                return;
+            }
+        } catch (\Throwable $e) {
+            // Si la columna tipo_origen no existe, continuar con el flujo normal.
+        }
+
         $this->model->cambiarEstadoItem($itemId, 'listo');
 
-        $db   = Database::getInstance();
         $stmt = $db->prepare(
             "SELECT pedido_id FROM rest_pedido_items WHERE id = ?"
         );

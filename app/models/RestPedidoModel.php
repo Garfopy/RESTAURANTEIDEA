@@ -2,6 +2,47 @@
 class RestPedidoModel extends BaseModel
 {
     protected string $table = 'rest_pedidos';
+    private static array $columnCache = [];
+
+    private function hasColumn(string $column): bool
+    {
+        $key = $this->table . '.' . $column;
+        if (array_key_exists($key, self::$columnCache)) {
+            return self::$columnCache[$key];
+        }
+
+        $stmt = $this->db->prepare(
+            "SELECT COUNT(*)
+               FROM information_schema.columns
+              WHERE table_schema = DATABASE()
+                AND table_name = ?
+                AND column_name = ?"
+        );
+        $stmt->execute([$this->table, $column]);
+        self::$columnCache[$key] = (int)$stmt->fetchColumn() > 0;
+        return self::$columnCache[$key];
+    }
+
+    public function soportaTipoOrigen(): bool
+    {
+        return $this->hasColumn('tipo_origen');
+    }
+
+    private function sqlNoStore(string $alias = 'p'): string
+    {
+        if (!$this->soportaTipoOrigen()) {
+            return '';
+        }
+        return " AND LOWER(COALESCE({$alias}.tipo_origen, '')) <> 'store'";
+    }
+
+    private function sqlSoloStore(string $alias = 'p'): string
+    {
+        if (!$this->soportaTipoOrigen()) {
+            return ' AND 1 = 0';
+        }
+        return " AND LOWER(COALESCE({$alias}.tipo_origen, '')) = 'store'";
+    }
 
     public function generarFolio(int $restauranteId): string
     {
@@ -51,15 +92,21 @@ class RestPedidoModel extends BaseModel
         }
     }
 
-    public function getConItems(int $pedidoId): ?array
+    public function getConItems(int $pedidoId, ?int $restauranteId = null): ?array
     {
+        $whereRestaurante = $restauranteId !== null ? ' AND p.restaurante_id = ?' : '';
+        $params = [$pedidoId];
+        if ($restauranteId !== null) {
+            $params[] = $restauranteId;
+        }
+
         $pedido = $this->queryOne(
             "SELECT p.*, m.nombre AS mesa_nombre, u.nombre AS mesero_nombre
              FROM rest_pedidos p
              LEFT JOIN rest_mesas m ON m.id = p.mesa_id
              LEFT JOIN usuarios u ON u.id = p.mesero_id
-             WHERE p.id = ?",
-            [$pedidoId]
+             WHERE p.id = ?{$whereRestaurante}",
+            $params
         );
         if (!$pedido) return null;
         $pedido['items'] = $this->query(
@@ -86,6 +133,8 @@ class RestPedidoModel extends BaseModel
 
     public function getKitchenQueue(int $restauranteId): array
     {
+        $noStore = $this->sqlNoStore('p');
+
         // Formato ingredientes_raw (separador ||, campos |):
         //   codigo | nombre | tipo | cantidad | unidad | notas | es_informativo
         //   - tipo: materia_prima | guarnicion | bebida | otro
@@ -136,6 +185,7 @@ class RestPedidoModel extends BaseModel
              WHERE p.restaurante_id = ?
                AND p.estado NOT IN ('cancelado', 'entregado')
                AND pi.estado IN ('pendiente','en_preparacion')
+               $noStore
              ORDER BY p.created_at ASC, pi.id ASC",
             [$restauranteId]
         );
@@ -220,13 +270,56 @@ class RestPedidoModel extends BaseModel
 
     public function listar(int $restauranteId, int $page = 1, string $estado = ''): array
     {
-        $where = $estado ? "AND p.estado = '$estado'" : '';
+        $noStore = $this->sqlNoStore('p');
+        $params = [$restauranteId];
+        $where = '';
+        if ($estado !== '') {
+            $where = 'AND p.estado = ?';
+            $params[] = $estado;
+        }
         $sql = "SELECT p.*, m.nombre AS mesa_nombre, u.nombre AS mesero_nombre
                 FROM rest_pedidos p
                 LEFT JOIN rest_mesas m ON m.id = p.mesa_id
                 LEFT JOIN usuarios u ON u.id = p.mesero_id
                 WHERE p.restaurante_id = ? $where
+                $noStore
                 ORDER BY p.created_at DESC";
-        return $this->paginate($sql, [$restauranteId], $page);
+        return $this->paginate($sql, $params, $page);
+    }
+
+    public function listarStore(int $restauranteId, int $page = 1, string $estado = ''): array
+    {
+        $soloStore = $this->sqlSoloStore('p');
+        $params = [$restauranteId];
+        $where = '';
+        if ($estado !== '') {
+            $where = 'AND p.estado = ?';
+            $params[] = $estado;
+        }
+
+        $sql = "SELECT p.*, m.nombre AS mesa_nombre, u.nombre AS mesero_nombre
+                FROM rest_pedidos p
+                LEFT JOIN rest_mesas m ON m.id = p.mesa_id
+                LEFT JOIN usuarios u ON u.id = p.mesero_id
+                WHERE p.restaurante_id = ? $where
+                $soloStore
+                ORDER BY p.created_at DESC";
+        return $this->paginate($sql, $params, $page);
+    }
+
+    public function cambiarEstadoStore(int $pedidoId, int $restauranteId, string $estado): bool
+    {
+        if (!$this->soportaTipoOrigen()) {
+            return false;
+        }
+
+        return $this->execute(
+            "UPDATE rest_pedidos
+                SET estado = ?
+              WHERE id = ?
+                AND restaurante_id = ?
+                AND LOWER(COALESCE(tipo_origen, '')) = 'store'",
+            [$estado, $pedidoId, $restauranteId]
+        );
     }
 }
