@@ -163,8 +163,6 @@ class RestConfigController extends BaseController
             $settings = [
                 ['color_primary', '#C8102E', $colorPrimario, 'Color primario'],
                 ['color_secondary', '#1f2937', $colorSecundario, 'Color secundario'],
-                ['color_primario', '#C8102E', $colorPrimario, 'Color primario restaurante'],
-                ['color_secundario', '#1f2937', $colorSecundario, 'Color secundario restaurante'],
             ];
 
             $upsert = $db->prepare(
@@ -201,6 +199,11 @@ class RestConfigController extends BaseController
                     $meta->execute($params);
                 }
             }
+
+            $deleteAliases = $db->prepare(
+                "DELETE FROM global_settings WHERE clave IN ('color_primario', 'color_secundario')"
+            );
+            $deleteAliases->execute();
         } catch (\Throwable $e) {
             error_log('[RestConfig] No se pudieron guardar colores en global_settings: ' . $e->getMessage());
         }
