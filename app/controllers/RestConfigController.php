@@ -152,6 +152,17 @@ class RestConfigController extends BaseController
         return preg_match('/^#[0-9a-fA-F]{6}$/', $value) ? strtoupper($value) : $fallback;
     }
 
+    private function normalizeCoordinate($value, float $min, float $max): ?float
+    {
+        $value = trim((string)$value);
+        if ($value === '' || !is_numeric($value)) {
+            return null;
+        }
+
+        $coordinate = (float)$value;
+        return ($coordinate >= $min && $coordinate <= $max) ? $coordinate : null;
+    }
+
     private function guardarColoresEnGlobalSettings(
         string $colorPrimario,
         string $colorSecundario,
@@ -310,6 +321,8 @@ class RestConfigController extends BaseController
         $descripcion = $this->normalizeUtf8Input($this->post('descripcion'));
         $telefono    = $this->normalizeUtf8Input($this->post('telefono'));
         $direccion   = $this->normalizeUtf8Input($this->post('direccion'));
+        $lat         = $this->normalizeCoordinate($this->post('lat'), -90, 90);
+        $lng         = $this->normalizeCoordinate($this->post('lng'), -180, 180);
         $colorPrimario = $this->normalizeHexColor($this->post('color_primario'), '#C8102E');
         $colorSecundario = $this->normalizeHexColor($this->post('color_secundario'), '#1F2937');
         $appBackgroundColor = $this->normalizeHexColor($this->post('app_background_color'), '#FFFFFF');
@@ -321,6 +334,8 @@ class RestConfigController extends BaseController
             'descripcion'     => $descripcion,
             'telefono'        => $telefono,
             'direccion'       => $direccion,
+            'lat'             => $lat,
+            'lng'             => $lng,
             'color_primario'  => $colorPrimario,
             'color_secundario'=> $colorSecundario,
             'horario_apertura'=> $this->post('horario_apertura') ?: null,

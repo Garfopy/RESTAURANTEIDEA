@@ -1133,6 +1133,7 @@ bindColorPair('appBtnTextPicker', 'txtAppBtnTextColor');
   let timer;
   inp.addEventListener('input', function() {
     clearTimeout(timer);
+    clearAddressCoords();
     const q = this.value.trim();
     if (q.length < 4) { sugg.style.display = 'none'; return; }
     timer = setTimeout(function() {
@@ -1142,7 +1143,11 @@ bindColorPair('appBtnTextPicker', 'txtAppBtnTextColor');
           if (!data || !data.length) { sugg.style.display = 'none'; return; }
           sugg.innerHTML = data.map(function(item) {
             var name = item.display_name.replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            var lat = parseFloat(item.lat);
+            var lng = parseFloat(item.lon);
             return '<div class="addr-opt" onmousedown="addrSelect(event,this)" data-val="' + name.replace(/"/g,'&quot;') + '"'
+              + ' data-lat="' + (isFinite(lat) ? lat.toFixed(6) : '') + '"'
+              + ' data-lng="' + (isFinite(lng) ? lng.toFixed(6) : '') + '"'
               + ' style="padding:9px 13px;cursor:pointer;font-size:.82rem;color:#374151;border-bottom:1px solid #F3F4F6;display:flex;align-items:flex-start;gap:8px">'
               + '<span style="flex-shrink:0;color:var(--cp)">📍</span>'
               + '<span>' + name + '</span></div>';
@@ -1159,9 +1164,38 @@ bindColorPair('appBtnTextPicker', 'txtAppBtnTextColor');
     if (sugg.innerHTML && this.value.length >= 4) sugg.style.display = 'block';
   });
 })();
+function setAddressCoords(lat, lng) {
+  const coordLat = document.getElementById('coordLat');
+  const coordLng = document.getElementById('coordLng');
+  const inpLat = document.getElementById('inpLat');
+  const inpLng = document.getElementById('inpLng');
+  const box = document.getElementById('coordsBox');
+  if (coordLat) coordLat.textContent = lat;
+  if (coordLng) coordLng.textContent = lng;
+  if (inpLat) inpLat.value = lat;
+  if (inpLng) inpLng.value = lng;
+  if (box) box.style.display = 'block';
+}
+function clearAddressCoords() {
+  const coordLat = document.getElementById('coordLat');
+  const coordLng = document.getElementById('coordLng');
+  const inpLat = document.getElementById('inpLat');
+  const inpLng = document.getElementById('inpLng');
+  const box = document.getElementById('coordsBox');
+  if (coordLat) coordLat.textContent = '—';
+  if (coordLng) coordLng.textContent = '—';
+  if (inpLat) inpLat.value = '';
+  if (inpLng) inpLng.value = '';
+  if (box) box.style.display = 'none';
+}
 function addrSelect(e, el) {
   e.preventDefault();
   document.getElementById('inpDireccion').value = el.dataset.val;
+  if (el.dataset.lat && el.dataset.lng) {
+    setAddressCoords(el.dataset.lat, el.dataset.lng);
+  } else {
+    clearAddressCoords();
+  }
   document.getElementById('addrSugg').style.display = 'none';
 }
 
