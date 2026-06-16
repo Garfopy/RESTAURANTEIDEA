@@ -183,7 +183,7 @@
 <div id="listosBanner" class="hidden">
   <div id="sinMesaSection" class="hidden" style="margin-bottom:14px">
     <div style="font-weight:700;color:#7C2D12;font-size:.88rem;margin-bottom:10px;display:flex;align-items:center;gap:6px">
-      Regalos / pedidos sin mesa <span id="cnt-sinmesa-text"></span>
+      Productos / regalos sin mesa <span id="cnt-sinmesa-text"></span>
     </div>
     <div id="sinMesaList"></div>
   </div>
@@ -387,9 +387,15 @@ function pedidoEsRegalo(p) {
   return Number(p.es_regalo || 0) === 1 || origen.includes('regalo') || entrega.includes('regalo') || entrega.includes('gift');
 }
 
+function pedidoEsProductoDirecto(p) {
+  const origen = String(p.tipo_origen || '').toLowerCase();
+  return Number(p.es_producto_directo || 0) === 1 || origen === 'store';
+}
+
 function pedidoUbicacionLabel(p) {
   if (p.mesa_nombre) return 'Mesa ' + p.mesa_nombre;
   if (pedidoEsRegalo(p)) return 'Regalo';
+  if (pedidoEsProductoDirecto(p)) return 'Producto';
   const entrega = String(p.tipo_pedido || p.tipo_entrega || p.tipo_origen || '').toLowerCase();
   if (entrega === 'delivery') return 'A domicilio';
   if (entrega === 'pickup') return 'Para recoger';

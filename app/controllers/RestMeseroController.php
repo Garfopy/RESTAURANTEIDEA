@@ -91,6 +91,35 @@ class RestMeseroController extends BaseController
         )";
     }
 
+    private function productoDirectoMeseroSql(string $pedidoAlias = 'p'): string
+    {
+        $parts = [];
+
+        if ($this->hasColumn('rest_pedidos', 'tipo_origen')) {
+            $parts[] = "LOWER(COALESCE({$pedidoAlias}.tipo_origen, '')) = 'store'";
+        }
+
+        if ($this->hasColumn('rest_pedidos', 'es_regalo')) {
+            $parts[] = "COALESCE({$pedidoAlias}.es_regalo, 0) = 1";
+        }
+
+        if ($this->hasColumn('rest_pedidos', 'tipo_entrega')) {
+            $parts[] = "LOWER(COALESCE({$pedidoAlias}.tipo_entrega, '')) IN ('gift','regalo','regalos')";
+        }
+
+        if ($this->hasColumn('rest_pedido_items', 'origen')) {
+            $parts[] = "EXISTS (
+                SELECT 1
+                  FROM rest_pedido_items dpi
+                 WHERE dpi.pedido_id = {$pedidoAlias}.id
+                   AND LOWER(COALESCE(dpi.origen, '')) = 'store'
+                   AND dpi.estado != 'cancelado'
+            )";
+        }
+
+        return $parts ? '(' . implode(' OR ', $parts) . ')' : '0';
+    }
+
     private function pedidoItemsSql(): string
     {
         $hasOrigen = $this->hasColumn('rest_pedido_items', 'origen');
@@ -200,15 +229,19 @@ class RestMeseroController extends BaseController
 
         // Solo puede entregar el mesero que reclamó, o cualquiera si no fue reclamado
         $giftExistsSql = $this->giftExistsSql('p');
+        $productoDirectoSql = $this->productoDirectoMeseroSql('p');
         $check = $db->prepare(
-            "SELECT p.estado, p.reclamado_por, ({$giftExistsSql}) AS es_regalo
+            "SELECT p.estado, p.reclamado_por,
+                    ({$giftExistsSql}) AS es_regalo,
+                    ({$productoDirectoSql}) AS es_producto_directo
              FROM rest_pedidos p
              WHERE p.id = ? AND p.restaurante_id = ?"
         );
         $check->execute([$pid, $this->restauranteId()]);
         $row = $check->fetch(PDO::FETCH_ASSOC);
-        $esRegalo = $row && (int)($row['es_regalo'] ?? 0) === 1;
-        $estadosValidos = $esRegalo
+        $esProductoDirecto = $row && (int)($row['es_producto_directo'] ?? 0) === 1;
+        $sinCocina = $esProductoDirecto;
+        $estadosValidos = $sinCocina
             ? ['pendiente', 'en_preparacion', 'listo', 'en_camino', 'reclamado']
             : ['listo', 'reclamado'];
 
@@ -224,7 +257,7 @@ class RestMeseroController extends BaseController
         }
 
         // Verificar que no haya ítems aún por preparar/pendientes (chef todavía trabajando)
-        if (!$esRegalo) {
+        if (!$sinCocina) {
             $pend = $db->prepare(
                 "SELECT COUNT(*) FROM rest_pedido_items
                  WHERE pedido_id = ? AND estado IN ('pendiente','en_preparacion')"
@@ -240,7 +273,7 @@ class RestMeseroController extends BaseController
             "UPDATE rest_pedidos SET estado='entregado', mesero_id = ? WHERE id = ? AND restaurante_id = ?"
         )->execute([$meseroId, $pid, $this->restauranteId()]);
 
-        $itemEstados = $esRegalo
+        $itemEstados = $sinCocina
             ? "estado NOT IN ('entregado','cancelado')"
             : "estado IN ('listo','reclamado')";
 
@@ -338,6 +371,7 @@ class RestMeseroController extends BaseController
         $stmtZ->execute([$restauranteId, $meseroId]);
         $misZonas = array_column($stmtZ->fetchAll(PDO::FETCH_ASSOC), 'zona_id');
         $giftExistsSql = $this->giftExistsSql('p');
+        $productoDirectoSql = $this->productoDirectoMeseroSql('p');
         $pedidoMetaSelect = $this->optionalPedidoSelect('p', [
             'tipo_origen',
             'tipo_entrega',
@@ -356,6 +390,7 @@ class RestMeseroController extends BaseController
                     p.reclamado_por, p.reclamado_at, p.mesa_id,
                     {$pedidoMetaSelect},
                     ({$giftExistsSql}) AS es_regalo,
+                    ({$productoDirectoSql}) AS es_producto_directo,
                     m.nombre AS mesa_nombre, m.zona_id,
                     u.nombre AS reclamado_por_nombre
              FROM rest_pedidos p
@@ -364,7 +399,7 @@ class RestMeseroController extends BaseController
              WHERE p.restaurante_id = ?
                AND (
                     p.estado IN ('listo','reclamado')
-                    OR (({$giftExistsSql}) AND p.estado IN ('pendiente','en_camino'))
+                    OR (({$productoDirectoSql}) AND p.estado IN ('pendiente','en_preparacion','en_camino'))
                )
              ORDER BY
                CASE WHEN m.zona_id IN (" . (count($misZonas) ? implode(',', array_fill(0, count($misZonas), '?')) : '0') . ") THEN 0 ELSE 1 END ASC,
