@@ -383,14 +383,14 @@ function toggleOtras() {
 
 function pedidoEsRegalo(p) {
   const origen = String(p.tipo_origen || '').toLowerCase();
-  const entrega = String(p.tipo_entrega || '').toLowerCase();
+  const entrega = String(p.tipo_pedido || p.tipo_entrega || '').toLowerCase();
   return Number(p.es_regalo || 0) === 1 || origen.includes('regalo') || entrega.includes('regalo') || entrega.includes('gift');
 }
 
 function pedidoUbicacionLabel(p) {
   if (p.mesa_nombre) return 'Mesa ' + p.mesa_nombre;
   if (pedidoEsRegalo(p)) return 'Regalo';
-  const entrega = String(p.tipo_entrega || p.tipo_origen || '').toLowerCase();
+  const entrega = String(p.tipo_pedido || p.tipo_entrega || p.tipo_origen || '').toLowerCase();
   if (entrega === 'delivery') return 'A domicilio';
   if (entrega === 'pickup') return 'Para recoger';
   if (entrega === 'eat_in') return 'Comer aqui';
@@ -400,7 +400,7 @@ function pedidoUbicacionLabel(p) {
 
 function pedidoDetalleEntrega(p) {
   const nombre = p.destinatario_nombre || p.comprador_nombre || '';
-  const direccion = p.destinatario_direccion || p.comprador_direccion || '';
+  const direccion = p.destinatario_direccion || p.direccion_entrega || p.comprador_direccion || '';
   const telefono = p.destinatario_telefono || p.comprador_telefono || '';
   return [nombre, direccion, telefono].filter(Boolean).join(' · ');
 }

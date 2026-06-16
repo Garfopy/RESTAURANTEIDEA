@@ -38,6 +38,30 @@ class RestMeseroController extends BaseController
         return self::$columnCache[$key];
     }
 
+    private function hasTable(string $table): bool
+    {
+        $key = 'table.' . $table;
+        if (array_key_exists($key, self::$columnCache)) {
+            return self::$columnCache[$key];
+        }
+
+        try {
+            $db = Database::getInstance();
+            $stmt = $db->prepare(
+                "SELECT COUNT(*)
+                   FROM information_schema.tables
+                  WHERE table_schema = DATABASE()
+                    AND table_name = ?"
+            );
+            $stmt->execute([$table]);
+            self::$columnCache[$key] = (int)$stmt->fetchColumn() > 0;
+        } catch (\Throwable $e) {
+            self::$columnCache[$key] = false;
+        }
+
+        return self::$columnCache[$key];
+    }
+
     private function optionalPedidoSelect(string $alias, array $columns): string
     {
         $parts = [];
@@ -49,6 +73,46 @@ class RestMeseroController extends BaseController
             }
         }
         return implode(",\n                    ", $parts);
+    }
+
+    private function giftExistsSql(string $pedidoAlias = 'p'): string
+    {
+        if (!$this->hasColumn('rest_pedido_items', 'origen') || !$this->hasTable('social_gift_products')) {
+            return '0';
+        }
+
+        return "EXISTS (
+            SELECT 1
+              FROM rest_pedido_items gi
+              JOIN social_gift_products sgp ON sgp.id = gi.platillo_id
+             WHERE gi.pedido_id = {$pedidoAlias}.id
+               AND LOWER(COALESCE(gi.origen, '')) = 'store'
+               AND COALESCE(sgp.es_regalo, 0) = 1
+        )";
+    }
+
+    private function pedidoItemsSql(): string
+    {
+        $hasOrigen = $this->hasColumn('rest_pedido_items', 'origen');
+        $hasGiftProducts = $this->hasTable('social_gift_products');
+
+        $joinPlatillos = $hasOrigen
+            ? "LEFT JOIN rest_platillos pl ON pl.id = pi.platillo_id AND LOWER(COALESCE(pi.origen, 'menu')) = 'menu'"
+            : "LEFT JOIN rest_platillos pl ON pl.id = pi.platillo_id";
+
+        $joinGifts = $hasGiftProducts
+            ? "LEFT JOIN social_gift_products sgp ON sgp.id = pi.platillo_id" . ($hasOrigen ? " AND LOWER(COALESCE(pi.origen, '')) = 'store'" : "")
+            : "";
+
+        $nameExpr = $hasGiftProducts
+            ? "COALESCE(pl.nombre, sgp.nombre, CONCAT('Producto #', pi.platillo_id))"
+            : "COALESCE(pl.nombre, CONCAT('Producto #', pi.platillo_id))";
+
+        return "SELECT pi.id, {$nameExpr} AS nombre, pi.cantidad, pi.estado
+                  FROM rest_pedido_items pi
+                  {$joinPlatillos}
+                  {$joinGifts}
+                 WHERE pi.pedido_id = ? AND pi.estado != 'cancelado'";
     }
 
     public function dashboard(?string $p = null): void
@@ -135,13 +199,20 @@ class RestMeseroController extends BaseController
         $pid      = (int)$pedidoId;
 
         // Solo puede entregar el mesero que reclamó, o cualquiera si no fue reclamado
+        $giftExistsSql = $this->giftExistsSql('p');
         $check = $db->prepare(
-            "SELECT estado, reclamado_por FROM rest_pedidos WHERE id = ? AND restaurante_id = ?"
+            "SELECT p.estado, p.reclamado_por, ({$giftExistsSql}) AS es_regalo
+             FROM rest_pedidos p
+             WHERE p.id = ? AND p.restaurante_id = ?"
         );
         $check->execute([$pid, $this->restauranteId()]);
         $row = $check->fetch(PDO::FETCH_ASSOC);
+        $esRegalo = $row && (int)($row['es_regalo'] ?? 0) === 1;
+        $estadosValidos = $esRegalo
+            ? ['pendiente', 'en_preparacion', 'listo', 'en_camino', 'reclamado']
+            : ['listo', 'reclamado'];
 
-        if (!$row || !in_array($row['estado'], ['listo', 'reclamado'], true)) {
+        if (!$row || !in_array($row['estado'], $estadosValidos, true)) {
             $this->json(['ok' => false, 'msg' => 'Estado inválido']);
             return;
         }
@@ -153,23 +224,29 @@ class RestMeseroController extends BaseController
         }
 
         // Verificar que no haya ítems aún por preparar/pendientes (chef todavía trabajando)
-        $pend = $db->prepare(
-            "SELECT COUNT(*) FROM rest_pedido_items
-             WHERE pedido_id = ? AND estado IN ('pendiente','en_preparacion')"
-        );
-        $pend->execute([$pid]);
-        if ((int)$pend->fetchColumn() > 0) {
-            $this->json(['ok' => false, 'msg' => 'Aún hay platillos sin marcar listos por el chef']);
-            return;
+        if (!$esRegalo) {
+            $pend = $db->prepare(
+                "SELECT COUNT(*) FROM rest_pedido_items
+                 WHERE pedido_id = ? AND estado IN ('pendiente','en_preparacion')"
+            );
+            $pend->execute([$pid]);
+            if ((int)$pend->fetchColumn() > 0) {
+                $this->json(['ok' => false, 'msg' => 'Aún hay platillos sin marcar listos por el chef']);
+                return;
+            }
         }
 
         $db->prepare(
             "UPDATE rest_pedidos SET estado='entregado', mesero_id = ? WHERE id = ? AND restaurante_id = ?"
         )->execute([$meseroId, $pid, $this->restauranteId()]);
 
+        $itemEstados = $esRegalo
+            ? "estado NOT IN ('entregado','cancelado')"
+            : "estado IN ('listo','reclamado')";
+
         $db->prepare(
             "UPDATE rest_pedido_items SET estado='entregado'
-             WHERE pedido_id = ? AND estado IN ('listo','reclamado')"
+             WHERE pedido_id = ? AND {$itemEstados}"
         )->execute([$pid]);
 
         // Propagar mesero_id al ticket si aún no tiene
@@ -260,10 +337,12 @@ class RestMeseroController extends BaseController
         );
         $stmtZ->execute([$restauranteId, $meseroId]);
         $misZonas = array_column($stmtZ->fetchAll(PDO::FETCH_ASSOC), 'zona_id');
+        $giftExistsSql = $this->giftExistsSql('p');
         $pedidoMetaSelect = $this->optionalPedidoSelect('p', [
             'tipo_origen',
             'tipo_entrega',
-            'es_regalo',
+            'tipo_pedido',
+            'direccion_entrega',
             'comprador_nombre',
             'comprador_direccion',
             'comprador_telefono',
@@ -276,12 +355,17 @@ class RestMeseroController extends BaseController
             "SELECT p.id, p.folio, p.estado, p.created_at, p.mesero_id,
                     p.reclamado_por, p.reclamado_at, p.mesa_id,
                     {$pedidoMetaSelect},
+                    ({$giftExistsSql}) AS es_regalo,
                     m.nombre AS mesa_nombre, m.zona_id,
                     u.nombre AS reclamado_por_nombre
              FROM rest_pedidos p
              LEFT JOIN rest_mesas m   ON m.id = p.mesa_id
              LEFT JOIN usuarios u     ON u.id = p.reclamado_por
-             WHERE p.restaurante_id = ? AND p.estado IN ('listo','reclamado')
+             WHERE p.restaurante_id = ?
+               AND (
+                    p.estado IN ('listo','reclamado')
+                    OR (({$giftExistsSql}) AND p.estado IN ('pendiente','en_camino'))
+               )
              ORDER BY
                CASE WHEN m.zona_id IN (" . (count($misZonas) ? implode(',', array_fill(0, count($misZonas), '?')) : '0') . ") THEN 0 ELSE 1 END ASC,
                p.created_at ASC
@@ -296,12 +380,7 @@ class RestMeseroController extends BaseController
             $ped['es_mi_reclamo'] = $ped['estado'] === 'reclamado' && (int)$ped['reclamado_por'] === $meseroId;
             $ped['reclamado_otro'] = $ped['estado'] === 'reclamado' && (int)$ped['reclamado_por'] !== $meseroId;
 
-            $stmt2 = $db->prepare(
-                "SELECT pi.id, pl.nombre AS nombre, pi.cantidad
-                 FROM rest_pedido_items pi
-                 JOIN rest_platillos pl ON pl.id = pi.platillo_id
-                 WHERE pi.pedido_id = ? AND pi.estado != 'cancelado'"
-            );
+            $stmt2 = $db->prepare($this->pedidoItemsSql());
             $stmt2->execute([(int)$ped['id']]);
             $ped['items'] = $stmt2->fetchAll(PDO::FETCH_ASSOC);
         }
