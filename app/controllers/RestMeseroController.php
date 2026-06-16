@@ -144,6 +144,85 @@ class RestMeseroController extends BaseController
                  WHERE pi.pedido_id = ? AND pi.estado != 'cancelado'";
     }
 
+    private function socialGiftSelect(string $alias, string $column, string $fallback): string
+    {
+        if ($this->hasColumn('social_gift_orders', $column)) {
+            return "{$alias}.`{$column}`";
+        }
+
+        return $fallback;
+    }
+
+    private function socialGiftOrdersListos(int $restauranteId, array $misZonas): array
+    {
+        if (!$this->hasTable('social_gift_orders')) {
+            return [];
+        }
+
+        $folioExpr = $this->socialGiftSelect('go', 'folio', "CONCAT('SG-', LPAD(go.id, 6, '0'))");
+        $statusExpr = $this->socialGiftSelect('go', 'status', "'listo'");
+        $createdAtExpr = $this->socialGiftSelect('go', 'created_at', 'NOW()');
+        $mesaIdExpr = $this->socialGiftSelect('go', 'mesa_id', 'NULL');
+        $senderNombreExpr = $this->socialGiftSelect('go', 'sender_nombre', 'NULL');
+        $recipientNombreExpr = $this->socialGiftSelect('go', 'recipient_nombre', 'NULL');
+        $senderMesaExpr = $this->socialGiftSelect('go', 'sender_mesa', 'NULL');
+        $recipientMesaExpr = $this->socialGiftSelect('go', 'recipient_mesa', 'NULL');
+        $giftNombreExpr = $this->socialGiftSelect('go', 'gift_nombre', "'Regalo'");
+
+        $db = Database::getInstance();
+        $stmt = $db->prepare(
+            "SELECT CONCAT('gift-', go.id) AS id,
+                    go.id AS gift_order_id,
+                    'social_gift_orders' AS origen_fuente,
+                    {$folioExpr} AS folio,
+                    COALESCE({$statusExpr}, 'listo') AS estado,
+                    {$createdAtExpr} AS created_at,
+                    NULL AS mesero_id,
+                    NULL AS reclamado_por,
+                    NULL AS reclamado_at,
+                    {$mesaIdExpr} AS mesa_id,
+                    'store' AS tipo_origen,
+                    'gift' AS tipo_entrega,
+                    'gift' AS tipo_pedido,
+                    NULL AS direccion_entrega,
+                    {$senderNombreExpr} AS comprador_nombre,
+                    {$senderMesaExpr} AS comprador_direccion,
+                    NULL AS comprador_telefono,
+                    {$recipientNombreExpr} AS destinatario_nombre,
+                    {$recipientMesaExpr} AS destinatario_direccion,
+                    NULL AS destinatario_telefono,
+                    1 AS es_regalo,
+                    1 AS es_producto_directo,
+                    m.nombre AS mesa_nombre,
+                    m.zona_id,
+                    NULL AS reclamado_por_nombre,
+                    {$giftNombreExpr} AS gift_nombre
+             FROM social_gift_orders go
+             LEFT JOIN rest_mesas m ON m.id = {$mesaIdExpr}
+             WHERE go.restaurante_id = ?
+               AND LOWER(COALESCE({$statusExpr}, 'listo')) NOT IN ('entregado','cancelado','cancelada')
+             ORDER BY {$createdAtExpr} ASC, go.id ASC
+             LIMIT 50"
+        );
+        $stmt->execute([$restauranteId]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($rows as &$row) {
+            $row['es_mi_zona'] = in_array((int)($row['zona_id'] ?? 0), $misZonas);
+            $row['es_mi_reclamo'] = false;
+            $row['reclamado_otro'] = false;
+            $row['items'] = [[
+                'id' => $row['gift_order_id'],
+                'nombre' => $row['gift_nombre'] ?: 'Regalo',
+                'cantidad' => 1,
+                'estado' => $row['estado'] ?: 'listo',
+            ]];
+        }
+        unset($row);
+
+        return $rows;
+    }
+
     public function dashboard(?string $p = null): void
     {
         $restauranteId = $this->restauranteId();
@@ -225,7 +304,26 @@ class RestMeseroController extends BaseController
     {
         $db       = Database::getInstance();
         $meseroId = $this->usuarioId();
-        $pid      = (int)$pedidoId;
+        if (is_string($pedidoId) && substr($pedidoId, 0, 5) === 'gift-') {
+            $giftOrderId = (int)substr($pedidoId, 5);
+            if (!$this->hasTable('social_gift_orders') || !$this->hasColumn('social_gift_orders', 'status')) {
+                $this->json(['ok' => false, 'msg' => 'No se pudo actualizar el regalo']);
+                return;
+            }
+
+            $stmt = $db->prepare(
+                "UPDATE social_gift_orders
+                 SET status = 'entregado'
+                 WHERE id = ? AND restaurante_id = ?
+                   AND LOWER(COALESCE(status, 'listo')) NOT IN ('entregado','cancelado','cancelada')"
+            );
+            $stmt->execute([$giftOrderId, $this->restauranteId()]);
+
+            $this->json(['ok' => $stmt->rowCount() > 0]);
+            return;
+        }
+
+        $pid = (int)$pedidoId;
 
         // Solo puede entregar el mesero que reclamó, o cualquiera si no fue reclamado
         $giftExistsSql = $this->giftExistsSql('p');
@@ -411,6 +509,7 @@ class RestMeseroController extends BaseController
         $pedidos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         foreach ($pedidos as &$ped) {
+            $ped['origen_fuente'] = 'rest_pedidos';
             $ped['es_mi_zona']    = in_array((int)($ped['zona_id'] ?? 0), $misZonas);
             $ped['es_mi_reclamo'] = $ped['estado'] === 'reclamado' && (int)$ped['reclamado_por'] === $meseroId;
             $ped['reclamado_otro'] = $ped['estado'] === 'reclamado' && (int)$ped['reclamado_por'] !== $meseroId;
@@ -420,6 +519,12 @@ class RestMeseroController extends BaseController
             $ped['items'] = $stmt2->fetchAll(PDO::FETCH_ASSOC);
         }
         unset($ped);
+
+        $pedidos = array_merge($pedidos, $this->socialGiftOrdersListos($restauranteId, $misZonas));
+        usort($pedidos, static function (array $a, array $b): int {
+            return strcmp((string)($a['created_at'] ?? ''), (string)($b['created_at'] ?? ''));
+        });
+        $pedidos = array_slice($pedidos, 0, 50);
 
         $this->json(['ok' => true, 'listos' => $pedidos, 'mis_zonas' => $misZonas]);
     }

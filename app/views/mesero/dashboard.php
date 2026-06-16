@@ -393,9 +393,13 @@ function pedidoEsProductoDirecto(p) {
 }
 
 function pedidoUbicacionLabel(p) {
+  const esRegalo = pedidoEsRegalo(p);
+  const esProducto = pedidoEsProductoDirecto(p);
+  if (p.mesa_nombre && esRegalo) return 'Regalo · Mesa ' + p.mesa_nombre;
+  if (p.mesa_nombre && esProducto) return 'Producto · Mesa ' + p.mesa_nombre;
   if (p.mesa_nombre) return 'Mesa ' + p.mesa_nombre;
-  if (pedidoEsRegalo(p)) return 'Regalo';
-  if (pedidoEsProductoDirecto(p)) return 'Producto';
+  if (esRegalo) return 'Regalo';
+  if (esProducto) return 'Producto';
   const entrega = String(p.tipo_pedido || p.tipo_entrega || p.tipo_origen || '').toLowerCase();
   if (entrega === 'delivery') return 'A domicilio';
   if (entrega === 'pickup') return 'Para recoger';
@@ -412,13 +416,15 @@ function pedidoDetalleEntrega(p) {
 }
 
 function buildListoCard(p) {
+  const pedidoKey = String(p.id);
+  const pedidoArg = JSON.stringify(pedidoKey);
   const itemsText = (p.items || []).map(i => `${i.cantidad}× ${i.nombre}`).join(', ');
   const ubicacion = pedidoUbicacionLabel(p);
   const detalleEntrega = pedidoDetalleEntrega(p);
 
   if (p.reclamado_otro) {
     // Otro mesero ya lo reclamó — mostrar chip informativo
-    return `<div class="listo-card" id="listo-${p.id}" style="opacity:.7">
+    return `<div class="listo-card" id="listo-${pedidoKey}" style="opacity:.7">
       <div style="flex:1">
         <div style="font-weight:700;font-size:.9rem;color:#111827">${p.folio} · ${ubicacion}</div>
         ${itemsText ? `<div style="font-size:.78rem;color:#6B7280;margin-top:3px">${itemsText}</div>` : ''}
@@ -432,25 +438,25 @@ function buildListoCard(p) {
 
   if (p.es_mi_reclamo) {
     // Yo lo reclamé — mostrar Entregado directo
-    return `<div class="listo-card" id="listo-${p.id}" style="border-color:#BFDBFE">
+    return `<div class="listo-card" id="listo-${pedidoKey}" style="border-color:#BFDBFE">
       <div style="flex:1">
         <div style="font-weight:700;font-size:.9rem;color:#111827">${p.folio} · ${ubicacion} <span style="font-size:.7rem;background:#DBEAFE;color:#1D4ED8;padding:1px 6px;border-radius:8px;font-weight:700">RECLAMADO</span></div>
         ${itemsText ? `<div style="font-size:.78rem;color:#6B7280;margin-top:3px">${itemsText}</div>` : ''}
         ${detalleEntrega ? `<div style="font-size:.76rem;color:#92400E;margin-top:3px">${detalleEntrega}</div>` : ''}
       </div>
-      <button class="btn-sm btn-entregar" onclick="marcarEntregado(${p.id},this)">Entregado ✓</button>
+      <button class="btn-sm btn-entregar" onclick='marcarEntregado(${pedidoArg},this)'>Entregado ✓</button>
     </div>`;
   }
 
   // Disponible — entregar directo
-  return `<div class="listo-card" id="listo-${p.id}">
+  return `<div class="listo-card" id="listo-${pedidoKey}">
     <div style="flex:1">
       <div style="font-weight:700;font-size:.9rem;color:#111827">${p.folio} · ${ubicacion}</div>
       ${itemsText ? `<div style="font-size:.78rem;color:#6B7280;margin-top:3px">${itemsText}</div>` : ''}
       ${detalleEntrega ? `<div style="font-size:.76rem;color:#92400E;margin-top:3px">${detalleEntrega}</div>` : ''}
     </div>
     <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end">
-      <button class="btn-sm btn-entregar" onclick="marcarEntregado(${p.id},this)">Entregado ✓</button>
+      <button class="btn-sm btn-entregar" onclick='marcarEntregado(${pedidoArg},this)'>Entregado ✓</button>
     </div>
   </div>`;
 }
