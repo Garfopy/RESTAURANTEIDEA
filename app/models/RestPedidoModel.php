@@ -33,7 +33,8 @@ class RestPedidoModel extends BaseModel
         if (!$this->soportaTipoOrigen()) {
             return '';
         }
-        return " AND LOWER(COALESCE({$alias}.tipo_origen, '')) <> 'store'";
+        $regalo = $this->sqlRegaloException($alias);
+        return " AND (LOWER(COALESCE({$alias}.tipo_origen, '')) <> 'store'{$regalo})";
     }
 
     private function sqlSoloStore(string $alias = 'p'): string
@@ -41,7 +42,21 @@ class RestPedidoModel extends BaseModel
         if (!$this->soportaTipoOrigen()) {
             return ' AND 1 = 0';
         }
-        return " AND LOWER(COALESCE({$alias}.tipo_origen, '')) = 'store'";
+        $regalo = $this->sqlRegaloException($alias);
+        return " AND LOWER(COALESCE({$alias}.tipo_origen, '')) = 'store' AND NOT (0{$regalo})";
+    }
+
+    private function sqlRegaloException(string $alias = 'p'): string
+    {
+        $parts = [];
+        if ($this->hasColumn('es_regalo')) {
+            $parts[] = "COALESCE({$alias}.es_regalo, 0) = 1";
+        }
+        if ($this->hasColumn('tipo_entrega')) {
+            $parts[] = "LOWER(COALESCE({$alias}.tipo_entrega, '')) IN ('gift', 'regalo', 'regalos')";
+        }
+
+        return $parts ? ' OR ' . implode(' OR ', $parts) : '';
     }
 
     public function generarFolio(int $restauranteId): string

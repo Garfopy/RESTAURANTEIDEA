@@ -181,6 +181,12 @@
 
 <!-- Órdenes listas para entregar -->
 <div id="listosBanner" class="hidden">
+  <div id="sinMesaSection" class="hidden" style="margin-bottom:14px">
+    <div style="font-weight:700;color:#7C2D12;font-size:.88rem;margin-bottom:10px;display:flex;align-items:center;gap:6px">
+      Regalos / pedidos sin mesa <span id="cnt-sinmesa-text"></span>
+    </div>
+    <div id="sinMesaList"></div>
+  </div>
   <div style="font-weight:700;color:#166534;font-size:.88rem;margin-bottom:10px;display:flex;align-items:center;gap:6px">
     ✅ Mis mesas — listas para entregar <span id="cnt-listos-text"></span>
   </div>
@@ -375,15 +381,42 @@ function toggleOtras() {
   btn.textContent = (otrasExpanded ? '▼ ' : '▶ ') + 'Otras mesas ' + btn.textContent.replace(/^[▼▶]\s*Otras mesas\s*/,'');
 }
 
+function pedidoEsRegalo(p) {
+  const origen = String(p.tipo_origen || '').toLowerCase();
+  const entrega = String(p.tipo_entrega || '').toLowerCase();
+  return Number(p.es_regalo || 0) === 1 || origen.includes('regalo') || entrega.includes('regalo') || entrega.includes('gift');
+}
+
+function pedidoUbicacionLabel(p) {
+  if (p.mesa_nombre) return 'Mesa ' + p.mesa_nombre;
+  if (pedidoEsRegalo(p)) return 'Regalo';
+  const entrega = String(p.tipo_entrega || p.tipo_origen || '').toLowerCase();
+  if (entrega === 'delivery') return 'A domicilio';
+  if (entrega === 'pickup') return 'Para recoger';
+  if (entrega === 'eat_in') return 'Comer aqui';
+  if (entrega === 'store') return 'Venta store';
+  return 'Sin mesa';
+}
+
+function pedidoDetalleEntrega(p) {
+  const nombre = p.destinatario_nombre || p.comprador_nombre || '';
+  const direccion = p.destinatario_direccion || p.comprador_direccion || '';
+  const telefono = p.destinatario_telefono || p.comprador_telefono || '';
+  return [nombre, direccion, telefono].filter(Boolean).join(' · ');
+}
+
 function buildListoCard(p) {
   const itemsText = (p.items || []).map(i => `${i.cantidad}× ${i.nombre}`).join(', ');
+  const ubicacion = pedidoUbicacionLabel(p);
+  const detalleEntrega = pedidoDetalleEntrega(p);
 
   if (p.reclamado_otro) {
     // Otro mesero ya lo reclamó — mostrar chip informativo
     return `<div class="listo-card" id="listo-${p.id}" style="opacity:.7">
       <div style="flex:1">
-        <div style="font-weight:700;font-size:.9rem;color:#111827">${p.folio} · Mesa ${p.mesa_nombre || '—'}</div>
+        <div style="font-weight:700;font-size:.9rem;color:#111827">${p.folio} · ${ubicacion}</div>
         ${itemsText ? `<div style="font-size:.78rem;color:#6B7280;margin-top:3px">${itemsText}</div>` : ''}
+        ${detalleEntrega ? `<div style="font-size:.76rem;color:#92400E;margin-top:3px">${detalleEntrega}</div>` : ''}
       </div>
       <span style="font-size:.75rem;font-weight:600;padding:4px 10px;border-radius:20px;background:#FEF3C7;color:#92400E;white-space:nowrap">
         🚶 En camino
@@ -395,8 +428,9 @@ function buildListoCard(p) {
     // Yo lo reclamé — mostrar Entregado directo
     return `<div class="listo-card" id="listo-${p.id}" style="border-color:#BFDBFE">
       <div style="flex:1">
-        <div style="font-weight:700;font-size:.9rem;color:#111827">${p.folio} · Mesa ${p.mesa_nombre || '—'} <span style="font-size:.7rem;background:#DBEAFE;color:#1D4ED8;padding:1px 6px;border-radius:8px;font-weight:700">RECLAMADO</span></div>
+        <div style="font-weight:700;font-size:.9rem;color:#111827">${p.folio} · ${ubicacion} <span style="font-size:.7rem;background:#DBEAFE;color:#1D4ED8;padding:1px 6px;border-radius:8px;font-weight:700">RECLAMADO</span></div>
         ${itemsText ? `<div style="font-size:.78rem;color:#6B7280;margin-top:3px">${itemsText}</div>` : ''}
+        ${detalleEntrega ? `<div style="font-size:.76rem;color:#92400E;margin-top:3px">${detalleEntrega}</div>` : ''}
       </div>
       <button class="btn-sm btn-entregar" onclick="marcarEntregado(${p.id},this)">Entregado ✓</button>
     </div>`;
@@ -405,8 +439,9 @@ function buildListoCard(p) {
   // Disponible — entregar directo
   return `<div class="listo-card" id="listo-${p.id}">
     <div style="flex:1">
-      <div style="font-weight:700;font-size:.9rem;color:#111827">${p.folio} · Mesa ${p.mesa_nombre || '—'}</div>
+      <div style="font-weight:700;font-size:.9rem;color:#111827">${p.folio} · ${ubicacion}</div>
       ${itemsText ? `<div style="font-size:.78rem;color:#6B7280;margin-top:3px">${itemsText}</div>` : ''}
+      ${detalleEntrega ? `<div style="font-size:.76rem;color:#92400E;margin-top:3px">${detalleEntrega}</div>` : ''}
     </div>
     <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end">
       <button class="btn-sm btn-entregar" onclick="marcarEntregado(${p.id},this)">Entregado ✓</button>
@@ -421,8 +456,10 @@ function pollListos() {
       if (!d.ok) return;
       const listos = d.listos;
 
-      const misMesas   = listos.filter(p => p.es_mi_zona && !p.reclamado_otro);
-      const otrosMesas = listos.filter(p => !p.es_mi_zona || p.reclamado_otro);
+      const sinMesa    = listos.filter(p => !p.mesa_id);
+      const conMesa    = listos.filter(p => p.mesa_id);
+      const misMesas   = conMesa.filter(p => p.es_mi_zona && !p.reclamado_otro);
+      const otrosMesas = conMesa.filter(p => !p.es_mi_zona || p.reclamado_otro);
       const cntMias    = misMesas.length;
       const cntTotal   = listos.length;
 
@@ -435,10 +472,19 @@ function pollListos() {
       if (!cntTotal) { banner.classList.add('hidden'); prevListosIds = new Set(); return; }
 
       // Detectar nuevos en mis mesas
-      const newIds = new Set(misMesas.map(l => l.id));
+      const newIds = new Set([...misMesas, ...sinMesa].map(l => l.id));
       const hayNuevos = [...newIds].some(id => !prevListosIds.has(id));
-      if (hayNuevos && prevListosIds.size > 0) { vibrar(); toast('🔔 ¡Pedido listo en tu zona!'); }
+      if (hayNuevos && prevListosIds.size > 0) { vibrar(); toast('🔔 Pedido listo para entregar'); }
       prevListosIds = newIds;
+
+      const sinMesaSection = document.getElementById('sinMesaSection');
+      if (sinMesa.length) {
+        document.getElementById('cnt-sinmesa-text').textContent = `(${sinMesa.length})`;
+        document.getElementById('sinMesaList').innerHTML = sinMesa.map(buildListoCard).join('');
+        sinMesaSection.classList.remove('hidden');
+      } else {
+        sinMesaSection.classList.add('hidden');
+      }
 
       // Contar sin los "en camino"
       const listosMios = misMesas.filter(p => !p.es_mi_reclamo || p.es_mi_reclamo).length;

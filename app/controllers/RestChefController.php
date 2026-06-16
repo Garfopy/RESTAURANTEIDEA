@@ -4,12 +4,58 @@ require_once ROOT_PATH . '/app/controllers/BaseController.php';
 class RestChefController extends BaseController
 {
     private RestPedidoModel $model;
+    private static array $columnCache = [];
 
     public function __construct()
     {
         parent::__construct();
         $this->requireChef();
         $this->model = new RestPedidoModel();
+    }
+
+    private function hasPedidoColumn(string $column): bool
+    {
+        if (array_key_exists($column, self::$columnCache)) {
+            return self::$columnCache[$column];
+        }
+
+        try {
+            $db = Database::getInstance();
+            $stmt = $db->prepare(
+                "SELECT COUNT(*)
+                   FROM information_schema.columns
+                  WHERE table_schema = DATABASE()
+                    AND table_name = 'rest_pedidos'
+                    AND column_name = ?"
+            );
+            $stmt->execute([$column]);
+            self::$columnCache[$column] = (int)$stmt->fetchColumn() > 0;
+        } catch (\Throwable $e) {
+            self::$columnCache[$column] = false;
+        }
+
+        return self::$columnCache[$column];
+    }
+
+    private function pedidoSelectMeta(string $alias): string
+    {
+        $select = ["{$alias}.tipo_origen"];
+        $select[] = $this->hasPedidoColumn('es_regalo') ? "{$alias}.es_regalo" : "0 AS es_regalo";
+        $select[] = $this->hasPedidoColumn('tipo_entrega') ? "{$alias}.tipo_entrega" : "NULL AS tipo_entrega";
+        return implode(', ', $select);
+    }
+
+    private function debeIgnorarPorStore(array $pedido): bool
+    {
+        if (strtolower((string)($pedido['tipo_origen'] ?? '')) !== 'store') {
+            return false;
+        }
+
+        $tipoEntrega = strtolower((string)($pedido['tipo_entrega'] ?? ''));
+        $esRegalo = (int)($pedido['es_regalo'] ?? 0) === 1
+            || in_array($tipoEntrega, ['gift', 'regalo', 'regalos'], true);
+
+        return !$esRegalo;
     }
 
     public function dashboard(?string $p = null): void
@@ -34,9 +80,10 @@ class RestChefController extends BaseController
         // ── Leer estado actual ANTES de cambiar (idempotencia) ────────────────
         try {
             $db       = Database::getInstance();
+            $pedidoMetaSelect = $this->pedidoSelectMeta('p');
             $stmtItem = $db->prepare(
                 "SELECT pi.platillo_id, pi.cantidad, pi.pedido_id, pi.estado,
-                        p.restaurante_id, p.tipo_origen
+                        p.restaurante_id, {$pedidoMetaSelect}
                  FROM rest_pedido_items pi
                  JOIN rest_pedidos p ON p.id = pi.pedido_id
                  WHERE pi.id = ? LIMIT 1"
@@ -44,7 +91,7 @@ class RestChefController extends BaseController
             $stmtItem->execute([$itemId]);
             $item = $stmtItem->fetch(\PDO::FETCH_ASSOC);
 
-            if ($item && strtolower((string)($item['tipo_origen'] ?? '')) === 'store') {
+            if ($item && $this->debeIgnorarPorStore($item)) {
                 $this->json(['ok' => true, 'store_ignored' => true]);
                 return;
             }
@@ -145,15 +192,16 @@ class RestChefController extends BaseController
         $itemId = (int)$itemId;
         $db   = Database::getInstance();
         try {
+            $pedidoMetaSelect = $this->pedidoSelectMeta('p');
             $stmtItem = $db->prepare(
-                "SELECT p.tipo_origen
+                "SELECT {$pedidoMetaSelect}
                    FROM rest_pedido_items pi
                    JOIN rest_pedidos p ON p.id = pi.pedido_id
                   WHERE pi.id = ? LIMIT 1"
             );
             $stmtItem->execute([$itemId]);
             $item = $stmtItem->fetch(\PDO::FETCH_ASSOC);
-            if ($item && strtolower((string)($item['tipo_origen'] ?? '')) === 'store') {
+            if ($item && $this->debeIgnorarPorStore($item)) {
                 $this->json(['ok' => true, 'store_ignored' => true]);
                 return;
             }

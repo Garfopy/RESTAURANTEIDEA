@@ -4,12 +4,51 @@ require_once ROOT_PATH . '/app/controllers/BaseController.php';
 class RestMeseroController extends BaseController
 {
     private RestPedidoModel $model;
+    private static array $columnCache = [];
 
     public function __construct()
     {
         parent::__construct();
         $this->requireMesero();
         $this->model = new RestPedidoModel();
+    }
+
+    private function hasColumn(string $table, string $column): bool
+    {
+        $key = $table . '.' . $column;
+        if (array_key_exists($key, self::$columnCache)) {
+            return self::$columnCache[$key];
+        }
+
+        try {
+            $db = Database::getInstance();
+            $stmt = $db->prepare(
+                "SELECT COUNT(*)
+                   FROM information_schema.columns
+                  WHERE table_schema = DATABASE()
+                    AND table_name = ?
+                    AND column_name = ?"
+            );
+            $stmt->execute([$table, $column]);
+            self::$columnCache[$key] = (int)$stmt->fetchColumn() > 0;
+        } catch (\Throwable $e) {
+            self::$columnCache[$key] = false;
+        }
+
+        return self::$columnCache[$key];
+    }
+
+    private function optionalPedidoSelect(string $alias, array $columns): string
+    {
+        $parts = [];
+        foreach ($columns as $column) {
+            if ($this->hasColumn('rest_pedidos', $column)) {
+                $parts[] = "{$alias}.`{$column}` AS `{$column}`";
+            } else {
+                $parts[] = "NULL AS `{$column}`";
+            }
+        }
+        return implode(",\n                    ", $parts);
     }
 
     public function dashboard(?string $p = null): void
@@ -221,10 +260,22 @@ class RestMeseroController extends BaseController
         );
         $stmtZ->execute([$restauranteId, $meseroId]);
         $misZonas = array_column($stmtZ->fetchAll(PDO::FETCH_ASSOC), 'zona_id');
+        $pedidoMetaSelect = $this->optionalPedidoSelect('p', [
+            'tipo_origen',
+            'tipo_entrega',
+            'es_regalo',
+            'comprador_nombre',
+            'comprador_direccion',
+            'comprador_telefono',
+            'destinatario_nombre',
+            'destinatario_direccion',
+            'destinatario_telefono',
+        ]);
 
         $stmt = $db->prepare(
             "SELECT p.id, p.folio, p.estado, p.created_at, p.mesero_id,
-                    p.reclamado_por, p.reclamado_at,
+                    p.reclamado_por, p.reclamado_at, p.mesa_id,
+                    {$pedidoMetaSelect},
                     m.nombre AS mesa_nombre, m.zona_id,
                     u.nombre AS reclamado_por_nombre
              FROM rest_pedidos p
