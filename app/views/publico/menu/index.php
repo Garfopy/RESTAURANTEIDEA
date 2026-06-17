@@ -6,20 +6,24 @@
   <title><?= htmlspecialchars($restaurante['nombre']) ?></title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="<?= BASE_URL ?>public/css/restaurant.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
   <style>
     /* ── Variables de marca ─────────────────────── */
     :root {
       --cp:       <?= htmlspecialchars($restaurante['color_primario']  ?? '#C8102E') ?>;
       --cs:       <?= htmlspecialchars($restaurante['color_secundario'] ?? '#1f2937') ?>;
-      --gold:     var(--cp);
-      --gold-dim: color-mix(in srgb, var(--cp) 12%, white);
-      --gold-hi:  color-mix(in srgb, var(--cp) 24%, white);
-      --bg:       #F7F6F2;
+      --accent:   var(--cp);
+      --accent-soft: color-mix(in srgb, var(--cp) 10%, white);
+      --accent-line: color-mix(in srgb, var(--cp) 28%, #D7DAE0);
+      --bg:       #F7F8FA;
       --card:     #FFFFFF;
-      --line:     rgba(0,0,0,.07);
-      --text-main:#1C1C2E;
-      --text-muted:#6B7280;
-      --radius-card: 16px;
+      --panel:    #F1F4F8;
+      --line:     rgba(17,24,39,.10);
+      --text-main:#151922;
+      --text-muted:#667085;
+      --radius-card: 8px;
+      --shadow-sm: 0 10px 28px rgba(15, 23, 42, .08);
+      --shadow-lg: 0 -18px 56px rgba(15, 23, 42, .22);
     }
 
     /* Evita recorte circular del logo en encabezado con banner */
@@ -34,85 +38,93 @@
     *, *::before, *::after { box-sizing: border-box; }
     body { margin:0; font-family:'Inter',system-ui,sans-serif; background:var(--bg); color:var(--text-main); -webkit-font-smoothing:antialiased; }
     a { color:inherit; text-decoration:none; }
+    .mn-icon { width:16px; height:16px; stroke-width:2; flex-shrink:0; }
+    .mn-icon-lg { width:20px; height:20px; stroke-width:2; flex-shrink:0; }
+    .mn-page { max-width:1120px; margin:0 auto; padding:0 14px 34px; }
 
     /* ── Barra de tabs ──────────────────────────── */
-    .mn-tab-bar { display:flex; gap:8px; padding:10px 16px 10px; overflow-x:auto; scrollbar-width:none; position:sticky; top:0; background:rgba(247,246,242,.97); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); z-index:20; border-bottom:1px solid rgba(0,0,0,.07); box-shadow:0 2px 12px rgba(0,0,0,.05); }
+    .mn-tab-bar { display:flex; gap:8px; padding:12px 14px; overflow-x:auto; scrollbar-width:none; position:sticky; top:0; background:rgba(247,248,250,.92); backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px); z-index:20; border-bottom:1px solid var(--line); }
     .mn-tab-bar::-webkit-scrollbar { display:none; }
-    .mn-tab { padding:7px 16px; border-radius:99px; font-size:.78rem; font-weight:600; border:1.5px solid #E2E3E6; background:#fff; color:var(--text-muted); cursor:pointer; white-space:nowrap; transition:all .18s; flex-shrink:0; display:flex; align-items:center; gap:5px; }
-    .mn-tab .mn-tab-count { font-size:.68rem; font-weight:700; background:#E5E7EB; color:var(--text-muted); border-radius:99px; padding:1px 6px; transition:all .18s; }
-    .mn-tab:hover { border-color:var(--gold); color:#7a5a00; background:var(--gold-dim); }
-    .mn-tab:hover .mn-tab-count { background:var(--gold-hi); color:#7a5a00; }
-    .mn-tab.active { background:var(--gold); border-color:var(--gold); color:#fff; box-shadow:0 3px 12px rgba(201,164,48,.4); }
+    .mn-tab { min-height:38px; padding:8px 14px; border-radius:999px; font-size:.78rem; font-weight:700; border:1px solid #DEE3EA; background:#fff; color:#4B5563; cursor:pointer; white-space:nowrap; transition:all .18s; flex-shrink:0; display:flex; align-items:center; gap:7px; box-shadow:0 1px 0 rgba(15,23,42,.02); }
+    .mn-tab .mn-tab-count { font-size:.67rem; font-weight:800; background:#EEF1F5; color:#6B7280; border-radius:99px; padding:2px 7px; transition:all .18s; }
+    .mn-tab:hover { border-color:var(--accent-line); color:var(--text-main); background:var(--accent-soft); }
+    .mn-tab.active { background:var(--accent); border-color:var(--accent); color:#fff; box-shadow:0 8px 20px color-mix(in srgb, var(--accent) 28%, transparent); }
     .mn-tab.active .mn-tab-count { background:rgba(255,255,255,.25); color:#fff; }
 
     /* ── Secciones ──────────────────────────────── */
-    .mn-section { margin-bottom:8px; }
+    .mn-section { margin:18px 0 4px; }
     .mn-section-title {
       display:flex; align-items:center; gap:10px;
-      margin:20px 16px 0;
-      padding:14px 16px;
-      background:var(--card);
-      border-radius:var(--radius-card) var(--radius-card) 0 0;
-      border-bottom:1px solid rgba(0,0,0,.06);
-      position:sticky; top:50px; z-index:10;
+      margin:0 0 10px;
+      padding:8px 2px;
+      background:transparent;
+      position:sticky; top:63px; z-index:10;
+      backdrop-filter:blur(10px);
     }
-    .mn-section-icon { font-size:1.5rem; line-height:1; }
+    .mn-section-icon { width:34px; height:34px; border-radius:8px; display:inline-flex; align-items:center; justify-content:center; color:var(--accent); background:var(--accent-soft); border:1px solid var(--accent-line); }
     .mn-section-text { flex:1; }
-    .mn-section-text h2 { margin:0; font-family:'Inter',system-ui,sans-serif; font-size:1.1rem; font-weight:700; color:var(--text-main); line-height:1.2; }
-    .mn-section-text span { font-size:.72rem; color:var(--text-muted); font-weight:500; }
-    .mn-section-divider { height:1px; background:linear-gradient(90deg,var(--gold) 0%,transparent 70%); margin:0 16px 0; opacity:.35; }
+    .mn-section-text h2 { margin:0; font-family:'Inter',system-ui,sans-serif; font-size:1.04rem; font-weight:800; color:var(--text-main); line-height:1.2; }
+    .mn-section-text span { font-size:.72rem; color:var(--text-muted); font-weight:600; }
 
     /* ── Lista de platillos ─────────────────────── */
-    .mn-list { background:var(--card); margin:0 16px; border-radius:0 0 var(--radius-card) var(--radius-card); overflow:hidden; }
+    .mn-list { display:grid; gap:10px; }
 
     /* ── Tarjeta horizontal ─────────────────────── */
     .mn-card {
       display:flex; align-items:stretch; gap:0;
-      padding:14px 16px;
-      border-bottom:1px solid rgba(0,0,0,.055);
+      padding:12px;
+      border:1px solid var(--line);
+      border-radius:var(--radius-card);
+      background:var(--card);
       cursor:pointer;
-      transition:background .15s;
+      transition:transform .16s, box-shadow .16s, border-color .16s;
       animation:fadeIn .22s ease both;
       position:relative;
+      box-shadow:0 1px 0 rgba(15,23,42,.02);
     }
-    .mn-card:last-child { border-bottom:none; }
-    .mn-card:hover { background:color-mix(in srgb, var(--cp) 8%, white); }
-    .mn-card:active { background:color-mix(in srgb, var(--cp) 14%, white); }
+    .mn-card:hover { transform:translateY(-1px); border-color:var(--accent-line); box-shadow:var(--shadow-sm); }
+    .mn-card:active { transform:translateY(0); box-shadow:none; }
 
     /* Lado izquierdo: texto */
-    .mn-card-body { flex:1; display:flex; flex-direction:column; justify-content:center; gap:4px; padding-right:14px; min-width:0; }
-    .mn-card-name { font-size:.97rem; font-weight:700; color:var(--text-main); line-height:1.3; }
-    .mn-card-desc { font-size:.78rem; color:var(--text-muted); line-height:1.5; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; margin-top:2px; }
-    .mn-card-chips { display:flex; flex-wrap:wrap; gap:4px; margin-top:5px; }
-    .mn-chip { font-size:.62rem; font-weight:600; padding:2px 8px; border-radius:99px; border:1px solid color-mix(in srgb, var(--cp) 35%, white); color:color-mix(in srgb, var(--cp) 78%, #111827); background:color-mix(in srgb, var(--cp) 12%, white); white-space:nowrap; }
-    .mn-chip-more { font-size:.62rem; color:color-mix(in srgb, var(--cp) 60%, #6B7280); align-self:center; }
-    .mn-card-price { font-size:.9rem; font-weight:800; color:var(--text-main); margin-top:6px; }
+    .mn-card-body { flex:1; display:flex; flex-direction:column; justify-content:center; gap:6px; padding-right:14px; min-width:0; }
+    .mn-card-name { font-size:1rem; font-weight:800; color:var(--text-main); line-height:1.28; letter-spacing:0; }
+    .mn-card-desc { font-size:.8rem; color:var(--text-muted); line-height:1.5; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; margin-top:1px; }
+    .mn-card-chips { display:flex; flex-wrap:wrap; gap:5px; margin-top:3px; }
+    .mn-chip { display:inline-flex; align-items:center; gap:4px; font-size:.64rem; font-weight:700; padding:3px 8px; border-radius:999px; border:1px solid var(--accent-line); color:color-mix(in srgb, var(--accent) 72%, #111827); background:var(--accent-soft); white-space:nowrap; }
+    .mn-chip-more { font-size:.65rem; color:color-mix(in srgb, var(--accent) 55%, #667085); align-self:center; font-weight:700; }
+    .mn-card-price { width:max-content; font-size:.86rem; font-weight:800; color:var(--text-main); margin-top:4px; padding:5px 10px; border-radius:999px; background:#F3F5F8; border:1px solid #E5EAF0; }
+    .mn-allergen { display:inline-flex; align-items:center; gap:4px; font-size:.62rem; font-weight:800; background:#FFF7ED; color:#9A3412; border:1px solid #FED7AA; border-radius:999px; padding:2px 7px; }
 
     /* Lado derecho: imagen */
-    .mn-card-thumb { position:relative; flex-shrink:0; width:140px; height:140px; border-radius:12px; overflow:hidden; background:linear-gradient(135deg,color-mix(in srgb, var(--cp) 8%, white),color-mix(in srgb, var(--cp) 18%, white)); align-self:center; }
+    .mn-card-thumb { position:relative; flex-shrink:0; width:118px; height:118px; border-radius:8px; overflow:hidden; background:linear-gradient(135deg,var(--panel),color-mix(in srgb, var(--accent) 12%, white)); align-self:center; border:1px solid #E8ECF2; }
     .mn-card-thumb img { width:100%; height:100%; object-fit:cover; }
-    .mn-card-emoji { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:3rem; }
+    .mn-card-icon { width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:color-mix(in srgb, var(--accent) 70%, #475467); }
+    .mn-card-icon .mn-icon-lg { width:34px; height:34px; }
+    .mn-card--visual { min-height:152px; }
+    .mn-card--visual .mn-card-body { justify-content:flex-start; padding-top:4px; padding-bottom:4px; }
+    .mn-card--visual .mn-card-desc { -webkit-line-clamp:3; }
+    .mn-card--visual .mn-card-thumb { width:148px; height:148px; }
 
     /* ── Modal / bottom-sheet ───────────────────── */
-    .mn-backdrop { display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px); z-index:200; align-items:flex-end; justify-content:center; }
+    .mn-backdrop { display:none; position:fixed; inset:0; background:rgba(15,23,42,.48); backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px); z-index:200; align-items:flex-end; justify-content:center; }
     .mn-backdrop.open { display:flex; }
-    .mn-sheet { background:#fff; border-radius:24px 24px 0 0; width:100%; max-width:520px; max-height:90vh; overflow-y:auto; animation:slideUp .28s cubic-bezier(.34,1.12,.64,1) both; scrollbar-width:thin; scrollbar-color:#D1D5DB transparent; box-shadow:0 -8px 40px rgba(0,0,0,.18); }
+    .mn-sheet { background:#fff; border-radius:18px 18px 0 0; width:100%; max-width:560px; height:min(88dvh, 720px); max-height:90vh; overflow-y:auto; animation:slideUp .28s cubic-bezier(.34,1.12,.64,1) both; scrollbar-width:thin; scrollbar-color:#D1D5DB transparent; box-shadow:var(--shadow-lg); padding-bottom:max(18px, env(safe-area-inset-bottom)); }
     .mn-sheet::-webkit-scrollbar { width:4px; }
     .mn-sheet::-webkit-scrollbar-thumb { background:#D1D5DB; border-radius:4px; }
     @keyframes slideUp { from { transform:translateY(100%); opacity:0; } to { transform:translateY(0); opacity:1; } }
     .mn-drag { width:40px; height:4px; background:rgba(0,0,0,.12); border-radius:99px; margin:10px auto 0; }
 
     /* Imagen del sheet */
-    .mn-sheet-img { width:100%; height:300px; object-fit:cover; display:block; }
-    .mn-sheet-img-placeholder { width:100%; height:240px; display:flex; align-items:center; justify-content:center; font-size:4.5rem; background:linear-gradient(135deg,#F5F3EE 0%,#EDE8DC 100%); }
+    .mn-sheet-img { width:100%; height:clamp(240px, 42dvh, 340px); object-fit:cover; display:block; }
+    .mn-sheet-img-placeholder { width:100%; height:220px; display:flex; align-items:center; justify-content:center; color:var(--accent); background:linear-gradient(135deg,#F1F4F8 0%,var(--accent-soft) 100%); }
 
-    .mn-sheet-hdr { padding:16px 20px 4px; position:relative; }
-    .mn-sheet-close { position:absolute; top:12px; right:16px; background:rgba(0,0,0,.07); border:none; width:30px; height:30px; border-radius:50%; color:var(--text-main); font-size:1rem; line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background .15s; }
-    .mn-sheet-close:hover { background:rgba(0,0,0,.12); }
-    .mn-sheet-title { font-family:'Inter',system-ui,sans-serif; font-size:1.25rem; font-weight:700; color:var(--text-main); margin:0 0 4px; padding-right:38px; }
-    .mn-sheet-sub { font-size:.83rem; color:var(--text-muted); margin:0 0 0; }
+    .mn-sheet-hdr { padding:18px 22px 4px; position:relative; }
+    .mn-sheet-close { position:absolute; top:14px; right:16px; background:#F2F4F7; border:1px solid #E5EAF0; width:34px; height:34px; border-radius:999px; color:var(--text-main); cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background .15s, transform .15s; }
+    .mn-sheet-close:hover { background:#E8EDF4; transform:scale(1.03); }
+    .mn-sheet-title { font-family:'Inter',system-ui,sans-serif; font-size:1.28rem; font-weight:800; color:var(--text-main); margin:0 0 5px; padding-right:42px; line-height:1.2; }
+    .mn-sheet-sub { display:inline-flex; align-items:center; gap:6px; font-size:.84rem; font-weight:800; color:var(--text-main); margin:0; padding:5px 10px; border-radius:999px; background:#F3F5F8; border:1px solid #E5EAF0; }
     .mn-sec { padding:0 20px 16px; }
-    .mn-sec-lbl { font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:var(--gold); margin-bottom:10px; margin-top:16px; }
+    .mn-sec-lbl { display:flex; align-items:center; gap:7px; font-size:.68rem; font-weight:800; text-transform:uppercase; letter-spacing:.1em; color:var(--accent); margin-bottom:10px; margin-top:16px; }
     .mn-guar-row { display:flex; align-items:center; gap:10px; padding:9px 13px; border-radius:12px; border:1px solid #E5E7EB; margin-bottom:6px; background:#F9FAFB; transition:all .15s; }
     .mn-guar-tog { flex:1; display:flex; align-items:center; gap:8px; font-size:.85rem; color:var(--text-main); }
     .mn-tog-icon { width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:.75rem; font-weight:800; flex-shrink:0; transition:all .15s; }
@@ -123,16 +135,27 @@
 
     /* ── Vacío / sin platillos ──────────────────── */
     .mn-empty { padding:72px 24px; text-align:center; }
-    .mn-empty-icon { font-size:3.5rem; margin-bottom:12px; }
+    .mn-empty-icon { width:54px; height:54px; border-radius:16px; margin:0 auto 12px; display:flex; align-items:center; justify-content:center; color:var(--accent); background:var(--accent-soft); border:1px solid var(--accent-line); }
     .mn-empty-title { font-family:'Playfair Display',Georgia,serif; font-size:1.1rem; color:var(--text-muted); margin-bottom:6px; }
     .mn-empty-sub { font-size:.87rem; color:var(--text-muted); line-height:1.6; opacity:.7; }
 
     /* ── Responsive: pantallas grandes ─────────── */
     @media (min-width:640px) {
-      .mn-list { display:grid; grid-template-columns:1fr 1fr; }
-      .mn-card { border-bottom:1px solid rgba(0,0,0,.055); border-right:1px solid rgba(0,0,0,.055); }
-      .mn-card:nth-child(2n) { border-right:none; }
-      .mn-card:nth-last-child(-n+2) { border-bottom:none; }
+      .mn-page { padding-left:20px; padding-right:20px; }
+      .mn-list { grid-template-columns:1fr 1fr; gap:14px; }
+      .mn-card { min-height:154px; }
+      .mn-card-thumb { width:132px; height:132px; }
+      .mn-card--visual { min-height:182px; }
+      .mn-card--visual .mn-card-thumb { width:162px; height:162px; }
+    }
+    @media (min-width:1024px) {
+      .mn-list { grid-template-columns:repeat(3, minmax(0, 1fr)); }
+      .mn-card { flex-direction:column-reverse; min-height:0; padding:0; overflow:hidden; }
+      .mn-card-body { padding:14px; }
+      .mn-card-thumb { width:100%; height:180px; border-radius:0; border:0; }
+      .mn-card-desc { -webkit-line-clamp:3; }
+      .mn-card--visual .mn-card-thumb { width:100%; height:240px; }
+      .mn-card--visual .mn-card-body { min-height:142px; padding:16px; }
     }
   </style>
 </head>
@@ -145,6 +168,12 @@
   $heroStyle  = $hasBanner
     ? 'style="background-image:url(\'' . BASE_URL . htmlspecialchars($restaurante['imagen_banner']) . '\')"'
     : '';
+  if (!function_exists('mnIcon')) {
+      function mnIcon(string $name, string $class = 'mn-icon'): string
+      {
+          return '<i data-lucide="' . htmlspecialchars($name, ENT_QUOTES, 'UTF-8') . '" class="' . htmlspecialchars($class, ENT_QUOTES, 'UTF-8') . '"></i>';
+      }
+  }
 ?>
 <div class="<?= $heroClass ?>" <?= $heroStyle ?>>
   <div class="pub-hero-content">
@@ -165,16 +194,14 @@
               background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.25);
               backdrop-filter:blur(8px);border-radius:999px;padding:7px 16px;
               font-size:.82rem;color:#fff;font-weight:600">
-    👁 Menú informativo
+    <?= mnIcon('book-open', 'mn-icon') ?> Menú informativo
   </div>
 
   <?php if ($mesa): ?>
   <div style="display:flex;flex-direction:column;align-items:center;gap:8px;width:100%;margin-top:10px">
     <div style="display:inline-flex;align-items:center;gap:6px;
                 background:rgba(255,255,255,.15);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.25);border-radius:10px;padding:7px 14px;font-size:.85rem;color:#fff">
-      <svg width="14" height="14" fill="currentColor" viewBox="0 0 20 20" style="opacity:.6">
-        <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/>
-      </svg>
+      <?= mnIcon('map-pin', 'mn-icon') ?>
       Mesa: <strong><?= htmlspecialchars($mesa['nombre']) ?></strong>
     </div>
   </div>
@@ -190,9 +217,10 @@ $catConteos = []; // cantidad de platillos por categoría
 
 foreach ($categorias as $cat) {
     $n = mb_strtolower($cat['nombre']);
-    if (str_contains($n,'bebida'))                               $catIconos[$cat['id']] = '🥂';
-    elseif (str_contains($n,'postre')||str_contains($n,'dulce')) $catIconos[$cat['id']] = '🍮';
-    else                                                         $catIconos[$cat['id']] = '🫔';
+    if (str_contains($n,'bebida') || str_contains($n,'bar'))      $catIconos[$cat['id']] = 'wine';
+    elseif (str_contains($n,'postre')||str_contains($n,'dulce')) $catIconos[$cat['id']] = 'cake-slice';
+    elseif (str_contains($n,'entrada')||str_contains($n,'botana')) $catIconos[$cat['id']] = 'salad';
+    else                                                         $catIconos[$cat['id']] = 'utensils';
 
     if (str_contains($n,'bebida') || str_contains($n,'postre') || str_contains($n,'dulce')) {
         $catSinIng[] = (int)$cat['id'];
@@ -201,13 +229,13 @@ foreach ($categorias as $cat) {
 // Contar platillos por categoría (se llenará después de armar $porCategoria)
 ?>
 <div class="mn-tab-bar">
-  <button class="mn-tab active" data-cat="">✨ Todos <span class="mn-tab-count"><?= count($platillos) ?></span></button>
+  <button class="mn-tab active" data-cat=""><?= mnIcon('layout-grid', 'mn-icon') ?> Todos <span class="mn-tab-count"><?= count($platillos) ?></span></button>
   <?php foreach ($categorias as $cat):
     $cnt = count(array_filter($platillos, fn($p) => (int)($p['categoria_id'] ?? 0) === (int)$cat['id']));
     if ($cnt === 0) continue;
   ?>
   <button class="mn-tab" data-cat="<?= (int)$cat['id'] ?>">
-    <?= $catIconos[$cat['id']] ?> <?= htmlspecialchars($cat['nombre']) ?>
+    <?= mnIcon($catIconos[$cat['id']] ?? 'utensils', 'mn-icon') ?> <?= htmlspecialchars($cat['nombre']) ?>
     <span class="mn-tab-count"><?= $cnt ?></span>
   </button>
   <?php endforeach; ?>
@@ -216,7 +244,7 @@ foreach ($categorias as $cat) {
 <!-- Platillos por sección -->
 <?php if (empty($platillos)): ?>
 <div class="mn-empty">
-  <div class="mn-empty-icon">🍽️</div>
+  <div class="mn-empty-icon"><?= mnIcon('utensils', 'mn-icon-lg') ?></div>
   <div class="mn-empty-title">Menú en preparación</div>
   <div class="mn-empty-sub">Aún no hay platillos disponibles.<br>Vuelve pronto o pide ayuda al personal.</div>
 </div>
@@ -232,7 +260,7 @@ $catNombres = array_column($categorias, 'nombre', 'id');
 <div class="mn-section" data-section-cat="<?= $cid ?>">
   <?php if (isset($catNombres[$cid])): ?>
   <div class="mn-section-title">
-    <div class="mn-section-icon"><?= $catIconos[$cid] ?? '🍽' ?></div>
+    <div class="mn-section-icon"><?= mnIcon($catIconos[$cid] ?? 'utensils', 'mn-icon-lg') ?></div>
     <div class="mn-section-text">
       <h2><?= htmlspecialchars($catNombres[$cid]) ?></h2>
       <span><?= count($platos) ?> <?= count($platos) === 1 ? 'platillo' : 'platillos' ?></span>
@@ -249,11 +277,11 @@ $catNombres = array_column($categorias, 'nombre', 'id');
     ));
     $chips = (!$esSinIng && !empty($ings)) ? array_slice($ings, 0, 4) : [];
     $more  = (!$esSinIng && !empty($ings)) ? max(0, count($ings) - count($chips)) : 0;
-    $icon  = $catIconos[$cid] ?? '🍽';
+    $icon  = $catIconos[$cid] ?? 'utensils';
     $desc  = trim($p['descripcion'] ?? '');
     $alerg = array_filter(array_map('trim', explode(',', $p['alergenos'] ?? '')));
   ?>
-  <div class="mn-card" data-cat="<?= $cid ?>" onclick="abrirModal(<?= $pId ?>)">
+  <div class="mn-card <?= $esSinIng ? 'mn-card--visual' : '' ?>" data-cat="<?= $cid ?>" onclick="abrirModal(<?= $pId ?>)">
     <div class="mn-card-body">
       <div class="mn-card-name"><?= htmlspecialchars($p['nombre']) ?></div>
       <?php if ($desc !== ''): ?>
@@ -263,9 +291,8 @@ $catNombres = array_column($categorias, 'nombre', 'id');
       <div style="display:flex;flex-wrap:wrap;gap:4px;margin:4px 0 6px">
         <?php foreach ($alerg as $a): ?>
         <span title="Contiene <?= htmlspecialchars($a) ?>"
-              style="font-size:.62rem;font-weight:700;background:#FEF3C7;color:#92400E;
-                     border:1px solid #FDE68A;border-radius:6px;padding:1px 6px">
-          ⚠ <?= htmlspecialchars($a) ?>
+              class="mn-allergen">
+          <?= mnIcon('triangle-alert', 'mn-icon') ?> <?= htmlspecialchars($a) ?>
         </span>
         <?php endforeach; ?>
       </div>
@@ -284,7 +311,7 @@ $catNombres = array_column($categorias, 'nombre', 'id');
       <?php if (!empty($p['imagen'])): ?>
       <img src="<?= BASE_URL . htmlspecialchars($p['imagen']) ?>" alt="<?= htmlspecialchars($p['nombre']) ?>">
       <?php else: ?>
-      <div class="mn-card-emoji"><?= $icon ?></div>
+      <div class="mn-card-icon"><?= mnIcon($icon, 'mn-icon-lg') ?></div>
       <?php endif; ?>
     </div>
   </div>
@@ -302,17 +329,17 @@ $catNombres = array_column($categorias, 'nombre', 'id');
     <div class="mn-drag"></div>
     <div id="sheetImgWrap"></div>
     <div class="mn-sheet-hdr">
-      <button onclick="cerrarModal()" type="button" class="mn-sheet-close">✕</button>
+      <button onclick="cerrarModal()" type="button" class="mn-sheet-close" aria-label="Cerrar"><?= mnIcon('x', 'mn-icon') ?></button>
       <div class="mn-sheet-title" id="sheetTitle">—</div>
       <div class="mn-sheet-sub"   id="sheetSub">—</div>
       <div id="sheetDesc" style="font-size:.9rem;color:#374151;line-height:1.55;margin-top:12px;display:none"></div>
     </div>
     <div class="mn-sec" id="infoAlergSec" style="display:none">
-      <div class="mn-sec-lbl">Información del platillo</div>
+      <div class="mn-sec-lbl"><?= mnIcon('info', 'mn-icon') ?> Información del platillo</div>
       <div id="infoAlergBox" style="display:flex;flex-direction:column;gap:8px;font-size:.82rem;color:#374151"></div>
     </div>
     <div class="mn-sec" id="guarSec" style="display:none">
-      <div class="mn-sec-lbl">Guarniciones incluidas</div>
+      <div class="mn-sec-lbl"><?= mnIcon('list-checks', 'mn-icon') ?> Guarniciones incluidas</div>
       <div id="guarList"></div>
     </div>
   </div>
@@ -360,7 +387,7 @@ document.querySelectorAll('.mn-tab').forEach(btn => {
 function abrirModal(id) {
   const d = MENU[id]; if (!d) return;
   document.getElementById('sheetTitle').textContent = d.nombre;
-  document.getElementById('sheetSub').textContent   = `$${d.precio % 1 === 0 ? d.precio.toFixed(0) : d.precio.toFixed(2)} por orden`;
+  document.getElementById('sheetSub').innerHTML = `${iconHtml('badge-dollar-sign')} $${d.precio % 1 === 0 ? d.precio.toFixed(0) : d.precio.toFixed(2)} por orden`;
 
   const desc = document.getElementById('sheetDesc');
   if (d.descripcion) {
@@ -375,7 +402,7 @@ function abrirModal(id) {
   if (d.imagen) {
     imgWrap.innerHTML = `<img class="mn-sheet-img" src="${BASE_URL}${d.imagen.replace(/^\//, '')}" alt="${esc(d.nombre)}">`;
   } else {
-    imgWrap.innerHTML = '';
+    imgWrap.innerHTML = `<div class="mn-sheet-img-placeholder">${iconHtml('utensils', 'mn-icon-lg')}</div>`;
   }
 
   const gSec  = document.getElementById('guarSec');
@@ -386,8 +413,8 @@ function abrirModal(id) {
   const infoBox = document.getElementById('infoAlergBox');
   let infoHtml = '';
   if (d.alergenos && d.alergenos.length) {
-    infoHtml += '<div><strong style="color:#92400E">⚠️ Alérgenos:</strong> '
-      + d.alergenos.map(a => `<span style="display:inline-block;background:#FEF3C7;color:#92400E;border:1px solid #FDE68A;border-radius:6px;padding:1px 7px;font-size:.74rem;font-weight:700;margin:2px 3px 0 0">${esc(a)}</span>`).join('')
+    infoHtml += `<div><strong style="color:#92400E;display:inline-flex;align-items:center;gap:5px">${iconHtml('triangle-alert')} Alérgenos:</strong> `
+      + d.alergenos.map(a => `<span class="mn-allergen" style="margin:2px 3px 0 0">${iconHtml('triangle-alert')} ${esc(a)}</span>`).join('')
       + '</div>';
   }
   if (d.contiene) {
@@ -404,17 +431,22 @@ function abrirModal(id) {
   }
   document.getElementById('mnBackdrop').classList.add('open');
   document.body.style.overflow = 'hidden';
+  renderIcons();
 }
 
 function guarRow(ing) {
   const cantidad = [ing.cantidad, ing.unidad].filter(Boolean).join(' ');
   return `<div class="mn-guar-row">
     <div class="mn-guar-tog" style="cursor:default">
-      <div class="mn-tog-icon incl">✓</div>
+      <div class="mn-tog-icon incl">${iconHtml('check')}</div>
       <span>${esc(ing.ingrediente_nombre)}</span>
       ${cantidad ? `<span style="font-size:.7rem;color:var(--text-muted);margin-left:auto;padding-left:6px">${esc(cantidad)}</span>` : ''}
     </div>
   </div>`;
+}
+
+function iconHtml(name, className = 'mn-icon') {
+  return `<i data-lucide="${esc(name)}" class="${esc(className)}"></i>`;
 }
 
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
@@ -424,6 +456,8 @@ function cerrarModal() {
   document.body.style.overflow = '';
 }
 function handleBackdrop(e) { if (e.target===e.currentTarget) cerrarModal(); }
+function renderIcons() { if (window.lucide) lucide.createIcons(); }
+renderIcons();
 </script>
 </body>
 </html>
