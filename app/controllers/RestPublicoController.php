@@ -192,16 +192,7 @@ class RestPublicoController extends BaseController
         //   Sin ?mesa  → visual siempre (no se puede ordenar, independiente del toggle)
         //   Con ?mesa  + toggle OFF → puede ordenar sin necesidad de login
         //   Con ?mesa  + toggle ON  → debe identificarse (email) antes de poder ordenar
-        $tieneMesa = ($mesa !== null);
-
-        if ($tieneMesa && $requiereLoginComensal && !$comensal) {
-            // Preservar el QR en la URL de retorno para volver al modo interactivo tras login
-            $returnUrl = 'menu/' . $restaurante['slug'] . '?mesa=' . urlencode($mesaQr ?? '');
-            $this->redirect('acceso/' . $restaurante['slug'] . '?return=' . urlencode($returnUrl));
-            return;
-        }
-
-        $puedeOrdenar = $tieneMesa && (!$requiereLoginComensal || (bool)$comensal);
+        $puedeOrdenar = false;
 
         $pageTitle = $restaurante['nombre'];
         $this->render('publico/menu/index', compact('restaurante','categorias','platillos','recetaIngredientes','mesa','visitaId','meseroAtiende','pageTitle','requiereLoginComensal','comensal','puedeOrdenar'));
@@ -209,161 +200,20 @@ class RestPublicoController extends BaseController
 
     public function ordenar(?string $slug = null): void
     {
-        if (!$this->isPost()) $this->redirect('menu/' . $slug);
-
-        $restaurante = $this->restModel->getBySlug($slug ?? '');
-        if (!$restaurante) { http_response_code(404); exit; }
-
-        $restauranteId = (int)$restaurante['id'];
-
-        $mesaQr        = $this->post('mesa_qr');
-        $mesa          = $mesaQr ? (new RestMesaModel())->getByQr($mesaQr) : null;
-
-        // Sin mesa → menú visual, no acepta pedidos
-        if (!$mesa) {
+        if (!$this->isPost()) {
             $this->redirect('menu/' . $slug);
             return;
         }
 
-        // Resolver mesero asignado a la zona de esta mesa hoy
-        $meseroId = null;
-        if (!empty($mesa['zona_id'])) {
-            try {
-                $stmtM = Database::getInstance()->prepare(
-                    "SELECT usuario_id FROM rest_mesero_turno
-                     WHERE restaurante_id = ? AND zona_id = ?
-                       AND turno_fecha = CURDATE() AND activo = 1
-                     LIMIT 1"
-                );
-                $stmtM->execute([$restauranteId, (int)$mesa['zona_id']]);
-                $rowM = $stmtM->fetch(PDO::FETCH_ASSOC);
-                $meseroId = $rowM ? (int)$rowM['usuario_id'] : null;
-            } catch (\Throwable $e) {}
+        $restaurante = $this->restModel->getBySlug($slug ?? '');
+        if (!$restaurante) { http_response_code(404); exit; }
+
+        $mesaQr = trim((string)$this->post('mesa_qr', ''));
+        $target = 'menu/' . $restaurante['slug'];
+        if ($mesaQr !== '') {
+            $target .= '?mesa=' . urlencode($mesaQr);
         }
-
-        $requiereLoginComensal = (int)($restaurante['requiere_login_comensal'] ?? 0);
-        // Con mesa + toggle ON → comensal debe estar identificado
-        if ($requiereLoginComensal && empty($_COOKIE['comensal_' . $restauranteId])) {
-            $returnUrl = 'menu/' . $restaurante['slug'] . '?mesa=' . urlencode($mesaQr);
-            $this->redirect('acceso/' . $restaurante['slug'] . '?return=' . urlencode($returnUrl));
-            return;
-        }
-        $visitaId      = $this->post('visita_id') ?: null;
-
-        // Validar que la visita pertenezca a este restaurante
-        if ($visitaId) {
-            $visitaExist = $this->visitaModel->find((int)$visitaId);
-            if (!$visitaExist || (int)$visitaExist['restaurante_id'] !== $restauranteId
-                || in_array($visitaExist['estado'], ['pagada','cancelada'])) {
-                $visitaId = null;
-            }
-        }
-
-        // Comensal logueado (opcional)
-        $comensalId = null;
-        $comensalCookie = $_COOKIE['comensal_' . $restauranteId] ?? null;
-        if ($comensalCookie) {
-            $decoded = json_decode($comensalCookie, true);
-            if (is_array($decoded) && !empty($decoded['id'])) {
-                $comensalId = (int)$decoded['id'];
-            }
-        }
-
-        // Crear visita si no existe
-        if (!$visitaId) {
-            $visitaId = $this->visitaModel->crear(
-                $restauranteId,
-                $mesa ? (int)$mesa['id'] : null,
-                $comensalId
-            );
-            // Guardar en cookie por 4 horas
-            $cookieName = 'visita_' . $restauranteId;
-            setcookie($cookieName, (string)$visitaId, ['expires' => time() + 4 * 3600, 'path' => '/', 'httponly' => true, 'samesite' => 'Lax']);
-        }
-
-        $platillosIds = $this->post('platillo_id', []);
-        $cantidades   = $this->post('cantidad', []);
-        $exclusiones  = $this->post('exclusiones', []);  // keyed by platillo_id
-        $notasItem    = $this->post('notas_item', []);   // keyed by platillo_id
-        $extrasPost   = $this->post('extras', []);        // keyed by platillo_id → JSON string
-
-        $items = [];
-        foreach ($platillosIds as $k => $platilloId) {
-            if (!$platilloId || empty($cantidades[$k])) continue;
-            $platillo = $this->menuModel->find((int)$platilloId);
-            if (!$platillo || !$platillo['disponible']) continue;
-            $cant = max(1, (int)$cantidades[$k]);
-            $excl = isset($exclusiones[$platilloId]) && is_array($exclusiones[$platilloId])
-                ? implode(', ', array_filter(array_map('trim', $exclusiones[$platilloId])))
-                : null;
-            $nota = isset($notasItem[$platilloId]) ? trim($notasItem[$platilloId]) : null;
-
-            // Extras: porción adicional de guarniciones (con costo)
-            $extrasJson = null;
-            $extrasCoste = 0.0;
-            if (!empty($extrasPost[$platilloId])) {
-                $extrasDecoded = json_decode($extrasPost[$platilloId], true);
-                if (is_array($extrasDecoded)) {
-                    // Cargar precios reales desde BD para no confiar en el cliente
-                    $preciosExtrasDb = [];
-                    $receta = $this->menuModel->getReceta((int)$platilloId);
-                    if ($receta) {
-                        foreach ($this->menuModel->getIngredientesReceta((int)$receta['id']) as $ri) {
-                            $preciosExtrasDb[(int)$ri['ingrediente_id']] = (float)$ri['precio_extra'];
-                        }
-                    }
-                    $extrasValidos = [];
-                    foreach ($extrasDecoded as $e) {
-                        if (!isset($e['ingrediente_id'], $e['nombre'], $e['cantidad'])) continue;
-                        if ((int)$e['cantidad'] <= 0) continue;
-                        $ingId = (int)$e['ingrediente_id'];
-                        if (!array_key_exists($ingId, $preciosExtrasDb)) continue; // ingrediente no en receta
-                        $e['precio_extra'] = $preciosExtrasDb[$ingId]; // precio siempre de BD
-                        $extrasValidos[] = $e;
-                    }
-                    if ($extrasValidos) {
-                        $extrasJson  = json_encode($extrasValidos);
-                        $extrasCoste = array_sum(array_map(
-                            fn($e) => (float)$e['precio_extra'] * (int)$e['cantidad'],
-                            $extrasValidos
-                        ));
-                    }
-                }
-            }
-
-            $precioUnit = (float)$platillo['precio'] + $extrasCoste;
-            $items[] = [
-                'platillo_id' => (int)$platilloId,
-                'cantidad'    => $cant,
-                'precio_unit' => $precioUnit,
-                'subtotal'    => $precioUnit * $cant,
-                'notas'       => $nota ?: null,
-                'exclusiones' => $excl,
-                'extras'      => $extrasJson,
-            ];
-        }
-
-        if (empty($items)) {
-            $this->redirect('menu/' . $slug . ($mesaQr ? '?mesa=' . urlencode($mesaQr) : ''));
-        }
-
-        $pedidoId = $this->pedidoModel->crear([
-            'restaurante_id' => $restauranteId,
-            'mesa_id'        => $mesa ? (int)$mesa['id'] : null,
-            'visita_id'      => $visitaId,
-            'mesero_id'      => $meseroId,
-        ], $items);
-
-        // Stock se descuenta cuando la cocina marca el ítem como "en_preparacion"
-        // (RestChefController::marcarPreparacion) — no al hacer el pedido.
-        $this->visitaModel->actualizarTotales((int)$visitaId);
-
-        // Marcar mesa como ocupada
-        if ($mesa) {
-            $this->mesaModel->cambiarEstado((int)$mesa['id'], 'ocupada');
-        }
-
-        $this->redirect('menu/' . $slug . '/confirmacion/' . $visitaId);
+        $this->redirect($target);
     }
 
     public function confirmacion(?string $slug = null): void

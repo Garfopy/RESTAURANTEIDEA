@@ -88,39 +88,10 @@
     .mn-chip-more { font-size:.62rem; color:color-mix(in srgb, var(--cp) 60%, #6B7280); align-self:center; }
     .mn-card-price { font-size:.9rem; font-weight:800; color:var(--text-main); margin-top:6px; }
 
-    /* Lado derecho: imagen + botón + */
+    /* Lado derecho: imagen */
     .mn-card-thumb { position:relative; flex-shrink:0; width:140px; height:140px; border-radius:12px; overflow:hidden; background:linear-gradient(135deg,color-mix(in srgb, var(--cp) 8%, white),color-mix(in srgb, var(--cp) 18%, white)); align-self:center; }
     .mn-card-thumb img { width:100%; height:100%; object-fit:cover; }
     .mn-card-emoji { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:3rem; }
-    .mn-add-circle {
-      position:absolute; bottom:-1px; right:-1px;
-      width:30px; height:30px; border-radius:50%;
-      background:var(--gold); color:#fff;
-      border:2px solid var(--bg);
-      display:flex; align-items:center; justify-content:center;
-      font-size:1.1rem; font-weight:700; line-height:1;
-      box-shadow:0 2px 8px rgba(201,164,48,.45);
-      cursor:pointer;
-      transition:transform .15s, filter .15s;
-    }
-    .mn-add-circle:hover { transform:scale(1.12); filter:brightness(1.1); }
-
-    /* ── Carrito flotante ───────────────────────── */
-    .pub-cart-bar {
-      position:fixed; bottom:0; left:0; right:0;
-      background:linear-gradient(135deg,#1a1508 0%,#2c2100 100%);
-      color:#fff; padding:14px 20px;
-      display:flex; justify-content:space-between; align-items:center;
-      z-index:99; transform:translateY(100%);
-      transition:transform .3s cubic-bezier(.4,0,.2,1);
-      box-shadow:0 -4px 32px rgba(0,0,0,.22);
-      padding-bottom:max(14px,env(safe-area-inset-bottom));
-    }
-    .pub-cart-bar.visible { transform:translateY(0); }
-    .pub-cart-btn { padding:11px 26px; background:var(--gold); color:#fff; border:none; border-radius:12px; font-weight:800; font-size:.92rem; cursor:pointer; transition:filter .15s, transform .12s; box-shadow:0 2px 12px rgba(201,164,48,.4); }
-    .pub-cart-btn:hover { filter:brightness(1.1); transform:translateY(-1px); }
-    .pub-cart-info-label { font-size:.72rem; color:rgba(255,255,255,.55); margin-bottom:2px; }
-    .pub-cart-info-total { font-weight:800; font-size:1.1rem; color:var(--gold); }
 
     /* ── Modal / bottom-sheet ───────────────────── */
     .mn-backdrop { display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px); z-index:200; align-items:flex-end; justify-content:center; }
@@ -143,28 +114,10 @@
     .mn-sec { padding:0 20px 16px; }
     .mn-sec-lbl { font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:var(--gold); margin-bottom:10px; margin-top:16px; }
     .mn-guar-row { display:flex; align-items:center; gap:10px; padding:9px 13px; border-radius:12px; border:1px solid #E5E7EB; margin-bottom:6px; background:#F9FAFB; transition:all .15s; }
-    .mn-guar-row.excl { opacity:.5; border-color:rgba(239,68,68,.25); background:rgba(239,68,68,.04); }
-    .mn-guar-tog { flex:1; display:flex; align-items:center; gap:8px; cursor:pointer; font-size:.85rem; color:var(--text-main); }
+    .mn-guar-tog { flex:1; display:flex; align-items:center; gap:8px; font-size:.85rem; color:var(--text-main); }
     .mn-tog-icon { width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:.75rem; font-weight:800; flex-shrink:0; transition:all .15s; }
     .mn-tog-icon.incl { background:rgba(34,197,94,.15); color:#16a34a; }
-    .mn-tog-icon.excl { background:rgba(239,68,68,.15); color:#dc2626; }
-    .mn-extra-btn { font-size:.7rem; font-weight:700; padding:3px 8px; border-radius:99px; border:1px solid rgba(201,164,48,.38); color:#8a6800; background:var(--gold-dim); cursor:pointer; white-space:nowrap; flex-shrink:0; transition:background .12s; }
-    .mn-extra-btn:hover { background:var(--gold-hi); }
-    .mn-xcnt { display:none; align-items:center; gap:6px; flex-shrink:0; }
-    .mn-xcnt.show { display:flex; }
-    .mn-xcnt button { width:24px; height:24px; border-radius:50%; border:1px solid #D1D5DB; background:#fff; color:var(--text-main); font-weight:700; cursor:pointer; font-size:.85rem; display:flex; align-items:center; justify-content:center; }
-    .mn-xcnt span { font-weight:700; font-size:.85rem; min-width:16px; text-align:center; color:var(--text-main); }
-    .mn-nota { width:100%; padding:10px 14px; border:1px solid #E5E7EB; border-radius:12px; background:#F9FAFB; color:var(--text-main); font-size:.875rem; resize:none; outline:none; font-family:inherit; transition:border-color .15s; }
-    .mn-nota::placeholder { color:var(--text-muted); }
-    .mn-nota:focus { border-color:var(--gold); background:#fff; }
-    .mn-sheet-foot { padding:14px 20px max(16px,env(safe-area-inset-bottom)); border-top:1px solid #E5E7EB; display:flex; gap:12px; align-items:center; background:#fff; position:sticky; bottom:0; }
-    .mn-qty { display:flex; align-items:center; gap:10px; background:#F3F4F6; border-radius:10px; padding:8px 14px; }
-    .mn-qty button { width:30px; height:30px; border-radius:50%; border:1.5px solid #D1D5DB; background:#fff; color:var(--text-main); font-weight:700; font-size:1rem; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:border-color .15s; }
-    .mn-qty button:hover { border-color:var(--gold); color:var(--gold); }
-    .mn-qty span { font-weight:800; min-width:20px; text-align:center; font-size:1rem; color:var(--text-main); }
-    .mn-add-btn { flex:1; padding:14px; background:var(--gold); color:#fff; border:none; border-radius:14px; font-size:.95rem; font-weight:800; cursor:pointer; transition:filter .15s, transform .12s; box-shadow:0 3px 14px rgba(201,164,48,.35); }
-    .mn-add-btn:hover { filter:brightness(1.08); transform:translateY(-1px); }
-    .mn-footer { padding:28px 20px 110px; text-align:center; font-size:.75rem; color:rgba(0,0,0,.22); }
+    .mn-footer { padding:28px 20px 40px; text-align:center; font-size:.75rem; color:rgba(0,0,0,.22); }
 
     @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
 
@@ -184,23 +137,6 @@
   </style>
 </head>
 <body>
-
-<?php if ($visitaId > 0): ?>
-<!-- Barra de regreso al seguimiento del pedido -->
-<a href="<?= BASE_URL ?>menu/confirmacion/<?= htmlspecialchars($restaurante['slug']) ?>/<?= $visitaId ?>"
-   style="display:flex;align-items:center;justify-content:center;gap:8px;
-          padding:11px 16px;background:#111827;color:#fff;text-decoration:none;
-          font-size:.82rem;font-weight:700;letter-spacing:.01em;position:sticky;top:0;z-index:100;
-          border-bottom:2px solid rgba(201,164,48,.5)">
-  <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="flex-shrink:0">
-    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"/>
-  </svg>
-  Ver seguimiento de mi pedido
-  <span style="background:var(--gold,#C9A430);color:#fff;font-size:.7rem;padding:2px 8px;border-radius:99px;font-weight:700">
-    En curso
-  </span>
-</a>
-<?php endif; ?>
 
 <!-- Hero -->
 <?php
@@ -225,74 +161,21 @@
     </p>
     <?php endif; ?>
 
-  <?php if (!empty($comensal['nombre'])): ?>
-  <div style="margin-top:12px;display:inline-flex;align-items:center;gap:8px;
-              background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);
-              backdrop-filter:blur(8px);border-radius:999px;padding:7px 16px;
-              font-size:.85rem;color:#fff;font-weight:600">
-    👋 Hola, <?= htmlspecialchars($comensal['nombre']) ?>
-  </div>
-  <?php endif; ?>
-
-  <?php if (!$mesa): ?>
   <div style="margin-top:12px;display:inline-flex;align-items:center;gap:8px;
               background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.25);
               backdrop-filter:blur(8px);border-radius:999px;padding:7px 16px;
               font-size:.82rem;color:#fff;font-weight:600">
-    👁 Menú informativo — escanea el QR de tu mesa para ordenar
+    👁 Menú informativo
   </div>
-  <?php endif; ?>
 
   <?php if ($mesa): ?>
-  <div style="display:flex;flex-direction:column;align-items:center;gap:8px;width:100%;margin-top:14px">
+  <div style="display:flex;flex-direction:column;align-items:center;gap:8px;width:100%;margin-top:10px">
     <div style="display:inline-flex;align-items:center;gap:6px;
                 background:rgba(255,255,255,.15);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.25);border-radius:10px;padding:7px 14px;font-size:.85rem;color:#fff">
       <svg width="14" height="14" fill="currentColor" viewBox="0 0 20 20" style="opacity:.6">
         <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/>
       </svg>
       Mesa: <strong><?= htmlspecialchars($mesa['nombre']) ?></strong>
-    </div>
-    <?php if (!empty($meseroAtiende)): ?>
-    <div style="display:inline-flex;align-items:center;gap:6px;
-                background:rgba(201,164,48,.22);border:1px solid rgba(201,164,48,.4);border-radius:10px;padding:6px 14px;font-size:.82rem;color:#fff">
-      👋 Te atiende: <strong><?= htmlspecialchars($meseroAtiende) ?></strong>
-    </div>
-    <?php else: ?>
-    <div style="display:inline-flex;align-items:center;gap:5px;
-                background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:10px;padding:5px 12px;font-size:.78rem;color:rgba(255,255,255,.75)">
-      🙌 Pronto te atendemos
-    </div>
-    <?php endif; ?>
-    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
-      <button id="btnLlamarMesero" onclick="llamarMesero()"
-              style="padding:8px 18px;background:rgba(255,255,255,.18);border:1.5px solid rgba(255,255,255,.35);
-                     color:#fff;border-radius:20px;font-size:.82rem;font-weight:600;cursor:pointer;backdrop-filter:blur(8px);box-shadow:0 2px 8px rgba(0,0,0,.15)">
-        🔔 Llamar mesero
-      </button>
-      <?php if ($visitaId): ?>
-      <button id="btnPedirCuenta" onclick="pedirCuenta()"
-              style="padding:8px 18px;background:rgba(239,68,68,.25);border:1.5px solid rgba(239,68,68,.5);
-                     color:#fff;border-radius:20px;font-size:.82rem;font-weight:600;cursor:pointer;backdrop-filter:blur(8px);box-shadow:0 2px 8px rgba(0,0,0,.15)">
-        🧾 Pedir la cuenta
-      </button>
-      <a href="<?= BASE_URL ?>menu/<?= htmlspecialchars($restaurante['slug']) ?>/pagar/<?= $visitaId ?>"
-         style="padding:8px 18px;background:rgba(255,255,255,.18);border:1.5px solid rgba(255,255,255,.35);
-                color:#fff;border-radius:20px;font-size:.82rem;font-weight:600;backdrop-filter:blur(8px);box-shadow:0 2px 8px rgba(0,0,0,.15)">
-        💳 Ver mi cuenta
-      </a>
-      <?php endif; ?>
-    </div>
-  </div>
-  <?php endif; ?>
-  <?php if ($visitaId): ?>
-  <div id="statusTracker" style="margin-top:14px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:12px;
-                                  padding:10px 16px;font-size:.82rem;display:none;color:#fff;backdrop-filter:blur(8px)">
-    <div id="statusContent">Verificando estado del pedido…</div>
-    <div id="statusBar" style="display:none;margin-top:8px">
-      <div style="background:rgba(255,255,255,.15);border-radius:4px;height:4px;overflow:hidden">
-        <div id="statusBarFill" style="height:100%;border-radius:4px;background:#c9a430;transition:width 1s ease"></div>
-      </div>
-      <div id="statusBarLabel" style="font-size:.72rem;color:rgba(255,255,255,.6);margin-top:4px;text-align:right"></div>
     </div>
   </div>
   <?php endif; ?>
@@ -329,14 +212,6 @@ foreach ($categorias as $cat) {
   </button>
   <?php endforeach; ?>
 </div>
-
-<!-- Formulario (hidden inputs generados por JS) -->
-<form id="formPedido" method="POST"
-      action="<?= BASE_URL ?>menu/<?= htmlspecialchars($restaurante['slug']) ?>/ordenar">
-  <input type="hidden" name="mesa_qr"   value="<?= htmlspecialchars($mesa['qr_codigo'] ?? '') ?>">
-  <input type="hidden" name="visita_id" id="inpVisitaId" value="<?= (int)($visitaId ?? 0) ?>">
-  <div id="hiddenContainer"></div>
-</form>
 
 <!-- Platillos por sección -->
 <?php if (empty($platillos)): ?>
@@ -411,9 +286,6 @@ $catNombres = array_column($categorias, 'nombre', 'id');
       <?php else: ?>
       <div class="mn-card-emoji"><?= $icon ?></div>
       <?php endif; ?>
-      <?php if ($puedeOrdenar): ?>
-      <button type="button" class="mn-add-circle" onclick="abrirModal(<?= $pId ?>);event.stopPropagation()">+</button>
-      <?php endif; ?>
     </div>
   </div>
   <?php endforeach; ?>
@@ -422,30 +294,9 @@ $catNombres = array_column($categorias, 'nombre', 'id');
 <?php endforeach; ?>
 <?php endif; ?>
 
-<!-- Carrito flotante -->
-<?php if ($puedeOrdenar): ?>
-<div class="pub-cart-bar" id="carritoBar">
-  <div>
-    <div class="pub-cart-info-label" id="carritoItems">0 items</div>
-    <div class="pub-cart-info-total" id="carritoTotal">$0</div>
-  </div>
-  <div style="display:flex;gap:8px;align-items:center">
-    <?php if ($visitaId): ?>
-    <button id="btnPedirMismo" onclick="pedirLoMismo()"
-            style="padding:9px 14px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.85);
-                   border:1.5px solid rgba(255,255,255,.2);border-radius:10px;
-                   font-size:.78rem;font-weight:600;cursor:pointer;display:none">
-      🔁 Lo mismo
-    </button>
-    <?php endif; ?>
-    <button onclick="submitPedido()" class="pub-cart-btn">Ordenar →</button>
-  </div>
-</div>
-<?php endif; ?>
-
 <div class="mn-footer">Potenciado por <strong>CarniHub</strong></div>
 
-<!-- ── Modal de personalización ───────────────────────────────────────────── -->
+<!-- ── Modal informativo ──────────────────────────────────────────────────── -->
 <div id="mnBackdrop" class="mn-backdrop" onclick="handleBackdrop(event)">
   <div class="mn-sheet">
     <div class="mn-drag"></div>
@@ -454,6 +305,7 @@ $catNombres = array_column($categorias, 'nombre', 'id');
       <button onclick="cerrarModal()" type="button" class="mn-sheet-close">✕</button>
       <div class="mn-sheet-title" id="sheetTitle">—</div>
       <div class="mn-sheet-sub"   id="sheetSub">—</div>
+      <div id="sheetDesc" style="font-size:.9rem;color:#374151;line-height:1.55;margin-top:12px;display:none"></div>
     </div>
     <div class="mn-sec" id="infoAlergSec" style="display:none">
       <div class="mn-sec-lbl">Información del platillo</div>
@@ -463,49 +315,19 @@ $catNombres = array_column($categorias, 'nombre', 'id');
       <div class="mn-sec-lbl">Guarniciones incluidas</div>
       <div id="guarList"></div>
     </div>
-    <div class="mn-sec">
-      <div class="mn-sec-lbl">Comentario al chef <span style="text-transform:none;font-weight:400;color:var(--text-muted)">(opcional)</span></div>
-      <textarea id="sheetNota" class="mn-nota" rows="2" placeholder="Ej: bien cocido, sin picante, extra salsa…"></textarea>
-    </div>
-    <div class="mn-sheet-foot">
-      <div class="mn-qty">
-        <button type="button" onclick="cambiarQty(-1)">−</button>
-        <span id="sheetQty">1</span>
-        <button type="button" onclick="cambiarQty(1)">+</button>
-      </div>
-      <?php if ($puedeOrdenar): ?>
-      <button type="button" class="mn-add-btn" id="addBtn" onclick="confirmarModal()">Agregar · $0</button>
-      <?php else: ?>
-      <button type="button" class="mn-add-btn" disabled
-              style="opacity:.55;cursor:not-allowed"
-              title="Este menú es solo informativo">Solo vista</button>
-      <?php endif; ?>
-    </div>
   </div>
 </div>
 
 <!-- ── JavaScript ──────────────────────────────────────────────────────────── -->
 <script>
-const BASE_URL  = '<?= BASE_URL ?>';
-const REST_SLUG = '<?= htmlspecialchars($restaurante['slug']) ?>';
-const REST_ID   = <?= (int)$restaurante['id'] ?>;
-<?php if ($mesa): ?>
-const MESA_QR   = '<?= htmlspecialchars($mesa['qr_codigo'] ?? '') ?>';
-<?php else: ?>
-const MESA_QR   = '';
-<?php endif; ?>
-const VID       = <?= (int)($visitaId ?? 0) ?>;
-
-// Categorías que NO muestran ingredientes en el modal
+const BASE_URL = '<?= BASE_URL ?>';
 const CAT_SIN_ING = new Set(<?= json_encode($catSinIng) ?>);
-
-const PRECIOS = {<?php foreach ($platillos as $p): ?><?= (int)$p['id'] ?>:<?= (float)$p['precio'] ?>,<?php endforeach; ?>};
-
 const MENU = <?= json_encode(array_combine(
   array_column($platillos, 'id'),
   array_map(function($p) use ($recetaIngredientes) {
       return [
           'nombre' => $p['nombre'],
+          'descripcion' => trim($p['descripcion'] ?? ''),
           'precio' => (float)$p['precio'],
           'imagen' => $p['imagen'] ?? '',
           'cat_id' => (int)($p['categoria_id'] ?? 0),
@@ -520,14 +342,6 @@ const MENU = <?= json_encode(array_combine(
   }, $platillos)
 ), JSON_UNESCAPED_UNICODE) ?>;
 
-// ── Carrito ─────────────────────────────────────────────────────────────────
-// { platilloId: { qty, excl:Set, extras:{ingId:{nombre,precio_extra,cantidad}}, nota } }
-const carrito = {};
-
-// ── Estado del modal ─────────────────────────────────────────────────────────
-let mId = null, mQty = 1, mExcl = new Set(), mExtra = {};
-
-// ── Tabs ─────────────────────────────────────────────────────────────────────
 document.querySelectorAll('.mn-tab').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.mn-tab').forEach(b => b.classList.remove('active'));
@@ -543,16 +357,20 @@ document.querySelectorAll('.mn-tab').forEach(btn => {
   });
 });
 
-// ── Abrir modal ───────────────────────────────────────────────────────────────
 function abrirModal(id) {
   const d = MENU[id]; if (!d) return;
-  mId = id; mQty = 1; mExcl = new Set(); mExtra = {};
   document.getElementById('sheetTitle').textContent = d.nombre;
   document.getElementById('sheetSub').textContent   = `$${d.precio % 1 === 0 ? d.precio.toFixed(0) : d.precio.toFixed(2)} por orden`;
-  document.getElementById('sheetQty').textContent   = 1;
-  document.getElementById('sheetNota').value        = '';
 
-  // Imagen en el header del sheet
+  const desc = document.getElementById('sheetDesc');
+  if (d.descripcion) {
+    desc.textContent = d.descripcion;
+    desc.style.display = '';
+  } else {
+    desc.textContent = '';
+    desc.style.display = 'none';
+  }
+
   const imgWrap = document.getElementById('sheetImgWrap');
   if (d.imagen) {
     imgWrap.innerHTML = `<img class="mn-sheet-img" src="${BASE_URL}${d.imagen.replace(/^\//, '')}" alt="${esc(d.nombre)}">`;
@@ -560,12 +378,10 @@ function abrirModal(id) {
     imgWrap.innerHTML = '';
   }
 
-  // Ingredientes solo si la categoría los muestra
   const gSec  = document.getElementById('guarSec');
   const gList = document.getElementById('guarList');
   const mostrarIng = !CAT_SIN_ING.has(d.cat_id);
 
-  // Info: alérgenos + contiene
   const infoSec = document.getElementById('infoAlergSec');
   const infoBox = document.getElementById('infoAlergBox');
   let infoHtml = '';
@@ -586,205 +402,28 @@ function abrirModal(id) {
     gSec.style.display = 'none';
     gList.innerHTML = '';
   }
-  actualizarAddBtn();
   document.getElementById('mnBackdrop').classList.add('open');
   document.body.style.overflow = 'hidden';
 }
 
 function guarRow(ing) {
-  const pid = ing.ingrediente_id;
-  return `<div class="mn-guar-row" id="gr_${pid}">
-    <div class="mn-guar-tog" onclick="toggleExcl(${pid},'${esc(ing.ingrediente_nombre)}')">
-      <div class="mn-tog-icon incl" id="gi_${pid}">✓</div>
+  const cantidad = [ing.cantidad, ing.unidad].filter(Boolean).join(' ');
+  return `<div class="mn-guar-row">
+    <div class="mn-guar-tog" style="cursor:default">
+      <div class="mn-tog-icon incl">✓</div>
       <span>${esc(ing.ingrediente_nombre)}</span>
-      <span style="font-size:.7rem;color:var(--text-muted);margin-left:auto;padding-left:6px">${ing.cantidad} ${ing.unidad}</span>
+      ${cantidad ? `<span style="font-size:.7rem;color:var(--text-muted);margin-left:auto;padding-left:6px">${esc(cantidad)}</span>` : ''}
     </div>
   </div>`;
 }
 
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-function toggleExcl(ingId, nombre) {
-  const row = document.getElementById(`gr_${ingId}`);
-  const ico = document.getElementById(`gi_${ingId}`);
-  if (mExcl.has(nombre)) {
-    mExcl.delete(nombre); row.classList.remove('excl');
-    ico.classList.replace('excl','incl'); ico.textContent = '✓';
-  } else {
-    mExcl.add(nombre); row.classList.add('excl');
-    ico.classList.replace('incl','excl'); ico.textContent = '✗';
-    if (mExtra[ingId]) { delete mExtra[ingId]; const xc=document.getElementById(`xc_${ingId}`); if(xc)xc.classList.remove('show'); }
-  }
-  actualizarAddBtn();
-}
-
-function toggleExtra(ev, ingId, nombre, px) {
-  ev.stopPropagation();
-  const xc = document.getElementById(`xc_${ingId}`);
-  if (mExtra[ingId]) { delete mExtra[ingId]; if(xc)xc.classList.remove('show'); }
-  else {
-    mExtra[ingId] = { ingrediente_id:ingId, nombre, precio_extra:px, cantidad:1 };
-    if(xc){ xc.classList.add('show'); const xv=document.getElementById(`xv_${ingId}`); if(xv)xv.textContent=1; }
-  }
-  actualizarAddBtn();
-}
-
-function cambiarExtra(ev, ingId, delta) {
-  ev.stopPropagation();
-  if (!mExtra[ingId]) return;
-  const n = Math.max(1, mExtra[ingId].cantidad + delta);
-  mExtra[ingId].cantidad = n;
-  const xv = document.getElementById(`xv_${ingId}`); if(xv)xv.textContent=n;
-  actualizarAddBtn();
-}
-
-function cambiarQty(d) {
-  mQty = Math.max(1, mQty + d);
-  document.getElementById('sheetQty').textContent = mQty;
-  actualizarAddBtn();
-}
-
-function actualizarAddBtn() {
-  if (!mId) return;
-  const base  = PRECIOS[mId] ?? 0;
-  const xtra  = Object.values(mExtra).reduce((s,e)=>s+e.precio_extra*e.cantidad,0);
-  const total = (base + xtra) * mQty;
-  document.getElementById('addBtn').textContent =
-    `Agregar · $${total % 1===0 ? total.toFixed(0) : total.toFixed(2)}`;
-}
-
-function confirmarModal() {
-  if (!mId) return;
-  const nota = document.getElementById('sheetNota').value.trim();
-  carrito[mId] = { qty: mQty, excl: new Set(mExcl),
-    extras: Object.fromEntries(Object.entries(mExtra).map(([k,v])=>[k,{...v}])), nota };
-  cerrarModal(); actualizarCarrito(); toast('✓ Agregado al pedido');
-}
-
 function cerrarModal() {
   document.getElementById('mnBackdrop').classList.remove('open');
   document.body.style.overflow = '';
-  mId = null;
 }
 function handleBackdrop(e) { if (e.target===e.currentTarget) cerrarModal(); }
-
-// ── Carrito ───────────────────────────────────────────────────────────────────
-function actualizarCarrito() {
-  let total=0, items=0;
-  for (const [id,s] of Object.entries(carrito)) {
-    if (s.qty < 1) continue;
-    const base = PRECIOS[id] ?? 0;
-    const xtra = Object.values(s.extras).reduce((a,e)=>a+e.precio_extra*e.cantidad,0);
-    total += (base+xtra)*s.qty; items += s.qty;
-  }
-  document.getElementById('carritoTotal').textContent = '$'+(total%1===0?total.toFixed(0):total.toFixed(2));
-  document.getElementById('carritoItems').textContent = items+' item'+(items!==1?'s':'');
-  document.getElementById('carritoBar').classList.toggle('visible', items>0);
-}
-
-function submitPedido() {
-  const hc = document.getElementById('hiddenContainer'); hc.innerHTML='';
-  let n=0;
-  for (const [id,s] of Object.entries(carrito)) {
-    if (s.qty<1) continue;
-    addH(hc,`platillo_id[]`,id); addH(hc,`cantidad[]`,s.qty);
-    for (const nom of s.excl) addH(hc,`exclusiones[${id}][]`,nom);
-    if (Object.keys(s.extras).length) addH(hc,`extras[${id}]`,JSON.stringify(Object.values(s.extras)));
-    if (s.nota) addH(hc,`notas_item[${id}]`,s.nota);
-    n++;
-  }
-  if (n===0) return;
-  document.getElementById('formPedido').submit();
-}
-function addH(c,name,val) { const i=document.createElement('input'); i.type='hidden'; i.name=name; i.value=val; c.appendChild(i); }
-
-// ── Toast ─────────────────────────────────────────────────────────────────────
-let _tt;
-function toast(msg) {
-  let t=document.getElementById('_toast');
-  if (!t) {
-    t=document.createElement('div'); t.id='_toast';
-    Object.assign(t.style,{position:'fixed',bottom:'88px',left:'50%',transform:'translateX(-50%) translateY(10px)',
-      background:'rgba(201,164,48,.96)',color:'#0d0d18',padding:'9px 20px',borderRadius:'99px',
-      fontWeight:'700',fontSize:'.85rem',zIndex:'300',opacity:'0',transition:'all .25s',whiteSpace:'nowrap'});
-    document.body.appendChild(t);
-  }
-  t.textContent=msg; t.style.opacity='1'; t.style.transform='translateX(-50%) translateY(0)';
-  clearTimeout(_tt); _tt=setTimeout(()=>{ t.style.opacity='0'; t.style.transform='translateX(-50%) translateY(10px)'; },2000);
-}
-
-// ── Cookie de visita ──────────────────────────────────────────────────────────
-(function(){
-  const ck = document.cookie.split('; ').find(r=>r.startsWith('visita_<?= (int)$restaurante['id'] ?>='));
-  if (ck) { const v=ck.split('=')[1]; const i=document.getElementById('inpVisitaId'); if(i&&(!i.value||i.value==='0'))i.value=v; }
-})();
-
-// ── Llamar mesero ─────────────────────────────────────────────────────────────
-<?php if ($mesa): ?>
-function llamarMesero() {
-  const btn=document.getElementById('btnLlamarMesero'); btn.disabled=true; btn.textContent='🔔 Avisando…';
-  fetch(`${BASE_URL}menu/${REST_SLUG}/llamarMesero`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:`mesa_qr=${encodeURIComponent(MESA_QR)}&visita_id=${VID}&tipo=mesero`})
-    .then(r=>r.json())
-    .then(d=>{btn.textContent=d.ok?'✅ Mesero avisado':'❌ Error';setTimeout(()=>{btn.textContent='🔔 Llamar mesero';btn.disabled=false;},4000);})
-    .catch(()=>{btn.textContent='🔔 Llamar mesero';btn.disabled=false;});
-}
-<?php if ($visitaId): ?>
-function pedirCuenta() {
-  const btn=document.getElementById('btnPedirCuenta'); btn.disabled=true; btn.textContent='💳 Avisando…';
-  fetch(`${BASE_URL}menu/${REST_SLUG}/llamarMesero`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:`mesa_qr=${encodeURIComponent(MESA_QR)}&visita_id=${VID}&tipo=cuenta`})
-    .then(r=>r.json())
-    .then(d=>{btn.textContent=d.ok?'✅ Mesero avisado':'❌ Error';setTimeout(()=>{btn.textContent='🧾 Pedir la cuenta';btn.disabled=false;},4000);})
-    .catch(()=>{btn.textContent='🧾 Pedir la cuenta';btn.disabled=false;});
-}
-<?php endif; ?>
-<?php endif; ?>
-
-// ── Polling estado del pedido ─────────────────────────────────────────────────
-<?php if ($visitaId): ?>
-const LABELS={pendiente:'⏳ Esperando que la cocina tome tu pedido',en_preparacion:'👨‍🍳 Tu pedido está en preparación',listo:'✅ ¡Listo! El mesero lo llevará pronto',entregado:'🍽️ Pedido entregado. ¡Buen provecho!'};
-const COLORS={pendiente:'#F59E0B',en_preparacion:'#3B82F6',listo:'#10B981',entregado:'#6B7280'};
-let prevState={};
-let prepInicio = null; // momento en que el pedido pasó a en_preparacion
-function pollEstado(){
-  fetch(`${BASE_URL}menu/${REST_SLUG}/estadoPedido/${VID}`)
-    .then(r=>r.json()).then(d=>{
-      if(!d.ok||!d.pedidos.length)return;
-      const pri=['pendiente','en_preparacion','listo','entregado']; let eg='entregado';
-      d.pedidos.forEach(p=>{ if(p.estado!=='cancelado'){const pi=pri.indexOf(p.estado),gi=pri.indexOf(eg);if(pi<gi)eg=p.estado;} });
-      const tr=document.getElementById('statusTracker'),ct=document.getElementById('statusContent');
-      let html=`<span style="color:${COLORS[eg]??'#c9a430'};font-weight:600">${LABELS[eg]??eg}</span>`;
-
-      // Barra de progreso para en_preparacion
-      const barDiv=document.getElementById('statusBar');
-      const barFill=document.getElementById('statusBarFill');
-      const barLabel=document.getElementById('statusBarLabel');
-      if(eg==='en_preparacion' && d.tiempo_min>0){
-        if(!prepInicio) prepInicio=Date.now();
-        const totalMs=d.tiempo_min*60000;
-        const pct=Math.min(100,Math.round(((Date.now()-prepInicio)/totalMs)*100));
-        const restMin=Math.max(0,Math.ceil((totalMs-(Date.now()-prepInicio))/60000));
-        barFill.style.width=pct+'%';
-        barLabel.textContent=restMin>0?`~${restMin} min restantes`:'¡Casi listo!';
-        barDiv.style.display='block';
-      } else {
-        if(eg!=='en_preparacion') prepInicio=null;
-        if(barDiv) barDiv.style.display='none';
-      }
-
-      ct.innerHTML=html; tr.style.display='block';
-      const bm=document.getElementById('btnPedirMismo');
-      if(bm&&d.pedidos.some(p=>p.estado==='entregado')){bm._pedidos=d.pedidos;bm.style.display='block';}
-    }).catch(()=>{});
-}
-pollEstado(); setInterval(pollEstado,5000);
-
-function pedirLoMismo(){
-  const bm=document.getElementById('btnPedirMismo'); const peds=bm?._pedidos??[];
-  const ul=peds.filter(p=>p.estado==='entregado').pop(); if(!ul||!ul.items)return;
-  ul.items.forEach(it=>{ if(!carrito[it.platillo_id])carrito[it.platillo_id]={qty:it.cantidad,excl:new Set(),extras:{},nota:''}; });
-  actualizarCarrito(); window.scrollTo({top:0,behavior:'smooth'}); toast('🔁 Items añadidos al carrito');
-}
-<?php endif; ?>
 </script>
 </body>
 </html>
