@@ -18,7 +18,7 @@ if (strpos($_SERVER['REQUEST_URI'] ?? '', 'api/auth/token') !== false) {
  *   /rest-chef/    → Portal chef
  *   /rest-portero/ → Portal portero
  *   /menu/         → Menú público (sin login)
- *   /acceso/       → Login de staff por slug
+ *   /acceso/       → Acceso de comensal por slug y compatibilidad legacy
  */
 
 define('ROOT_PATH', __DIR__);
@@ -139,7 +139,7 @@ $routes = [
     'rest-propinas' => 'RestPropinaController',
     // Menú público (sin login)
     'menu'          => 'RestPublicoController',
-    // Login de staff por slug de restaurante
+    // Acceso de comensal por slug de restaurante
     'acceso'        => 'StaffAccesoController',
     // Webhook entrante de CarniHub (sin login)
     'carnihub'      => 'CarnihubController',
@@ -175,7 +175,7 @@ $publicPaths = [
     'menu/scanPortero',
     'menu/registrarSalidaPublica',
     'menu/gracias',
-    // Acceso staff (login por slug de restaurante)
+    // Acceso comensal y rutas legacy de staff
     'acceso/index',
     'acceso/login',
     'acceso/entrarComensal',

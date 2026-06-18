@@ -44,7 +44,7 @@
         ['num'=>'3', 'titulo'=>'QR de visita (portero)',
          'desc'=>'El portero genera el QR al registrar la entrada. Al salir, escanea para verificar que el ticket esté pagado.'],
         ['num'=>'4', 'titulo'=>'Login de staff',
-         'desc'=>'Tu equipo entra en ' . BASE_URL . 'acceso/' . ($restaurante['slug'] ?? '') . ' con su correo y contraseña.'],
+         'desc'=>'Tu equipo entra en ' . BASE_URL . 'auth/login con su correo y contraseña.'],
       ];
       foreach ($pasos as $paso):
       ?>
@@ -71,7 +71,7 @@
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <code style="flex:1;background:#fff;border-radius:8px;padding:8px 12px;font-size:.85rem;
                    color:#111827;border:1px solid color-mix(in srgb,var(--cp) 20%,white)">
-        <?= BASE_URL ?>acceso/<?= htmlspecialchars($restaurante['slug'] ?? '') ?>/staff
+        <?= BASE_URL ?>auth/login
       </code>
       <button onclick="copiarURL()" class="btn btn-primary btn-sm" id="btnCopiar">Copiar</button>
     </div>
@@ -98,7 +98,7 @@ function downloadQR() {
 }
 
 function copiarURL() {
-  navigator.clipboard.writeText('<?= addslashes(BASE_URL . 'acceso/' . ($restaurante['slug'] ?? '')) ?>')
+  navigator.clipboard.writeText('<?= addslashes(BASE_URL . 'auth/login') ?>')
     .then(() => {
       const btn = document.getElementById('btnCopiar');
       btn.textContent = '¡Copiado!';

@@ -149,7 +149,7 @@
         </div>
       </div>
       <div style="background:#F0FDF4;border-radius:8px;padding:10px 12px;font-size:.8rem;color:#166534;margin-bottom:4px">
-        El staff iniciará sesión en <strong><?= BASE_URL ?>acceso/<?= htmlspecialchars($restaurante['slug'] ?? '') ?></strong> con su correo y contraseña.
+        El staff iniciará sesión en <strong><?= BASE_URL ?>auth/login</strong> con su correo y contraseña.
       </div>
       <div class="rst-modal-footer">
         <button type="button" onclick="rstModal('modalStaff')" class="btn btn-outline">Cancelar</button>

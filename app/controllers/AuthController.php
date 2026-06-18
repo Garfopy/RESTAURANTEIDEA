@@ -89,21 +89,66 @@ class AuthController extends BaseController
         $stmt = $db->prepare("DELETE FROM login_intentos WHERE ip = ?");
         $stmt->execute([$ip]);
 
-        $_SESSION['usuario'] = $usuario;
+        $rolSlug = $usuario['rol_slug'] ?? '';
+        $esStaffLogin = in_array($rolSlug, ['mesero', 'chef', 'portero'], true);
+        if ($esStaffLogin) {
+            $stmtStaff = $db->prepare(
+                "SELECT rs.restaurante_id
+                   FROM rest_staff rs
+                  WHERE rs.usuario_id = ?
+                    AND rs.activo = 1
+                  ORDER BY rs.id ASC
+                  LIMIT 1"
+            );
+            $stmtStaff->execute([(int)$usuario['id']]);
+            $restauranteId = (int)($stmtStaff->fetchColumn() ?: 0);
 
-        if (!empty($usuario['empresa_id'])) {
-            $empresaModel = new EmpresaModel();
-            $_SESSION['empresa'] = $empresaModel->find($usuario['empresa_id']);
+            if (!$restauranteId) {
+                $this->flash('error', 'Tu usuario de staff no tiene un restaurante activo asignado.');
+                $this->redirect('auth/login');
+            }
+
+            $usuario['restaurante_id'] = $restauranteId;
         }
 
-        $this->log('Login exitoso', 'auth');
+        if (!$esStaffLogin) {
+            $_SESSION['usuario'] = $usuario;
+
+            if (!empty($usuario['empresa_id'])) {
+                $empresaModel = new EmpresaModel();
+                $_SESSION['empresa'] = $empresaModel->find($usuario['empresa_id']);
+            }
+
+            $this->log('Login exitoso', 'auth');
+        }
 
         // Verificar si es primer login después de verificación
-        if ($usuario['email_verificado'] && empty($usuario['primer_login_completado'])) {
+        if (!$esStaffLogin && $usuario['email_verificado'] && empty($usuario['primer_login_completado'])) {
             $this->flash('first_login', '¡Bienvenido! Te recomendamos cambiar tu contraseña para mayor seguridad.');
         }
 
-        $this->redirectSegunRol($usuario['rol_slug']);
+        if ($esStaffLogin) {
+            $sessionData = [
+                'id'             => $usuario['id'],
+                'nombre'         => $usuario['nombre'],
+                'email'          => $usuario['email'],
+                'rol_id'         => $usuario['rol_id'],
+                'rol_slug'       => $rolSlug,
+                'empresa_id'     => $usuario['empresa_id'] ?? null,
+                'restaurante_id' => $usuario['restaurante_id'] ?? null,
+            ];
+
+            session_write_close();
+            session_name(SESSION_NAME . '_' . $rolSlug);
+            session_id(session_create_id());
+            session_start();
+            $_SESSION                          = [];
+            $_SESSION['usuario']               = $sessionData;
+            $_SESSION['restaurante_activo_id'] = $usuario['restaurante_id'] ?? null;
+            $this->log('Login exitoso', 'auth');
+        }
+
+        $this->redirectSegunRol($rolSlug);
     }
 
     public function verificar(?string $p = null): void
@@ -209,8 +254,7 @@ class AuthController extends BaseController
         }
         session_destroy();
 
-        $target = $restSlug ? ('acceso/' . $restSlug . '/staff') : '';
-        header('Location: ' . BASE_URL . $target);
+        header('Location: ' . BASE_URL . 'auth/login');
         exit;
     }
 
