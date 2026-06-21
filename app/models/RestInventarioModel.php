@@ -68,7 +68,7 @@ class RestInventarioModel extends BaseModel
         ]);
     }
 
-    private static function convertirUnidad(float $cantidad, string $desde, string $hasta): float
+    public static function convertirUnidad(float $cantidad, string $desde, string $hasta): float
     {
         $d = strtolower(trim($desde));
         $h = strtolower(trim($hasta));
@@ -105,7 +105,12 @@ class RestInventarioModel extends BaseModel
              JOIN rest_receta_ingredientes ri ON ri.receta_id = rec.id
              JOIN rest_ingredientes i ON i.id = ri.ingrediente_id
              WHERE pi.pedido_id = ?
-               AND COALESCE(ri.es_informativo, 0) = 0",
+               AND COALESCE(ri.es_informativo, 0) = 0
+               AND NOT EXISTS (
+                   SELECT 1 FROM rest_pedido_item_modificadores pim
+                   JOIN rest_modificadores m ON m.id=pim.modificador_id
+                   WHERE pim.pedido_item_id=pi.id AND m.tipo='sin' AND m.ingrediente_id=ri.ingrediente_id
+               )",
             [$pedidoId]
         );
 
@@ -136,6 +141,22 @@ class RestInventarioModel extends BaseModel
         // bebidas/postres no tienen filas en rest_receta_ingredientes.
         // Detectamos platillos cuya receta tiene 0 ingredientes no-informativos
         // y buscamos el ingrediente correspondiente por su codigo (B*, DP*).
+        $extras = $this->query(
+            "SELECT pi.cantidad AS cantidad_pedida, pim.cantidad AS cantidad_extra,
+                    m.ingrediente_id, m.cantidad_unidad, m.unidad, i.unidad_principal
+             FROM rest_pedido_items pi
+             JOIN rest_pedido_item_modificadores pim ON pim.pedido_item_id = pi.id
+             JOIN rest_modificadores m ON m.id = pim.modificador_id AND m.tipo = 'extra'
+             JOIN rest_ingredientes i ON i.id = m.ingrediente_id
+             WHERE pi.pedido_id = ?",
+            [$pedidoId]
+        );
+        foreach ($extras as $extra) {
+            $cantidad = (float)$extra['cantidad_unidad'] * (int)$extra['cantidad_extra'] * (int)$extra['cantidad_pedida'];
+            $descuento = self::convertirUnidad($cantidad, $extra['unidad'], $extra['unidad_principal']);
+            $this->ajustarStock((int)$extra['ingrediente_id'], -$descuento, 'salida', 'Extra de pedido restaurante', $ref, $restauranteId, $usuarioId);
+        }
+
         $sinReceta = $this->query(
             "SELECT pi.cantidad AS cantidad_pedida,
                     i.id        AS ingrediente_id,

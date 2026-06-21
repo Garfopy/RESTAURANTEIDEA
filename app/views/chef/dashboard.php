@@ -328,6 +328,7 @@ function renderColumna(pedidos, colId) {
           <div class="item-sub">×${it.cantidad}${it.tiempo_preparacion_min ? ' · ' + it.tiempo_preparacion_min + ' min' : ''}</div>
           ${it.exclusiones ? `<span class="pill pill-exclu">🚫 Sin: ${esc(it.exclusiones)}</span>` : ''}
           ${it.item_notas   ? `<span class="pill pill-nota">💬 ${esc(it.item_notas)}</span>`       : ''}
+          ${it.extras_display ? `<span class="pill pill-nota">Extras: ${esc(it.extras_display)}</span>` : ''}
           ${renderReceta(it.ingredientes_raw, it.cantidad, it.instrucciones_armado)}
         </div>
         <div>

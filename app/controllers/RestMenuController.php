@@ -60,6 +60,17 @@ class RestMenuController extends BaseController
             'ingrediente_directo_id' => $this->post('ingrediente_directo_id') ?: null,
         ];
 
+        try {
+            $modificadores = $this->normalizarModificadores(
+                $restauranteId,
+                array_map('intval', (array)$this->post('ingrediente_id', []))
+            );
+        } catch (\InvalidArgumentException $e) {
+            $this->flash('error', $e->getMessage());
+            $this->redirect('rest-menu/form/' . ($id ?: ''));
+            return;
+        }
+
         // Imagen del platillo (subida)
         $imagenPath = $this->procesarImagenPlatillo($restauranteId, $id);
         if ($imagenPath !== null) {
@@ -112,8 +123,94 @@ class RestMenuController extends BaseController
             $this->model->syncIngredientesReceta($recetaId, $ings);
         }
 
-        $this->flash('success', 'Platillo guardado.');
+        $this->model->syncModificadores($restauranteId, $platilloId, $modificadores);
+        $syncError = $this->syncModificadoresAmare($restauranteId, $platilloId);
+
+        $this->flash($syncError ? 'error' : 'success', $syncError ?: 'Platillo guardado.');
         $this->redirect('rest-menu/index');
+    }
+
+    private function normalizarModificadores(int $restauranteId, array $ingredientesReceta): array
+    {
+        $ids = (array)$this->post('modificador_id', []);
+        $tipos = (array)$this->post('modificador_tipo', []);
+        $ingredientes = (array)$this->post('modificador_ingrediente_id', []);
+        $nombres = (array)$this->post('modificador_nombre', []);
+        $cantidades = (array)$this->post('modificador_cantidad', []);
+        $unidades = (array)$this->post('modificador_unidad', []);
+        $precios = (array)$this->post('modificador_precio', []);
+        $maximos = (array)$this->post('modificador_max', []);
+        $resultado = [];
+        $db = Database::getInstance();
+
+        foreach ($tipos as $k => $tipo) {
+            if (!in_array($tipo, ['sin', 'extra'], true)) continue;
+            $ingredienteId = (int)($ingredientes[$k] ?? 0);
+            if ($ingredienteId <= 0) throw new \InvalidArgumentException('Selecciona un ingrediente para cada modificador.');
+            $stmt = $db->prepare("SELECT id, nombre, unidad_principal FROM rest_ingredientes WHERE id=? AND restaurante_id=? AND activo=1");
+            $stmt->execute([$ingredienteId, $restauranteId]);
+            $ingrediente = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if (!$ingrediente) throw new \InvalidArgumentException('Uno de los ingredientes de los modificadores no pertenece a este restaurante.');
+            if ($tipo === 'sin' && !in_array($ingredienteId, $ingredientesReceta, true)) {
+                throw new \InvalidArgumentException('Las guarniciones removibles deben formar parte de la receta del platillo.');
+            }
+            $precio = $tipo === 'extra' ? max(0, (float)($precios[$k] ?? 0)) : 0.0;
+            $cantidad = max(0.001, (float)($cantidades[$k] ?? 1));
+            $maximo = $tipo === 'extra' ? max(1, (int)($maximos[$k] ?? 1)) : 1;
+            $nombre = trim((string)($nombres[$k] ?? ''));
+            $resultado[] = [
+                'id' => (int)($ids[$k] ?? 0),
+                'tipo' => $tipo,
+                'ingrediente_id' => $ingredienteId,
+                'nombre' => $nombre !== '' ? mb_substr($nombre, 0, 120) : ($tipo === 'sin' ? 'Sin ' : 'Extra ') . $ingrediente['nombre'],
+                'cantidad_unidad' => $cantidad,
+                'unidad' => mb_substr(trim((string)($unidades[$k] ?? $ingrediente['unidad_principal'])), 0, 20),
+                'precio_extra' => $precio,
+                'max_seleccion' => $maximo,
+            ];
+        }
+        return $resultado;
+    }
+
+    private function syncModificadoresAmare(int $restauranteId, int $platilloId): ?string
+    {
+        try {
+            $db = Database::getInstance();
+            $restStmt = $db->prepare("SELECT exclusiones_app_habilitadas, extras_app_habilitados FROM rest_restaurantes WHERE id=?");
+            $restStmt->execute([$restauranteId]);
+            $rest = $restStmt->fetch(\PDO::FETCH_ASSOC) ?: [];
+            $cfgStmt = $db->query("SELECT clave, valor FROM global_settings WHERE clave IN ('amare_api_url','amare_api_token')");
+            $cfg = array_column($cfgStmt->fetchAll(\PDO::FETCH_ASSOC), 'valor', 'clave');
+            if (empty($cfg['amare_api_url']) || empty($cfg['amare_api_token'])) return null;
+
+            $mods = array_values(array_filter(
+                $this->model->getModificadoresPlatillo($platilloId),
+                fn($m) => ($m['tipo'] === 'sin' && !empty($rest['exclusiones_app_habilitadas']))
+                    || ($m['tipo'] === 'extra' && !empty($rest['extras_app_habilitados']))
+            ));
+            $payload = ['platillo_id' => $platilloId, 'modificadores' => array_map(fn($m) => [
+                'id' => (int)$m['id'],
+                'tipo' => $m['tipo'] === 'sin' ? 'exclusion' : 'extra',
+                'nombre' => $m['nombre'],
+                'ingrediente_id' => (int)$m['ingrediente_id'],
+                'cantidad_unidad' => (float)$m['cantidad_unidad'],
+                'unidad' => $m['unidad'],
+                'precio_unitario' => (float)$m['precio_extra'],
+                'max_cantidad' => (int)$m['max_seleccion'],
+            ], $mods)];
+            $ch = curl_init(rtrim($cfg['amare_api_url'], '/') . '/branches/' . $restauranteId . '/menu-items/' . $platilloId . '/modifiers');
+            curl_setopt_array($ch, [CURLOPT_CUSTOMREQUEST => 'PUT', CURLOPT_POSTFIELDS => json_encode($payload), CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 10, CURLOPT_CONNECTTIMEOUT => 5, CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Accept: application/json', 'Authorization: Bearer ' . $cfg['amare_api_token']]]);
+            $response = curl_exec($ch); $error = curl_error($ch); $code = curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
+            if ($error || $code < 200 || $code >= 300) {
+                error_log('[ModificadoresAmare] HTTP ' . $code . ' ' . $error . ' ' . $response);
+                return 'Platillo guardado localmente, pero sus modificadores no se pudieron sincronizar con Amare-App.';
+            }
+        } catch (\Throwable $e) {
+            error_log('[ModificadoresAmare] ' . $e->getMessage());
+            return 'Platillo guardado localmente, pero sus modificadores no se pudieron sincronizar con Amare-App.';
+        }
+        return null;
     }
 
     public function detalle(?string $id = null): void

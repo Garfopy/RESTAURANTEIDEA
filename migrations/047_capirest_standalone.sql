@@ -173,6 +173,8 @@ CREATE TABLE IF NOT EXISTS `rest_restaurantes` (
   `portero_habilitado`       TINYINT(1)    NOT NULL DEFAULT 1,
   `propinas_sugeridas`       VARCHAR(40)   NOT NULL DEFAULT '0,10,15,20',
   `requiere_login_comensal`  TINYINT(1)    NOT NULL DEFAULT 0,
+  `exclusiones_app_habilitadas` TINYINT(1) NOT NULL DEFAULT 0,
+  `extras_app_habilitados`      TINYINT(1) NOT NULL DEFAULT 0,
   `activo`                   TINYINT(1)    NOT NULL DEFAULT 1,
   `created_at`               TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
@@ -622,15 +624,20 @@ CREATE TABLE IF NOT EXISTS `rest_platillo_armado` (
 CREATE TABLE IF NOT EXISTS `rest_modificadores` (
   `id`             INT UNSIGNED NOT NULL AUTO_INCREMENT,
   `restaurante_id` INT UNSIGNED NOT NULL,
+  `ingrediente_id` INT UNSIGNED DEFAULT NULL,
   `nombre`         VARCHAR(120)  NOT NULL,
   `descripcion`    VARCHAR(255)  DEFAULT NULL,
   `tipo`           ENUM('extra','sin','opcion') NOT NULL DEFAULT 'opcion',
   `precio_extra`   DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  `cantidad_unidad` DECIMAL(12,3) NOT NULL DEFAULT 1.000,
+  `unidad`         VARCHAR(20) NOT NULL DEFAULT 'pza',
   `activo`         TINYINT(1)   NOT NULL DEFAULT 1,
   `created_at`     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_rm_restaurante` (`restaurante_id`),
-  CONSTRAINT `fk_rm_restaurante` FOREIGN KEY (`restaurante_id`) REFERENCES `rest_restaurantes`(`id`) ON DELETE CASCADE
+  KEY `idx_rm_ingrediente` (`ingrediente_id`),
+  CONSTRAINT `fk_rm_restaurante` FOREIGN KEY (`restaurante_id`) REFERENCES `rest_restaurantes`(`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_rm_ingrediente` FOREIGN KEY (`ingrediente_id`) REFERENCES `rest_ingredientes`(`id`) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `rest_platillo_modificador` (

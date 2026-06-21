@@ -309,12 +309,11 @@ class RestConfigController extends BaseController
             $cfgCarniHub = [];
         }
 
-        if ($this->isBloqueadoPorCarniHub($restauranteId, $cfgCarniHub)) {
+        $bloqueadoPorCarniHub = $this->isBloqueadoPorCarniHub($restauranteId, $cfgCarniHub);
+        if ($bloqueadoPorCarniHub) {
             $this->forzarCarniHubActivo($restauranteId);
             $this->sincronizarDatosDesdeCarniHub($restauranteId);
             $this->flash('success', 'Configuración bloqueada: este local está vinculado a CarniHub y sus datos se sincronizan automáticamente.');
-            $this->redirect('rest-config/index');
-            return;
         }
 
         $nombre      = trim((string)$this->normalizeUtf8Input($this->post('nombre', '')));
@@ -347,6 +346,8 @@ class RestConfigController extends BaseController
             'reservas_habilitadas'    => $this->post('reservas_habilitadas')    ? 1 : 0,
             'portero_habilitado'      => $this->post('portero_habilitado')      ? 1 : 0,
             'requiere_login_comensal' => $this->post('requiere_login_comensal') ? 1 : 0,
+            'exclusiones_app_habilitadas' => $this->post('exclusiones_app_habilitadas') ? 1 : 0,
+            'extras_app_habilitados'      => $this->post('extras_app_habilitados') ? 1 : 0,
             'propinas_sugeridas'      => trim($this->post('propinas_sugeridas', '0,10,15,20')) ?: '0,10,15,20',
             'horarios_json'           => $this->post('horarios_json') ?: null,
         ];
@@ -380,7 +381,9 @@ class RestConfigController extends BaseController
         }
 
         try {
-            $this->model->update($restauranteId, $base);
+            if (!$bloqueadoPorCarniHub) {
+                $this->model->update($restauranteId, $base);
+            }
             $this->guardarColoresEnGlobalSettings($colorPrimario, $colorSecundario, $appBackgroundColor, $appButtonColor, $appButtonTextColor);
         } catch (PDOException $e) {
             $msg = $e->getMessage();
@@ -526,7 +529,9 @@ class RestConfigController extends BaseController
                         'background_color' => $appBackgroundColor,
                         'button_color' => $appButtonColor,
                         'button_text_color' => $appButtonTextColor,
-                    ]
+                    ],
+                    (bool)$modos['exclusiones_app_habilitadas'],
+                    (bool)$modos['extras_app_habilitados']
                 );
             }
         } catch (\Exception $e) {
@@ -660,7 +665,9 @@ class RestConfigController extends BaseController
         array $metodosPago,
         string $costoEnvio,
         string $pedidoMinimo,
-        array $appColors = []
+        array $appColors = [],
+        bool $exclusionesHabilitadas = false,
+        bool $extrasHabilitados = false
     ): void {
         $url = rtrim($apiUrl, '/') . '/branches/' . $restauranteId . '/config';
 
@@ -673,6 +680,10 @@ class RestConfigController extends BaseController
                 'background_color' => $appColors['background_color'] ?? '#FFFFFF',
                 'button_color' => $appColors['button_color'] ?? '#C8102E',
                 'button_text_color' => $appColors['button_text_color'] ?? '#FFFFFF',
+            ],
+            'modificadores' => [
+                'exclusiones_habilitadas' => $exclusionesHabilitadas,
+                'extras_habilitados' => $extrasHabilitados,
             ],
         ]);
 

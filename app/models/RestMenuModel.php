@@ -149,7 +149,81 @@ class RestMenuModel extends BaseModel
         $receta = $this->getReceta($platilloId);
         $platillo['receta'] = $receta;
         $platillo['ingredientes'] = $receta ? $this->getIngredientesReceta($receta['id']) : [];
+        $platillo['modificadores'] = $this->getModificadoresPlatillo($platilloId, false);
         return $platillo;
+    }
+
+    public function getModificadoresPlatillo(int $platilloId, bool $soloActivos = true): array
+    {
+        $activo = $soloActivos ? ' AND m.activo = 1' : '';
+        return $this->query(
+            "SELECT m.*, pm.max_seleccion, i.nombre AS ingrediente_nombre,
+                    i.unidad_principal AS ingrediente_unidad
+             FROM rest_platillo_modificador pm
+             JOIN rest_modificadores m ON m.id = pm.modificador_id
+             LEFT JOIN rest_ingredientes i ON i.id = m.ingrediente_id
+             WHERE pm.platillo_id = ?{$activo}
+             ORDER BY FIELD(m.tipo, 'sin', 'extra', 'opcion'), m.nombre",
+            [$platilloId]
+        );
+    }
+
+    public function getModificadorValido(int $restauranteId, int $platilloId, int $modificadorId): ?array
+    {
+        return $this->queryOne(
+            "SELECT m.*, pm.max_seleccion, i.nombre AS ingrediente_nombre
+             FROM rest_platillo_modificador pm
+             JOIN rest_modificadores m ON m.id = pm.modificador_id
+             LEFT JOIN rest_ingredientes i ON i.id = m.ingrediente_id
+             WHERE pm.platillo_id = ? AND m.id = ? AND m.restaurante_id = ? AND m.activo = 1",
+            [$platilloId, $modificadorId, $restauranteId]
+        );
+    }
+
+    public function syncModificadores(int $restauranteId, int $platilloId, array $modificadores): void
+    {
+        $actuales = $this->getModificadoresPlatillo($platilloId, false);
+        $actualesPorId = array_column($actuales, null, 'id');
+        $conservar = [];
+
+        foreach ($modificadores as $mod) {
+            $id = (int)($mod['id'] ?? 0);
+            $params = [
+                $restauranteId,
+                (int)$mod['ingrediente_id'],
+                $mod['nombre'],
+                $mod['tipo'],
+                (float)$mod['precio_extra'],
+                (float)$mod['cantidad_unidad'],
+                $mod['unidad'],
+            ];
+            if ($id && isset($actualesPorId[$id])) {
+                $this->execute(
+                    "UPDATE rest_modificadores SET restaurante_id=?, ingrediente_id=?, nombre=?, tipo=?, precio_extra=?, cantidad_unidad=?, unidad=?, activo=1 WHERE id=?",
+                    array_merge($params, [$id])
+                );
+            } else {
+                $this->execute(
+                    "INSERT INTO rest_modificadores (restaurante_id, ingrediente_id, nombre, tipo, precio_extra, cantidad_unidad, unidad, activo) VALUES (?,?,?,?,?,?,?,1)",
+                    $params
+                );
+                $id = (int)$this->db->lastInsertId();
+            }
+            $max = $mod['tipo'] === 'sin' ? 1 : max(1, (int)$mod['max_seleccion']);
+            $this->execute(
+                "INSERT INTO rest_platillo_modificador (platillo_id, modificador_id, obligatorio, max_seleccion)
+                 VALUES (?,?,0,?) ON DUPLICATE KEY UPDATE max_seleccion=VALUES(max_seleccion)",
+                [$platilloId, $id, $max]
+            );
+            $conservar[] = $id;
+        }
+
+        foreach ($actuales as $actual) {
+            $id = (int)$actual['id'];
+            if (!in_array($id, $conservar, true)) {
+                $this->execute("UPDATE rest_modificadores SET activo=0 WHERE id=?", [$id]);
+            }
+        }
     }
 
     // ── Estadísticas de ventas ────────────────────────────────────

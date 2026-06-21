@@ -70,6 +70,45 @@ class RestPedidoModel extends BaseModel
 
     public function crear(array $data, array $items): int
     {
+        $menuModel = new RestMenuModel();
+        $restauranteId = (int)$data['restaurante_id'];
+        $restaurante = (new RestauranteModel())->find($restauranteId) ?: [];
+        foreach ($items as &$item) {
+            $platillo = $menuModel->find((int)$item['platillo_id']);
+            if (!$platillo || (int)$platillo['restaurante_id'] !== $restauranteId) {
+                throw new \InvalidArgumentException('Platillo no valido para este restaurante.');
+            }
+            $selecciones = []; $extraUnitario = 0.0; $exclusiones = []; $agrupadas = [];
+            foreach ((array)($item['modificadores'] ?? []) as $seleccion) {
+                $modId = (int)($seleccion['modificador_id'] ?? 0);
+                if ($modId <= 0) continue;
+                $agrupadas[$modId] = ($agrupadas[$modId] ?? 0) + max(1, (int)($seleccion['cantidad'] ?? 1));
+            }
+            foreach ($agrupadas as $modId => $cantidad) {
+                $mod = $menuModel->getModificadorValido($restauranteId, (int)$item['platillo_id'], $modId);
+                if (!$mod || $cantidad > (int)$mod['max_seleccion']) {
+                    throw new \InvalidArgumentException('Modificador invalido o cantidad superior al maximo permitido.');
+                }
+                if (($mod['tipo'] === 'sin' && empty($restaurante['exclusiones_app_habilitadas']))
+                    || ($mod['tipo'] === 'extra' && empty($restaurante['extras_app_habilitados']))) {
+                    throw new \InvalidArgumentException('Este tipo de modificador esta deshabilitado para el restaurante.');
+                }
+                if ($mod['tipo'] === 'sin') { $cantidad = 1; $exclusiones[] = $mod['ingrediente_nombre'] ?: $mod['nombre']; }
+                if ($mod['tipo'] === 'extra') $extraUnitario += (float)$mod['precio_extra'] * $cantidad;
+                $selecciones[] = ['modificador' => $mod, 'cantidad' => $cantidad];
+            }
+            $cantidadPlatillos = max(1, (int)($item['cantidad'] ?? 1));
+            $item['cantidad'] = $cantidadPlatillos;
+            $item['precio_unit'] = round((float)$platillo['precio'] + $extraUnitario, 2);
+            $item['subtotal'] = round($item['precio_unit'] * $cantidadPlatillos, 2);
+            $item['selecciones_validadas'] = $selecciones;
+            $item['exclusiones'] = $exclusiones ? implode(', ', $exclusiones) : null;
+            $item['extras'] = json_encode(array_values(array_map(fn($s) => [
+                'modificador_id' => (int)$s['modificador']['id'], 'ingrediente_id' => (int)$s['modificador']['ingrediente_id'],
+                'nombre' => $s['modificador']['nombre'], 'precio_extra' => (float)$s['modificador']['precio_extra'], 'cantidad' => (int)$s['cantidad'],
+            ], array_filter($selecciones, fn($s) => $s['modificador']['tipo'] === 'extra'))), JSON_UNESCAPED_UNICODE);
+        }
+        unset($item);
         $this->db->beginTransaction();
         try {
             $folio = $this->generarFolio($data['restaurante_id']);
@@ -97,6 +136,13 @@ class RestPedidoModel extends BaseModel
                      VALUES (?,?,?,?,?,?,?,?)",
                     [$pedidoId, $item['platillo_id'], $item['cantidad'], $item['precio_unit'], $item['subtotal'], $item['notas'] ?? null, $item['exclusiones'] ?? null, $item['extras'] ?? null]
                 );
+                $pedidoItemId = (int)$this->db->lastInsertId();
+                foreach ($item['selecciones_validadas'] ?? [] as $seleccion) {
+                    $this->execute(
+                        "INSERT INTO rest_pedido_item_modificadores (pedido_item_id, modificador_id, cantidad, precio_extra) VALUES (?,?,?,?)",
+                        [$pedidoItemId, $seleccion['modificador']['id'], $seleccion['cantidad'], $seleccion['modificador']['precio_extra']]
+                    );
+                }
             }
 
             $this->db->commit();
@@ -131,6 +177,16 @@ class RestPedidoModel extends BaseModel
              WHERE pi.pedido_id = ?",
             [$pedidoId]
         );
+        foreach ($pedido['items'] as &$item) {
+            $item['modificadores'] = $this->query(
+                "SELECT pim.cantidad, pim.precio_extra, m.nombre, m.tipo, m.ingrediente_id, m.cantidad_unidad, m.unidad
+                 FROM rest_pedido_item_modificadores pim
+                 JOIN rest_modificadores m ON m.id = pim.modificador_id
+                 WHERE pim.pedido_item_id = ? ORDER BY m.tipo, m.nombre",
+                [(int)$item['id']]
+            );
+        }
+        unset($item);
         return $pedido;
     }
 
@@ -160,6 +216,10 @@ class RestPedidoModel extends BaseModel
                     m.nombre AS mesa_nombre,
                     pi.id AS item_id, pi.platillo_id, pi.cantidad, pi.notas AS item_notas, pi.estado AS item_estado,
                     pi.exclusiones,
+                    (SELECT GROUP_CONCAT(CONCAT(mo.nombre, ' x', pim.cantidad) SEPARATOR ', ')
+                       FROM rest_pedido_item_modificadores pim
+                       JOIN rest_modificadores mo ON mo.id = pim.modificador_id
+                      WHERE pim.pedido_item_id = pi.id AND mo.tipo = 'extra') AS extras_display,
                     pl.nombre AS platillo_nombre, pl.tiempo_preparacion_min,
                     COALESCE(pl.codigo,'') AS platillo_codigo,
                     (SELECT r.notas

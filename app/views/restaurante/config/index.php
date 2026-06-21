@@ -316,6 +316,8 @@
             ['reservas_habilitadas',    1, '📅 Reservaciones',           'Permite que los comensales reserven mesa con anticipación.'],
             ['portero_habilitado',      1, '🛡️ Portero (verifica pago)','Un portero escanea el QR del comensal al salir para confirmar el pago.'],
             ['requiere_login_comensal', 0, '🔐 Login obligatorio',       'Exige Google login o nombre+teléfono antes de ordenar.'],
+            ['exclusiones_app_habilitadas', 0, 'Quitar guarniciones en app', 'Permite quitar guarniciones configuradas sin cambiar el precio.'],
+            ['extras_app_habilitados', 0, 'Extras en app', 'Permite agregar extras configurados con precio y cantidad maxima.'],
           ];
           foreach ($toggles as [$key, $def, $label, $desc]):
             $val = (int)($r[$key] ?? $def);

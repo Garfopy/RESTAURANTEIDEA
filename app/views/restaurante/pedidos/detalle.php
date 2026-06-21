@@ -17,7 +17,14 @@
     <table style="width:100%;border-collapse:collapse;font-size:.875rem">
       <?php foreach ($pedido['items'] as $item): ?>
       <tr style="border-bottom:1px solid #F3F4F6">
-        <td style="padding:10px 0;font-weight:500"><?= htmlspecialchars($item['platillo_nombre']) ?></td>
+        <td style="padding:10px 0;font-weight:500">
+          <?= htmlspecialchars($item['platillo_nombre']) ?>
+          <?php foreach ($item['modificadores'] ?? [] as $mod): ?>
+          <div style="font-size:.75rem;color:<?= $mod['tipo'] === 'sin' ? '#B91C1C' : '#2563EB' ?>;font-weight:400">
+            <?= $mod['tipo'] === 'sin' ? 'Sin: ' : 'Extra: ' ?><?= htmlspecialchars($mod['nombre']) ?><?= $mod['tipo'] === 'extra' ? ' x' . (int)$mod['cantidad'] : '' ?>
+          </div>
+          <?php endforeach; ?>
+        </td>
         <td style="padding:10px;text-align:center;color:#6B7280">x<?= (int)$item['cantidad'] ?></td>
         <td style="padding:10px 0;text-align:right;color:#6B7280">$<?= number_format((float)$item['precio_unit'],2) ?></td>
         <td style="padding:10px 0;text-align:right;font-weight:600">$<?= number_format((float)$item['subtotal'],2) ?></td>

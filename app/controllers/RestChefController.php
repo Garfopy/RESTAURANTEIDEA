@@ -111,7 +111,7 @@ class RestChefController extends BaseController
         try {
             $db       = Database::getInstance();
             $stmtItem = $db->prepare(
-                "SELECT pi.platillo_id, pi.cantidad, pi.pedido_id, p.restaurante_id
+                "SELECT pi.platillo_id, pi.cantidad, pi.pedido_id, pi.exclusiones, p.restaurante_id
                  FROM rest_pedido_items pi
                  JOIN rest_pedidos p ON p.id = pi.pedido_id
                  WHERE pi.id = ? LIMIT 1"
@@ -129,18 +129,26 @@ class RestChefController extends BaseController
 
                 // Ingredientes de la receta que sí descuentan stock (es_informativo = 0)
                 $stmtRec = $db->prepare(
-                    "SELECT ri.ingrediente_id, ri.cantidad
+                    "SELECT ri.ingrediente_id, ri.cantidad, i.nombre
                      FROM rest_receta_ingredientes ri
                      JOIN rest_recetas rec ON rec.id = ri.receta_id
+                     JOIN rest_ingredientes i ON i.id = ri.ingrediente_id
                      WHERE rec.platillo_id = ?
-                       AND ri.es_informativo = 0"
+                       AND ri.es_informativo = 0
+                       AND NOT EXISTS (
+                           SELECT 1 FROM rest_pedido_item_modificadores pim
+                           JOIN rest_modificadores m ON m.id=pim.modificador_id
+                           WHERE pim.pedido_item_id=? AND m.tipo='sin' AND m.ingrediente_id=ri.ingrediente_id
+                       )"
                 );
-                $stmtRec->execute([$platilloId]);
+                $stmtRec->execute([$platilloId, $itemId]);
                 $recIngredientes = $stmtRec->fetchAll(\PDO::FETCH_ASSOC);
 
                 if (!empty($recIngredientes)) {
                     // Platillo con receta → descontar ingredientes
                     foreach ($recIngredientes as $ri) {
+                        $excluidos = array_map('trim', explode(',', (string)($item['exclusiones'] ?? '')));
+                        if (in_array($ri['nombre'], $excluidos, true)) continue;
                         $delta = (float)$ri['cantidad'] * $cantidadPlatos;
                         $invModel->ajustarStock(
                             (int)$ri['ingrediente_id'],
@@ -178,6 +186,20 @@ class RestChefController extends BaseController
                             null
                         );
                     }
+                }
+
+                $stmtExtras = $db->prepare(
+                    "SELECT pim.cantidad, m.ingrediente_id, m.cantidad_unidad, m.unidad, i.unidad_principal
+                     FROM rest_pedido_item_modificadores pim
+                     JOIN rest_modificadores m ON m.id=pim.modificador_id AND m.tipo='extra'
+                     JOIN rest_ingredientes i ON i.id=m.ingrediente_id
+                     WHERE pim.pedido_item_id=?"
+                );
+                $stmtExtras->execute([$itemId]);
+                foreach ($stmtExtras->fetchAll(\PDO::FETCH_ASSOC) as $extra) {
+                    $cantidadExtra = (float)$extra['cantidad_unidad'] * (int)$extra['cantidad'] * $cantidadPlatos;
+                    $delta = RestInventarioModel::convertirUnidad($cantidadExtra, $extra['unidad'], $extra['unidad_principal']);
+                    $invModel->ajustarStock((int)$extra['ingrediente_id'], -$delta, 'salida', 'Extra de pedido #' . $pedidoId, $ref, $restauranteId, null);
                 }
             }
         } catch (\Throwable $e) {

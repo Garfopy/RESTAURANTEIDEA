@@ -1308,7 +1308,9 @@ class ApiController extends BaseController
         $segs     = array_values(array_filter(explode('/', $urlParam)));
         $branchId = (isset($segs[2]) && ctype_digit((string)$segs[2])) ? (int)$segs[2] : null;
         $subAct   = $segs[3] ?? null;
-        if (!$branchId || $subAct !== 'config' || $_SERVER['REQUEST_METHOD'] !== 'PUT') {
+        $menuItemId = ($subAct === 'menu-items' && isset($segs[4]) && ctype_digit((string)$segs[4])) ? (int)$segs[4] : null;
+        $esModificadores = $menuItemId && (($segs[5] ?? null) === 'modifiers');
+        if (!$branchId || ($subAct !== 'config' && !$esModificadores) || $_SERVER['REQUEST_METHOD'] !== 'PUT') {
             $this->adminApiError('Ruta no encontrada', 404);
         }
         $jwtUser = $this->requireAdminJWT(false);
@@ -1322,12 +1324,35 @@ class ApiController extends BaseController
             $this->adminApiError('No tienes permiso para modificar esta sucursal', 403);
         }
         try {
+            if ($esModificadores) {
+                $mods = $body['modificadores'] ?? null;
+                if (!is_array($mods)) $this->adminApiError('modificadores debe ser un arreglo', 422);
+                foreach ($mods as $mod) {
+                    if (!isset($mod['id'], $mod['tipo'], $mod['ingrediente_id'], $mod['max_cantidad'])
+                        || !in_array($mod['tipo'], ['exclusion', 'extra'], true)
+                        || (int)$mod['max_cantidad'] < 1) {
+                        $this->adminApiError('Modificador invalido', 422);
+                    }
+                }
+                $db->prepare(
+                    "INSERT INTO amare_branch_menu_modifiers (branch_id, platillo_external_id, payload_json)
+                     VALUES (?,?,?) ON DUPLICATE KEY UPDATE payload_json=VALUES(payload_json), updated_at=CURRENT_TIMESTAMP"
+                )->execute([$branchId, $menuItemId, json_encode($body, JSON_UNESCAPED_UNICODE)]);
+                $this->adminApiOk('Modificadores del platillo actualizados correctamente');
+            }
             $sets = []; $params = [];
             if (isset($body['metodos_pago']))  { $sets[] = 'metodos_pago = ?';  $params[] = json_encode($body['metodos_pago']); }
             if (isset($body['tipos_entrega'])) { $sets[] = 'tipos_entrega = ?'; $params[] = json_encode($body['tipos_entrega']); }
             if (isset($body['costo_envio']))   { $sets[] = 'costo_envio = ?';   $params[] = (float)$body['costo_envio']; }
             if (isset($body['pedido_minimo'])) { $sets[] = 'pedido_minimo = ?'; $params[] = (float)$body['pedido_minimo']; }
             if (isset($body['activo']))        { $sets[] = 'activo = ?';        $params[] = $body['activo'] ? 1 : 0; }
+            if (isset($body['modificadores']) && is_array($body['modificadores'])) {
+                $sets[] = 'modificadores_config = ?';
+                $params[] = json_encode([
+                    'exclusiones_habilitadas' => !empty($body['modificadores']['exclusiones_habilitadas']),
+                    'extras_habilitados' => !empty($body['modificadores']['extras_habilitados']),
+                ]);
+            }
             if (!empty($sets)) { $params[] = $branchId; $db->prepare("UPDATE sucursales SET " . implode(', ', $sets) . " WHERE id = ?")->execute($params); }
             $this->adminApiOk('Configuración de sucursal actualizada correctamente');
         } catch (\Throwable $e) { $this->adminApiError('Error al actualizar: ' . $e->getMessage(), 500); }
