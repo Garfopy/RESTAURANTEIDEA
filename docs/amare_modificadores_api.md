@@ -13,6 +13,12 @@
 }
 ```
 
+La app puede recuperar la configuracion y todos los modificadores ya sincronizados con:
+
+`GET /branches/{branchId}/config`
+
+La respuesta incluye `data.modificadores` y `data.platillos_modificadores`, indexados por ID de platillo.
+
 ## Catalogo por platillo
 
 CarniHub sincroniza `PUT /branches/{branchId}/menu-items/{platilloId}/modifiers`:
@@ -34,6 +40,8 @@ CarniHub sincroniza `PUT /branches/{branchId}/menu-items/{platilloId}/modifiers`
   ]
 }
 ```
+
+Tambien puede consultarse un solo platillo con `GET /branches/{branchId}/menu-items/{platilloId}/modifiers`.
 
 `tipo` puede ser `exclusion` o `extra`. Una exclusion siempre tiene precio cero y cantidad maxima uno.
 

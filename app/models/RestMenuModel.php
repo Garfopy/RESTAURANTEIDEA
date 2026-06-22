@@ -226,6 +226,56 @@ class RestMenuModel extends BaseModel
         }
     }
 
+    /** Crea modificadores faltantes a partir de guarniciones/extras de recetas antiguas. */
+    public function materializarModificadoresExistentes(int $restauranteId): int
+    {
+        $candidatos = $this->query(
+            "SELECT p.id AS platillo_id, ri.ingrediente_id, i.nombre, ri.cantidad, ri.unidad,
+                    COALESCE(ri.tipo_componente, 'materia_prima') AS tipo_componente,
+                    COALESCE(ri.precio_extra, 0) AS precio_extra
+             FROM rest_platillos p
+             JOIN rest_recetas r ON r.platillo_id = p.id
+             JOIN rest_receta_ingredientes ri ON ri.receta_id = r.id
+             JOIN rest_ingredientes i ON i.id = ri.ingrediente_id
+             WHERE p.restaurante_id = ? AND p.activo = 1
+               AND (ri.tipo_componente = 'guarnicion' OR COALESCE(ri.precio_extra, 0) > 0)",
+            [$restauranteId]
+        );
+        $creados = 0;
+        foreach ($candidatos as $row) {
+            $tipos = [];
+            if ($row['tipo_componente'] === 'guarnicion') $tipos[] = 'sin';
+            if ((float)$row['precio_extra'] > 0) $tipos[] = 'extra';
+            foreach ($tipos as $tipo) {
+                $existe = $this->queryOne(
+                    "SELECT m.id FROM rest_platillo_modificador pm
+                     JOIN rest_modificadores m ON m.id=pm.modificador_id
+                     WHERE pm.platillo_id=? AND m.restaurante_id=? AND m.ingrediente_id=? AND m.tipo=? LIMIT 1",
+                    [(int)$row['platillo_id'], $restauranteId, (int)$row['ingrediente_id'], $tipo]
+                );
+                if ($existe) {
+                    $this->execute("UPDATE rest_modificadores SET activo=1 WHERE id=?", [(int)$existe['id']]);
+                    continue;
+                }
+                $nombre = ($tipo === 'sin' ? 'Sin ' : 'Extra ') . $row['nombre'];
+                $this->execute(
+                    "INSERT INTO rest_modificadores (restaurante_id, ingrediente_id, nombre, tipo, precio_extra, cantidad_unidad, unidad, activo)
+                     VALUES (?,?,?,?,?,?,?,1)",
+                    [$restauranteId, (int)$row['ingrediente_id'], $nombre, $tipo,
+                     $tipo === 'extra' ? (float)$row['precio_extra'] : 0.0,
+                     max(0.001, (float)$row['cantidad']), $row['unidad'] ?: 'pza']
+                );
+                $modificadorId = (int)$this->db->lastInsertId();
+                $this->execute(
+                    "INSERT INTO rest_platillo_modificador (platillo_id, modificador_id, obligatorio, max_seleccion) VALUES (?,?,0,1)",
+                    [(int)$row['platillo_id'], $modificadorId]
+                );
+                $creados++;
+            }
+        }
+        return $creados;
+    }
+
     // ── Estadísticas de ventas ────────────────────────────────────
 
     /**

@@ -174,43 +174,10 @@ class RestMenuController extends BaseController
 
     private function syncModificadoresAmare(int $restauranteId, int $platilloId): ?string
     {
-        try {
-            $db = Database::getInstance();
-            $restStmt = $db->prepare("SELECT exclusiones_app_habilitadas, extras_app_habilitados FROM rest_restaurantes WHERE id=?");
-            $restStmt->execute([$restauranteId]);
-            $rest = $restStmt->fetch(\PDO::FETCH_ASSOC) ?: [];
-            $cfgStmt = $db->query("SELECT clave, valor FROM global_settings WHERE clave IN ('amare_api_url','amare_api_token')");
-            $cfg = array_column($cfgStmt->fetchAll(\PDO::FETCH_ASSOC), 'valor', 'clave');
-            if (empty($cfg['amare_api_url']) || empty($cfg['amare_api_token'])) return null;
-
-            $mods = array_values(array_filter(
-                $this->model->getModificadoresPlatillo($platilloId),
-                fn($m) => ($m['tipo'] === 'sin' && !empty($rest['exclusiones_app_habilitadas']))
-                    || ($m['tipo'] === 'extra' && !empty($rest['extras_app_habilitados']))
-            ));
-            $payload = ['platillo_id' => $platilloId, 'modificadores' => array_map(fn($m) => [
-                'id' => (int)$m['id'],
-                'tipo' => $m['tipo'] === 'sin' ? 'exclusion' : 'extra',
-                'nombre' => $m['nombre'],
-                'ingrediente_id' => (int)$m['ingrediente_id'],
-                'cantidad_unidad' => (float)$m['cantidad_unidad'],
-                'unidad' => $m['unidad'],
-                'precio_unitario' => (float)$m['precio_extra'],
-                'max_cantidad' => (int)$m['max_seleccion'],
-            ], $mods)];
-            $ch = curl_init(rtrim($cfg['amare_api_url'], '/') . '/branches/' . $restauranteId . '/menu-items/' . $platilloId . '/modifiers');
-            curl_setopt_array($ch, [CURLOPT_CUSTOMREQUEST => 'PUT', CURLOPT_POSTFIELDS => json_encode($payload), CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT => 10, CURLOPT_CONNECTTIMEOUT => 5, CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Accept: application/json', 'Authorization: Bearer ' . $cfg['amare_api_token']]]);
-            $response = curl_exec($ch); $error = curl_error($ch); $code = curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
-            if ($error || $code < 200 || $code >= 300) {
-                error_log('[ModificadoresAmare] HTTP ' . $code . ' ' . $error . ' ' . $response);
-                return 'Platillo guardado localmente, pero sus modificadores no se pudieron sincronizar con Amare-App.';
-            }
-        } catch (\Throwable $e) {
-            error_log('[ModificadoresAmare] ' . $e->getMessage());
-            return 'Platillo guardado localmente, pero sus modificadores no se pudieron sincronizar con Amare-App.';
-        }
-        return null;
+        $result = (new AmareModifierSyncService())->syncPlatillo($restauranteId, $platilloId);
+        if (!empty($result['ok'])) return null;
+        return 'Platillo guardado localmente, pero Amare-App rechazo los modificadores (HTTP '
+            . (int)($result['http_code'] ?? 0) . '): ' . mb_substr((string)($result['message'] ?? ''), 0, 180);
     }
 
     public function detalle(?string $id = null): void

@@ -1294,13 +1294,13 @@ class ApiController extends BaseController
         }
     }
 
-    /** PUT /api/branches/{id}/config */
+    /** GET|PUT /api/branches/{id}/config y /menu-items/{id}/modifiers */
     public function branches(?string $branchId = null): void
     {
         header('Content-Type: application/json; charset=utf-8');
         header('Access-Control-Allow-Origin: *');
         if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-            header('Access-Control-Allow-Methods: PUT, OPTIONS');
+            header('Access-Control-Allow-Methods: GET, PUT, OPTIONS');
             header('Access-Control-Allow-Headers: Authorization, Content-Type');
             http_response_code(204); exit;
         }
@@ -1310,11 +1310,12 @@ class ApiController extends BaseController
         $subAct   = $segs[3] ?? null;
         $menuItemId = ($subAct === 'menu-items' && isset($segs[4]) && ctype_digit((string)$segs[4])) ? (int)$segs[4] : null;
         $esModificadores = $menuItemId && (($segs[5] ?? null) === 'modifiers');
-        if (!$branchId || ($subAct !== 'config' && !$esModificadores) || $_SERVER['REQUEST_METHOD'] !== 'PUT') {
+        $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
+        if (!$branchId || ($subAct !== 'config' && !$esModificadores) || !in_array($method, ['GET','PUT'], true)) {
             $this->adminApiError('Ruta no encontrada', 404);
         }
         $jwtUser = $this->requireAdminJWT(false);
-        $body    = json_decode(file_get_contents('php://input'), true) ?? [];
+        $body    = $method === 'PUT' ? (json_decode(file_get_contents('php://input'), true) ?? []) : [];
         $db      = Database::getInstance();
         $stmt = $db->prepare("SELECT id, empresa_id FROM sucursales WHERE id = ? LIMIT 1");
         $stmt->execute([$branchId]);
@@ -1324,6 +1325,31 @@ class ApiController extends BaseController
             $this->adminApiError('No tienes permiso para modificar esta sucursal', 403);
         }
         try {
+            if ($method === 'GET' && $esModificadores) {
+                $stored = $db->prepare("SELECT payload_json FROM amare_branch_menu_modifiers WHERE branch_id=? AND platillo_external_id=?");
+                $stored->execute([$branchId, $menuItemId]);
+                $payload = json_decode((string)($stored->fetchColumn() ?: '{}'), true) ?: ['platillo_id' => $menuItemId, 'modificadores' => []];
+                $this->adminApiOk('Modificadores obtenidos correctamente', $payload);
+            }
+            if ($method === 'GET' && $subAct === 'config') {
+                $configStmt = $db->prepare("SELECT metodos_pago, tipos_entrega, costo_envio, pedido_minimo, modificadores_config FROM sucursales WHERE id=?");
+                $configStmt->execute([$branchId]);
+                $config = $configStmt->fetch(\PDO::FETCH_ASSOC) ?: [];
+                $modsStmt = $db->prepare("SELECT platillo_external_id, payload_json FROM amare_branch_menu_modifiers WHERE branch_id=? ORDER BY platillo_external_id");
+                $modsStmt->execute([$branchId]);
+                $platillos = [];
+                foreach ($modsStmt->fetchAll(\PDO::FETCH_ASSOC) as $row) {
+                    $platillos[(int)$row['platillo_external_id']] = json_decode($row['payload_json'], true) ?: [];
+                }
+                $this->adminApiOk('Configuracion de sucursal obtenida correctamente', [
+                    'metodos_pago' => json_decode($config['metodos_pago'] ?? '[]', true) ?: [],
+                    'tipos_entrega' => json_decode($config['tipos_entrega'] ?? '[]', true) ?: [],
+                    'costo_envio' => (float)($config['costo_envio'] ?? 0),
+                    'pedido_minimo' => (float)($config['pedido_minimo'] ?? 0),
+                    'modificadores' => json_decode($config['modificadores_config'] ?? '{}', true) ?: [],
+                    'platillos_modificadores' => $platillos,
+                ]);
+            }
             if ($esModificadores) {
                 $mods = $body['modificadores'] ?? null;
                 if (!is_array($mods)) $this->adminApiError('modificadores debe ser un arreglo', 422);
