@@ -23,7 +23,7 @@ class RestMenuController extends BaseController
         $sucursales = (new RestauranteModel())->getByComprador($this->usuarioId());
         $ingredientes = (new RestInventarioModel())->getByRestaurante($restauranteId, true);
         try {
-            $this->model->materializarCatalogoGlobal($restauranteId);
+            $this->model->prepararSelectorUnificado($restauranteId);
         } catch (\Throwable $e) {
             if (!$flash) $flash = ['type' => 'error', 'message' => $e->getMessage()];
         }

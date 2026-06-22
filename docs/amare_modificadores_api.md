@@ -1,5 +1,13 @@
 # Modificadores de platillos para Amare-App
 
+## Despliegue de base de datos
+
+Ejecutar en orden `069_modificadores_app.sql`, `070_selector_unificado_guarniciones.sql`
+y `071_reparar_modificadores_legacy.sql`. La base usada por el endpoint de
+Amare-App tambien debe tener `amare_branch_menu_modifiers`; la migracion 071
+la crea de forma idempotente. Si falta, el `PUT .../modifiers` responde HTTP 500
+y la configuracion queda guardada solamente en CarniHub.
+
 ## Configuracion de sucursal
 
 `PUT /branches/{branchId}/config` admite:

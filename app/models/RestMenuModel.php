@@ -237,7 +237,26 @@ class RestMenuModel extends BaseModel
         }
     }
 
-    /** Crea modificadores faltantes a partir de guarniciones/extras de recetas antiguas. */
+    /** Normaliza guarniciones incluidas antiguas sin convertir extras ni materias primas. */
+    public function clasificarGuarnicionesLegacy(int $restauranteId): int
+    {
+        $stmt = $this->db->prepare(
+            "UPDATE rest_receta_ingredientes ri
+             JOIN rest_recetas r ON r.id=ri.receta_id
+             JOIN rest_platillos p ON p.id=r.platillo_id
+             JOIN rest_ingredientes i ON i.id=ri.ingrediente_id
+             SET ri.tipo_componente='guarnicion'
+             WHERE p.restaurante_id=? AND p.activo=1
+               AND i.restaurante_id=? AND i.tipo='guarnicion'
+               AND COALESCE(ri.precio_extra, 0)=0
+               AND COALESCE(ri.es_informativo, 0)=0
+               AND COALESCE(ri.tipo_componente, 'materia_prima')<>'guarnicion'"
+        );
+        $stmt->execute([$restauranteId, $restauranteId]);
+        return $stmt->rowCount();
+    }
+
+    /** Crea exclusiones faltantes a partir de guarniciones incluidas en recetas antiguas. */
     public function materializarModificadoresExistentes(int $restauranteId): int
     {
         $candidatos = $this->query(
@@ -249,7 +268,9 @@ class RestMenuModel extends BaseModel
              JOIN rest_receta_ingredientes ri ON ri.receta_id = r.id
              JOIN rest_ingredientes i ON i.id = ri.ingrediente_id
              WHERE p.restaurante_id = ? AND p.activo = 1
-               AND ri.tipo_componente = 'guarnicion'",
+               AND COALESCE(ri.precio_extra, 0)=0
+               AND (ri.tipo_componente='guarnicion'
+                    OR (i.tipo='guarnicion' AND COALESCE(ri.es_informativo, 0)=0))",
             [$restauranteId]
         );
         $creados = 0;
@@ -365,14 +386,30 @@ class RestMenuModel extends BaseModel
             throw new \RuntimeException('Falta ejecutar la migracion 070_selector_unificado_guarniciones.sql.');
         }
         $grupos = $this->query(
-            "SELECT m.ingrediente_id, MAX(m.precio_extra) AS precio_extra,
-                    MAX(m.cantidad_unidad) AS cantidad_unidad, MAX(m.unidad) AS unidad,
-                    MAX(pm.max_seleccion) AS max_seleccion, MAX(m.nombre) AS nombre
-             FROM rest_modificadores m
-             LEFT JOIN rest_platillo_modificador pm ON pm.modificador_id=m.id
-             WHERE m.restaurante_id=? AND m.tipo='extra' AND m.alcance='platillo' AND m.activo=1
-             GROUP BY m.ingrediente_id",
-            [$restauranteId]
+            "SELECT origen.ingrediente_id, MAX(origen.precio_extra) AS precio_extra,
+                    MAX(origen.cantidad_unidad) AS cantidad_unidad,
+                    MAX(origen.unidad) AS unidad, MAX(origen.max_seleccion) AS max_seleccion,
+                    MAX(origen.nombre) AS nombre
+             FROM (
+                 SELECT m.ingrediente_id, m.precio_extra, m.cantidad_unidad, m.unidad,
+                        COALESCE(pm.max_seleccion, 1) AS max_seleccion, m.nombre
+                 FROM rest_modificadores m
+                 LEFT JOIN rest_platillo_modificador pm ON pm.modificador_id=m.id
+                 WHERE m.restaurante_id=? AND m.tipo='extra'
+                   AND m.alcance='platillo' AND m.activo=1
+                 UNION ALL
+                 SELECT ri.ingrediente_id, ri.precio_extra, ri.cantidad, ri.unidad,
+                        1 AS max_seleccion, CONCAT('Extra ', i.nombre) AS nombre
+                 FROM rest_receta_ingredientes ri
+                 JOIN rest_recetas r ON r.id=ri.receta_id
+                 JOIN rest_platillos p ON p.id=r.platillo_id
+                 JOIN rest_ingredientes i ON i.id=ri.ingrediente_id
+                 WHERE p.restaurante_id=? AND p.activo=1 AND i.restaurante_id=?
+                   AND COALESCE(ri.precio_extra, 0)>0
+             ) origen
+             WHERE origen.ingrediente_id IS NOT NULL
+             GROUP BY origen.ingrediente_id",
+            [$restauranteId, $restauranteId, $restauranteId]
         );
         $creados = 0;
         foreach ($grupos as $grupo) {
@@ -390,13 +427,11 @@ class RestMenuModel extends BaseModel
                 $creados++;
             }
         }
-        if ($grupos) {
-            $this->execute(
-                "UPDATE rest_modificadores SET activo=0
-                 WHERE restaurante_id=? AND tipo='extra' AND alcance='platillo' AND activo=1",
-                [$restauranteId]
-            );
-        }
+        $this->execute(
+            "UPDATE rest_modificadores SET activo=0
+             WHERE restaurante_id=? AND tipo='extra' AND alcance='platillo' AND activo=1",
+            [$restauranteId]
+        );
         $this->sincronizarCatalogoExtras($restauranteId);
         return $creados;
     }
@@ -427,7 +462,10 @@ class RestMenuModel extends BaseModel
             "SELECT ri.ingrediente_id, ri.cantidad, ri.unidad, i.nombre
              FROM rest_recetas r JOIN rest_receta_ingredientes ri ON ri.receta_id=r.id
              JOIN rest_ingredientes i ON i.id=ri.ingrediente_id
-             WHERE r.platillo_id=? AND i.restaurante_id=? AND ri.tipo_componente='guarnicion'",
+             WHERE r.platillo_id=? AND i.restaurante_id=?
+               AND COALESCE(ri.precio_extra, 0)=0
+               AND (ri.tipo_componente='guarnicion'
+                    OR (i.tipo='guarnicion' AND COALESCE(ri.es_informativo, 0)=0))",
             [$platilloId, $restauranteId]
         );
         $conservar = [];
@@ -465,6 +503,7 @@ class RestMenuModel extends BaseModel
 
     public function prepararSelectorUnificado(int $restauranteId): void
     {
+        $this->clasificarGuarnicionesLegacy($restauranteId);
         $this->materializarCatalogoGlobal($restauranteId);
         $platillos = $this->query("SELECT id FROM rest_platillos WHERE restaurante_id=? AND activo=1", [$restauranteId]);
         foreach ($platillos as $platillo) {
