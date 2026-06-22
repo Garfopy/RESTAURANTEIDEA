@@ -1299,6 +1299,8 @@ class ApiController extends BaseController
     {
         header('Content-Type: application/json; charset=utf-8');
         header('Access-Control-Allow-Origin: *');
+        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+        header('Pragma: no-cache');
         if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
             header('Access-Control-Allow-Methods: GET, PUT, OPTIONS');
             header('Access-Control-Allow-Headers: Authorization, Content-Type');
@@ -1325,21 +1327,38 @@ class ApiController extends BaseController
             $this->adminApiError('No tienes permiso para modificar esta sucursal', 403);
         }
         try {
+            $restauranteId = $this->restauranteIdPorSucursal($db, $branchId);
+            if ($esModificadores && !$restauranteId) {
+                $this->adminApiError('La sucursal no tiene un restaurante vinculado.', 404);
+            }
+            if ($esModificadores) {
+                $platilloStmt = $db->prepare(
+                    "SELECT id FROM rest_platillos WHERE id=? AND restaurante_id=? LIMIT 1"
+                );
+                $platilloStmt->execute([$menuItemId, $restauranteId]);
+                if (!$platilloStmt->fetchColumn()) {
+                    $this->adminApiError('El platillo no existe para esta sucursal.', 404);
+                }
+            }
             if ($method === 'GET' && $esModificadores) {
-                $stored = $db->prepare("SELECT payload_json FROM amare_branch_menu_modifiers WHERE branch_id=? AND platillo_external_id=?");
-                $stored->execute([$branchId, $menuItemId]);
-                $payload = json_decode((string)($stored->fetchColumn() ?: '{}'), true) ?: ['platillo_id' => $menuItemId, 'modificadores' => []];
+                $payload = (new AmareModifierSyncService())->buildPayload($restauranteId, $menuItemId);
                 $this->adminApiOk('Modificadores obtenidos correctamente', $payload);
             }
             if ($method === 'GET' && $subAct === 'config') {
                 $configStmt = $db->prepare("SELECT metodos_pago, tipos_entrega, costo_envio, pedido_minimo, modificadores_config FROM sucursales WHERE id=?");
                 $configStmt->execute([$branchId]);
                 $config = $configStmt->fetch(\PDO::FETCH_ASSOC) ?: [];
-                $modsStmt = $db->prepare("SELECT platillo_external_id, payload_json FROM amare_branch_menu_modifiers WHERE branch_id=? ORDER BY platillo_external_id");
-                $modsStmt->execute([$branchId]);
                 $platillos = [];
-                foreach ($modsStmt->fetchAll(\PDO::FETCH_ASSOC) as $row) {
-                    $platillos[(int)$row['platillo_external_id']] = json_decode($row['payload_json'], true) ?: [];
+                $restauranteId = $restauranteId ?: $this->restauranteIdPorSucursal($db, $branchId);
+                if ($restauranteId) {
+                    $menuStmt = $db->prepare(
+                        "SELECT id FROM rest_platillos WHERE restaurante_id=? AND activo=1 ORDER BY id"
+                    );
+                    $menuStmt->execute([$restauranteId]);
+                    $modifierService = new AmareModifierSyncService();
+                    foreach ($menuStmt->fetchAll(\PDO::FETCH_COLUMN) as $platilloId) {
+                        $platillos[(int)$platilloId] = $modifierService->buildPayload($restauranteId, (int)$platilloId);
+                    }
                 }
                 $this->adminApiOk('Configuracion de sucursal obtenida correctamente', [
                     'metodos_pago' => json_decode($config['metodos_pago'] ?? '[]', true) ?: [],
@@ -1351,20 +1370,22 @@ class ApiController extends BaseController
                 ]);
             }
             if ($esModificadores) {
-                $mods = $body['modificadores'] ?? null;
-                if (!is_array($mods)) $this->adminApiError('modificadores debe ser un arreglo', 422);
-                foreach ($mods as $mod) {
-                    if (!isset($mod['id'], $mod['tipo'], $mod['ingrediente_id'], $mod['max_cantidad'])
-                        || !in_array($mod['tipo'], ['exclusion', 'extra'], true)
-                        || (int)$mod['max_cantidad'] < 1) {
-                        $this->adminApiError('Modificador invalido', 422);
-                    }
+                if (!is_array($body)) {
+                    $this->adminApiError('El cuerpo JSON debe ser un arreglo u objeto.', 422);
                 }
-                $db->prepare(
-                    "INSERT INTO amare_branch_menu_modifiers (branch_id, platillo_external_id, payload_json)
-                     VALUES (?,?,?) ON DUPLICATE KEY UPDATE payload_json=VALUES(payload_json), updated_at=CURRENT_TIMESTAMP"
-                )->execute([$branchId, $menuItemId, json_encode($body, JSON_UNESCAPED_UNICODE)]);
-                $this->adminApiOk('Modificadores del platillo actualizados correctamente');
+                $mods = array_is_list($body)
+                    ? $body
+                    : ($body['modifiers'] ?? $body['modificadores'] ?? null);
+                if (!is_array($mods)) {
+                    $this->adminApiError('modifiers debe ser un arreglo.', 422);
+                }
+                $count = $this->sincronizarModificadoresOficiales(
+                    $db, $restauranteId, $menuItemId, $mods
+                );
+                $this->adminApiOk('Modificadores sincronizados correctamente.', [
+                    'count' => $count,
+                    'platillo_id' => $menuItemId,
+                ]);
             }
             $sets = []; $params = [];
             if (isset($body['metodos_pago']))  { $sets[] = 'metodos_pago = ?';  $params[] = json_encode($body['metodos_pago']); }
@@ -1381,7 +1402,131 @@ class ApiController extends BaseController
             }
             if (!empty($sets)) { $params[] = $branchId; $db->prepare("UPDATE sucursales SET " . implode(', ', $sets) . " WHERE id = ?")->execute($params); }
             $this->adminApiOk('Configuración de sucursal actualizada correctamente');
-        } catch (\Throwable $e) { $this->adminApiError('Error al actualizar: ' . $e->getMessage(), 500); }
+        } catch (\InvalidArgumentException $e) {
+            if ($db->inTransaction()) $db->rollBack();
+            $this->adminApiError($e->getMessage(), 422);
+        } catch (\Throwable $e) {
+            if ($db->inTransaction()) $db->rollBack();
+            error_log('[ApiController::syncModifiers] ' . $e->getMessage());
+            error_log('[ApiController::syncModifiers TRACE] ' . $e->getTraceAsString());
+            $message = 'No se pudieron sincronizar los modificadores.';
+            if (defined('APP_ENV') && APP_ENV !== 'production') $message .= ' ' . $e->getMessage();
+            $this->adminApiError($message, 500);
+        }
+    }
+
+    private function restauranteIdPorSucursal(\PDO $db, int $branchId): ?int
+    {
+        $columns = $db->query(
+            "SELECT column_name FROM information_schema.columns
+             WHERE table_schema=DATABASE() AND table_name='rest_restaurantes'
+               AND column_name IN ('sucursal_id','sucursal_carnihub_id')"
+        )->fetchAll(\PDO::FETCH_COLUMN);
+        foreach (['sucursal_id', 'sucursal_carnihub_id'] as $column) {
+            if (!in_array($column, $columns, true)) continue;
+            $stmt = $db->prepare("SELECT id FROM rest_restaurantes WHERE `{$column}`=? AND activo=1 LIMIT 1");
+            $stmt->execute([$branchId]);
+            $id = (int)$stmt->fetchColumn();
+            if ($id > 0) return $id;
+        }
+        if (!$columns) {
+            $stmt = $db->prepare("SELECT id FROM rest_restaurantes WHERE id=? AND activo=1 LIMIT 1");
+            $stmt->execute([$branchId]);
+            $id = (int)$stmt->fetchColumn();
+            return $id > 0 ? $id : null;
+        }
+        return null;
+    }
+
+    private function sincronizarModificadoresOficiales(
+        \PDO $db,
+        int $restauranteId,
+        int $platilloId,
+        array $mods
+    ): int {
+        if (!$mods) return 0;
+        $db->beginTransaction();
+        $count = 0;
+        foreach ($mods as $mod) {
+            if (!is_array($mod)) throw new \InvalidArgumentException('Modificador invalido.');
+            $tipoEntrada = (string)($mod['tipo'] ?? '');
+            $tipo = $tipoEntrada === 'exclusion' ? 'sin' : $tipoEntrada;
+            if (!in_array($tipo, ['sin', 'extra', 'opcion'], true)) {
+                throw new \InvalidArgumentException('Tipo de modificador invalido.');
+            }
+            $ingredienteId = (int)($mod['ingrediente_id'] ?? 0);
+            $ingrediente = $db->prepare(
+                "SELECT id, nombre, unidad_principal FROM rest_ingredientes
+                 WHERE id=? AND restaurante_id=? AND activo=1 LIMIT 1"
+            );
+            $ingrediente->execute([$ingredienteId, $restauranteId]);
+            $ingredienteRow = $ingrediente->fetch(\PDO::FETCH_ASSOC);
+            if (!$ingredienteRow) {
+                throw new \InvalidArgumentException('El ingrediente del modificador no pertenece al restaurante.');
+            }
+            $id = (int)($mod['id'] ?? 0);
+            $alcanceRecibido = in_array(($mod['alcance'] ?? ''), ['platillo', 'restaurante'], true)
+                ? $mod['alcance'] : null;
+            $alcance = $alcanceRecibido ?: 'platillo';
+            $nombre = trim((string)($mod['nombre'] ?? '')) ?: ($tipo === 'sin' ? 'Sin ' : 'Extra ') . $ingredienteRow['nombre'];
+            $precio = max(0, (float)($mod['precio_extra'] ?? $mod['precio_unitario'] ?? 0));
+            $cantidad = max(0.001, (float)($mod['cantidad_unidad'] ?? 1));
+            $unidad = trim((string)($mod['unidad'] ?? $ingredienteRow['unidad_principal'] ?? 'pza')) ?: 'pza';
+            $max = max(1, (int)($mod['max_seleccion'] ?? $mod['max_cantidad'] ?? 1));
+
+            if ($id > 0) {
+                $owner = $db->prepare("SELECT id, alcance FROM rest_modificadores WHERE id=? AND restaurante_id=? LIMIT 1");
+                $owner->execute([$id, $restauranteId]);
+                $ownerRow = $owner->fetch(\PDO::FETCH_ASSOC);
+                if (!$ownerRow) {
+                    throw new \InvalidArgumentException('El modificador no pertenece al restaurante.');
+                }
+                $alcance = $alcanceRecibido ?: $ownerRow['alcance'];
+                $db->prepare(
+                    "UPDATE rest_modificadores SET ingrediente_id=?, nombre=?, tipo=?, alcance=?,
+                     precio_extra=?, cantidad_unidad=?, unidad=?, max_seleccion_global=?, activo=1 WHERE id=?"
+                )->execute([$ingredienteId, $nombre, $tipo, $alcance, $precio, $cantidad, $unidad, $max, $id]);
+            } else {
+                $existing = $db->prepare(
+                    "SELECT id FROM rest_modificadores WHERE restaurante_id=? AND ingrediente_id=?
+                     AND tipo=? AND alcance=? AND nombre=? LIMIT 1"
+                );
+                $existing->execute([$restauranteId, $ingredienteId, $tipo, $alcance, $nombre]);
+                $id = (int)$existing->fetchColumn();
+                if (!$id) {
+                    $db->prepare(
+                        "INSERT INTO rest_modificadores
+                         (restaurante_id, ingrediente_id, nombre, tipo, alcance, precio_extra,
+                          cantidad_unidad, unidad, max_seleccion_global, activo)
+                         VALUES (?,?,?,?,?,?,?,?,?,1)"
+                    )->execute([$restauranteId, $ingredienteId, $nombre, $tipo, $alcance, $precio, $cantidad, $unidad, $max]);
+                    $id = (int)$db->lastInsertId();
+                } else {
+                    $db->prepare(
+                        "UPDATE rest_modificadores SET precio_extra=?, cantidad_unidad=?, unidad=?,
+                         max_seleccion_global=?, activo=1 WHERE id=?"
+                    )->execute([$precio, $cantidad, $unidad, $max, $id]);
+                }
+            }
+            if ($alcance === 'restaurante') {
+                $db->prepare(
+                    "INSERT INTO rest_platillo_modificador
+                     (platillo_id, modificador_id, obligatorio, max_seleccion)
+                     SELECT p.id, ?, 0, ? FROM rest_platillos p
+                     WHERE p.restaurante_id=? AND p.activo=1
+                     ON DUPLICATE KEY UPDATE max_seleccion=VALUES(max_seleccion)"
+                )->execute([$id, $max, $restauranteId]);
+            } else {
+                $db->prepare(
+                    "INSERT INTO rest_platillo_modificador
+                     (platillo_id, modificador_id, obligatorio, max_seleccion)
+                     VALUES (?,?,0,?) ON DUPLICATE KEY UPDATE max_seleccion=VALUES(max_seleccion)"
+                )->execute([$platilloId, $id, $max]);
+            }
+            $count++;
+        }
+        $db->commit();
+        return $count;
     }
 
     // ── Admin API Helpers ────────────────────────────────────────

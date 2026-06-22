@@ -3,10 +3,9 @@
 ## Despliegue de base de datos
 
 Ejecutar en orden `069_modificadores_app.sql`, `070_selector_unificado_guarniciones.sql`
-y `071_reparar_modificadores_legacy.sql`. La base usada por el endpoint de
-Amare-App tambien debe tener `amare_branch_menu_modifiers`; la migracion 071
-la crea de forma idempotente. Si falta, el `PUT .../modifiers` responde HTTP 500
-y la configuracion queda guardada solamente en CarniHub.
+y `071_reparar_modificadores_legacy.sql`. Web y Amare-App usan como fuente
+oficial `rest_modificadores` y `rest_platillo_modificador`; el flujo no lee ni
+escribe `amare_branch_menu_modifiers`.
 
 ## Configuracion de sucursal
 
@@ -29,7 +28,8 @@ La respuesta incluye `data.modificadores` y `data.platillos_modificadores`, inde
 
 ## Catalogo por platillo
 
-CarniHub sincroniza `PUT /branches/{branchId}/menu-items/{platilloId}/modifiers`:
+La app consulta `GET /branches/{branchId}/menu-items/{platilloId}/modifiers`.
+La respuesta se genera directamente desde las tablas oficiales compartidas:
 
 ```json
 {
@@ -49,7 +49,7 @@ CarniHub sincroniza `PUT /branches/{branchId}/menu-items/{platilloId}/modifiers`
 }
 ```
 
-Durante la transicion se conserva `modificadores` y se agrega el selector unificado:
+Se conserva `modificadores` y se agrega el selector unificado:
 
 ```json
 {
@@ -86,7 +86,10 @@ Durante la transicion se conserva `modificadores` y se agrega el selector unific
 
 La app muestra cada elemento de `incluidas` visible y marcado por defecto. Desmarcarlo no lo elimina del catalogo: agrega su `id` a los modificadores enviados para omitirlo solamente en esa partida. Si `incluidas` esta vacio muestra solo extras; si ambas listas estan vacias usa `visible=false` y oculta el selector.
 
-Tambien puede consultarse un solo platillo con `GET /branches/{branchId}/menu-items/{platilloId}/modifiers`.
+El `PUT` se mantiene por compatibilidad con clientes anteriores. Acepta
+`modifiers`, `modificadores` o una lista JSON directa, incluida una lista vacia,
+y actualiza idempotentemente las mismas tablas oficiales. La web no necesita
+invocarlo porque ya escribe en la base compartida.
 
 `tipo` puede ser `exclusion` o `extra`. Una exclusion siempre tiene precio cero y cantidad maxima uno.
 

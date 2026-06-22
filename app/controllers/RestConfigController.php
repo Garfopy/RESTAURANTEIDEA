@@ -563,8 +563,8 @@ class RestConfigController extends BaseController
                     if (empty($bulkSync['ok'])) {
                         $first = $bulkSync['errores'][0] ?? [];
                         $result = $first['result'] ?? [];
-                        $syncError = 'Configuracion guardada, pero Amare-App rechazo modificadores de '
-                            . ($first['nombre'] ?? 'un platillo') . ' (HTTP ' . (int)($result['http_code'] ?? 0) . '): '
+                        $syncError = 'Configuracion guardada, pero no se pudieron preparar modificadores de '
+                            . ($first['nombre'] ?? 'un platillo') . ': '
                             . mb_substr((string)($result['message'] ?? ''), 0, 160);
                     }
                 }
@@ -598,7 +598,7 @@ class RestConfigController extends BaseController
         } elseif ($syncError) {
             $this->flash('error', $syncError);
         } elseif (is_array($bulkSync)) {
-            $this->flash('success', 'Configuracion guardada y ' . (int)$bulkSync['sincronizados'] . ' platillos sincronizados con Amare-App.');
+            $this->flash('success', 'Configuracion guardada y ' . (int)$bulkSync['sincronizados'] . ' platillos preparados para Amare-App.');
         } else {
             $this->flash('success', 'Configuración guardada.');
         }

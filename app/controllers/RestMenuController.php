@@ -133,8 +133,8 @@ class RestMenuController extends BaseController
     {
         $result = (new AmareModifierSyncService())->syncPlatillo($restauranteId, $platilloId);
         if (!empty($result['ok'])) return null;
-        return 'Platillo guardado localmente, pero Amare-App rechazo los modificadores (HTTP '
-            . (int)($result['http_code'] ?? 0) . '): ' . mb_substr((string)($result['message'] ?? ''), 0, 180);
+        return 'Platillo guardado, pero no se pudieron preparar sus modificadores: '
+            . mb_substr((string)($result['message'] ?? ''), 0, 180);
     }
 
     public function detalle(?string $id = null): void
@@ -211,7 +211,7 @@ class RestMenuController extends BaseController
                 'max_seleccion_global' => (int)$this->post('max_seleccion_global', 1),
             ]);
             $sync = (new AmareModifierSyncService())->syncTodos($restauranteId);
-            if (empty($sync['ok'])) throw new \RuntimeException('Se guardo localmente, pero algunos platillos no sincronizaron con Amare-App.');
+            if (empty($sync['ok'])) throw new \RuntimeException('Se guardo localmente, pero no se pudieron preparar algunos platillos.');
             $this->flash('success', 'Guarnicion extra guardada y disponible en todos los platillos.');
         } catch (\Throwable $e) {
             $this->flash('error', $e->getMessage());
@@ -228,7 +228,7 @@ class RestMenuController extends BaseController
             $this->model->sincronizarCatalogoExtras($restauranteId);
             $sync = (new AmareModifierSyncService())->syncTodos($restauranteId);
             $this->flash(empty($sync['ok']) ? 'error' : 'success', empty($sync['ok'])
-                ? 'El estado se guardo, pero Amare-App rechazo algunos platillos.' : 'Catalogo de extras actualizado.');
+                ? 'El estado se guardo, pero no se pudieron preparar algunos platillos.' : 'Catalogo de extras actualizado.');
         }
         $this->redirect('rest-menu/index');
     }

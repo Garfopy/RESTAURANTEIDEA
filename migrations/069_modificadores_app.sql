@@ -4,14 +4,6 @@ SET @exists := (SELECT COUNT(*) FROM information_schema.columns WHERE table_sche
 SET @sql := IF(@exists = 0, 'ALTER TABLE rest_restaurantes ADD COLUMN exclusiones_app_habilitadas TINYINT(1) NOT NULL DEFAULT 0 AFTER requiere_login_comensal', 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
-CREATE TABLE IF NOT EXISTS amare_branch_menu_modifiers (
-  branch_id INT UNSIGNED NOT NULL,
-  platillo_external_id INT UNSIGNED NOT NULL,
-  payload_json TEXT NOT NULL,
-  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (branch_id, platillo_external_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
 SET @exists := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'sucursales' AND column_name = 'modificadores_config');
 SET @sql := IF(@exists = 0, 'ALTER TABLE sucursales ADD COLUMN modificadores_config TEXT NULL', 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

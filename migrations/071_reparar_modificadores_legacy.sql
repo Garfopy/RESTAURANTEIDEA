@@ -1,13 +1,5 @@
--- Repara datos legacy del selector y asegura el almacenamiento de Amare-App.
+-- Repara datos legacy del selector usando las tablas oficiales compartidas.
 -- Idempotente para MySQL 5.7+; requiere 069 y 070.
-
-CREATE TABLE IF NOT EXISTS amare_branch_menu_modifiers (
-  branch_id INT UNSIGNED NOT NULL,
-  platillo_external_id INT UNSIGNED NOT NULL,
-  payload_json TEXT NOT NULL,
-  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (branch_id, platillo_external_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Una guarnicion incluida legacy tiene precio cero, participa en inventario y
 -- su ingrediente ya estaba clasificado como guarnicion. Las opciones con
