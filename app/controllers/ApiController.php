@@ -1512,10 +1512,16 @@ class ApiController extends BaseController
                 $db->prepare(
                     "INSERT INTO rest_platillo_modificador
                      (platillo_id, modificador_id, obligatorio, max_seleccion)
-                     SELECT p.id, ?, 0, ? FROM rest_platillos p
+                     SELECT DISTINCT p.id, ?, 0, ? FROM rest_platillos p
+                     JOIN rest_recetas r ON r.platillo_id=p.id
+                     JOIN rest_receta_ingredientes ri ON ri.receta_id=r.id
+                     JOIN rest_ingredientes i ON i.id=ri.ingrediente_id
                      WHERE p.restaurante_id=? AND p.activo=1
+                       AND ri.ingrediente_id=? AND COALESCE(ri.precio_extra, 0)=0
+                       AND (ri.tipo_componente='guarnicion'
+                            OR (i.tipo='guarnicion' AND COALESCE(ri.es_informativo, 0)=0))
                      ON DUPLICATE KEY UPDATE max_seleccion=VALUES(max_seleccion)"
-                )->execute([$id, $max, $restauranteId]);
+                )->execute([$id, $max, $restauranteId, $ingredienteId]);
             } else {
                 $db->prepare(
                     "INSERT INTO rest_platillo_modificador

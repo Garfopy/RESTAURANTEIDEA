@@ -21,14 +21,12 @@ class RestMenuController extends BaseController
         $pageTitle  = 'Menú';
         $activeMenu = 'rest_menu';
         $sucursales = (new RestauranteModel())->getByComprador($this->usuarioId());
-        $ingredientes = (new RestInventarioModel())->getByRestaurante($restauranteId, true);
         try {
             $this->model->prepararSelectorUnificado($restauranteId);
         } catch (\Throwable $e) {
             if (!$flash) $flash = ['type' => 'error', 'message' => $e->getMessage()];
         }
-        $extrasCatalogo = $this->model->getCatalogoExtras($restauranteId);
-        $this->render('restaurante/menu/index', compact('platillos','categorias','flash','pageTitle','activeMenu','sucursales','ingredientes','extrasCatalogo'));
+        $this->render('restaurante/menu/index', compact('platillos','categorias','flash','pageTitle','activeMenu','sucursales'));
     }
 
     public function form(?string $id = null): void
@@ -37,11 +35,10 @@ class RestMenuController extends BaseController
         $platillo   = $id ? $this->model->getPlatilloConReceta((int)$id) : null;
         $categorias = $this->model->getCategorias($restauranteId, true);
         $ingredientes = (new RestInventarioModel())->getByRestaurante($restauranteId, true);
-        $extrasCatalogo = $this->model->getCatalogoExtras($restauranteId, true);
         $flash      = $this->getFlash();
         $pageTitle  = $platillo ? 'Editar Platillo' : 'Nuevo Platillo';
         $activeMenu = 'rest_menu';
-        $this->render('restaurante/menu/form', compact('platillo','categorias','ingredientes','extrasCatalogo','flash','pageTitle','activeMenu'));
+        $this->render('restaurante/menu/form', compact('platillo','categorias','ingredientes','flash','pageTitle','activeMenu'));
     }
 
     public function guardar(?string $p = null): void
@@ -97,7 +94,9 @@ class RestMenuController extends BaseController
         $cantidades       = $this->post('cantidad', []);
         $unidades         = $this->post('unidad', []);
         $informativos     = $this->post('es_informativo', []);
-        $tiposComponentes = $this->post('tipo_componente', []);
+        $tipoIngredienteStmt = \Database::getInstance()->prepare(
+            "SELECT tipo FROM rest_ingredientes WHERE id=? AND restaurante_id=? LIMIT 1"
+        );
 
         if (!empty($ingredientesIds)) {
             $recetaId = $this->model->upsertReceta(
@@ -108,12 +107,14 @@ class RestMenuController extends BaseController
             $ings = [];
             foreach ($ingredientesIds as $k => $ingId) {
                 if (!$ingId) continue;
+                $tipoIngredienteStmt->execute([(int)$ingId, $restauranteId]);
+                $tipoIngrediente = (string)($tipoIngredienteStmt->fetchColumn() ?: 'materia_prima');
                 $ings[] = [
                     'ingrediente_id'  => (int)$ingId,
                     'cantidad'        => (float)($cantidades[$k] ?? 0),
                     'unidad'          => $unidades[$k] ?? 'kg',
                     'es_informativo'  => in_array((string)$ingId, (array)$informativos) ? 1 : 0,
-                    'tipo_componente' => ($tiposComponentes[$k] ?? '') === 'guarnicion' ? 'guarnicion' : 'materia_prima',
+                    'tipo_componente' => $tipoIngrediente === 'guarnicion' ? 'guarnicion' : 'materia_prima',
                     'codigo_display'  => null,
                     'precio_extra'    => 0.0,
                 ];
@@ -198,40 +199,6 @@ class RestMenuController extends BaseController
     }
 
     // ── Categorías ────────────────────────────────────────────────
-
-    public function guardarExtra(?string $p = null): void
-    {
-        if (!$this->isPost()) $this->redirect('rest-menu/index');
-        $restauranteId = $this->restauranteId();
-        try {
-            $this->model->guardarExtraGlobal($restauranteId, [
-                'id' => (int)$this->post('id', 0), 'ingrediente_id' => (int)$this->post('ingrediente_id', 0),
-                'nombre' => $this->post('nombre', ''), 'cantidad_unidad' => (float)$this->post('cantidad_unidad', 1),
-                'unidad' => $this->post('unidad', 'pza'), 'precio_extra' => (float)$this->post('precio_extra', 0),
-                'max_seleccion_global' => (int)$this->post('max_seleccion_global', 1),
-            ]);
-            $sync = (new AmareModifierSyncService())->syncTodos($restauranteId);
-            if (empty($sync['ok'])) throw new \RuntimeException('Se guardo localmente, pero no se pudieron preparar algunos platillos.');
-            $this->flash('success', 'Guarnicion extra guardada y disponible en todos los platillos.');
-        } catch (\Throwable $e) {
-            $this->flash('error', $e->getMessage());
-        }
-        $this->redirect('rest-menu/index');
-    }
-
-    public function toggleExtra(?string $id = null): void
-    {
-        $restauranteId = $this->restauranteId();
-        if (!$this->model->toggleExtraGlobal($restauranteId, (int)$id)) {
-            $this->flash('error', 'Guarnicion extra no encontrada.');
-        } else {
-            $this->model->sincronizarCatalogoExtras($restauranteId);
-            $sync = (new AmareModifierSyncService())->syncTodos($restauranteId);
-            $this->flash(empty($sync['ok']) ? 'error' : 'success', empty($sync['ok'])
-                ? 'El estado se guardo, pero no se pudieron preparar algunos platillos.' : 'Catalogo de extras actualizado.');
-        }
-        $this->redirect('rest-menu/index');
-    }
 
     public function guardarCategoria(?string $p = null): void
     {

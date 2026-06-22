@@ -114,9 +114,10 @@ registros con `tipo='extra'` en `selector.extras`.
 Reglas:
 
 - Las incluidas aparecen visibles y seleccionadas por defecto.
+- El nombre visible de una incluida es el ingrediente, sin prefijo `Sin`.
 - Desmarcar una incluida envia su modificador de exclusion.
 - Los extras comienzan con cantidad cero.
-- Si no existen incluidas, se muestran solamente los extras.
+- Los extras son las mismas guarniciones de la receta, nunca el catalogo completo.
 - Si ambas listas estan vacias, `visible` debe ser `false`.
 
 ## 6. Reescribir syncModifiers
@@ -155,8 +156,9 @@ ON DUPLICATE KEY UPDATE
   max_seleccion = VALUES(max_seleccion);
 ```
 
-Si `alcance='restaurante'`, asociar el modificador con todos los platillos
-activos del restaurante.
+Si `alcance='restaurante'`, usar su precio y porcion como ficha compartida,
+pero asociarlo solamente con los platillos cuya receta incluye ese ingrediente
+como guarnicion.
 
 No desactivar modificadores omitidos en el payload. CarniHub puede excluirlos
 temporalmente cuando los interruptores globales estan apagados.
@@ -269,7 +271,7 @@ Ejecutar dos veces el mismo cuerpo. No debe duplicar registros ni relaciones.
 ### Lectura
 
 - Platillo con incluida y extras: devuelve ambos grupos.
-- Platillo sin incluida: devuelve extras globales.
+- Platillo sin guarniciones incluidas: no devuelve extras.
 - Platillo sin opciones: devuelve selector oculto.
 - Cambios de la web aparecen sin cerrar sesion.
 
@@ -308,6 +310,6 @@ WHERE id IN (94, 95);
 - Web y app usan una sola fuente de datos.
 - Los platillos sin modificadores son validos.
 - No existen relaciones duplicadas.
-- Los extras globales aparecen en todos los platillos activos.
+- Cada platillo muestra como extras solamente sus propias guarniciones.
 - Las guarniciones incluidas pueden omitirse sin desaparecer del menu.
 - La app recibe cambios sin cerrar sesion.

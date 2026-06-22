@@ -261,10 +261,9 @@
               <option value="<?= $u ?>" <?= ($ing['unidad'] ?? '') === $u ? 'selected' : '' ?>><?= $u ?></option>
               <?php endforeach; ?>
             </select>
-            <select name="tipo_componente[]" class="form-select" title="Tipo dentro del platillo">
-              <option value="materia_prima" <?= ($ing['tipo_componente'] ?? 'materia_prima') !== 'guarnicion' ? 'selected' : '' ?>>Materia prima</option>
-              <option value="guarnicion" <?= ($ing['tipo_componente'] ?? '') === 'guarnicion' ? 'selected' : '' ?>>Guarnicion removible</option>
-            </select>
+            <span class="ing-tipo-auto" style="font-size:.72rem;color:<?= ($ing['ingrediente_tipo'] ?? '') === 'guarnicion' ? '#166534' : '#6B7280' ?>;padding:9px 4px;white-space:nowrap">
+              <?= ($ing['ingrediente_tipo'] ?? '') === 'guarnicion' ? 'Guarnicion automatica' : 'Materia prima' ?>
+            </span>
             <label style="display:flex;align-items:center;gap:4px;font-size:.75rem;color:#6B7280;cursor:pointer;white-space:nowrap" title="No descuenta stock, solo aparece en la info del cliente">
               <input type="checkbox" name="es_informativo[]" value="<?= (int)$ing['ingrediente_id'] ?>"
                      <?= ($ing['es_informativo'] ?? 0) ? 'checked' : '' ?> style="cursor:pointer">
@@ -284,22 +283,6 @@
                 onmouseout="this.style.borderColor='#D1D5DB';this.style.color='#6B7280'">
           + Agregar ingrediente a la receta
         </button>
-
-        <div class="mod-box">
-          <div class="mod-title">Personalizacion en Amare-App</div>
-          <div class="mod-help">Marca arriba las guarniciones incluidas que pueden omitirse. Los extras globales se administran desde Menu y se ofrecen en todos los platillos.</div>
-          <?php if (!empty($extrasCatalogo)): ?>
-          <div style="display:flex;flex-wrap:wrap;gap:6px">
-            <?php foreach ($extrasCatalogo as $extra): ?>
-            <span style="background:#EFF6FF;color:#1D4ED8;border-radius:8px;padding:4px 8px;font-size:.75rem">
-              <?= htmlspecialchars($extra['nombre']) ?> +$<?= number_format((float)$extra['precio_extra'], 2) ?> (max <?= (int)$extra['max_seleccion_global'] ?>)
-            </span>
-            <?php endforeach; ?>
-          </div>
-          <?php else: ?>
-          <div style="font-size:.78rem;color:#9CA3AF">Aun no hay guarniciones extras en el catalogo global.</div>
-          <?php endif; ?>
-        </div>
 
         <!-- Banner costo estimado -->
         <div id="costoTotalBanner" style="display:none;margin-top:12px;padding:12px 16px;
@@ -372,8 +355,6 @@
   .btn-icon-danger{padding:8px 12px;background:#FEE2E2;color:#991B1B;border:none;border-radius:8px;
                    cursor:pointer;font-size:.85rem;transition:.15s;align-self:start;margin-top:1px}
   .btn-icon-danger:hover{background:#FCA5A5;color:#7F1D1D}
-  .mod-box{margin-top:18px;padding:14px;border:1px solid #E5E7EB;border-radius:12px;background:#FAFAFA}
-  .mod-title{font-size:.88rem;font-weight:700;color:#111827}.mod-help{font-size:.75rem;color:#6B7280;margin:3px 0 10px}
   .wizard-nav{display:flex;gap:10px;justify-content:space-between;margin-top:24px;padding-top:18px;border-top:1px solid #F3F4F6}
   .alergen-lbl input:checked ~ * { /* handled via JS */ }
   .alergen-lbl.activo { outline:2px solid #4C1D95; }
@@ -460,6 +441,7 @@ function ingBuildOpts(query) {
       data-nombre="${nombre.replace(/"/g,'&quot;')}"
       data-unidad="${(i.unidad_principal||'').replace(/"/g,'&quot;')}"
       data-costo="${parseFloat(i.costo_unitario)||0}"
+      data-tipo="${(i.tipo||'materia_prima').replace(/"/g,'&quot;')}"
       data-cat="${cat.replace(/"/g,'&quot;')}">
       <div style="display:flex;align-items:center;flex-wrap:wrap;gap:2px">
         <div style="font-weight:600;font-size:.85rem;color:#111827">${nombre}</div>
@@ -494,6 +476,12 @@ function ingSeleccionar(e, card) {
   wrap.querySelector('.ing-search').value    = card.dataset.nombre;
   wrap.querySelector('.ing-id-hidden').value = card.dataset.id;
   wrap.querySelector('.ing-dd').style.display = 'none';
+  const tipoLabel = row.querySelector('.ing-tipo-auto');
+  if (tipoLabel) {
+    const esGuarnicion = card.dataset.tipo === 'guarnicion';
+    tipoLabel.textContent = esGuarnicion ? 'Guarnicion automatica' : 'Materia prima';
+    tipoLabel.style.color = esGuarnicion ? '#166534' : '#6B7280';
+  }
   // Populate unit options based on ingredient's unit
   const unidSel = row.querySelector('.ing-unidad');
   if (unidSel) {
@@ -633,10 +621,7 @@ function addIngrediente() {
       <option value="L">L</option><option value="ml">ml</option>
       <option value="pza">pza</option><option value="caja">caja</option><option value="bolsa">bolsa</option>
     </select>
-    <select name="tipo_componente[]" class="form-select" title="Tipo dentro del platillo">
-      <option value="materia_prima">Materia prima</option>
-      <option value="guarnicion">Guarnicion removible</option>
-    </select>
+    <span class="ing-tipo-auto" style="font-size:.72rem;color:#6B7280;padding:9px 4px;white-space:nowrap">Automatico</span>
     <label style="display:flex;align-items:center;gap:4px;font-size:.75rem;color:#6B7280;cursor:pointer;white-space:nowrap;padding-top:8px"
            title="No descuenta stock, solo aparece en info del cliente">
       <input type="checkbox" name="es_informativo[]" value="_new" style="cursor:pointer">

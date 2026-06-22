@@ -52,7 +52,9 @@ class AmareModifierSyncService
             'id' => (int)$m['id'],
             'tipo' => $m['tipo'] === 'sin' ? 'exclusion' : 'extra',
             'alcance' => $m['alcance'] ?? 'platillo',
-            'nombre' => $m['nombre'],
+            'nombre' => $m['tipo'] === 'sin'
+                ? ($m['ingrediente_nombre'] ?? $m['nombre'])
+                : $m['nombre'],
             'ingrediente_nombre' => $m['ingrediente_nombre'] ?? $m['nombre'],
             'ingrediente_id' => (int)$m['ingrediente_id'],
             'cantidad_unidad' => (float)$m['cantidad_unidad'],

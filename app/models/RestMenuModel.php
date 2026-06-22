@@ -94,6 +94,7 @@ class RestMenuModel extends BaseModel
     {
         return $this->query(
             "SELECT ri.*, i.nombre AS ingrediente_nombre, i.unidad_principal, i.costo_unitario,
+                    i.tipo AS ingrediente_tipo,
                     COALESCE(ri.precio_extra, 0) AS precio_extra,
                     ri.tipo_componente, ri.codigo_display
              FROM rest_receta_ingredientes ri
@@ -398,6 +399,12 @@ class RestMenuModel extends BaseModel
                  WHERE m.restaurante_id=? AND m.tipo='extra'
                    AND m.alcance='platillo' AND m.activo=1
                  UNION ALL
+                 SELECT m.ingrediente_id, m.precio_extra, m.cantidad_unidad, m.unidad,
+                        m.max_seleccion_global AS max_seleccion, m.nombre
+                 FROM rest_modificadores m
+                 WHERE m.restaurante_id=? AND m.tipo='extra'
+                   AND m.alcance='restaurante' AND m.activo=1
+                 UNION ALL
                  SELECT ri.ingrediente_id, ri.precio_extra, ri.cantidad, ri.unidad,
                         1 AS max_seleccion, CONCAT('Extra ', i.nombre) AS nombre
                  FROM rest_receta_ingredientes ri
@@ -406,10 +413,21 @@ class RestMenuModel extends BaseModel
                  JOIN rest_ingredientes i ON i.id=ri.ingrediente_id
                  WHERE p.restaurante_id=? AND p.activo=1 AND i.restaurante_id=?
                    AND COALESCE(ri.precio_extra, 0)>0
+                 UNION ALL
+                 SELECT ri.ingrediente_id, 0 AS precio_extra, ri.cantidad, ri.unidad,
+                        1 AS max_seleccion, CONCAT('Extra ', i.nombre) AS nombre
+                 FROM rest_receta_ingredientes ri
+                 JOIN rest_recetas r ON r.id=ri.receta_id
+                 JOIN rest_platillos p ON p.id=r.platillo_id
+                 JOIN rest_ingredientes i ON i.id=ri.ingrediente_id
+                 WHERE p.restaurante_id=? AND p.activo=1 AND i.restaurante_id=?
+                   AND COALESCE(ri.precio_extra, 0)=0
+                   AND (ri.tipo_componente='guarnicion'
+                        OR (i.tipo='guarnicion' AND COALESCE(ri.es_informativo, 0)=0))
              ) origen
              WHERE origen.ingrediente_id IS NOT NULL
              GROUP BY origen.ingrediente_id",
-            [$restauranteId, $restauranteId, $restauranteId]
+            [$restauranteId, $restauranteId, $restauranteId, $restauranteId, $restauranteId, $restauranteId]
         );
         $creados = 0;
         foreach ($grupos as $grupo) {
@@ -425,6 +443,14 @@ class RestMenuModel extends BaseModel
                     'unidad' => $grupo['unidad'], 'max_seleccion_global' => max(1, (int)$grupo['max_seleccion']),
                 ]);
                 $creados++;
+            } else {
+                $this->execute(
+                    "UPDATE rest_modificadores SET nombre=?, precio_extra=?, cantidad_unidad=?,
+                     unidad=?, max_seleccion_global=?, activo=1 WHERE id=?",
+                    [$grupo['nombre'], max(0, (float)$grupo['precio_extra']),
+                     max(0.001, (float)$grupo['cantidad_unidad']), $grupo['unidad'] ?: 'pza',
+                     max(1, (int)$grupo['max_seleccion']), (int)$existente['id']]
+                );
             }
         }
         $this->execute(
@@ -439,17 +465,41 @@ class RestMenuModel extends BaseModel
     public function sincronizarCatalogoExtras(int $restauranteId): void
     {
         if (!$this->soportaSelectorUnificado()) return;
-        $extras = $this->getCatalogoExtras($restauranteId, true);
-        $platillos = $this->query("SELECT id FROM rest_platillos WHERE restaurante_id=? AND activo=1", [$restauranteId]);
-        foreach ($extras as $extra) {
-            foreach ($platillos as $platillo) {
-                $this->execute(
-                    "INSERT INTO rest_platillo_modificador (platillo_id, modificador_id, obligatorio, max_seleccion)
-                     VALUES (?,?,0,?) ON DUPLICATE KEY UPDATE max_seleccion=VALUES(max_seleccion)",
-                    [(int)$platillo['id'], (int)$extra['id'], max(1, (int)$extra['max_seleccion_global'])]
-                );
-            }
-        }
+        $this->execute(
+            "DELETE pm FROM rest_platillo_modificador pm
+             JOIN rest_platillos p ON p.id=pm.platillo_id
+             JOIN rest_modificadores m ON m.id=pm.modificador_id
+             WHERE p.restaurante_id=? AND m.restaurante_id=?
+               AND m.tipo='extra' AND m.alcance='restaurante'
+               AND NOT EXISTS (
+                   SELECT 1 FROM rest_recetas r
+                   JOIN rest_receta_ingredientes ri ON ri.receta_id=r.id
+                   JOIN rest_ingredientes i ON i.id=ri.ingrediente_id
+                   WHERE r.platillo_id=p.id AND ri.ingrediente_id=m.ingrediente_id
+                     AND COALESCE(ri.precio_extra, 0)=0
+                     AND (ri.tipo_componente='guarnicion'
+                          OR (i.tipo='guarnicion' AND COALESCE(ri.es_informativo, 0)=0))
+               )",
+            [$restauranteId, $restauranteId]
+        );
+        $this->execute(
+            "INSERT INTO rest_platillo_modificador
+             (platillo_id, modificador_id, obligatorio, max_seleccion)
+             SELECT DISTINCT p.id, m.id, 0, GREATEST(1, m.max_seleccion_global)
+             FROM rest_platillos p
+             JOIN rest_recetas r ON r.platillo_id=p.id
+             JOIN rest_receta_ingredientes ri ON ri.receta_id=r.id
+             JOIN rest_ingredientes i ON i.id=ri.ingrediente_id
+             JOIN rest_modificadores m ON m.restaurante_id=p.restaurante_id
+               AND m.ingrediente_id=ri.ingrediente_id
+               AND m.tipo='extra' AND m.alcance='restaurante' AND m.activo=1
+             WHERE p.restaurante_id=? AND p.activo=1
+               AND COALESCE(ri.precio_extra, 0)=0
+               AND (ri.tipo_componente='guarnicion'
+                    OR (i.tipo='guarnicion' AND COALESCE(ri.es_informativo, 0)=0))
+             ON DUPLICATE KEY UPDATE max_seleccion=VALUES(max_seleccion)",
+            [$restauranteId]
+        );
     }
 
     public function sincronizarExclusionesDesdeReceta(int $restauranteId, int $platilloId): void

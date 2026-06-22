@@ -86,6 +86,12 @@ Se conserva `modificadores` y se agrega el selector unificado:
 
 La app muestra cada elemento de `incluidas` visible y marcado por defecto. Desmarcarlo no lo elimina del catalogo: agrega su `id` a los modificadores enviados para omitirlo solamente en esa partida. Si `incluidas` esta vacio muestra solo extras; si ambas listas estan vacias usa `visible=false` y oculta el selector.
 
+Cada platillo recibe solamente las guarniciones incluidas en su receta. Esas
+mismas guarniciones aparecen como incluidas removibles y como extras; la ficha
+compartida conserva automaticamente precio y porcion, pero no hace que el extra
+aparezca en otros platillos. En `incluidas.nombre` se envia el nombre del
+ingrediente (por ejemplo, `Arroz Rojo`), no el prefijo interno `Sin`.
+
 El `PUT` se mantiene por compatibilidad con clientes anteriores. Acepta
 `modifiers`, `modificadores` o una lista JSON directa, incluida una lista vacia,
 y actualiza idempotentemente las mismas tablas oficiales. La web no necesita
