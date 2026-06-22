@@ -41,6 +41,39 @@ CarniHub sincroniza `PUT /branches/{branchId}/menu-items/{platilloId}/modifiers`
 }
 ```
 
+Durante la transicion se conserva `modificadores` y se agrega el selector unificado:
+
+```json
+{
+  "selector": {
+    "tipo": "personalizacion_platillo",
+    "titulo": "Personaliza tu platillo",
+    "visible": true,
+    "incluidas": [
+      {
+        "id": 21,
+        "tipo": "exclusion",
+        "nombre": "Sin ensalada",
+        "seleccionada_por_defecto": true,
+        "accion_al_desmarcar": "excluir"
+      }
+    ],
+    "extras": [
+      {
+        "id": 12,
+        "tipo": "extra",
+        "nombre": "Extra aguacate",
+        "precio_unitario": 25,
+        "cantidad_inicial": 0,
+        "max_cantidad": 3
+      }
+    ]
+  }
+}
+```
+
+La app muestra ambas listas dentro de un solo bloque. Si `incluidas` esta vacio muestra solo extras; si ambas listas estan vacias usa `visible=false` y oculta el selector.
+
 Tambien puede consultarse un solo platillo con `GET /branches/{branchId}/menu-items/{platilloId}/modifiers`.
 
 `tipo` puede ser `exclusion` o `extra`. Una exclusion siempre tiene precio cero y cantidad maxima uno.

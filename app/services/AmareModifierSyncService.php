@@ -27,7 +27,7 @@ class AmareModifierSyncService
                 fn($m) => ($m['tipo'] === 'sin' && !empty($rest['exclusiones_app_habilitadas']))
                     || ($m['tipo'] === 'extra' && !empty($rest['extras_app_habilitados']))
             ));
-            $payload = ['platillo_id' => $platilloId, 'modificadores' => array_map(fn($m) => [
+            $flat = array_map(fn($m) => [
                 'id' => (int)$m['id'],
                 'tipo' => $m['tipo'] === 'sin' ? 'exclusion' : 'extra',
                 'nombre' => $m['nombre'],
@@ -36,7 +36,25 @@ class AmareModifierSyncService
                 'unidad' => $m['unidad'],
                 'precio_unitario' => (float)$m['precio_extra'],
                 'max_cantidad' => (int)$m['max_seleccion'],
-            ], $mods)];
+            ], $mods);
+            $incluidas = array_values(array_map(fn($m) => array_merge($m, [
+                'seleccionada_por_defecto' => true,
+                'accion_al_desmarcar' => 'excluir',
+            ]), array_filter($flat, fn($m) => $m['tipo'] === 'exclusion')));
+            $extras = array_values(array_map(fn($m) => array_merge($m, [
+                'cantidad_inicial' => 0,
+            ]), array_filter($flat, fn($m) => $m['tipo'] === 'extra')));
+            $payload = [
+                'platillo_id' => $platilloId,
+                'modificadores' => array_values($flat),
+                'selector' => [
+                    'tipo' => 'personalizacion_platillo',
+                    'titulo' => 'Personaliza tu platillo',
+                    'visible' => !empty($incluidas) || !empty($extras),
+                    'incluidas' => $incluidas,
+                    'extras' => $extras,
+                ],
+            ];
             $branchId = $this->resolveBranchId($restauranteId);
             $url = rtrim($cfg['amare_api_url'], '/') . '/branches/' . $branchId . '/menu-items/' . $platilloId . '/modifiers';
             $ch = curl_init($url);

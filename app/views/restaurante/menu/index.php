@@ -46,6 +46,8 @@
   display:block;padding:7px 10px;border-radius:7px;font-size:.75rem;
   text-decoration:none;margin:2px 0;
 }
+.extras-panel{background:#fff;border:1.5px solid #DBEAFE;border-radius:14px;padding:16px;margin-bottom:22px}
+.extras-grid{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.extra-chip{border:1px solid #E5E7EB;border-radius:10px;padding:8px 10px;display:flex;align-items:center;gap:8px;font-size:.78rem}
 </style>
 
 <?php
@@ -55,12 +57,31 @@ $restauranteId = $_SESSION['restaurante_activo_id'] ?? 0;
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
   <div style="display:flex;gap:10px">
     <a href="<?= BASE_URL ?>rest-menu/form" class="btn btn-primary">+ Nuevo Platillo</a>
+    <button type="button" onclick="abrirModalExtra()" class="btn btn-outline">+ Guarnicion extra</button>
     <button onclick="abrirModalCat()" class="btn btn-outline">+ Categoría</button>
   </div>
   <a href="<?= BASE_URL ?>menu/<?= htmlspecialchars($restaurante['slug'] ?? '') ?>"
      target="_blank" style="font-size:.8rem;color:var(--cp);font-weight:600;text-decoration:none">
     Ver menú público ↗
   </a>
+</div>
+
+<div class="extras-panel">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
+    <div><div style="font-weight:700;color:#1E3A8A">Catalogo global de guarniciones extras</div>
+      <div style="font-size:.78rem;color:#6B7280;margin-top:2px">Aparecen en todos los platillos dentro de “Personaliza tu platillo”.</div></div>
+    <span style="font-size:.72rem;background:#EFF6FF;color:#1D4ED8;border-radius:99px;padding:3px 9px"><?= count(array_filter($extrasCatalogo ?? [], fn($e) => (int)$e['activo'] === 1)) ?> activas</span>
+  </div>
+  <div class="extras-grid">
+    <?php foreach ($extrasCatalogo ?? [] as $extra): ?>
+    <div class="extra-chip" style="opacity:<?= $extra['activo'] ? '1' : '.5' ?>">
+      <div><strong><?= htmlspecialchars($extra['nombre']) ?></strong><br><span style="color:#6B7280"><?= (float)$extra['cantidad_unidad'] ?> <?= htmlspecialchars($extra['unidad']) ?> · $<?= number_format((float)$extra['precio_extra'],2) ?> · max <?= (int)$extra['max_seleccion_global'] ?></span></div>
+      <button type="button" onclick='abrirModalExtra(<?= json_encode($extra, JSON_HEX_APOS|JSON_HEX_QUOT) ?>)' style="border:0;background:#F3F4F6;border-radius:6px;padding:4px 7px;cursor:pointer">Editar</button>
+      <a href="<?= BASE_URL ?>rest-menu/toggleExtra/<?= (int)$extra['id'] ?>" style="color:<?= $extra['activo'] ? '#B91C1C' : '#166534' ?>;text-decoration:none"><?= $extra['activo'] ? 'Apagar' : 'Activar' ?></a>
+    </div>
+    <?php endforeach; ?>
+    <?php if (empty($extrasCatalogo)): ?><div style="font-size:.8rem;color:#9CA3AF">Aun no hay extras globales configurados.</div><?php endif; ?>
+  </div>
 </div>
 
 <?php if (empty($categorias)): ?>
@@ -175,6 +196,24 @@ $restauranteId = $_SESSION['restaurante_activo_id'] ?? 0;
 <?php endif; ?>
 
 <!-- Modal categoría -->
+<div id="modalExtra" class="rst-modal-backdrop" onclick="if(event.target===this)cerrarModalExtra()">
+  <div class="rst-modal" style="width:560px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><h3 id="extraTitulo" style="margin:0;font-size:1.05rem">Nueva guarnicion extra</h3><button type="button" onclick="cerrarModalExtra()" style="border:0;background:none;font-size:1.2rem;cursor:pointer">x</button></div>
+    <form method="POST" action="<?= BASE_URL ?>rest-menu/guardarExtra">
+      <input type="hidden" name="id" id="extraId" value="">
+      <div class="form-group"><label class="form-label">Ingrediente *</label><select name="ingrediente_id" id="extraIngrediente" class="form-input" required onchange="extraSyncUnidad()"><option value="">-- Selecciona --</option><?php foreach ($ingredientes ?? [] as $ing): ?><option value="<?= (int)$ing['id'] ?>" data-unidad="<?= htmlspecialchars($ing['unidad_principal'] ?? 'pza') ?>"><?= htmlspecialchars($ing['nombre']) ?></option><?php endforeach; ?></select></div>
+      <div class="form-group"><label class="form-label">Nombre visible</label><input name="nombre" id="extraNombre" class="form-input" placeholder="Ej: Extra ensalada"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-group"><label class="form-label">Porcion</label><input type="number" name="cantidad_unidad" id="extraCantidad" class="form-input" min="0.001" step="0.001" value="1" required></div>
+        <div class="form-group"><label class="form-label">Unidad</label><input name="unidad" id="extraUnidad" class="form-input" value="pza" required></div>
+        <div class="form-group"><label class="form-label">Precio extra</label><input type="number" name="precio_extra" id="extraPrecio" class="form-input" min="0" step="0.01" value="0" required></div>
+        <div class="form-group"><label class="form-label">Cantidad maxima</label><input type="number" name="max_seleccion_global" id="extraMax" class="form-input" min="1" step="1" value="1" required></div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button type="button" class="btn btn-outline" onclick="cerrarModalExtra()">Cancelar</button><button class="btn btn-primary" type="submit">Guardar extra</button></div>
+    </form>
+  </div>
+</div>
+
 <div id="modalCat" class="rst-modal-backdrop" onclick="if(event.target===this)cerrarModalCat()">
   <div class="rst-modal" style="width:420px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
@@ -217,6 +256,20 @@ $restauranteId = $_SESSION['restaurante_activo_id'] ?? 0;
 </div>
 
 <script>
+function abrirModalExtra(extra = null) {
+  document.getElementById('extraTitulo').textContent = extra ? 'Editar guarnicion extra' : 'Nueva guarnicion extra';
+  document.getElementById('extraId').value = extra?.id || '';
+  document.getElementById('extraIngrediente').value = extra?.ingrediente_id || '';
+  document.getElementById('extraNombre').value = extra?.nombre || '';
+  document.getElementById('extraCantidad').value = extra?.cantidad_unidad || 1;
+  document.getElementById('extraUnidad').value = extra?.unidad || 'pza';
+  document.getElementById('extraPrecio').value = extra?.precio_extra || 0;
+  document.getElementById('extraMax').value = extra?.max_seleccion_global || 1;
+  document.getElementById('modalExtra').classList.add('open');
+}
+function cerrarModalExtra(){ document.getElementById('modalExtra').classList.remove('open'); }
+function extraSyncUnidad(){ const o=document.getElementById('extraIngrediente').selectedOptions[0]; if(o?.dataset.unidad) document.getElementById('extraUnidad').value=o.dataset.unidad; }
+
 function abrirModalCat() {
   document.getElementById('modalCat').classList.add('open');
   setTimeout(() => document.getElementById('catNombre').focus(), 100);
@@ -253,6 +306,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     closeMenuActions();
     cerrarModalCat();
+    cerrarModalExtra();
   }
 });
 </script>

@@ -628,14 +628,17 @@ CREATE TABLE IF NOT EXISTS `rest_modificadores` (
   `nombre`         VARCHAR(120)  NOT NULL,
   `descripcion`    VARCHAR(255)  DEFAULT NULL,
   `tipo`           ENUM('extra','sin','opcion') NOT NULL DEFAULT 'opcion',
+  `alcance`        ENUM('platillo','restaurante') NOT NULL DEFAULT 'platillo',
   `precio_extra`   DECIMAL(10,2) NOT NULL DEFAULT 0.00,
   `cantidad_unidad` DECIMAL(12,3) NOT NULL DEFAULT 1.000,
   `unidad`         VARCHAR(20) NOT NULL DEFAULT 'pza',
+  `max_seleccion_global` SMALLINT UNSIGNED NOT NULL DEFAULT 1,
   `activo`         TINYINT(1)   NOT NULL DEFAULT 1,
   `created_at`     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_rm_restaurante` (`restaurante_id`),
   KEY `idx_rm_ingrediente` (`ingrediente_id`),
+  KEY `idx_rm_catalogo` (`restaurante_id`,`alcance`,`tipo`,`activo`),
   CONSTRAINT `fk_rm_restaurante` FOREIGN KEY (`restaurante_id`) REFERENCES `rest_restaurantes`(`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_rm_ingrediente` FOREIGN KEY (`ingrediente_id`) REFERENCES `rest_ingredientes`(`id`) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

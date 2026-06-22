@@ -261,6 +261,10 @@
               <option value="<?= $u ?>" <?= ($ing['unidad'] ?? '') === $u ? 'selected' : '' ?>><?= $u ?></option>
               <?php endforeach; ?>
             </select>
+            <select name="tipo_componente[]" class="form-select" title="Tipo dentro del platillo">
+              <option value="materia_prima" <?= ($ing['tipo_componente'] ?? 'materia_prima') !== 'guarnicion' ? 'selected' : '' ?>>Materia prima</option>
+              <option value="guarnicion" <?= ($ing['tipo_componente'] ?? '') === 'guarnicion' ? 'selected' : '' ?>>Guarnicion removible</option>
+            </select>
             <label style="display:flex;align-items:center;gap:4px;font-size:.75rem;color:#6B7280;cursor:pointer;white-space:nowrap" title="No descuenta stock, solo aparece en la info del cliente">
               <input type="checkbox" name="es_informativo[]" value="<?= (int)$ing['ingrediente_id'] ?>"
                      <?= ($ing['es_informativo'] ?? 0) ? 'checked' : '' ?> style="cursor:pointer">
@@ -281,54 +285,20 @@
           + Agregar ingrediente a la receta
         </button>
 
-        <?php
-          $modsActuales = $platillo['modificadores'] ?? [];
-          $modsSin = array_values(array_filter($modsActuales, fn($m) => $m['tipo'] === 'sin' && (int)$m['activo'] === 1));
-          $modsExtra = array_values(array_filter($modsActuales, fn($m) => $m['tipo'] === 'extra' && (int)$m['activo'] === 1));
-          $renderIngOptions = function($selected = 0) use ($ingredientes) {
-              $html = '<option value="">-- Ingrediente --</option>';
-              foreach ($ingredientes as $item) {
-                  $sel = (int)$selected === (int)$item['id'] ? ' selected' : '';
-                  $html .= '<option value="' . (int)$item['id'] . '" data-unidad="' . htmlspecialchars($item['unidad_principal'] ?? 'pza') . '"' . $sel . '>' . htmlspecialchars($item['nombre']) . '</option>';
-              }
-              return $html;
-          };
-        ?>
         <div class="mod-box">
-          <div class="mod-title">Guarniciones que el cliente puede quitar</div>
-          <div class="mod-help">Deben estar incluidas en la receta. Quitarlas no cambia el precio.</div>
-          <div id="mods-sin">
-            <?php foreach ($modsSin as $m): ?>
-            <div class="mod-row mod-row-sin">
-              <input type="hidden" name="modificador_id[]" value="<?= (int)$m['id'] ?>"><input type="hidden" name="modificador_tipo[]" value="sin">
-              <select name="modificador_ingrediente_id[]" class="form-select"><?= $renderIngOptions($m['ingrediente_id']) ?></select>
-              <input name="modificador_nombre[]" class="form-input" value="<?= htmlspecialchars($m['nombre']) ?>" placeholder="Nombre visible, ej. Sin ensalada">
-              <input type="hidden" name="modificador_cantidad[]" value="1"><input type="hidden" name="modificador_unidad[]" value="pza"><input type="hidden" name="modificador_precio[]" value="0"><input type="hidden" name="modificador_max[]" value="1">
-              <button type="button" class="btn-icon-danger" onclick="this.closest('.mod-row').remove()">x</button>
-            </div>
+          <div class="mod-title">Personalizacion en Amare-App</div>
+          <div class="mod-help">Marca arriba las guarniciones incluidas que pueden omitirse. Los extras globales se administran desde Menu y se ofrecen en todos los platillos.</div>
+          <?php if (!empty($extrasCatalogo)): ?>
+          <div style="display:flex;flex-wrap:wrap;gap:6px">
+            <?php foreach ($extrasCatalogo as $extra): ?>
+            <span style="background:#EFF6FF;color:#1D4ED8;border-radius:8px;padding:4px 8px;font-size:.75rem">
+              <?= htmlspecialchars($extra['nombre']) ?> +$<?= number_format((float)$extra['precio_extra'], 2) ?> (max <?= (int)$extra['max_seleccion_global'] ?>)
+            </span>
             <?php endforeach; ?>
           </div>
-          <button type="button" class="mod-add" onclick="addModificador('sin')">+ Guarnicion removible</button>
-        </div>
-
-        <div class="mod-box">
-          <div class="mod-title">Extras disponibles en la app</div>
-          <div class="mod-help">Cada extra se vincula al inventario y puede tener precio y cantidad maxima.</div>
-          <div id="mods-extra">
-            <?php foreach ($modsExtra as $m): ?>
-            <div class="mod-row mod-row-extra">
-              <input type="hidden" name="modificador_id[]" value="<?= (int)$m['id'] ?>"><input type="hidden" name="modificador_tipo[]" value="extra">
-              <select name="modificador_ingrediente_id[]" class="form-select" onchange="syncModUnidad(this)"><?= $renderIngOptions($m['ingrediente_id']) ?></select>
-              <input name="modificador_nombre[]" class="form-input" value="<?= htmlspecialchars($m['nombre']) ?>" placeholder="Nombre visible">
-              <input type="number" name="modificador_cantidad[]" class="form-input" min="0.001" step="0.001" value="<?= (float)$m['cantidad_unidad'] ?>" title="Porcion">
-              <input name="modificador_unidad[]" class="form-input" value="<?= htmlspecialchars($m['unidad']) ?>" placeholder="Unidad">
-              <input type="number" name="modificador_precio[]" class="form-input" min="0" step="0.01" value="<?= (float)$m['precio_extra'] ?>" title="Precio">
-              <input type="number" name="modificador_max[]" class="form-input" min="1" step="1" value="<?= (int)$m['max_seleccion'] ?>" title="Maximo">
-              <button type="button" class="btn-icon-danger" onclick="this.closest('.mod-row').remove()">x</button>
-            </div>
-            <?php endforeach; ?>
-          </div>
-          <button type="button" class="mod-add" onclick="addModificador('extra')">+ Agregar extra</button>
+          <?php else: ?>
+          <div style="font-size:.78rem;color:#9CA3AF">Aun no hay guarniciones extras en el catalogo global.</div>
+          <?php endif; ?>
         </div>
 
         <!-- Banner costo estimado -->
@@ -389,7 +359,7 @@
   .wpane{display:none;animation:fadeIn .25s ease both}
   .wpane.active{display:block}
   @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-  .ing-row{display:grid;grid-template-columns:2fr 80px 80px auto auto;gap:6px;margin-bottom:8px;align-items:start}
+  .ing-row{display:grid;grid-template-columns:2fr 80px 80px 150px auto auto;gap:6px;margin-bottom:8px;align-items:start}
   .ing-picker-wrap{position:relative}
   .ing-dd{display:none;position:absolute;top:calc(100% + 2px);left:0;right:0;
           z-index:200;background:#fff;border:1.5px solid #E5E7EB;border-radius:10px;
@@ -404,8 +374,6 @@
   .btn-icon-danger:hover{background:#FCA5A5;color:#7F1D1D}
   .mod-box{margin-top:18px;padding:14px;border:1px solid #E5E7EB;border-radius:12px;background:#FAFAFA}
   .mod-title{font-size:.88rem;font-weight:700;color:#111827}.mod-help{font-size:.75rem;color:#6B7280;margin:3px 0 10px}
-  .mod-row{display:grid;gap:6px;margin-bottom:7px;align-items:center}.mod-row-sin{grid-template-columns:1.2fr 1.5fr auto}.mod-row-extra{grid-template-columns:1.2fr 1.3fr 75px 65px 80px 60px auto}
-  .mod-add{border:1px dashed #9CA3AF;background:#fff;color:#374151;border-radius:8px;padding:7px 11px;cursor:pointer;font-size:.8rem}
   .wizard-nav{display:flex;gap:10px;justify-content:space-between;margin-top:24px;padding-top:18px;border-top:1px solid #F3F4F6}
   .alergen-lbl input:checked ~ * { /* handled via JS */ }
   .alergen-lbl.activo { outline:2px solid #4C1D95; }
@@ -414,35 +382,6 @@
 <script>
 const ingredientesArr = <?= json_encode(array_values($ingredientes)) ?>;
 const catNames = <?= json_encode(array_column($categorias, 'nombre', 'id')) ?>;
-const modifierIngredientOptions = <?= json_encode($renderIngOptions(0)) ?>;
-
-function addModificador(tipo) {
-  const row = document.createElement('div');
-  row.className = 'mod-row ' + (tipo === 'sin' ? 'mod-row-sin' : 'mod-row-extra');
-  if (tipo === 'sin') {
-    row.innerHTML = `<input type="hidden" name="modificador_id[]" value=""><input type="hidden" name="modificador_tipo[]" value="sin">
-      <select name="modificador_ingrediente_id[]" class="form-select">${modifierIngredientOptions}</select>
-      <input name="modificador_nombre[]" class="form-input" placeholder="Nombre visible, ej. Sin ensalada">
-      <input type="hidden" name="modificador_cantidad[]" value="1"><input type="hidden" name="modificador_unidad[]" value="pza"><input type="hidden" name="modificador_precio[]" value="0"><input type="hidden" name="modificador_max[]" value="1">
-      <button type="button" class="btn-icon-danger" onclick="this.closest('.mod-row').remove()">x</button>`;
-  } else {
-    row.innerHTML = `<input type="hidden" name="modificador_id[]" value=""><input type="hidden" name="modificador_tipo[]" value="extra">
-      <select name="modificador_ingrediente_id[]" class="form-select" onchange="syncModUnidad(this)">${modifierIngredientOptions}</select>
-      <input name="modificador_nombre[]" class="form-input" placeholder="Nombre visible">
-      <input type="number" name="modificador_cantidad[]" class="form-input" min="0.001" step="0.001" value="1" title="Porcion">
-      <input name="modificador_unidad[]" class="form-input" value="pza" placeholder="Unidad">
-      <input type="number" name="modificador_precio[]" class="form-input" min="0" step="0.01" value="0" title="Precio">
-      <input type="number" name="modificador_max[]" class="form-input" min="1" step="1" value="1" title="Maximo">
-      <button type="button" class="btn-icon-danger" onclick="this.closest('.mod-row').remove()">x</button>`;
-  }
-  document.getElementById(tipo === 'sin' ? 'mods-sin' : 'mods-extra').appendChild(row);
-}
-
-function syncModUnidad(select) {
-  const unidad = select.selectedOptions[0]?.dataset.unidad || 'pza';
-  const input = select.closest('.mod-row').querySelector('input[name="modificador_unidad[]"]');
-  if (input) input.value = unidad;
-}
 
 // Alérgenos: toggle visual
 document.querySelectorAll('.alergen-lbl').forEach(lbl => {
@@ -693,6 +632,10 @@ function addIngrediente() {
       <option value="g">g</option><option value="kg">kg</option><option value="mg">mg</option>
       <option value="L">L</option><option value="ml">ml</option>
       <option value="pza">pza</option><option value="caja">caja</option><option value="bolsa">bolsa</option>
+    </select>
+    <select name="tipo_componente[]" class="form-select" title="Tipo dentro del platillo">
+      <option value="materia_prima">Materia prima</option>
+      <option value="guarnicion">Guarnicion removible</option>
     </select>
     <label style="display:flex;align-items:center;gap:4px;font-size:.75rem;color:#6B7280;cursor:pointer;white-space:nowrap;padding-top:8px"
            title="No descuenta stock, solo aparece en info del cliente">

@@ -355,7 +355,7 @@ class RestConfigController extends BaseController
         }
         if ($modifierSaveError === null && ($exclusionesApp || $extrasApp)) {
             try {
-                (new RestMenuModel())->materializarModificadoresExistentes($restauranteId);
+                (new RestMenuModel())->prepararSelectorUnificado($restauranteId);
             } catch (\Throwable $e) {
                 $modifierSaveError = 'Se guardaron los interruptores, pero no se pudieron preparar los platillos existentes: ' . $e->getMessage();
                 error_log('[RestConfig materializar modificadores] ' . $e->getMessage());

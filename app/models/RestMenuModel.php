@@ -238,14 +238,12 @@ class RestMenuModel extends BaseModel
              JOIN rest_receta_ingredientes ri ON ri.receta_id = r.id
              JOIN rest_ingredientes i ON i.id = ri.ingrediente_id
              WHERE p.restaurante_id = ? AND p.activo = 1
-               AND (ri.tipo_componente = 'guarnicion' OR COALESCE(ri.precio_extra, 0) > 0)",
+               AND ri.tipo_componente = 'guarnicion'",
             [$restauranteId]
         );
         $creados = 0;
         foreach ($candidatos as $row) {
-            $tipos = [];
-            if ($row['tipo_componente'] === 'guarnicion') $tipos[] = 'sin';
-            if ((float)$row['precio_extra'] > 0) $tipos[] = 'extra';
+            $tipos = ['sin'];
             foreach ($tipos as $tipo) {
                 $existe = $this->queryOne(
                     "SELECT m.id FROM rest_platillo_modificador pm
@@ -274,6 +272,185 @@ class RestMenuModel extends BaseModel
             }
         }
         return $creados;
+    }
+
+    public function getCatalogoExtras(int $restauranteId, bool $soloActivos = false): array
+    {
+        $activo = $soloActivos ? ' AND m.activo=1' : '';
+        return $this->query(
+            "SELECT m.*, i.nombre AS ingrediente_nombre, i.unidad_principal AS ingrediente_unidad
+             FROM rest_modificadores m
+             JOIN rest_ingredientes i ON i.id=m.ingrediente_id
+             WHERE m.restaurante_id=? AND m.tipo='extra' AND m.alcance='restaurante'{$activo}
+             ORDER BY m.activo DESC, m.nombre",
+            [$restauranteId]
+        );
+    }
+
+    public function guardarExtraGlobal(int $restauranteId, array $data): int
+    {
+        $ingrediente = $this->queryOne(
+            "SELECT id, nombre, unidad_principal FROM rest_ingredientes WHERE id=? AND restaurante_id=? AND activo=1",
+            [(int)$data['ingrediente_id'], $restauranteId]
+        );
+        if (!$ingrediente) throw new \InvalidArgumentException('Selecciona un ingrediente activo del restaurante.');
+        $id = (int)($data['id'] ?? 0);
+        $actual = $id ? $this->queryOne(
+            "SELECT m.id, (SELECT COUNT(*) FROM rest_pedido_item_modificadores pim WHERE pim.modificador_id=m.id) AS usos
+             FROM rest_modificadores m WHERE m.id=? AND m.restaurante_id=? AND m.tipo='extra' AND m.alcance='restaurante'",
+            [$id, $restauranteId]
+        ) : $this->queryOne(
+            "SELECT id, 0 AS usos FROM rest_modificadores WHERE restaurante_id=? AND ingrediente_id=? AND tipo='extra' AND alcance='restaurante' AND activo=1 LIMIT 1",
+            [$restauranteId, (int)$ingrediente['id']]
+        );
+        $id = (int)($actual['id'] ?? 0);
+        if ($id) {
+            $duplicado = $this->queryOne(
+                "SELECT id FROM rest_modificadores WHERE restaurante_id=? AND ingrediente_id=? AND tipo='extra' AND alcance='restaurante' AND activo=1 AND id<>? LIMIT 1",
+                [$restauranteId, (int)$ingrediente['id'], $id]
+            );
+            if ($duplicado) throw new \InvalidArgumentException('Ese ingrediente ya existe en el catalogo global de extras.');
+        }
+        if ($id && (int)($actual['usos'] ?? 0) > 0) {
+            $this->execute("UPDATE rest_modificadores SET activo=0 WHERE id=?", [$id]);
+            $id = 0;
+        }
+        $nombre = trim((string)($data['nombre'] ?? '')) ?: 'Extra ' . $ingrediente['nombre'];
+        $params = [(int)$ingrediente['id'], mb_substr($nombre, 0, 120), max(0, (float)$data['precio_extra']),
+            max(0.001, (float)$data['cantidad_unidad']), mb_substr(trim((string)($data['unidad'] ?: $ingrediente['unidad_principal'])), 0, 20),
+            max(1, (int)$data['max_seleccion_global'])];
+        if ($id) {
+            $this->execute(
+                "UPDATE rest_modificadores SET ingrediente_id=?, nombre=?, precio_extra=?, cantidad_unidad=?, unidad=?, max_seleccion_global=?, activo=1 WHERE id=?",
+                array_merge($params, [$id])
+            );
+        } else {
+            $this->execute(
+                "INSERT INTO rest_modificadores (restaurante_id, ingrediente_id, nombre, tipo, alcance, precio_extra, cantidad_unidad, unidad, max_seleccion_global, activo)
+                 VALUES (?,?,?,'extra','restaurante',?,?,?,?,1)",
+                array_merge([$restauranteId], $params)
+            );
+            $id = (int)$this->db->lastInsertId();
+        }
+        $this->sincronizarCatalogoExtras($restauranteId);
+        return $id;
+    }
+
+    public function toggleExtraGlobal(int $restauranteId, int $modificadorId): bool
+    {
+        $mod = $this->queryOne(
+            "SELECT id, activo FROM rest_modificadores WHERE id=? AND restaurante_id=? AND tipo='extra' AND alcance='restaurante'",
+            [$modificadorId, $restauranteId]
+        );
+        if (!$mod) return false;
+        return $this->execute("UPDATE rest_modificadores SET activo=? WHERE id=?", [(int)!$mod['activo'], $modificadorId]);
+    }
+
+    /** Consolida extras locales antiguos en un catálogo global por ingrediente. */
+    public function materializarCatalogoGlobal(int $restauranteId): int
+    {
+        $grupos = $this->query(
+            "SELECT m.ingrediente_id, MAX(m.precio_extra) AS precio_extra,
+                    MAX(m.cantidad_unidad) AS cantidad_unidad, MAX(m.unidad) AS unidad,
+                    MAX(pm.max_seleccion) AS max_seleccion, MAX(m.nombre) AS nombre
+             FROM rest_modificadores m
+             LEFT JOIN rest_platillo_modificador pm ON pm.modificador_id=m.id
+             WHERE m.restaurante_id=? AND m.tipo='extra' AND m.alcance='platillo' AND m.activo=1
+             GROUP BY m.ingrediente_id",
+            [$restauranteId]
+        );
+        $creados = 0;
+        foreach ($grupos as $grupo) {
+            if (!(int)$grupo['ingrediente_id']) continue;
+            $existente = $this->queryOne(
+                "SELECT id FROM rest_modificadores WHERE restaurante_id=? AND ingrediente_id=? AND tipo='extra' AND alcance='restaurante' LIMIT 1",
+                [$restauranteId, (int)$grupo['ingrediente_id']]
+            );
+            if (!$existente) {
+                $this->guardarExtraGlobal($restauranteId, [
+                    'ingrediente_id' => (int)$grupo['ingrediente_id'], 'nombre' => $grupo['nombre'],
+                    'precio_extra' => (float)$grupo['precio_extra'], 'cantidad_unidad' => (float)$grupo['cantidad_unidad'],
+                    'unidad' => $grupo['unidad'], 'max_seleccion_global' => max(1, (int)$grupo['max_seleccion']),
+                ]);
+                $creados++;
+            }
+        }
+        if ($grupos) {
+            $this->execute(
+                "UPDATE rest_modificadores SET activo=0
+                 WHERE restaurante_id=? AND tipo='extra' AND alcance='platillo' AND activo=1",
+                [$restauranteId]
+            );
+        }
+        $this->sincronizarCatalogoExtras($restauranteId);
+        return $creados;
+    }
+
+    public function sincronizarCatalogoExtras(int $restauranteId): void
+    {
+        $extras = $this->getCatalogoExtras($restauranteId, true);
+        $platillos = $this->query("SELECT id FROM rest_platillos WHERE restaurante_id=? AND activo=1", [$restauranteId]);
+        foreach ($extras as $extra) {
+            foreach ($platillos as $platillo) {
+                $this->execute(
+                    "INSERT INTO rest_platillo_modificador (platillo_id, modificador_id, obligatorio, max_seleccion)
+                     VALUES (?,?,0,?) ON DUPLICATE KEY UPDATE max_seleccion=VALUES(max_seleccion)",
+                    [(int)$platillo['id'], (int)$extra['id'], max(1, (int)$extra['max_seleccion_global'])]
+                );
+            }
+        }
+    }
+
+    public function sincronizarExclusionesDesdeReceta(int $restauranteId, int $platilloId): void
+    {
+        $guarniciones = $this->query(
+            "SELECT ri.ingrediente_id, ri.cantidad, ri.unidad, i.nombre
+             FROM rest_recetas r JOIN rest_receta_ingredientes ri ON ri.receta_id=r.id
+             JOIN rest_ingredientes i ON i.id=ri.ingrediente_id
+             WHERE r.platillo_id=? AND i.restaurante_id=? AND ri.tipo_componente='guarnicion'",
+            [$platilloId, $restauranteId]
+        );
+        $conservar = [];
+        foreach ($guarniciones as $guarnicion) {
+            $mod = $this->queryOne(
+                "SELECT m.id FROM rest_platillo_modificador pm JOIN rest_modificadores m ON m.id=pm.modificador_id
+                 WHERE pm.platillo_id=? AND m.restaurante_id=? AND m.ingrediente_id=? AND m.tipo='sin' AND m.alcance='platillo' LIMIT 1",
+                [$platilloId, $restauranteId, (int)$guarnicion['ingrediente_id']]
+            );
+            $id = (int)($mod['id'] ?? 0);
+            if ($id) {
+                $this->execute("UPDATE rest_modificadores SET nombre=?, cantidad_unidad=?, unidad=?, activo=1 WHERE id=?",
+                    ['Sin ' . $guarnicion['nombre'], max(0.001, (float)$guarnicion['cantidad']), $guarnicion['unidad'], $id]);
+            } else {
+                $this->execute(
+                    "INSERT INTO rest_modificadores (restaurante_id, ingrediente_id, nombre, tipo, alcance, precio_extra, cantidad_unidad, unidad, max_seleccion_global, activo)
+                     VALUES (?,?,?,'sin','platillo',0,?,?,1,1)",
+                    [$restauranteId, (int)$guarnicion['ingrediente_id'], 'Sin ' . $guarnicion['nombre'], max(0.001, (float)$guarnicion['cantidad']), $guarnicion['unidad']]
+                );
+                $id = (int)$this->db->lastInsertId();
+                $this->execute("INSERT INTO rest_platillo_modificador (platillo_id, modificador_id, obligatorio, max_seleccion) VALUES (?,?,0,1)", [$platilloId, $id]);
+            }
+            $conservar[] = $id;
+        }
+        $actuales = $this->query(
+            "SELECT m.id FROM rest_platillo_modificador pm JOIN rest_modificadores m ON m.id=pm.modificador_id
+             WHERE pm.platillo_id=? AND m.restaurante_id=? AND m.tipo='sin' AND m.alcance='platillo'",
+            [$platilloId, $restauranteId]
+        );
+        foreach ($actuales as $actual) {
+            if (!in_array((int)$actual['id'], $conservar, true)) $this->execute("UPDATE rest_modificadores SET activo=0 WHERE id=?", [(int)$actual['id']]);
+        }
+        $this->sincronizarCatalogoExtras($restauranteId);
+    }
+
+    public function prepararSelectorUnificado(int $restauranteId): void
+    {
+        $this->materializarCatalogoGlobal($restauranteId);
+        $platillos = $this->query("SELECT id FROM rest_platillos WHERE restaurante_id=? AND activo=1", [$restauranteId]);
+        foreach ($platillos as $platillo) {
+            $this->sincronizarExclusionesDesdeReceta($restauranteId, (int)$platillo['id']);
+        }
+        $this->sincronizarCatalogoExtras($restauranteId);
     }
 
     // ── Estadísticas de ventas ────────────────────────────────────
