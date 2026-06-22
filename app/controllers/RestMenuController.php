@@ -22,7 +22,11 @@ class RestMenuController extends BaseController
         $activeMenu = 'rest_menu';
         $sucursales = (new RestauranteModel())->getByComprador($this->usuarioId());
         $ingredientes = (new RestInventarioModel())->getByRestaurante($restauranteId, true);
-        $this->model->materializarCatalogoGlobal($restauranteId);
+        try {
+            $this->model->materializarCatalogoGlobal($restauranteId);
+        } catch (\Throwable $e) {
+            if (!$flash) $flash = ['type' => 'error', 'message' => $e->getMessage()];
+        }
         $extrasCatalogo = $this->model->getCatalogoExtras($restauranteId);
         $this->render('restaurante/menu/index', compact('platillos','categorias','flash','pageTitle','activeMenu','sucursales','ingredientes','extrasCatalogo'));
     }

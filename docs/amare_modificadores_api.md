@@ -53,9 +53,13 @@ Durante la transicion se conserva `modificadores` y se agrega el selector unific
       {
         "id": 21,
         "tipo": "exclusion",
-        "nombre": "Sin ensalada",
+        "nombre": "Ensalada",
+        "incluida": true,
+        "visible": true,
+        "puede_omitirse": true,
+        "omitida_por_defecto": false,
         "seleccionada_por_defecto": true,
-        "accion_al_desmarcar": "excluir"
+        "accion_al_desmarcar": "enviar_exclusion"
       }
     ],
     "extras": [
@@ -72,7 +76,7 @@ Durante la transicion se conserva `modificadores` y se agrega el selector unific
 }
 ```
 
-La app muestra ambas listas dentro de un solo bloque. Si `incluidas` esta vacio muestra solo extras; si ambas listas estan vacias usa `visible=false` y oculta el selector.
+La app muestra cada elemento de `incluidas` visible y marcado por defecto. Desmarcarlo no lo elimina del catalogo: agrega su `id` a los modificadores enviados para omitirlo solamente en esa partida. Si `incluidas` esta vacio muestra solo extras; si ambas listas estan vacias usa `visible=false` y oculta el selector.
 
 Tambien puede consultarse un solo platillo con `GET /branches/{branchId}/menu-items/{platilloId}/modifiers`.
 

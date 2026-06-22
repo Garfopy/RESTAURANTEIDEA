@@ -3,6 +3,17 @@ class RestMenuModel extends BaseModel
 {
     protected string $table = 'rest_platillos';
 
+    public function soportaSelectorUnificado(): bool
+    {
+        $stmt = $this->db->prepare(
+            "SELECT COUNT(*) FROM information_schema.columns
+             WHERE table_schema=DATABASE() AND table_name='rest_modificadores'
+               AND column_name IN ('alcance','max_seleccion_global')"
+        );
+        $stmt->execute();
+        return (int)$stmt->fetchColumn() === 2;
+    }
+
     // ── Categorías ────────────────────────────────────────────────
 
     public function getCategorias(int $restauranteId, bool $soloActivas = false): array
@@ -276,6 +287,7 @@ class RestMenuModel extends BaseModel
 
     public function getCatalogoExtras(int $restauranteId, bool $soloActivos = false): array
     {
+        if (!$this->soportaSelectorUnificado()) return [];
         $activo = $soloActivos ? ' AND m.activo=1' : '';
         return $this->query(
             "SELECT m.*, i.nombre AS ingrediente_nombre, i.unidad_principal AS ingrediente_unidad
@@ -349,6 +361,9 @@ class RestMenuModel extends BaseModel
     /** Consolida extras locales antiguos en un catálogo global por ingrediente. */
     public function materializarCatalogoGlobal(int $restauranteId): int
     {
+        if (!$this->soportaSelectorUnificado()) {
+            throw new \RuntimeException('Falta ejecutar la migracion 070_selector_unificado_guarniciones.sql.');
+        }
         $grupos = $this->query(
             "SELECT m.ingrediente_id, MAX(m.precio_extra) AS precio_extra,
                     MAX(m.cantidad_unidad) AS cantidad_unidad, MAX(m.unidad) AS unidad,
@@ -388,6 +403,7 @@ class RestMenuModel extends BaseModel
 
     public function sincronizarCatalogoExtras(int $restauranteId): void
     {
+        if (!$this->soportaSelectorUnificado()) return;
         $extras = $this->getCatalogoExtras($restauranteId, true);
         $platillos = $this->query("SELECT id FROM rest_platillos WHERE restaurante_id=? AND activo=1", [$restauranteId]);
         foreach ($extras as $extra) {
@@ -403,6 +419,10 @@ class RestMenuModel extends BaseModel
 
     public function sincronizarExclusionesDesdeReceta(int $restauranteId, int $platilloId): void
     {
+        if (!$this->soportaSelectorUnificado()) {
+            $this->materializarModificadoresExistentes($restauranteId);
+            return;
+        }
         $guarniciones = $this->query(
             "SELECT ri.ingrediente_id, ri.cantidad, ri.unidad, i.nombre
              FROM rest_recetas r JOIN rest_receta_ingredientes ri ON ri.receta_id=r.id

@@ -31,6 +31,7 @@ class AmareModifierSyncService
                 'id' => (int)$m['id'],
                 'tipo' => $m['tipo'] === 'sin' ? 'exclusion' : 'extra',
                 'nombre' => $m['nombre'],
+                'ingrediente_nombre' => $m['ingrediente_nombre'] ?? $m['nombre'],
                 'ingrediente_id' => (int)$m['ingrediente_id'],
                 'cantidad_unidad' => (float)$m['cantidad_unidad'],
                 'unidad' => $m['unidad'],
@@ -38,8 +39,13 @@ class AmareModifierSyncService
                 'max_cantidad' => (int)$m['max_seleccion'],
             ], $mods);
             $incluidas = array_values(array_map(fn($m) => array_merge($m, [
+                'nombre' => $m['ingrediente_nombre'] ?: $m['nombre'],
+                'incluida' => true,
+                'visible' => true,
+                'puede_omitirse' => true,
+                'omitida_por_defecto' => false,
                 'seleccionada_por_defecto' => true,
-                'accion_al_desmarcar' => 'excluir',
+                'accion_al_desmarcar' => 'enviar_exclusion',
             ]), array_filter($flat, fn($m) => $m['tipo'] === 'exclusion')));
             $extras = array_values(array_map(fn($m) => array_merge($m, [
                 'cantidad_inicial' => 0,

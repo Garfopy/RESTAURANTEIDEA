@@ -252,7 +252,13 @@ class RestPedidoModel extends BaseModel
                      ) ri_dedup ON ri_dedup.receta_id = r.id
                      JOIN rest_receta_ingredientes ri ON ri.id = ri_dedup.best_id
                      JOIN rest_ingredientes ing ON ing.id = ri.ingrediente_id
-                     WHERE r.platillo_id = pi.platillo_id) AS ingredientes_raw
+                     WHERE r.platillo_id = pi.platillo_id
+                       AND NOT EXISTS (
+                           SELECT 1 FROM rest_pedido_item_modificadores pim_ex
+                           JOIN rest_modificadores mod_ex ON mod_ex.id=pim_ex.modificador_id
+                           WHERE pim_ex.pedido_item_id=pi.id AND mod_ex.tipo='sin'
+                             AND mod_ex.ingrediente_id=ri.ingrediente_id
+                       )) AS ingredientes_raw
              FROM rest_pedidos p
              JOIN rest_pedido_items pi ON pi.pedido_id = p.id
              JOIN rest_platillos pl ON pl.id = pi.platillo_id
