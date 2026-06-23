@@ -3,14 +3,25 @@ require_once ROOT_PATH . '/app/controllers/BaseController.php';
 
 class RestChefController extends BaseController
 {
-    private RestPedidoModel $model;
+    protected RestPedidoModel $model;
     private static array $columnCache = [];
+    protected string $kdsArea = 'cocina';
+    protected string $kdsBaseRoute = 'rest-chef';
+    protected string $kdsLogoutRol = 'chef';
+    protected string $kdsTitle = 'KDS - Cocina';
+    protected string $kdsBrand = 'KDS Cocina';
+    protected string $kdsIcon = 'Cocina';
 
     public function __construct()
     {
         parent::__construct();
-        $this->requireChef();
+        $this->authorize();
         $this->model = new RestPedidoModel();
+    }
+
+    protected function authorize(): void
+    {
+        $this->requireChef();
     }
 
     private function hasPedidoColumn(string $column): bool
@@ -63,13 +74,27 @@ class RestChefController extends BaseController
         $restauranteId = $this->restauranteId();
         $restaurante   = (new RestauranteModel())->find($restauranteId);
         $pageTitle     = 'Cocina — KDS';
-        $this->render('chef/dashboard', compact('restaurante','pageTitle'));
+        $pageTitle     = $this->kdsTitle;
+        $kdsBaseRoute  = $this->kdsBaseRoute;
+        $kdsLogoutRol  = $this->kdsLogoutRol;
+        $kdsTitle      = $this->kdsTitle;
+        $kdsBrand      = $this->kdsBrand;
+        $kdsIcon       = $this->kdsIcon;
+        $this->render('chef/dashboard', compact(
+            'restaurante',
+            'pageTitle',
+            'kdsBaseRoute',
+            'kdsLogoutRol',
+            'kdsTitle',
+            'kdsBrand',
+            'kdsIcon'
+        ));
     }
 
     public function queue(?string $p = null): void
     {
         $restauranteId = $this->restauranteId();
-        $items = $this->model->getKitchenQueue($restauranteId);
+        $items = $this->model->getKitchenQueue($restauranteId, $this->kdsArea);
         $this->json($items);
     }
 

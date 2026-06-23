@@ -42,6 +42,7 @@ $_earlyAction   = strtolower($_earlySegments[1] ?? '');
 
 $_roleCookies = [
     'rest-chef'     => '_chef',
+    'rest-bar'      => '_barra',
     'rest-mesero'   => '_mesero',
     'rest-portero'  => '_portero',
     'menu'          => '_comensal',
@@ -52,7 +53,7 @@ $_cookieSuffix = $_roleCookies[$_earlyCtrl] ?? '';
 // auth/logoutStaff/{rol} destruye SOLO la cookie de ese rol
 if ($_earlyCtrl === 'auth' && $_earlyAction === 'logoutstaff') {
     $_logoutRol = strtolower($_earlySegments[2] ?? '');
-    if (in_array($_logoutRol, ['chef', 'mesero', 'portero', 'staff', 'comensal', 'login'], true)) {
+    if (in_array($_logoutRol, ['chef', 'barra', 'mesero', 'portero', 'staff', 'comensal', 'login'], true)) {
         $_cookieSuffix = '_' . $_logoutRol;
     }
 }
@@ -134,6 +135,7 @@ $routes = [
     // Portales staff
     'rest-mesero'   => 'RestMeseroController',
     'rest-chef'     => 'RestChefController',
+    'rest-bar'      => 'RestBarController',
     'rest-portero'  => 'RestPorteroController',
     'rest-staff'    => 'RestStaffController',
     'rest-propinas' => 'RestPropinaController',
@@ -243,13 +245,16 @@ if ($ctrlSlug === 'auth' && $action === 'index' && isset($_SESSION['usuario'])) 
         header('Location: ' . BASE_URL . 'restaurante/seleccionar'); exit;
     }
     if ($rol === 'mesero') {
-        header('Location: ' . BASE_URL . 'rest-mesero/inicio'); exit;
+        header('Location: ' . BASE_URL . 'rest-mesero/dashboard'); exit;
     }
     if ($rol === 'chef') {
-        header('Location: ' . BASE_URL . 'rest-chef/inicio'); exit;
+        header('Location: ' . BASE_URL . 'rest-chef/dashboard'); exit;
+    }
+    if ($rol === 'barra') {
+        header('Location: ' . BASE_URL . 'rest-bar/dashboard'); exit;
     }
     if ($rol === 'portero') {
-        header('Location: ' . BASE_URL . 'rest-portero/inicio'); exit;
+        header('Location: ' . BASE_URL . 'rest-portero/dashboard'); exit;
     }
     header('Location: ' . BASE_URL . 'auth/login'); exit;
 }

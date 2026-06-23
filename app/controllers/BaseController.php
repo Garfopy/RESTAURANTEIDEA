@@ -45,6 +45,7 @@ abstract class BaseController
             $rol === 'admin_local'                                     => $this->redirect('restaurante/dashboard'),
             $rol === 'mesero'                                          => $this->redirect('rest-mesero/dashboard'),
             $rol === 'chef'                                            => $this->redirect('rest-chef/dashboard'),
+            $rol === 'barra'                                           => $this->redirect('rest-bar/dashboard'),
             $rol === 'portero'                                         => $this->redirect('rest-portero/dashboard'),
             default                                                    => $this->redirect('auth/login'),
         };
@@ -142,6 +143,12 @@ abstract class BaseController
     protected function requireChef(): void
     {
         $this->requireRole(['chef', 'comprador']);
+    }
+
+    /** Staff: barra */
+    protected function requireBar(): void
+    {
+        $this->requireRole(['barra', 'comprador']);
     }
 
     /** Staff: portero */

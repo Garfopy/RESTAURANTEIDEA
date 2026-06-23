@@ -202,9 +202,18 @@ class RestPedidoModel extends BaseModel
         );
     }
 
-    public function getKitchenQueue(int $restauranteId): array
+    private function sqlAreaKds(string $area, string $platilloAlias = 'pl', string $categoriaAlias = 'cm'): string
+    {
+        $esBebida = "(LOWER(COALESCE({$categoriaAlias}.nombre, '')) LIKE '%bebida%'
+                     OR COALESCE({$platilloAlias}.codigo, '') REGEXP '^B[0-9]+$')";
+
+        return $area === 'barra' ? " AND {$esBebida}" : " AND NOT {$esBebida}";
+    }
+
+    public function getKitchenQueue(int $restauranteId, string $area = 'cocina'): array
     {
         $noStore = $this->sqlNoStore('p');
+        $areaWhere = $this->sqlAreaKds($area);
 
         // Formato ingredientes_raw (separador ||, campos |):
         //   codigo | nombre | tipo | cantidad | unidad | notas | es_informativo
@@ -262,11 +271,13 @@ class RestPedidoModel extends BaseModel
              FROM rest_pedidos p
              JOIN rest_pedido_items pi ON pi.pedido_id = p.id
              JOIN rest_platillos pl ON pl.id = pi.platillo_id
+             LEFT JOIN rest_categorias_menu cm ON cm.id = pl.categoria_id
              LEFT JOIN rest_mesas m ON m.id = p.mesa_id
              WHERE p.restaurante_id = ?
                AND p.estado NOT IN ('cancelado', 'entregado')
                AND pi.estado IN ('pendiente','en_preparacion')
                $noStore
+               $areaWhere
              ORDER BY p.created_at ASC, pi.id ASC",
             [$restauranteId]
         );

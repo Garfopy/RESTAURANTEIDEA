@@ -37,7 +37,8 @@ INSERT IGNORE INTO `roles` VALUES
   (7,  'Mesero',            'mesero'),
   (8,  'Chef',              'chef'),
   (9,  'Portero',           'portero'),
-  (10, 'Admin Local',       'admin_local');
+  (10, 'Admin Local',       'admin_local'),
+  (11, 'Barra',             'barra');
 
 -- ── Empresas (solo negocios de tipo restaurante) ──────────────
 CREATE TABLE IF NOT EXISTS `empresas` (

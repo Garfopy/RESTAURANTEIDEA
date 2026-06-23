@@ -90,7 +90,7 @@ class AuthController extends BaseController
         $stmt->execute([$ip]);
 
         $rolSlug = $usuario['rol_slug'] ?? '';
-        $esStaffLogin = in_array($rolSlug, ['mesero', 'chef', 'portero'], true);
+        $esStaffLogin = in_array($rolSlug, ['mesero', 'chef', 'barra', 'portero'], true);
         if ($esStaffLogin) {
             $stmtStaff = $db->prepare(
                 "SELECT rs.restaurante_id
@@ -226,12 +226,12 @@ class AuthController extends BaseController
         exit;
     }
 
-    // Cierra solo la cookie de sesión del rol indicado (chef|mesero|portero|staff|comensal)
+    // Cierra solo la cookie de sesión del rol indicado (chef|barra|mesero|portero|staff|comensal)
     // manteniendo intactas las otras sesiones (admin u otros staff).
     public function logoutStaff(?string $rol = null): void
     {
         $rol = strtolower($rol ?? '');
-        if (!in_array($rol, ['chef', 'mesero', 'portero', 'staff', 'comensal'], true)) {
+        if (!in_array($rol, ['chef', 'barra', 'mesero', 'portero', 'staff', 'comensal'], true)) {
             header('Location: ' . BASE_URL); exit;
         }
         // Capturar slug del restaurante ANTES de destruir la sesión para

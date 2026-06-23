@@ -56,7 +56,7 @@ class RestStaffController extends BaseController
             $this->flash('error', 'Nombre, email y contraseña son requeridos.');
             $this->redirect('rest-staff/index');
         }
-        if (!in_array($rolSlug, ['mesero','chef','portero'], true)) {
+        if (!in_array($rolSlug, ['mesero','chef','barra','portero'], true)) {
             $this->flash('error', 'Rol inválido.');
             $this->redirect('rest-staff/index');
         }
@@ -95,7 +95,7 @@ class RestStaffController extends BaseController
         $usuarioId = (int)$db->lastInsertId();
 
         if (!$codigo) {
-            $prefix = ['mesero'=>'ME','chef'=>'CH','portero'=>'PT'][$rolSlug] ?? 'ST';
+            $prefix = ['mesero'=>'ME','chef'=>'CH','barra'=>'BA','portero'=>'PT'][$rolSlug] ?? 'ST';
             $codigo = $prefix . str_pad((string)$usuarioId, 3, '0', STR_PAD_LEFT);
         }
         $ins2 = $db->prepare(

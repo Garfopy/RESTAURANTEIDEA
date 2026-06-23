@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>KDS — Cocina</title>
+  <title><?= htmlspecialchars($kdsTitle ?? 'KDS - Cocina') ?></title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { background: #0D1117; color: #E6EDF3; font-family: system-ui, -apple-system, sans-serif; min-height: 100vh; }
@@ -169,14 +169,14 @@
 <!-- Topbar -->
 <div class="topbar">
   <div class="topbar-brand">
-    🍳 KDS
-    <span style="font-size:.85rem;color:#8B949E;font-weight:400"><?= htmlspecialchars($restaurante['nombre'] ?? 'Cocina') ?></span>
+    <?= htmlspecialchars($kdsBrand ?? 'KDS Cocina') ?>
+    <span style="font-size:.85rem;color:#8B949E;font-weight:400"><?= htmlspecialchars($restaurante['nombre'] ?? ($kdsIcon ?? 'Cocina')) ?></span>
   </div>
   <div class="topbar-right">
     <span class="counter-badge cb-azul"   id="cnt-pendiente">— pendientes</span>
     <span class="counter-badge cb-naranja" id="cnt-preparacion">— en prep.</span>
     <span id="clock"></span>
-    <a href="<?= BASE_URL ?>auth/logoutStaff/chef" class="exit-link">Salir</a>
+    <a href="<?= BASE_URL ?>auth/logoutStaff/<?= urlencode($kdsLogoutRol ?? 'chef') ?>" class="exit-link">Salir</a>
   </div>
 </div>
 
@@ -198,6 +198,7 @@
 <script>
 let prevIds  = new Set();
 const BASE   = '<?= BASE_URL ?>';
+const KDS_ROUTE = '<?= htmlspecialchars($kdsBaseRoute ?? 'rest-chef', ENT_QUOTES) ?>';
 
 // ── Sonido ────────────────────────────────────────
 const alertSound = () => {
@@ -333,10 +334,10 @@ function renderColumna(pedidos, colId) {
         </div>
         <div>
           ${!esPrepCol && it.item_estado === 'pendiente'
-            ? `<button class="btn-action btn-prep"  onclick="marcar('${BASE}rest-chef/marcarPreparacion/${it.item_id}',this)">Prep. ▶</button>`
+            ? `<button class="btn-action btn-prep"  onclick="marcar('${BASE}${KDS_ROUTE}/marcarPreparacion/${it.item_id}',this)">Prep. ▶</button>`
             : ''}
           ${esPrepCol && it.item_estado === 'en_preparacion'
-            ? `<button class="btn-action btn-listo" onclick="marcar('${BASE}rest-chef/marcarListo/${it.item_id}',this)">Listo ✓</button>`
+            ? `<button class="btn-action btn-listo" onclick="marcar('${BASE}${KDS_ROUTE}/marcarListo/${it.item_id}',this)">Listo ✓</button>`
             : ''}
         </div>
       </div>
@@ -423,7 +424,7 @@ async function marcar(url, btn) {
 // ── Cargar queue ─────────────────────────────────
 async function loadQueue() {
   try {
-    const res = await fetch(BASE + 'rest-chef/queue?t=' + Date.now(), { credentials: 'same-origin' });
+    const res = await fetch(BASE + KDS_ROUTE + '/queue?t=' + Date.now(), { credentials: 'same-origin' });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     renderQueue(await res.json());
   } catch (e) {

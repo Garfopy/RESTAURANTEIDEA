@@ -30,12 +30,13 @@
 </div>
 
 <!-- Roles de acceso rápido -->
-<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px">
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px">
   <?php
   $roles = [
     ['slug'=>'mesero',  'label'=>'Mesero',  'icon'=>'🧑‍💼', 'desc'=>'Toma pedidos, atiende mesas', 'badge'=>'badge-blue'],
     ['slug'=>'chef',    'label'=>'Chef',    'icon'=>'👨‍🍳', 'desc'=>'Ve el KDS, marca platillos listos', 'badge'=>'badge-amber'],
     ['slug'=>'portero', 'label'=>'Portero', 'icon'=>'🔐', 'desc'=>'Escanea QR de entrada/salida', 'badge'=>'badge-green'],
+    ['slug'=>'barra',   'label'=>'Barra',   'icon'=>'BAR', 'desc'=>'Ve solo bebidas y las marca listas', 'badge'=>'badge-purple'],
   ];
   foreach ($roles as $r):
     $count = count(array_filter($staff, fn($s) => $s['rol_slug'] === $r['slug'] && $s['staff_activo']));
@@ -69,7 +70,7 @@
         <td style="color:#6B7280;font-size:.85rem"><?= htmlspecialchars($s['email']) ?></td>
         <td>
           <?php
-          $badgeRol = ['mesero'=>'badge-blue','chef'=>'badge-amber','portero'=>'badge-green'][$s['rol_slug']] ?? 'badge-gray';
+          $badgeRol = ['mesero'=>'badge-blue','chef'=>'badge-amber','barra'=>'badge-purple','portero'=>'badge-green'][$s['rol_slug']] ?? 'badge-gray';
           ?>
           <span class="badge <?= $badgeRol ?>"><?= htmlspecialchars($s['rol_nombre']) ?></span>
         </td>
@@ -98,7 +99,7 @@
           <div class="empty-state">
             <svg width="40" height="40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
             <div style="font-size:.95rem;font-weight:600;color:#374151;margin-bottom:4px">Sin staff registrado</div>
-            <div>Crea cuentas para tus meseros, chefs y porteros</div>
+            <div>Crea cuentas para tus meseros, chefs, barra y porteros</div>
           </div>
         </td>
       </tr>
@@ -118,7 +119,7 @@
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div class="form-group" style="grid-column:span 2">
           <label class="form-label">Rol *</label>
-          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:4px">
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:4px">
             <?php foreach ($roles as $r): ?>
             <label class="rol-lbl" style="display:flex;flex-direction:column;align-items:center;padding:12px 8px;
                           border:2px solid #E5E7EB;border-radius:10px;cursor:pointer;transition:.15s;text-align:center">
