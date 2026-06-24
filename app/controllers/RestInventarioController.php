@@ -231,11 +231,16 @@ class RestInventarioController extends BaseController
             ? (float)$this->post('stock_inicial_ch', 0)
             : (float)$this->post('stock_inicial', 0);
 
+        $tipo = trim((string)$this->post('tipo', ''));
+        if ($tipo === '') {
+            $tipo = 'otro';
+        }
+
         $data = [
             'restaurante_id'      => $restauranteId,
             'nombre'              => $nombre,
             'codigo'              => $this->post('codigo') ?: null,
-            'tipo'                => $this->post('tipo') ?: null,
+            'tipo'                => $tipo,
             'unidad_principal'    => $unidad,
             'costo_unitario'      => $costoPosteado,
             'stock_minimo'        => $stockMinimo,

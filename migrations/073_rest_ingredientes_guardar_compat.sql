@@ -23,9 +23,16 @@ SET @exists := (
     AND COLUMN_NAME = 'tipo'
 );
 SET @sql := IF(@exists = 0,
-  'ALTER TABLE rest_ingredientes ADD COLUMN tipo VARCHAR(30) NULL AFTER codigo',
+  'ALTER TABLE rest_ingredientes ADD COLUMN tipo VARCHAR(30) NOT NULL DEFAULT ''otro'' AFTER codigo',
   'SELECT 1'
 );
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+UPDATE rest_ingredientes
+   SET tipo = 'otro'
+ WHERE tipo IS NULL OR tipo = '';
+
+SET @sql := 'ALTER TABLE rest_ingredientes MODIFY COLUMN tipo VARCHAR(30) NOT NULL DEFAULT ''otro''';
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 SET @exists := (
@@ -87,4 +94,3 @@ SET @sql := IF(@idx_exists = 0,
   'SELECT 1'
 );
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
-
