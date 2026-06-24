@@ -1,64 +1,665 @@
+<?php
+$isEdit = !empty($restaurante);
+$nombre = $restaurante['nombre'] ?? '';
+$descripcion = $restaurante['descripcion'] ?? '';
+$telefono = $restaurante['telefono'] ?? '';
+$direccion = $restaurante['direccion'] ?? '';
+$horarioApertura = $restaurante['horario_apertura'] ?? '';
+$horarioCierre = $restaurante['horario_cierre'] ?? '';
+$colorPrimario = $restaurante['color_primario'] ?? '#C8102E';
+$colorSecundario = $restaurante['color_secundario'] ?? '#1F2937';
+$formAction = BASE_URL . ($isEdit ? 'restaurante/actualizar/' . (int)$restaurante['id'] : 'restaurante/guardar');
+$cancelUrl = BASE_URL . ($isEdit ? 'restaurante/dashboard' : 'restaurante/seleccionar');
+$title = ($isEdit ? 'Editar local' : 'Crear local') . ' - CarniHub';
+?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title><?= ($restaurante ? 'Editar' : 'Crear') ?> Restaurante — CarniHub</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <title><?= htmlspecialchars($title) ?></title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --cp: <?= htmlspecialchars($colorPrimario) ?>;
+      --cs: <?= htmlspecialchars($colorSecundario) ?>;
+      --bg: #F6F7F9;
+      --ink: #111827;
+      --muted: #6B7280;
+      --line: #E5E7EB;
+      --soft: #F9FAFB;
+      --danger-bg: #FEE2E2;
+      --danger: #991B1B;
+      --success-bg: #DCFCE7;
+      --success: #166534;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: inherit; }
+    .page {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 28px 0 40px;
+    }
+    .topline {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: #4B5563;
+      text-decoration: none;
+      font-size: .86rem;
+      font-weight: 700;
+    }
+    .back-link:hover { color: var(--cp); }
+    .shell {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      gap: 20px;
+      align-items: start;
+    }
+    .panel {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: 0 12px 28px rgba(17,24,39,.06);
+      overflow: hidden;
+    }
+    .hero {
+      padding: 26px 28px 22px;
+      border-bottom: 1px solid var(--line);
+      background:
+        linear-gradient(135deg, color-mix(in srgb, var(--cp) 10%, white), #fff 58%),
+        #fff;
+    }
+    .eyebrow {
+      color: var(--cp);
+      font-size: .72rem;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    h1 {
+      margin: 0;
+      font-size: clamp(1.45rem, 2.4vw, 2.15rem);
+      line-height: 1.08;
+      letter-spacing: 0;
+    }
+    .hero-copy {
+      margin: 10px 0 0;
+      max-width: 720px;
+      color: var(--muted);
+      font-size: .94rem;
+      line-height: 1.55;
+    }
+    form { margin: 0; }
+    .form-body { padding: 24px 28px 8px; }
+    .section {
+      padding: 0 0 24px;
+      margin-bottom: 24px;
+      border-bottom: 1px solid #EEF0F3;
+    }
+    .section:last-child {
+      border-bottom: none;
+      margin-bottom: 0;
+    }
+    .section-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+    .section-title {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 800;
+      letter-spacing: 0;
+    }
+    .section-note {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: .82rem;
+      line-height: 1.45;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+    .field.full { grid-column: 1 / -1; }
+    label {
+      display: block;
+      margin-bottom: 6px;
+      color: #374151;
+      font-size: .82rem;
+      font-weight: 700;
+    }
+    .required { color: var(--cp); }
+    input[type="text"],
+    input[type="tel"],
+    input[type="time"],
+    textarea {
+      width: 100%;
+      border: 1px solid #D1D5DB;
+      border-radius: 8px;
+      background: #fff;
+      color: var(--ink);
+      font: inherit;
+      font-size: .93rem;
+      outline: none;
+      padding: 11px 12px;
+      transition: border-color .16s ease, box-shadow .16s ease, background .16s ease;
+    }
+    textarea {
+      min-height: 104px;
+      resize: vertical;
+      line-height: 1.45;
+    }
+    input:focus,
+    textarea:focus {
+      border-color: var(--cp);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--cp) 14%, transparent);
+    }
+    input::placeholder,
+    textarea::placeholder { color: #9CA3AF; }
+    .hint {
+      margin-top: 6px;
+      color: #6B7280;
+      font-size: .76rem;
+      line-height: 1.4;
+    }
+    .color-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .color-field {
+      display: grid;
+      grid-template-columns: 48px minmax(0, 1fr);
+      gap: 10px;
+      align-items: center;
+      padding: 10px;
+      border: 1px solid #D1D5DB;
+      border-radius: 8px;
+      background: #fff;
+    }
+    .color-field input[type="color"] {
+      width: 48px;
+      height: 42px;
+      padding: 0;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+    }
+    .color-name {
+      color: #374151;
+      font-size: .82rem;
+      font-weight: 800;
+    }
+    .color-value {
+      margin-top: 2px;
+      color: #6B7280;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: .78rem;
+      text-transform: uppercase;
+    }
+    .actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      padding: 18px 28px;
+      border-top: 1px solid var(--line);
+      background: #fff;
+      position: sticky;
+      bottom: 0;
+      z-index: 5;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 42px;
+      padding: 10px 18px;
+      border-radius: 8px;
+      border: 1px solid transparent;
+      font-size: .88rem;
+      font-weight: 800;
+      text-decoration: none;
+      cursor: pointer;
+      transition: transform .14s ease, filter .14s ease, box-shadow .14s ease, background .14s ease;
+      white-space: nowrap;
+    }
+    .btn:active { transform: translateY(1px); }
+    .btn-primary {
+      background: var(--cp);
+      color: #fff;
+      box-shadow: 0 10px 18px color-mix(in srgb, var(--cp) 22%, transparent);
+    }
+    .btn-primary:hover { filter: brightness(1.04); }
+    .btn-outline {
+      background: #fff;
+      border-color: #D1D5DB;
+      color: #374151;
+    }
+    .btn-outline:hover { background: #F9FAFB; }
+    .side {
+      position: sticky;
+      top: 20px;
+      display: grid;
+      gap: 14px;
+    }
+    .preview {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 12px 28px rgba(17,24,39,.06);
+    }
+    .preview-top {
+      min-height: 118px;
+      background:
+        linear-gradient(135deg, color-mix(in srgb, var(--cp) 86%, #000), color-mix(in srgb, var(--cs) 90%, #000));
+      color: #fff;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .preview-chip {
+      align-self: flex-start;
+      border: 1px solid rgba(255,255,255,.28);
+      border-radius: 999px;
+      padding: 4px 9px;
+      font-size: .72rem;
+      font-weight: 800;
+      background: rgba(255,255,255,.12);
+    }
+    .preview-name {
+      font-size: 1.15rem;
+      font-weight: 800;
+      line-height: 1.2;
+      word-break: break-word;
+    }
+    .preview-body { padding: 16px; }
+    .preview-desc {
+      color: #4B5563;
+      font-size: .86rem;
+      line-height: 1.5;
+      min-height: 42px;
+    }
+    .preview-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 16px;
+    }
+    .preview-row {
+      display: grid;
+      grid-template-columns: 30px minmax(0, 1fr);
+      gap: 10px;
+      align-items: center;
+      color: #374151;
+      font-size: .84rem;
+    }
+    .preview-icon {
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: color-mix(in srgb, var(--cp) 10%, white);
+      color: var(--cp);
+      font-weight: 800;
+      font-size: .78rem;
+    }
+    .status {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+    }
+    .status-title {
+      font-size: .84rem;
+      font-weight: 800;
+      margin-bottom: 10px;
+    }
+    .checks {
+      display: grid;
+      gap: 8px;
+    }
+    .check {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #4B5563;
+      font-size: .8rem;
+    }
+    .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #D1D5DB;
+      flex: 0 0 auto;
+    }
+    .check.done .dot { background: var(--cp); }
+    .flash {
+      padding: 12px 14px;
+      margin-bottom: 14px;
+      border-radius: 8px;
+      font-size: .86rem;
+      font-weight: 700;
+      border: 1px solid transparent;
+    }
+    .flash.success {
+      background: var(--success-bg);
+      color: var(--success);
+      border-color: #BBF7D0;
+    }
+    .flash.error {
+      background: var(--danger-bg);
+      color: var(--danger);
+      border-color: #FECACA;
+    }
+    @media (max-width: 980px) {
+      .shell { grid-template-columns: 1fr; }
+      .side { position: static; grid-template-columns: 1fr; }
+    }
+    @media (max-width: 680px) {
+      .page {
+        width: min(100% - 20px, 1180px);
+        padding-top: 16px;
+      }
+      .topline { align-items: flex-start; }
+      .hero,
+      .form-body,
+      .actions { padding-left: 18px; padding-right: 18px; }
+      .grid,
+      .color-grid { grid-template-columns: 1fr; }
+      .actions {
+        position: static;
+        flex-direction: column-reverse;
+      }
+      .btn { width: 100%; }
+    }
+  </style>
 </head>
-<body style="background:#F9FAFB;font-family:system-ui,sans-serif;min-height:100vh;padding:40px 20px">
-<div style="max-width:580px;margin:0 auto">
-  <h1 style="font-size:1.4rem;font-weight:700;color:#111827;margin-bottom:24px">
-    <?= ($restaurante ? 'Editar' : 'Crear') ?> Restaurante
-  </h1>
+<body>
+  <main class="page">
+    <div class="topline">
+      <a class="back-link" href="<?= htmlspecialchars($cancelUrl) ?>" aria-label="Volver">
+        <svg width="17" height="17" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+        </svg>
+        Volver
+      </a>
+    </div>
 
-  <?php if (!empty($flash)): ?>
-  <div style="padding:12px 16px;border-radius:8px;margin-bottom:16px;font-size:.875rem;font-weight:500;
-    background:<?= $flash['type'] === 'success' ? '#DCFCE7' : '#FEE2E2' ?>;
-    color:<?= $flash['type'] === 'success' ? '#166534' : '#991B1B' ?>">
-    <?= htmlspecialchars($flash['message']) ?>
-  </div>
-  <?php endif; ?>
+    <?php if (!empty($flash)): ?>
+    <div class="flash <?= $flash['type'] === 'success' ? 'success' : 'error' ?>">
+      <?= htmlspecialchars($flash['message']) ?>
+    </div>
+    <?php endif; ?>
 
-  <div style="background:#fff;border-radius:16px;border:1px solid #E5E7EB;padding:28px">
-    <form method="POST" action="<?= BASE_URL . ($restaurante ? 'restaurante/actualizar/'.$restaurante['id'] : 'restaurante/guardar') ?>">
-      <div style="margin-bottom:16px">
-        <label style="font-size:.85rem;font-weight:500">Nombre del restaurante *</label>
-        <input type="text" name="nombre" value="<?= htmlspecialchars($restaurante['nombre'] ?? '') ?>" required
-          style="width:100%;padding:8px 12px;border:1px solid #D1D5DB;border-radius:8px;margin-top:4px;font-size:.9rem">
-      </div>
-      <div style="margin-bottom:16px">
-        <label style="font-size:.85rem;font-weight:500">Descripción</label>
-        <textarea name="descripcion" rows="2"
-          style="width:100%;padding:8px 12px;border:1px solid #D1D5DB;border-radius:8px;margin-top:4px;font-size:.9rem;resize:vertical"><?= htmlspecialchars($restaurante['descripcion'] ?? '') ?></textarea>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px">
-        <div>
-          <label style="font-size:.85rem;font-weight:500">Teléfono</label>
-          <input type="text" name="telefono" value="<?= htmlspecialchars($restaurante['telefono'] ?? '') ?>"
-            style="width:100%;padding:8px 12px;border:1px solid #D1D5DB;border-radius:8px;margin-top:4px;font-size:.9rem">
+    <div class="shell">
+      <section class="panel">
+        <div class="hero">
+          <div class="eyebrow"><?= $isEdit ? 'Configuracion del local' : 'Nuevo local' ?></div>
+          <h1><?= $isEdit ? 'Actualiza la informacion del restaurante' : 'Crea tu restaurante' ?></h1>
+          <p class="hero-copy">
+            Estos datos se usan para identificar el local en el panel, el menu publico y las operaciones del restaurante.
+          </p>
         </div>
-        <div>
-          <label style="font-size:.85rem;font-weight:500">Color primario</label>
-          <input type="color" name="color_primario" value="<?= htmlspecialchars($restaurante['color_primario'] ?? '#C8102E') ?>"
-            style="height:40px;width:100%;border:1px solid #D1D5DB;border-radius:8px;margin-top:4px;padding:2px;cursor:pointer">
-        </div>
-      </div>
-      <div style="margin-bottom:20px">
-        <label style="font-size:.85rem;font-weight:500">Dirección</label>
-        <input type="text" name="direccion" value="<?= htmlspecialchars($restaurante['direccion'] ?? '') ?>"
-          style="width:100%;padding:8px 12px;border:1px solid #D1D5DB;border-radius:8px;margin-top:4px;font-size:.9rem">
-      </div>
-      <div style="display:flex;gap:10px;justify-content:flex-end">
-        <a href="<?= BASE_URL ?>restaurante/seleccionar"
-          style="padding:8px 16px;border:1px solid #D1D5DB;border-radius:8px;font-size:.875rem;text-decoration:none;color:#374151">Cancelar</a>
-        <button type="submit"
-          style="padding:8px 24px;background:#C8102E;color:#fff;border:none;border-radius:8px;font-size:.875rem;font-weight:500;cursor:pointer">
-          <?= $restaurante ? 'Actualizar' : 'Crear Restaurante' ?>
-        </button>
-      </div>
-    </form>
-  </div>
-</div>
+
+        <form method="POST" action="<?= htmlspecialchars($formAction) ?>" id="restaurantForm">
+          <div class="form-body">
+            <div class="section">
+              <div class="section-head">
+                <div>
+                  <h2 class="section-title">Identidad</h2>
+                  <p class="section-note">Nombre comercial y descripcion visible del local.</p>
+                </div>
+              </div>
+
+              <div class="grid">
+                <div class="field full">
+                  <label for="nombre">Nombre del restaurante <span class="required">*</span></label>
+                  <input
+                    id="nombre"
+                    type="text"
+                    name="nombre"
+                    value="<?= htmlspecialchars($nombre) ?>"
+                    required
+                    maxlength="120"
+                    autocomplete="organization"
+                    placeholder="Ej. Amare Restaurant"
+                  >
+                </div>
+
+                <div class="field full">
+                  <label for="descripcion">Descripcion</label>
+                  <textarea
+                    id="descripcion"
+                    name="descripcion"
+                    maxlength="500"
+                    placeholder="Cocina mexicana contemporanea, bebidas de autor y servicio para mesa."
+                  ><?= htmlspecialchars($descripcion) ?></textarea>
+                </div>
+              </div>
+            </div>
+
+            <div class="section">
+              <div class="section-head">
+                <div>
+                  <h2 class="section-title">Contacto y ubicacion</h2>
+                  <p class="section-note">Informacion operativa del local.</p>
+                </div>
+              </div>
+
+              <div class="grid">
+                <div class="field">
+                  <label for="telefono">Telefono</label>
+                  <input
+                    id="telefono"
+                    type="tel"
+                    name="telefono"
+                    value="<?= htmlspecialchars($telefono) ?>"
+                    maxlength="30"
+                    autocomplete="tel"
+                    placeholder="442 123 4567"
+                  >
+                </div>
+
+                <div class="field">
+                  <label for="horario_apertura">Apertura</label>
+                  <input
+                    id="horario_apertura"
+                    type="time"
+                    name="horario_apertura"
+                    value="<?= htmlspecialchars($horarioApertura) ?>"
+                  >
+                </div>
+
+                <div class="field">
+                  <label for="horario_cierre">Cierre</label>
+                  <input
+                    id="horario_cierre"
+                    type="time"
+                    name="horario_cierre"
+                    value="<?= htmlspecialchars($horarioCierre) ?>"
+                  >
+                </div>
+
+                <div class="field full">
+                  <label for="direccion">Direccion</label>
+                  <input
+                    id="direccion"
+                    type="text"
+                    name="direccion"
+                    value="<?= htmlspecialchars($direccion) ?>"
+                    maxlength="255"
+                    autocomplete="street-address"
+                    placeholder="Calle, numero, colonia, ciudad"
+                  >
+                </div>
+              </div>
+            </div>
+
+            <div class="section">
+              <div class="section-head">
+                <div>
+                  <h2 class="section-title">Marca visual</h2>
+                  <p class="section-note">Colores base para el panel y el menu publico.</p>
+                </div>
+              </div>
+
+              <div class="color-grid">
+                <label class="color-field" for="color_primario">
+                  <input id="color_primario" type="color" name="color_primario" value="<?= htmlspecialchars($colorPrimario) ?>">
+                  <span>
+                    <span class="color-name">Primario</span>
+                    <span class="color-value" id="primaryValue"><?= htmlspecialchars($colorPrimario) ?></span>
+                  </span>
+                </label>
+
+                <label class="color-field" for="color_secundario">
+                  <input id="color_secundario" type="color" name="color_secundario" value="<?= htmlspecialchars($colorSecundario) ?>">
+                  <span>
+                    <span class="color-name">Secundario</span>
+                    <span class="color-value" id="secondaryValue"><?= htmlspecialchars($colorSecundario) ?></span>
+                  </span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="actions">
+            <a class="btn btn-outline" href="<?= htmlspecialchars($cancelUrl) ?>">Cancelar</a>
+            <button class="btn btn-primary" type="submit">
+              <?= $isEdit ? 'Guardar cambios' : 'Crear local' ?>
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <aside class="side" aria-label="Vista previa del local">
+        <section class="preview">
+          <div class="preview-top">
+            <span class="preview-chip">Menu publico</span>
+            <div class="preview-name" id="previewName"><?= htmlspecialchars($nombre ?: 'Nombre del restaurante') ?></div>
+          </div>
+          <div class="preview-body">
+            <div class="preview-desc" id="previewDesc">
+              <?= htmlspecialchars($descripcion ?: 'Descripcion breve del local') ?>
+            </div>
+            <div class="preview-list">
+              <div class="preview-row">
+                <span class="preview-icon">TEL</span>
+                <span id="previewPhone"><?= htmlspecialchars($telefono ?: 'Sin telefono') ?></span>
+              </div>
+              <div class="preview-row">
+                <span class="preview-icon">HRS</span>
+                <span id="previewHours">
+                  <?= htmlspecialchars(($horarioApertura || $horarioCierre) ? trim($horarioApertura . ' - ' . $horarioCierre, ' -') : 'Sin horario') ?>
+                </span>
+              </div>
+              <div class="preview-row">
+                <span class="preview-icon">DIR</span>
+                <span id="previewAddress"><?= htmlspecialchars($direccion ?: 'Sin direccion') ?></span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="status">
+          <div class="status-title">Datos capturados</div>
+          <div class="checks">
+            <div class="check" data-check="nombre"><span class="dot"></span><span>Nombre</span></div>
+            <div class="check" data-check="descripcion"><span class="dot"></span><span>Descripcion</span></div>
+            <div class="check" data-check="contacto"><span class="dot"></span><span>Contacto</span></div>
+            <div class="check" data-check="horario"><span class="dot"></span><span>Horario</span></div>
+            <div class="check" data-check="direccion"><span class="dot"></span><span>Direccion</span></div>
+          </div>
+        </section>
+      </aside>
+    </div>
+  </main>
+
+  <script>
+    const form = document.getElementById('restaurantForm');
+    const fields = {
+      nombre: document.getElementById('nombre'),
+      descripcion: document.getElementById('descripcion'),
+      telefono: document.getElementById('telefono'),
+      apertura: document.getElementById('horario_apertura'),
+      cierre: document.getElementById('horario_cierre'),
+      direccion: document.getElementById('direccion'),
+      primary: document.getElementById('color_primario'),
+      secondary: document.getElementById('color_secundario')
+    };
+
+    const setText = (id, value, fallback) => {
+      document.getElementById(id).textContent = value && value.trim() ? value.trim() : fallback;
+    };
+
+    const setCheck = (name, done) => {
+      const el = document.querySelector(`[data-check="${name}"]`);
+      if (el) el.classList.toggle('done', !!done);
+    };
+
+    const updatePreview = () => {
+      const nombre = fields.nombre.value.trim();
+      const descripcion = fields.descripcion.value.trim();
+      const telefono = fields.telefono.value.trim();
+      const apertura = fields.apertura.value;
+      const cierre = fields.cierre.value;
+      const direccion = fields.direccion.value.trim();
+      const horario = [apertura, cierre].filter(Boolean).join(' - ');
+
+      document.documentElement.style.setProperty('--cp', fields.primary.value);
+      document.documentElement.style.setProperty('--cs', fields.secondary.value);
+      document.getElementById('primaryValue').textContent = fields.primary.value.toUpperCase();
+      document.getElementById('secondaryValue').textContent = fields.secondary.value.toUpperCase();
+
+      setText('previewName', nombre, 'Nombre del restaurante');
+      setText('previewDesc', descripcion, 'Descripcion breve del local');
+      setText('previewPhone', telefono, 'Sin telefono');
+      setText('previewHours', horario, 'Sin horario');
+      setText('previewAddress', direccion, 'Sin direccion');
+
+      setCheck('nombre', nombre.length > 0);
+      setCheck('descripcion', descripcion.length > 0);
+      setCheck('contacto', telefono.length > 0);
+      setCheck('horario', apertura.length > 0 || cierre.length > 0);
+      setCheck('direccion', direccion.length > 0);
+    };
+
+    Object.values(fields).forEach(field => {
+      field.addEventListener('input', updatePreview);
+      field.addEventListener('change', updatePreview);
+    });
+
+    form.addEventListener('submit', () => {
+      form.querySelector('button[type="submit"]').disabled = true;
+      form.querySelector('button[type="submit"]').textContent = 'Guardando...';
+    });
+
+    updatePreview();
+  </script>
 </body>
 </html>

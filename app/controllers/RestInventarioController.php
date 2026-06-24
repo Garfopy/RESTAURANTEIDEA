@@ -249,17 +249,28 @@ class RestInventarioController extends BaseController
             $data['costo_unitario'] = $precioRemoto;
         }
 
-        if ($id) {
-            $this->model->update($id, array_diff_key($data, ['restaurante_id' => '']));
-        } else {
-            $ingId = $this->model->insert($data);
-            // Registrar stock inicial si > 0
-            if ($stockInicial > 0) {
-                $this->model->ajustarStock(
-                    $ingId, $stockInicial, 'entrada',
-                    'Stock inicial', null, $restauranteId, $this->usuarioId()
-                );
+        try {
+            if ($id) {
+                $this->model->update($id, array_diff_key($data, ['restaurante_id' => '']));
+            } else {
+                $ingId = $this->model->insert($data);
+                // Registrar stock inicial si > 0
+                if ($stockInicial > 0) {
+                    $this->model->ajustarStock(
+                        $ingId, $stockInicial, 'entrada',
+                        'Stock inicial', null, $restauranteId, $this->usuarioId()
+                    );
+                }
             }
+        } catch (\Throwable $e) {
+            error_log('[RestInventarioController::guardar] ' . $e->getMessage());
+            error_log('[RestInventarioController::guardar TRACE] ' . $e->getTraceAsString());
+            $msg = 'No se pudo guardar el ingrediente.';
+            if ((defined('APP_ENV') ? APP_ENV : '') !== 'production') {
+                $msg .= ' ' . $e->getMessage();
+            }
+            $this->flash('error', $msg);
+            $this->redirect('rest-inventario/index');
         }
 
         $this->flash('success', 'Ingrediente guardado.');

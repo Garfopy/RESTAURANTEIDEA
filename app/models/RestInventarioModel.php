@@ -2,6 +2,45 @@
 class RestInventarioModel extends BaseModel
 {
     protected string $table = 'rest_ingredientes';
+    private static ?array $columnCache = null;
+
+    private function getColumns(): array
+    {
+        if (self::$columnCache !== null) {
+            return self::$columnCache;
+        }
+
+        $stmt = $this->db->prepare(
+            "SELECT COLUMN_NAME
+               FROM information_schema.COLUMNS
+              WHERE TABLE_SCHEMA = DATABASE()
+                AND TABLE_NAME = ?"
+        );
+        $stmt->execute([$this->table]);
+        self::$columnCache = array_fill_keys($stmt->fetchAll(PDO::FETCH_COLUMN), true);
+
+        return self::$columnCache;
+    }
+
+    private function filterExistingColumns(array $data): array
+    {
+        $columns = $this->getColumns();
+        return array_filter(
+            $data,
+            static fn($column) => isset($columns[$column]),
+            ARRAY_FILTER_USE_KEY
+        );
+    }
+
+    public function insert(array $data): int
+    {
+        return parent::insert($this->filterExistingColumns($data));
+    }
+
+    public function update(int $id, array $data): bool
+    {
+        return parent::update($id, $this->filterExistingColumns($data));
+    }
 
     public function getByRestaurante(int $restauranteId, bool $soloActivos = false): array
     {
