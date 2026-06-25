@@ -62,10 +62,16 @@ class RestChefController extends BaseController
         $tipoOrigen = strtolower((string)($pedido['tipo_origen'] ?? ''));
         $tipoEntrega = strtolower((string)($pedido['tipo_entrega'] ?? ''));
         $tipoPedido = strtolower((string)($pedido['tipo_pedido'] ?? ''));
+        $platilloCodigo = strtolower((string)($pedido['platillo_codigo'] ?? ''));
+        $platilloNombre = strtolower((string)($pedido['platillo_nombre'] ?? ''));
+        $itemNotas = strtolower((string)($pedido['item_notas'] ?? ''));
         $esRegalo = (int)($pedido['es_regalo'] ?? 0) === 1
             || in_array($tipoOrigen, ['gift', 'regalo', 'regalos'], true)
             || in_array($tipoEntrega, ['gift', 'regalo', 'regalos'], true)
-            || in_array($tipoPedido, ['gift', 'regalo', 'regalos'], true);
+            || in_array($tipoPedido, ['gift', 'regalo', 'regalos'], true)
+            || str_starts_with($platilloCodigo, 'sg-')
+            || str_starts_with($platilloNombre, 'regalo:')
+            || str_contains($itemNotas, 'regalo para');
 
         return $tipoOrigen === 'store' || $esRegalo;
     }
@@ -109,9 +115,13 @@ class RestChefController extends BaseController
             $pedidoMetaSelect = $this->pedidoSelectMeta('p');
             $stmtItem = $db->prepare(
                 "SELECT pi.platillo_id, pi.cantidad, pi.pedido_id, pi.estado,
+                        pi.notas AS item_notas,
+                        COALESCE(pl.codigo, '') AS platillo_codigo,
+                        pl.nombre AS platillo_nombre,
                         p.restaurante_id, {$pedidoMetaSelect}
                  FROM rest_pedido_items pi
                  JOIN rest_pedidos p ON p.id = pi.pedido_id
+                 JOIN rest_platillos pl ON pl.id = pi.platillo_id
                  WHERE pi.id = ? LIMIT 1"
             );
             $stmtItem->execute([$itemId]);
@@ -242,9 +252,13 @@ class RestChefController extends BaseController
         try {
             $pedidoMetaSelect = $this->pedidoSelectMeta('p');
             $stmtItem = $db->prepare(
-                "SELECT {$pedidoMetaSelect}
+                "SELECT pi.notas AS item_notas,
+                        COALESCE(pl.codigo, '') AS platillo_codigo,
+                        pl.nombre AS platillo_nombre,
+                        {$pedidoMetaSelect}
                    FROM rest_pedido_items pi
                    JOIN rest_pedidos p ON p.id = pi.pedido_id
+                   JOIN rest_platillos pl ON pl.id = pi.platillo_id
                   WHERE pi.id = ? LIMIT 1"
             );
             $stmtItem->execute([$itemId]);

@@ -64,7 +64,7 @@ class RestPedidoModel extends BaseModel
         return $parts ? ' OR ' . implode(' OR ', $parts) : '';
     }
 
-    private function sqlNoRegalosKds(string $pedidoAlias = 'p', string $itemAlias = 'pi'): string
+    private function sqlNoRegalosKds(string $pedidoAlias = 'p', string $itemAlias = 'pi', string $platilloAlias = 'pl'): string
     {
         $parts = [];
 
@@ -83,6 +83,9 @@ class RestPedidoModel extends BaseModel
         if ($this->hasColumnInTable('rest_pedido_items', 'origen')) {
             $parts[] = "LOWER(COALESCE({$itemAlias}.origen, 'menu')) = 'store'";
         }
+        $parts[] = "LOWER(COALESCE({$platilloAlias}.codigo, '')) LIKE 'sg-%'";
+        $parts[] = "LOWER(COALESCE({$platilloAlias}.nombre, '')) LIKE 'regalo:%'";
+        $parts[] = "LOWER(COALESCE({$itemAlias}.notas, '')) LIKE '%regalo para%'";
 
         return $parts ? ' AND NOT (' . implode(' OR ', $parts) . ')' : '';
     }
@@ -241,7 +244,7 @@ class RestPedidoModel extends BaseModel
     public function getKitchenQueue(int $restauranteId, string $area = 'cocina'): array
     {
         $noStore = $this->sqlNoStore('p');
-        $noRegalosKds = $this->sqlNoRegalosKds('p', 'pi');
+        $noRegalosKds = $this->sqlNoRegalosKds('p', 'pi', 'pl');
         $areaWhere = $this->sqlAreaKds($area);
 
         // Formato ingredientes_raw (separador ||, campos |):
