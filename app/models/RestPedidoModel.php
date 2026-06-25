@@ -4,9 +4,9 @@ class RestPedidoModel extends BaseModel
     protected string $table = 'rest_pedidos';
     private static array $columnCache = [];
 
-    private function hasColumn(string $column): bool
+    private function hasColumnInTable(string $table, string $column): bool
     {
-        $key = $this->table . '.' . $column;
+        $key = $table . '.' . $column;
         if (array_key_exists($key, self::$columnCache)) {
             return self::$columnCache[$key];
         }
@@ -18,9 +18,14 @@ class RestPedidoModel extends BaseModel
                 AND table_name = ?
                 AND column_name = ?"
         );
-        $stmt->execute([$this->table, $column]);
+        $stmt->execute([$table, $column]);
         self::$columnCache[$key] = (int)$stmt->fetchColumn() > 0;
         return self::$columnCache[$key];
+    }
+
+    private function hasColumn(string $column): bool
+    {
+        return $this->hasColumnInTable($this->table, $column);
     }
 
     public function soportaTipoOrigen(): bool
@@ -57,6 +62,29 @@ class RestPedidoModel extends BaseModel
         }
 
         return $parts ? ' OR ' . implode(' OR ', $parts) : '';
+    }
+
+    private function sqlNoRegalosKds(string $pedidoAlias = 'p', string $itemAlias = 'pi'): string
+    {
+        $parts = [];
+
+        if ($this->hasColumn('es_regalo')) {
+            $parts[] = "COALESCE({$pedidoAlias}.es_regalo, 0) = 1";
+        }
+        if ($this->hasColumn('tipo_entrega')) {
+            $parts[] = "LOWER(COALESCE({$pedidoAlias}.tipo_entrega, '')) IN ('gift', 'regalo', 'regalos')";
+        }
+        if ($this->hasColumn('tipo_origen')) {
+            $parts[] = "LOWER(COALESCE({$pedidoAlias}.tipo_origen, '')) IN ('gift', 'regalo', 'regalos')";
+        }
+        if ($this->hasColumn('tipo_pedido')) {
+            $parts[] = "LOWER(COALESCE({$pedidoAlias}.tipo_pedido, '')) IN ('gift', 'regalo', 'regalos')";
+        }
+        if ($this->hasColumnInTable('rest_pedido_items', 'origen')) {
+            $parts[] = "LOWER(COALESCE({$itemAlias}.origen, 'menu')) = 'store'";
+        }
+
+        return $parts ? ' AND NOT (' . implode(' OR ', $parts) . ')' : '';
     }
 
     public function generarFolio(int $restauranteId): string
@@ -213,6 +241,7 @@ class RestPedidoModel extends BaseModel
     public function getKitchenQueue(int $restauranteId, string $area = 'cocina'): array
     {
         $noStore = $this->sqlNoStore('p');
+        $noRegalosKds = $this->sqlNoRegalosKds('p', 'pi');
         $areaWhere = $this->sqlAreaKds($area);
 
         // Formato ingredientes_raw (separador ||, campos |):
@@ -277,6 +306,7 @@ class RestPedidoModel extends BaseModel
                AND p.estado NOT IN ('cancelado', 'entregado')
                AND pi.estado IN ('pendiente','en_preparacion')
                $noStore
+               $noRegalosKds
                $areaWhere
              ORDER BY p.created_at ASC, pi.id ASC",
             [$restauranteId]

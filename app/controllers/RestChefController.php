@@ -50,23 +50,24 @@ class RestChefController extends BaseController
 
     private function pedidoSelectMeta(string $alias): string
     {
-        $select = ["{$alias}.tipo_origen"];
+        $select = [$this->hasPedidoColumn('tipo_origen') ? "{$alias}.tipo_origen" : "NULL AS tipo_origen"];
         $select[] = $this->hasPedidoColumn('es_regalo') ? "{$alias}.es_regalo" : "0 AS es_regalo";
         $select[] = $this->hasPedidoColumn('tipo_entrega') ? "{$alias}.tipo_entrega" : "NULL AS tipo_entrega";
+        $select[] = $this->hasPedidoColumn('tipo_pedido') ? "{$alias}.tipo_pedido" : "NULL AS tipo_pedido";
         return implode(', ', $select);
     }
 
     private function debeIgnorarPorStore(array $pedido): bool
     {
-        if (strtolower((string)($pedido['tipo_origen'] ?? '')) !== 'store') {
-            return false;
-        }
-
+        $tipoOrigen = strtolower((string)($pedido['tipo_origen'] ?? ''));
         $tipoEntrega = strtolower((string)($pedido['tipo_entrega'] ?? ''));
+        $tipoPedido = strtolower((string)($pedido['tipo_pedido'] ?? ''));
         $esRegalo = (int)($pedido['es_regalo'] ?? 0) === 1
-            || in_array($tipoEntrega, ['gift', 'regalo', 'regalos'], true);
+            || in_array($tipoOrigen, ['gift', 'regalo', 'regalos'], true)
+            || in_array($tipoEntrega, ['gift', 'regalo', 'regalos'], true)
+            || in_array($tipoPedido, ['gift', 'regalo', 'regalos'], true);
 
-        return !$esRegalo;
+        return $tipoOrigen === 'store' || $esRegalo;
     }
 
     public function dashboard(?string $p = null): void
