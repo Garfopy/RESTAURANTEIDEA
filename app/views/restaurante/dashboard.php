@@ -76,6 +76,72 @@ $totalPasos  = count($pasos);
   <?php endforeach; ?>
 </div>
 
+<?php
+$ingCmp = (float)($comparativaFinanzas['ingresos'] ?? 0);
+$perCmp = (float)($comparativaFinanzas['perdidas'] ?? 0);
+$netCmp = (float)($comparativaFinanzas['neto'] ?? 0);
+$maxCmp = max($ingCmp, $perCmp, 1);
+$ingPct = min(100, round(($ingCmp / $maxCmp) * 100));
+$perPct = min(100, round(($perCmp / $maxCmp) * 100));
+$amareCards = [
+  ['label'=>'Saldo Amare', 'val'=>'$'.number_format((float)($amareKpis['saldo'] ?? 0), 2), 'color'=>'#111827', 'sub'=>'Saldo vivo en wallets'],
+  ['label'=>'Recargas del mes', 'val'=>'$'.number_format((float)($amareKpis['recargas'] ?? 0), 2), 'color'=>'#2563EB', 'sub'=>'Topups confirmados'],
+  ['label'=>'Saldo usado', 'val'=>'$'.number_format((float)($amareKpis['walletUsado'] ?? 0), 2), 'color'=>'#0F766E', 'sub'=>'Pagos con Saldo Amare'],
+  ['label'=>'Puntos dados', 'val'=>number_format((int)($amareKpis['puntosDados'] ?? 0)), 'color'=>'#7C3AED', 'sub'=>'Puntos generados'],
+  ['label'=>'Descuentos / puntos', 'val'=>'$'.number_format((float)($amareKpis['perdidaAmare'] ?? 0), 2), 'color'=>'#DC2626', 'sub'=>'Impacto promocional'],
+];
+?>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;margin-bottom:24px">
+  <div style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:18px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:14px">
+      <div>
+        <div style="font-weight:800;color:#111827">Metricas Amare</div>
+        <div style="font-size:.78rem;color:#6B7280;margin-top:2px">Saldo, recargas, puntos y descuentos del mes actual.</div>
+      </div>
+      <span style="font-size:.72rem;color:#6B7280;background:#F3F4F6;border-radius:99px;padding:4px 10px;font-weight:700"><?= date('M Y') ?></span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px">
+      <?php foreach ($amareCards as $c): ?>
+      <div style="border:1px solid #EEF2F7;background:#F9FAFB;border-radius:10px;padding:14px;min-height:100px">
+        <div style="font-size:.74rem;color:#6B7280;margin-bottom:8px"><?= htmlspecialchars($c['label']) ?></div>
+        <div style="font-size:1.25rem;font-weight:800;color:<?= $c['color'] ?>;line-height:1.15"><?= htmlspecialchars($c['val']) ?></div>
+        <div style="font-size:.68rem;color:#9CA3AF;margin-top:8px"><?= htmlspecialchars($c['sub']) ?></div>
+      </div>
+      <?php endforeach; ?>
+    </div>
+  </div>
+
+  <div style="background:#111827;color:#F9FAFB;border-radius:12px;padding:18px;border:1px solid #111827">
+    <div style="font-weight:800;margin-bottom:4px">Ingresos vs perdidas</div>
+    <div style="font-size:.76rem;color:#9CA3AF;margin-bottom:18px">Incluye gastos, retiros y descuentos Amare.</div>
+
+    <div style="margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;font-size:.78rem;margin-bottom:6px">
+        <span style="color:#A7F3D0;font-weight:700">Ingresos</span>
+        <strong>$<?= number_format($ingCmp, 2) ?></strong>
+      </div>
+      <div style="height:9px;background:#374151;border-radius:99px;overflow:hidden">
+        <div style="height:100%;width:<?= $ingPct ?>%;background:#10B981;border-radius:99px"></div>
+      </div>
+    </div>
+
+    <div style="margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;font-size:.78rem;margin-bottom:6px">
+        <span style="color:#FCA5A5;font-weight:700">Perdidas</span>
+        <strong>$<?= number_format($perCmp, 2) ?></strong>
+      </div>
+      <div style="height:9px;background:#374151;border-radius:99px;overflow:hidden">
+        <div style="height:100%;width:<?= $perPct ?>%;background:#EF4444;border-radius:99px"></div>
+      </div>
+    </div>
+
+    <div style="border-top:1px solid #374151;padding-top:14px;display:flex;justify-content:space-between;align-items:center;gap:10px">
+      <span style="font-size:.78rem;color:#D1D5DB">Resultado neto</span>
+      <strong style="font-size:1.2rem;color:<?= $netCmp >= 0 ? '#A7F3D0' : '#FCA5A5' ?>">$<?= number_format($netCmp, 2) ?></strong>
+    </div>
+  </div>
+</div>
+
 <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px">
   <div style="background:#fff;border-radius:12px;padding:20px;border:1px solid #E5E7EB">
     <div style="font-size:.8rem;color:#6B7280">Mesas activas</div>

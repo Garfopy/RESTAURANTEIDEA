@@ -6,11 +6,11 @@
   <title><?= htmlspecialchars($kdsTitle ?? 'KDS - Cocina') ?></title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #0D1117; color: #E6EDF3; font-family: system-ui, -apple-system, sans-serif; min-height: 100vh; }
+    body { background: #0B1020; color: #E6EDF3; font-family: system-ui, -apple-system, sans-serif; min-height: 100vh; }
 
     /* ── Topbar ── */
     .topbar {
-      background: #161B22; border-bottom: 1px solid #30363D;
+      background: #101827; border-bottom: 1px solid #233047;
       padding: 0 20px; height: 56px;
       display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10;
     }
@@ -28,31 +28,48 @@
     /* ── Layout columnas ── */
     .kds-grid {
       display: grid;
-      grid-template-columns: 1fr 1px 1fr;
-      gap: 0;
-      padding: 0;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      padding: 14px;
     }
     .kds-col {
-      padding: 16px;
-      min-height: calc(100vh - 56px);
+      padding: 14px;
+      min-height: calc(100vh - 84px);
+      background: rgba(15, 23, 42, .72);
+      border: 1px solid #233047;
+      border-radius: 12px;
     }
     .kds-col-header {
-      font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .1em;
-      padding: 8px 12px; border-radius: 8px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
+      font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em;
+      padding: 10px 12px; border-radius: 8px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
     }
     .col-pendientes   .kds-col-header { background: #1D4ED815; color: #60A5FA; border: 1px solid #1D4ED830; }
     .col-preparacion  .kds-col-header { background: #92400E15; color: #FBBF24; border: 1px solid #92400E30; }
-    .col-divider { width: 1px; background: #21262D; margin: 16px 0; }
+    .col-divider { display: none; }
+
+    .order-section { margin-bottom: 16px; }
+    .order-section:last-child { margin-bottom: 0; }
+    .order-section-title {
+      display: flex; justify-content: space-between; align-items: center; gap: 10px;
+      color: #CBD5E1; font-size: .72rem; font-weight: 800; text-transform: uppercase;
+      letter-spacing: .08em; padding: 8px 4px; margin-bottom: 8px;
+    }
+    .order-section-title span:last-child {
+      color: #94A3B8; background: #0F172A; border: 1px solid #334155;
+      border-radius: 999px; padding: 2px 8px; font-size: .68rem;
+    }
 
     /* ── Cards ── */
     .kds-card {
-      background: #161B22;
-      border: 1px solid #30363D;
-      border-radius: 14px;
+      background: #111827;
+      border: 1px solid #334155;
+      border-radius: 10px;
       padding: 16px;
       margin-bottom: 12px;
-      transition: border-color .25s;
+      transition: border-color .25s, transform .15s;
+      box-shadow: 0 10px 28px rgba(0,0,0,.18);
     }
+    .kds-card:hover { transform: translateY(-1px); }
     .kds-card.urgente  { border-color: #EF4444; }
     .kds-card.alerta   { border-color: #F59E0B; }
     .kds-card.normal   { border-color: #3B82F6; }
@@ -64,6 +81,13 @@
     }
     .card-folio  { font-weight: 800; font-size: 1rem; color: #E6EDF3; }
     .card-meta   { font-size: .75rem; color: #8B949E; margin-top: 2px; }
+    .order-type-chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      margin-top: 7px; padding: 3px 8px; border-radius: 999px;
+      border: 1px solid #334155; color: #CBD5E1; background: #0F172A;
+      font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em;
+    }
+    .order-type-chip + .card-meta + .card-meta { display: none; }
     .timer-badge {
       padding: 4px 10px; border-radius: 20px; font-size: .72rem; font-weight: 700;
       white-space: nowrap; flex-shrink: 0;
@@ -74,7 +98,7 @@
 
     /* ── Item row ── */
     .item-row {
-      padding: 10px 0; border-bottom: 1px solid #21262D;
+      padding: 12px 0; border-bottom: 1px solid #243044;
       display: flex; justify-content: space-between; align-items: center; gap: 8px;
     }
     .item-row:last-child { border-bottom: none; }
@@ -142,8 +166,8 @@
 
     /* ── Botones ── */
     .btn-action {
-      min-height: 44px; min-width: 90px;
-      padding: 8px 16px; border-radius: 10px; border: none;
+      min-height: 44px; min-width: 96px;
+      padding: 8px 16px; border-radius: 8px; border: none;
       font-size: .82rem; font-weight: 700; cursor: pointer; transition: opacity .15s;
     }
     .btn-action:disabled { opacity: .5; cursor: not-allowed; }
@@ -162,6 +186,13 @@
       opacity: 0; transition: transform .35s cubic-bezier(.34,1.56,.64,1), opacity .35s; z-index: 99;
     }
     #kds-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    @media (max-width: 820px) {
+      .topbar { height: auto; min-height: 56px; gap: 10px; flex-wrap: wrap; padding: 12px 14px; }
+      .topbar-right { flex-wrap: wrap; gap: 8px; }
+      .kds-grid { grid-template-columns: 1fr; padding: 10px; }
+      .kds-col { min-height: auto; }
+    }
   </style>
 </head>
 <body>
@@ -173,7 +204,7 @@
     <span style="font-size:.85rem;color:#8B949E;font-weight:400"><?= htmlspecialchars($restaurante['nombre'] ?? ($kdsIcon ?? 'Cocina')) ?></span>
   </div>
   <div class="topbar-right">
-    <span class="counter-badge cb-azul"   id="cnt-pendiente">— pendientes</span>
+    <span class="counter-badge cb-azul"   id="cnt-pendiente">0 pendientes</span>
     <span class="counter-badge cb-naranja" id="cnt-preparacion">— en prep.</span>
     <span id="clock"></span>
     <a href="<?= BASE_URL ?>auth/logoutStaff/<?= urlencode($kdsLogoutRol ?? 'chef') ?>" class="exit-link">Salir</a>
@@ -183,12 +214,12 @@
 <!-- Layout dos columnas -->
 <div class="kds-grid">
   <div class="kds-col col-pendientes">
-    <div class="kds-col-header">🔵 Pendientes</div>
+    <div class="kds-col-header">Pendientes</div>
     <div id="col-pendiente"></div>
   </div>
   <div class="col-divider"></div>
   <div class="kds-col col-preparacion">
-    <div class="kds-col-header">🟡 En preparación</div>
+    <div class="kds-col-header">En preparacion</div>
     <div id="col-preparacion"></div>
   </div>
 </div>
@@ -308,16 +339,50 @@ function renderReceta(raw, cantidadPlatillo, instruccionesArmado) {
 }
 
 // ── Renderizar columna ───────────────────────────
+const ORDER_TYPE_LABELS = {
+  eat_in: 'Comer aqui',
+  delivery: 'Delivery',
+  pickup: 'Pick up'
+};
+
+function tipoPedido(ped) {
+  const raw = String(ped.tipo_pedido || ped.tipo_entrega || '').toLowerCase().replace(/\s+/g, '_');
+  if (raw === 'delivery' || raw === 'domicilio') return 'delivery';
+  if (raw === 'pickup' || raw === 'pick_up' || raw === 'takeaway' || raw === 'para_llevar') return 'pickup';
+  if (raw === 'eat_in' || raw === 'mesa' || raw === 'comedor') return 'eat_in';
+  return ped.mesa_nombre ? 'eat_in' : 'pickup';
+}
+
+function ordenarPedidosPorTipo(pedidos) {
+  const order = { eat_in: 0, delivery: 1, pickup: 2 };
+  return [...pedidos].sort((a, b) => {
+    const ta = tipoPedido(a);
+    const tb = tipoPedido(b);
+    if (order[ta] !== order[tb]) return order[ta] - order[tb];
+    return new Date(a.created_at) - new Date(b.created_at);
+  });
+}
+
 function renderColumna(pedidos, colId) {
   const col = document.getElementById(colId);
+  pedidos = ordenarPedidosPorTipo(pedidos);
   if (!pedidos.length) {
     col.innerHTML = '<div class="empty-col">✅ Sin órdenes</div>';
     return;
   }
-  col.innerHTML = pedidos.map(ped => {
+  col.innerHTML = pedidos.map((ped, idx) => {
     const t   = elapsed(ped.created_at);
     const urg = urgencyClass(ped.created_at);
     const esPrepCol = colId === 'col-preparacion';
+    const tipo = tipoPedido(ped);
+    const tipoLabel = ORDER_TYPE_LABELS[tipo] || 'Pedido';
+    const ubicacion = tipo === 'delivery'
+      ? (ped.direccion_entrega || 'Delivery')
+      : (tipo === 'pickup' ? 'Mostrador' : (ped.mesa_nombre || 'Sin mesa'));
+    const prevTipo = idx > 0 ? tipoPedido(pedidos[idx - 1]) : null;
+    const typeHeader = prevTipo !== tipo
+      ? `<div class="order-section-title"><span>${esc(tipoLabel)}</span><span>${pedidos.filter(p => tipoPedido(p) === tipo).length}</span></div>`
+      : '';
 
     const itemsHtml = ped.items.map(it => `
       <div class="item-row">
@@ -343,11 +408,13 @@ function renderColumna(pedidos, colId) {
       </div>
     `).join('');
 
-    return `
+    return `${typeHeader}
       <div class="kds-card ${urg}${esPrepCol ? ' preparacion' : ''}">
         <div class="card-header">
           <div>
             <div class="card-folio">${ped.folio || 'Pedido'}</div>
+            <span class="order-type-chip">${esc(tipoLabel)}</span>
+            <div class="card-meta">${esc(ubicacion)}</div>
             <div class="card-meta">🪑 ${ped.mesa_nombre || '—'}</div>
           </div>
           <span class="timer-badge ${t.cls}" data-created="${ped.created_at}">⏱ ${t.label}</span>

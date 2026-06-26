@@ -103,7 +103,7 @@
   </div>
   <div style="margin-top:10px;padding-top:10px;border-top:1px solid #BFDBFE">
     <strong>Alerta stock bajo:</strong> cuando el stock llega al mínimo que configures, aparece un aviso rojo. <br>
-    <strong>Descuento automático:</strong> cuando el chef marca un pedido como "listo", los ingredientes de la receta se descuentan solos. <br>
+    <strong>Descuento automático:</strong> cuando cocina inicia la preparación, los ingredientes de la receta se descuentan solos. <br>
     <strong>Stock mínimo:</strong> edita el ingrediente y ajusta el campo "Stock mínimo" para configurar desde qué cantidad te alertamos.
   </div>
 </div>

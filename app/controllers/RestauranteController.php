@@ -107,6 +107,15 @@ class RestauranteController extends BaseController
         $hoy        = date('Y-m-d');
         $inicioMes  = date('Y-m-01');
         $kpis       = $finanzas->kpisDashboard($restauranteId, $inicioMes, $hoy);
+        $amareKpis  = $finanzas->amareDashboardKpis($restauranteId, $inicioMes, $hoy);
+        $perdidasMes = (float)($kpis['gastos'] ?? 0)
+            + (float)($kpis['retiros'] ?? 0)
+            + (float)($amareKpis['perdidaAmare'] ?? 0);
+        $comparativaFinanzas = [
+            'ingresos' => (float)($kpis['ingresos'] ?? 0),
+            'perdidas' => $perdidasMes,
+            'neto' => (float)($kpis['ingresos'] ?? 0) - $perdidasMes,
+        ];
 
         $pedidos    = new RestPedidoModel();
         $activos    = $pedidos->getKitchenQueue($restauranteId);
@@ -127,7 +136,7 @@ class RestauranteController extends BaseController
         $pageTitle  = 'Dashboard — ' . $restaurante['nombre'];
         $activeMenu = 'rest_dashboard';
         $this->render('restaurante/dashboard', compact(
-            'restaurante','kpis','activos','alertas','proximas',
+            'restaurante','kpis','amareKpis','comparativaFinanzas','activos','alertas','proximas',
             'topVendidos','menosVendidos',
             'linkStaff','linkMenu','flash','pageTitle','activeMenu'
         ));

@@ -156,6 +156,10 @@ class RestChefController extends BaseController
             $item = $stmtItem->fetch(\PDO::FETCH_ASSOC);
 
             if ($item && $item['restaurante_id']) {
+                (new RestInventarioModel())->descontarPorItem($itemId, (int)$item['restaurante_id'], $this->usuarioId());
+            }
+
+            if (false && $item && $item['restaurante_id']) {
                 $restauranteId  = (int)$item['restaurante_id'];
                 $platilloId     = (int)$item['platillo_id'];
                 $cantidadPlatos = max(1, (int)$item['cantidad']);

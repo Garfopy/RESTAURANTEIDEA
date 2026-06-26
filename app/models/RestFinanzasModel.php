@@ -2,6 +2,41 @@
 class RestFinanzasModel extends BaseModel
 {
     protected string $table = 'rest_tickets';
+    private static array $schemaCache = [];
+
+    private function tableExists(string $table): bool
+    {
+        $key = 'table:' . $table;
+        if (array_key_exists($key, self::$schemaCache)) {
+            return self::$schemaCache[$key];
+        }
+
+        $row = $this->queryOne(
+            "SELECT COUNT(*) AS c
+             FROM information_schema.tables
+             WHERE table_schema = DATABASE() AND table_name = ?",
+            [$table]
+        );
+        self::$schemaCache[$key] = $row && (int)$row['c'] > 0;
+        return self::$schemaCache[$key];
+    }
+
+    private function columnExists(string $table, string $column): bool
+    {
+        $key = 'column:' . $table . '.' . $column;
+        if (array_key_exists($key, self::$schemaCache)) {
+            return self::$schemaCache[$key];
+        }
+
+        $row = $this->queryOne(
+            "SELECT COUNT(*) AS c
+             FROM information_schema.columns
+             WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?",
+            [$table, $column]
+        );
+        self::$schemaCache[$key] = $row && (int)$row['c'] > 0;
+        return self::$schemaCache[$key];
+    }
 
     public function kpisDashboard(int $restauranteId, string $desde, string $hasta): array
     {
@@ -49,6 +84,128 @@ class RestFinanzasModel extends BaseModel
         $margen    = $ingresos > 0 ? round(($utilidad / $ingresos) * 100, 2) : 0;
 
         return compact('ingresos','gastos','retiros','propinas','utilidad','margen','totalTickets','ticketPromedio','pendiente');
+    }
+
+    public function amareDashboardKpis(int $restauranteId, string $desde, string $hasta): array
+    {
+        $saldo = 0.0;
+        $recargas = 0.0;
+        $walletUsado = 0.0;
+        $descuentos = 0.0;
+        $puntosDados = 0;
+        $puntosRedimidos = 0;
+
+        if ($this->tableExists('amare_wallets')) {
+            $saldo = (float)($this->queryOne(
+                "SELECT COALESCE(SUM(balance_mxn),0) AS v FROM amare_wallets"
+            )['v'] ?? 0);
+        } elseif ($this->tableExists('mobile_usuarios') && $this->columnExists('mobile_usuarios', 'amare_saldo')) {
+            $saldo = (float)($this->queryOne(
+                "SELECT COALESCE(SUM(amare_saldo),0) AS v FROM mobile_usuarios WHERE activo = 1"
+            )['v'] ?? 0);
+        }
+
+        if ($this->tableExists('amare_wallet_topups')) {
+            $recargas = (float)($this->queryOne(
+                "SELECT COALESCE(SUM(COALESCE(amount_received, requested_amount)),0) AS v
+                 FROM amare_wallet_topups
+                 WHERE status = 'confirmed' AND DATE(COALESCE(confirmed_at, created_at)) BETWEEN ? AND ?",
+                [$desde, $hasta]
+            )['v'] ?? 0);
+        } elseif ($this->tableExists('amare_wallet_transactions')) {
+            $recargas = (float)($this->queryOne(
+                "SELECT COALESCE(SUM(amount_mxn),0) AS v
+                 FROM amare_wallet_transactions
+                 WHERE type IN ('wallet_topup','demo_credit')
+                   AND amount_mxn > 0
+                   AND DATE(created_at) BETWEEN ? AND ?",
+                [$desde, $hasta]
+            )['v'] ?? 0);
+        }
+
+        if ($this->tableExists('amare_wallet_transactions') && $this->tableExists('rest_pedidos')) {
+            $walletUsado = (float)($this->queryOne(
+                "SELECT COALESCE(SUM(ABS(wt.amount_mxn)),0) AS v
+                 FROM amare_wallet_transactions wt
+                 JOIN rest_pedidos p ON p.id = wt.reference_id
+                 WHERE p.restaurante_id = ?
+                   AND wt.reference_type = 'order'
+                   AND wt.type = 'wallet_payment'
+                   AND wt.amount_mxn < 0
+                   AND DATE(wt.created_at) BETWEEN ? AND ?",
+                [$restauranteId, $desde, $hasta]
+            )['v'] ?? 0);
+
+            $puntosDados = (int)($this->queryOne(
+                "SELECT COALESCE(SUM(GREATEST(wt.points_delta, 0)),0) AS v
+                 FROM amare_wallet_transactions wt
+                 JOIN rest_pedidos p ON p.id = wt.reference_id
+                 WHERE p.restaurante_id = ?
+                   AND wt.reference_type = 'order'
+                   AND DATE(wt.created_at) BETWEEN ? AND ?",
+                [$restauranteId, $desde, $hasta]
+            )['v'] ?? 0);
+
+            $puntosRedimidos = (int)($this->queryOne(
+                "SELECT COALESCE(SUM(ABS(LEAST(wt.points_delta, 0))),0) AS v
+                 FROM amare_wallet_transactions wt
+                 JOIN rest_pedidos p ON p.id = wt.reference_id
+                 WHERE p.restaurante_id = ?
+                   AND wt.reference_type = 'order'
+                   AND DATE(wt.created_at) BETWEEN ? AND ?",
+                [$restauranteId, $desde, $hasta]
+            )['v'] ?? 0);
+        }
+
+        if ($this->tableExists('rest_pedidos')) {
+            $pedidoFechaExpr = $this->columnExists('rest_pedidos', 'pagado_at') ? 'COALESCE(pagado_at, created_at)' : 'created_at';
+
+            if ($this->columnExists('rest_pedidos', 'amare_discount_mxn')) {
+                $descuentos += (float)($this->queryOne(
+                    "SELECT COALESCE(SUM(amare_discount_mxn),0) AS v
+                     FROM rest_pedidos
+                     WHERE restaurante_id = ? AND DATE({$pedidoFechaExpr}) BETWEEN ? AND ?",
+                    [$restauranteId, $desde, $hasta]
+                )['v'] ?? 0);
+            }
+
+            if ($walletUsado <= 0 && $this->columnExists('rest_pedidos', 'amare_wallet_used_mxn')) {
+                $walletUsado = (float)($this->queryOne(
+                    "SELECT COALESCE(SUM(amare_wallet_used_mxn),0) AS v
+                     FROM rest_pedidos
+                     WHERE restaurante_id = ? AND DATE({$pedidoFechaExpr}) BETWEEN ? AND ?",
+                    [$restauranteId, $desde, $hasta]
+                )['v'] ?? 0);
+            }
+
+            if ($puntosDados <= 0 && $this->columnExists('rest_pedidos', 'amare_points_earned')) {
+                $puntosDados = (int)($this->queryOne(
+                    "SELECT COALESCE(SUM(amare_points_earned),0) AS v
+                     FROM rest_pedidos
+                     WHERE restaurante_id = ? AND DATE({$pedidoFechaExpr}) BETWEEN ? AND ?",
+                    [$restauranteId, $desde, $hasta]
+                )['v'] ?? 0);
+            }
+
+            if ($puntosRedimidos <= 0 && $this->columnExists('rest_pedidos', 'amare_points_redeemed')) {
+                $puntosRedimidos = (int)($this->queryOne(
+                    "SELECT COALESCE(SUM(amare_points_redeemed),0) AS v
+                     FROM rest_pedidos
+                     WHERE restaurante_id = ? AND DATE({$pedidoFechaExpr}) BETWEEN ? AND ?",
+                    [$restauranteId, $desde, $hasta]
+                )['v'] ?? 0);
+            }
+        }
+
+        return [
+            'saldo' => $saldo,
+            'recargas' => $recargas,
+            'walletUsado' => $walletUsado,
+            'descuentos' => $descuentos,
+            'puntosDados' => $puntosDados,
+            'puntosRedimidos' => $puntosRedimidos,
+            'perdidaAmare' => $descuentos + $puntosRedimidos,
+        ];
     }
 
     public function ingresosVsEgresosGrafica(int $restauranteId, string $desde, string $hasta): array

@@ -107,6 +107,15 @@ class RestInventarioModel extends BaseModel
         ]);
     }
 
+    private function referenciaTieneMovimientos(string $ref): bool
+    {
+        $row = $this->queryOne(
+            "SELECT COUNT(*) AS c FROM rest_movimientos_inventario WHERE referencia = ?",
+            [$ref]
+        );
+        return $row && (int)$row['c'] > 0;
+    }
+
     public static function convertirUnidad(float $cantidad, string $desde, string $hasta): float
     {
         $d = strtolower(trim($desde));
@@ -126,16 +135,12 @@ class RestInventarioModel extends BaseModel
     {
         // Idempotencia: si ya se descontó stock para este pedido, no repetir.
         $ref = 'rest_pedido:' . $pedidoId;
-        $ya = $this->queryOne(
-            "SELECT COUNT(*) AS c FROM rest_movimientos_inventario WHERE referencia = ?",
-            [$ref]
-        );
-        if ($ya && (int)$ya['c'] > 0) {
+        if ($this->referenciaTieneMovimientos($ref)) {
             return;
         }
 
         $items = $this->query(
-            "SELECT pi.cantidad AS cantidad_pedida, pi.exclusiones,
+            "SELECT pi.id AS pedido_item_id, pi.cantidad AS cantidad_pedida, pi.exclusiones,
                     ri.ingrediente_id, ri.cantidad AS cant_receta, ri.unidad,
                     rec.porciones_base, i.unidad_principal, i.nombre AS ingrediente_nombre
              FROM rest_pedido_items pi
@@ -154,6 +159,10 @@ class RestInventarioModel extends BaseModel
         );
 
         foreach ($items as $item) {
+            if ($this->referenciaTieneMovimientos('rest_item:' . (int)$item['pedido_item_id'])) {
+                continue;
+            }
+
             // Si el comensal excluyó este ingrediente, no se abrió el paquete → no descontar
             if (!empty($item['exclusiones'])) {
                 $excluidos = array_map('trim', explode(',', $item['exclusiones']));
@@ -181,7 +190,7 @@ class RestInventarioModel extends BaseModel
         // Detectamos platillos cuya receta tiene 0 ingredientes no-informativos
         // y buscamos el ingrediente correspondiente por su codigo (B*, DP*).
         $extras = $this->query(
-            "SELECT pi.cantidad AS cantidad_pedida, pim.cantidad AS cantidad_extra,
+            "SELECT pi.id AS pedido_item_id, pi.cantidad AS cantidad_pedida, pim.cantidad AS cantidad_extra,
                     m.ingrediente_id, m.cantidad_unidad, m.unidad, i.unidad_principal
              FROM rest_pedido_items pi
              JOIN rest_pedido_item_modificadores pim ON pim.pedido_item_id = pi.id
@@ -191,13 +200,18 @@ class RestInventarioModel extends BaseModel
             [$pedidoId]
         );
         foreach ($extras as $extra) {
+            if ($this->referenciaTieneMovimientos('rest_item:' . (int)$extra['pedido_item_id'])) {
+                continue;
+            }
+
             $cantidad = (float)$extra['cantidad_unidad'] * (int)$extra['cantidad_extra'] * (int)$extra['cantidad_pedida'];
             $descuento = self::convertirUnidad($cantidad, $extra['unidad'], $extra['unidad_principal']);
             $this->ajustarStock((int)$extra['ingrediente_id'], -$descuento, 'salida', 'Extra de pedido restaurante', $ref, $restauranteId, $usuarioId);
         }
 
         $sinReceta = $this->query(
-            "SELECT pi.cantidad AS cantidad_pedida,
+            "SELECT pi.id AS pedido_item_id,
+                    pi.cantidad AS cantidad_pedida,
                     i.id        AS ingrediente_id,
                     i.nombre    AS ingrediente_nombre,
                     i.unidad_principal
@@ -220,12 +234,132 @@ class RestInventarioModel extends BaseModel
         );
 
         foreach ($sinReceta as $item) {
+            if ($this->referenciaTieneMovimientos('rest_item:' . (int)$item['pedido_item_id'])) {
+                continue;
+            }
+
             $this->ajustarStock(
                 (int) $item['ingrediente_id'],
                 -(float) $item['cantidad_pedida'],
                 'salida',
                 'Consumo pedido restaurante',
                 'rest_pedido:' . $pedidoId,
+                $restauranteId,
+                $usuarioId
+            );
+        }
+    }
+
+    public function descontarPorItem(int $pedidoItemId, int $restauranteId, ?int $usuarioId = null): void
+    {
+        $ref = 'rest_item:' . $pedidoItemId;
+        if ($this->referenciaTieneMovimientos($ref)) {
+            return;
+        }
+
+        $item = $this->queryOne(
+            "SELECT pi.id, pi.pedido_id, pi.platillo_id, pi.cantidad AS cantidad_pedida, pi.exclusiones
+             FROM rest_pedido_items pi
+             JOIN rest_pedidos p ON p.id = pi.pedido_id
+             WHERE pi.id = ? AND p.restaurante_id = ?
+             LIMIT 1",
+            [$pedidoItemId, $restauranteId]
+        );
+        if (!$item) {
+            return;
+        }
+
+        $ingredientes = $this->query(
+            "SELECT ri.ingrediente_id, ri.cantidad AS cant_receta, ri.unidad,
+                    rec.porciones_base, i.unidad_principal, i.nombre AS ingrediente_nombre
+             FROM rest_recetas rec
+             JOIN rest_receta_ingredientes ri ON ri.receta_id = rec.id
+             JOIN rest_ingredientes i ON i.id = ri.ingrediente_id
+             WHERE rec.platillo_id = ?
+               AND COALESCE(ri.es_informativo, 0) = 0
+               AND NOT EXISTS (
+                   SELECT 1 FROM rest_pedido_item_modificadores pim
+                   JOIN rest_modificadores m ON m.id = pim.modificador_id
+                   WHERE pim.pedido_item_id = ? AND m.tipo = 'sin' AND m.ingrediente_id = ri.ingrediente_id
+               )",
+            [(int)$item['platillo_id'], $pedidoItemId]
+        );
+
+        foreach ($ingredientes as $ing) {
+            if (!empty($item['exclusiones'])) {
+                $excluidos = array_map('trim', explode(',', $item['exclusiones']));
+                if (in_array($ing['ingrediente_nombre'], $excluidos, true)) {
+                    continue;
+                }
+            }
+
+            $cantidadEnUnidadReceta = ((float)$ing['cant_receta'] / max(1, (float)$ing['porciones_base'])) * (int)$item['cantidad_pedida'];
+            $descuento = self::convertirUnidad($cantidadEnUnidadReceta, $ing['unidad'], $ing['unidad_principal']);
+            $this->ajustarStock(
+                (int)$ing['ingrediente_id'],
+                -$descuento,
+                'salida',
+                'Preparacion pedido #' . (int)$item['pedido_id'],
+                $ref,
+                $restauranteId,
+                $usuarioId
+            );
+        }
+
+        $extras = $this->query(
+            "SELECT pim.cantidad AS cantidad_extra,
+                    m.ingrediente_id, m.cantidad_unidad, m.unidad, i.unidad_principal
+             FROM rest_pedido_item_modificadores pim
+             JOIN rest_modificadores m ON m.id = pim.modificador_id AND m.tipo = 'extra'
+             JOIN rest_ingredientes i ON i.id = m.ingrediente_id
+             WHERE pim.pedido_item_id = ?",
+            [$pedidoItemId]
+        );
+        foreach ($extras as $extra) {
+            $cantidad = (float)$extra['cantidad_unidad'] * (int)$extra['cantidad_extra'] * (int)$item['cantidad_pedida'];
+            $descuento = self::convertirUnidad($cantidad, $extra['unidad'], $extra['unidad_principal']);
+            $this->ajustarStock(
+                (int)$extra['ingrediente_id'],
+                -$descuento,
+                'salida',
+                'Extra pedido #' . (int)$item['pedido_id'],
+                $ref,
+                $restauranteId,
+                $usuarioId
+            );
+        }
+
+        if (!empty($ingredientes)) {
+            return;
+        }
+
+        $sinReceta = $this->queryOne(
+            "SELECT i.id AS ingrediente_id
+             FROM rest_platillos pl
+             JOIN rest_ingredientes i
+                  ON i.restaurante_id = ?
+                 AND TRIM(i.codigo) != ''
+                 AND TRIM(i.codigo) = TRIM(COALESCE(pl.codigo, ''))
+                 AND i.activo = 1
+             LEFT JOIN rest_recetas rec
+                  ON rec.platillo_id = pl.id
+             LEFT JOIN rest_receta_ingredientes ri_check
+                  ON ri_check.receta_id = rec.id
+                 AND COALESCE(ri_check.es_informativo, 0) = 0
+             WHERE pl.id = ?
+               AND ri_check.id IS NULL
+               AND COALESCE(TRIM(pl.codigo), '') != ''
+             LIMIT 1",
+            [$restauranteId, (int)$item['platillo_id']]
+        );
+
+        if ($sinReceta && !empty($sinReceta['ingrediente_id'])) {
+            $this->ajustarStock(
+                (int)$sinReceta['ingrediente_id'],
+                -(float)$item['cantidad_pedida'],
+                'salida',
+                'Preparacion pedido #' . (int)$item['pedido_id'],
+                $ref,
                 $restauranteId,
                 $usuarioId
             );

@@ -246,6 +246,9 @@ class RestPedidoModel extends BaseModel
         $noStore = $this->sqlNoStore('p');
         $noRegalosKds = $this->sqlNoRegalosKds('p', 'pi', 'pl');
         $areaWhere = $this->sqlAreaKds($area);
+        $tipoPedidoSelect = $this->hasColumn('tipo_pedido') ? "p.tipo_pedido" : "NULL AS tipo_pedido";
+        $tipoEntregaSelect = $this->hasColumn('tipo_entrega') ? "p.tipo_entrega" : "NULL AS tipo_entrega";
+        $direccionEntregaSelect = $this->hasColumn('direccion_entrega') ? "p.direccion_entrega" : "NULL AS direccion_entrega";
 
         // Formato ingredientes_raw (separador ||, campos |):
         //   codigo | nombre | tipo | cantidad | unidad | notas | es_informativo
@@ -255,6 +258,9 @@ class RestPedidoModel extends BaseModel
             "SELECT p.id, p.folio, p.created_at, p.notas AS pedido_notas,
                     TIMESTAMPDIFF(MINUTE, p.created_at, NOW()) AS minutos_espera,
                     m.nombre AS mesa_nombre,
+                    {$tipoPedidoSelect},
+                    {$tipoEntregaSelect},
+                    {$direccionEntregaSelect},
                     pi.id AS item_id, pi.platillo_id, pi.cantidad, pi.notas AS item_notas, pi.estado AS item_estado,
                     pi.exclusiones,
                     (SELECT GROUP_CONCAT(CONCAT(mo.nombre, ' x', pim.cantidad) SEPARATOR ', ')
