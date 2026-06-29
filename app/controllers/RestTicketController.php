@@ -25,6 +25,12 @@ class RestTicketController extends BaseController
 
     public function generar(?string $visitaId = null): void
     {
+        $visita = (new RestVisitaModel())->find((int)$visitaId);
+        if (!$visita || (int)$visita['restaurante_id'] !== $this->restauranteId()) {
+            $this->flash('error', 'Visita no encontrada.');
+            $this->redirect('rest-ticket/index');
+        }
+
         $propina  = (float)$this->post('propina', 0);
         $ticketId = $this->model->consolidar((int)$visitaId, $propina);
         $this->flash('success', 'Ticket generado.');
@@ -33,7 +39,7 @@ class RestTicketController extends BaseController
 
     public function detalle(?string $id = null): void
     {
-        $ticket = $this->model->find((int)$id);
+        $ticket = $this->model->getDetalle((int)$id, $this->restauranteId());
         if (!$ticket) { $this->flash('error', 'Ticket no encontrado.'); $this->redirect('rest-ticket/index'); }
 
         // Cargar ítems de todos los pedidos de esta visita
@@ -59,15 +65,18 @@ class RestTicketController extends BaseController
 
     public function confirmarPago(?string $id = null): void
     {
+        $ticket = $this->model->getDetalle((int)$id, $this->restauranteId());
+        if (!$ticket) {
+            $this->flash('error', 'Ticket no encontrado.');
+            $this->redirect('rest-ticket/index');
+        }
+
         $metodoPago = $this->post('metodo_pago', 'efectivo');
         $paypalOrderId = $this->post('paypal_order_id');
         $this->model->marcarPagado((int)$id, $metodoPago, $paypalOrderId);
 
-        // Marcar visita como pagada
-        $ticket = $this->model->find((int)$id);
-        if ($ticket) {
-            (new RestVisitaModel())->marcarPagada((int)$ticket['visita_id']);
-        }
+        (new RestPedidoModel())->marcarVisitaEntregada((int)$ticket['visita_id']);
+        (new RestVisitaModel())->marcarPagada((int)$ticket['visita_id']);
 
         $this->flash('success', 'Pago registrado.');
         $this->redirect('rest-ticket/detalle/' . $id);

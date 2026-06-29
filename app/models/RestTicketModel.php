@@ -14,11 +14,17 @@ class RestTicketModel extends BaseModel
 
     public function consolidar(int $visitaId, float $propina = 0): int
     {
+        $propina = max(0, $propina);
         $existing = $this->queryOne(
             "SELECT id FROM rest_tickets WHERE visita_id = ? AND estado = 'pendiente'",
             [$visitaId]
         );
-        if ($existing) return (int)$existing['id'];
+        if ($existing) {
+            $ticketId = (int)$existing['id'];
+            $this->actualizarPropina($ticketId, $propina);
+            $this->recalcularSubtotal($ticketId, $visitaId);
+            return $ticketId;
+        }
 
         $visita = $this->queryOne(
             "SELECT v.*, r.id AS rest_id
@@ -56,6 +62,25 @@ class RestTicketModel extends BaseModel
             [$visitaId]
         );
         return $ticketId;
+    }
+
+    public function getDetalle(int $ticketId, ?int $restauranteId = null): ?array
+    {
+        $params = [$ticketId];
+        $whereRestaurante = '';
+        if ($restauranteId !== null) {
+            $whereRestaurante = ' AND t.restaurante_id = ?';
+            $params[] = $restauranteId;
+        }
+
+        return $this->queryOne(
+            "SELECT t.*, m.nombre AS mesa_nombre, v.qr_code, v.estado AS visita_estado
+             FROM rest_tickets t
+             LEFT JOIN rest_mesas m ON m.id = t.mesa_id
+             LEFT JOIN rest_visitas v ON v.id = t.visita_id
+             WHERE t.id = ?{$whereRestaurante}",
+            $params
+        );
     }
 
     public function getByVisita(int $visitaId): ?array
