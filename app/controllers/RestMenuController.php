@@ -93,7 +93,6 @@ class RestMenuController extends BaseController
         $ingredientesIds  = $this->post('ingrediente_id', []);
         $cantidades       = $this->post('cantidad', []);
         $unidades         = $this->post('unidad', []);
-        $informativos     = $this->post('es_informativo', []);
         $tipoIngredienteStmt = \Database::getInstance()->prepare(
             "SELECT tipo FROM rest_ingredientes WHERE id=? AND restaurante_id=? LIMIT 1"
         );
@@ -113,7 +112,7 @@ class RestMenuController extends BaseController
                     'ingrediente_id'  => (int)$ingId,
                     'cantidad'        => (float)($cantidades[$k] ?? 0),
                     'unidad'          => $unidades[$k] ?? 'kg',
-                    'es_informativo'  => in_array((string)$ingId, (array)$informativos) ? 1 : 0,
+                    'es_informativo'  => 0,
                     'tipo_componente' => $tipoIngrediente === 'guarnicion' ? 'guarnicion' : 'materia_prima',
                     'codigo_display'  => null,
                     'precio_extra'    => 0.0,

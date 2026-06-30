@@ -237,18 +237,39 @@ class RestInventarioController extends BaseController
         }
 
         $data = [
-            'restaurante_id'      => $restauranteId,
-            'nombre'              => $nombre,
-            'codigo'              => $this->post('codigo') ?: null,
-            'tipo'                => $tipo,
-            'unidad_principal'    => $unidad,
-            'costo_unitario'      => $costoPosteado,
-            'stock_minimo'        => $stockMinimo,
-            'categoria'           => $this->post('categoria') ?: null,
-            'proveedor_carnihub'  => $esCarnihub,
-            'carnihub_producto_id'=> $carnihubProdId,
-            'proveedor_nombre'    => !$esCarnihub ? ($this->post('proveedor_nombre') ?: null) : null,
+            'restaurante_id'   => $restauranteId,
+            'nombre'           => $nombre,
+            'tipo'             => $this->normalizarTipoIngrediente($tipo),
+            'unidad_principal' => $unidad,
+            'equivalencia'     => 1.0,
+            'costo_unitario'   => $costoPosteado,
+            'stock'            => 0,
+            'stock_minimo'     => $stockMinimo,
+            'activo'           => 1,
         ];
+
+        $codigo = trim((string)$this->post('codigo', ''));
+        if ($codigo !== '') {
+            $data['codigo'] = $codigo;
+        }
+
+        $categoria = trim((string)$this->post('categoria', ''));
+        if ($categoria !== '') {
+            $data['categoria'] = $categoria;
+        }
+
+        if ($esCarnihub) {
+            $data['proveedor_carnihub'] = 1;
+            if ($carnihubProdId) {
+                $data['carnihub_producto_id'] = $carnihubProdId;
+            }
+        } else {
+            $proveedorNombre = trim((string)$this->post('proveedor_nombre', ''));
+            $data['proveedor_carnihub'] = 0;
+            if ($proveedorNombre !== '') {
+                $data['proveedor_nombre'] = $proveedorNombre;
+            }
+        }
 
         if ($precioRemoto > 0) {
             $data['costo_unitario'] = $precioRemoto;
@@ -256,9 +277,9 @@ class RestInventarioController extends BaseController
 
         try {
             if ($id) {
-                $this->model->update($id, array_diff_key($data, ['restaurante_id' => '']));
+                $this->actualizarIngredienteConFallback($id, $data);
             } else {
-                $ingId = $this->model->insert($data);
+                $ingId = $this->insertarIngredienteConFallback($data);
                 // Registrar stock inicial si > 0
                 if ($stockInicial > 0) {
                     $this->model->ajustarStock(
@@ -270,12 +291,9 @@ class RestInventarioController extends BaseController
         } catch (\Throwable $e) {
             error_log('[RestInventarioController::guardar] ' . $e->getMessage());
             error_log('[RestInventarioController::guardar TRACE] ' . $e->getTraceAsString());
-            $msg = 'No se pudo guardar el ingrediente.';
-            if ((defined('APP_ENV') ? APP_ENV : '') !== 'production') {
-                $msg .= ' ' . $e->getMessage();
-            }
-            $this->flash('error', $msg);
+            $this->flash('error', 'No se pudo guardar el ingrediente. Revisa los datos e intenta nuevamente.');
             $this->redirect('rest-inventario/index');
+            return;
         }
 
         $this->flash('success', 'Ingrediente guardado.');
@@ -1139,6 +1157,52 @@ class RestInventarioController extends BaseController
         }
 
         return 0.0;
+    }
+
+    private function normalizarTipoIngrediente($tipo): string
+    {
+        $tipo = trim((string)$tipo);
+        $permitidos = ['materia_prima', 'guarnicion', 'bebida', 'otro'];
+        return in_array($tipo, $permitidos, true) ? $tipo : 'otro';
+    }
+
+    private function insertarIngredienteConFallback(array $data): int
+    {
+        try {
+            return $this->model->insert($data);
+        } catch (\PDOException $e) {
+            return $this->model->insert($this->legacyIngredienteData($data, true));
+        }
+    }
+
+    private function actualizarIngredienteConFallback(int $id, array $data): void
+    {
+        $updateData = array_diff_key($data, ['restaurante_id' => '', 'stock' => '', 'activo' => '']);
+        try {
+            $this->model->update($id, $updateData);
+        } catch (\PDOException $e) {
+            $this->model->update($id, $this->legacyIngredienteData($updateData, false));
+        }
+    }
+
+    private function legacyIngredienteData(array $data, bool $isInsert): array
+    {
+        $legacy = array_diff_key($data, [
+            'equivalencia' => '',
+            'categoria' => '',
+            'carnihub_producto_id' => '',
+            'proveedor_carnihub' => '',
+            'proveedor_nombre' => '',
+        ]);
+
+        if (!$isInsert) {
+            return $legacy;
+        }
+
+        return $legacy + [
+            'stock' => 0,
+            'activo' => 1,
+        ];
     }
 
     /**

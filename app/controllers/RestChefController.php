@@ -167,19 +167,18 @@ class RestChefController extends BaseController
                 $ref            = 'rest_item:' . $itemId;
                 $invModel       = new RestInventarioModel();
 
-                // Ingredientes de la receta que sí descuentan stock (es_informativo = 0)
+                // Ingredientes de la receta que descuentan stock
                 $stmtRec = $db->prepare(
                     "SELECT ri.ingrediente_id, ri.cantidad, i.nombre
                      FROM rest_receta_ingredientes ri
                      JOIN rest_recetas rec ON rec.id = ri.receta_id
                      JOIN rest_ingredientes i ON i.id = ri.ingrediente_id
                      WHERE rec.platillo_id = ?
-                       AND ri.es_informativo = 0
                        AND NOT EXISTS (
-                           SELECT 1 FROM rest_pedido_item_modificadores pim
-                           JOIN rest_modificadores m ON m.id=pim.modificador_id
-                           WHERE pim.pedido_item_id=? AND m.tipo='sin' AND m.ingrediente_id=ri.ingrediente_id
-                       )"
+                            SELECT 1 FROM rest_pedido_item_modificadores pim
+                            JOIN rest_modificadores m ON m.id=pim.modificador_id
+                            WHERE pim.pedido_item_id=? AND m.tipo='sin' AND m.ingrediente_id=ri.ingrediente_id
+                        )"
                 );
                 $stmtRec->execute([$platilloId, $itemId]);
                 $recIngredientes = $stmtRec->fetchAll(\PDO::FETCH_ASSOC);

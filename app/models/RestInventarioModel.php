@@ -194,7 +194,6 @@ class RestInventarioModel extends BaseModel
                  JOIN rest_receta_ingredientes ri ON ri.id = ri_dedup.best_id
                  JOIN rest_ingredientes i ON i.id = ri.ingrediente_id
                  WHERE pi.pedido_id = ?
-                   AND COALESCE(ri.es_informativo, 0) = 0
                    AND NOT EXISTS (
                        SELECT 1 FROM rest_pedido_item_modificadores pim
                        JOIN rest_modificadores m ON m.id=pim.modificador_id
@@ -271,7 +270,6 @@ class RestInventarioModel extends BaseModel
                       ON rec.platillo_id = pl.id
                  LEFT JOIN rest_receta_ingredientes ri_check
                       ON ri_check.receta_id = rec.id
-                     AND COALESCE(ri_check.es_informativo, 0) = 0
                  WHERE pi.pedido_id = ?
                    AND ri_check.id IS NULL
                    AND COALESCE(TRIM(pl.codigo), '') != ''",

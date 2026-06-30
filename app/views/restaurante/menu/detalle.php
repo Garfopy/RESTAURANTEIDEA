@@ -95,12 +95,9 @@
           $costo = (float)($ing['costo_total_ing'] ?? 0);
           $costoUnit = (float)($ing['costo_por_unidad_receta'] ?? 0);
         ?>
-        <tr <?= ($ing['es_informativo'] ?? 0) ? 'style="opacity:.6"' : '' ?>>
+        <tr>
           <td>
             <strong><?= htmlspecialchars($ing['ingrediente_nombre'] ?? $ing['nombre'] ?? '—') ?></strong>
-            <?php if ($ing['es_informativo'] ?? 0): ?>
-            <span class="badge badge-gray" style="font-size:.65rem;margin-left:4px">solo info</span>
-            <?php endif; ?>
           </td>
           <td class="num"><?= number_format((float)$ing['cantidad'], 3) ?></td>
           <td><?= htmlspecialchars($ing['unidad'] ?? '') ?></td>

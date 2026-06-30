@@ -57,7 +57,7 @@ class RestMenuModel extends BaseModel
                     c.nombre AS categoria_nombre,
                     CASE WHEN EXISTS(
                         SELECT 1 FROM rest_recetas r
-                        JOIN rest_receta_ingredientes ri ON ri.receta_id = r.id AND ri.es_informativo = 0
+                        JOIN rest_receta_ingredientes ri ON ri.receta_id = r.id
                         WHERE r.platillo_id = p.id
                     ) THEN 1 ELSE 0 END AS tiene_receta
              FROM rest_platillos p
