@@ -264,11 +264,6 @@
             <span class="ing-tipo-auto" style="font-size:.72rem;color:<?= ($ing['ingrediente_tipo'] ?? '') === 'guarnicion' ? '#166534' : '#6B7280' ?>;padding:9px 4px;white-space:nowrap">
               <?= ($ing['ingrediente_tipo'] ?? '') === 'guarnicion' ? 'Guarnicion automatica' : 'Materia prima' ?>
             </span>
-            <label style="display:flex;align-items:center;gap:4px;font-size:.75rem;color:#6B7280;cursor:pointer;white-space:nowrap" title="No descuenta stock, solo aparece en la info del cliente">
-              <input type="checkbox" name="es_informativo[]" value="<?= (int)$ing['ingrediente_id'] ?>"
-                     <?= ($ing['es_informativo'] ?? 0) ? 'checked' : '' ?> style="cursor:pointer">
-              Solo info
-            </label>
             <button type="button" onclick="this.closest('.ing-row').remove();updateTotalCosto()"
                     class="btn-icon-danger">✕</button>
           </div>
@@ -622,11 +617,7 @@ function addIngrediente() {
       <option value="pza">pza</option><option value="caja">caja</option><option value="bolsa">bolsa</option>
     </select>
     <span class="ing-tipo-auto" style="font-size:.72rem;color:#6B7280;padding:9px 4px;white-space:nowrap">Automatico</span>
-    <label style="display:flex;align-items:center;gap:4px;font-size:.75rem;color:#6B7280;cursor:pointer;white-space:nowrap;padding-top:8px"
-           title="No descuenta stock, solo aparece en info del cliente">
-      <input type="checkbox" name="es_informativo[]" value="_new" style="cursor:pointer">
-      Solo info
-    </label>
+    <span class="ing-tipo-auto" style="font-size:.72rem;color:#6B7280;padding:9px 4px;white-space:nowrap">Automatico</span>
     <button type="button" onclick="this.closest('.ing-row').remove();updateTotalCosto()" class="btn-icon-danger">✕</button>
   `;
   document.getElementById('ingredientes-lista').appendChild(row);
