@@ -3,6 +3,60 @@
   <div class="rst-card">
     <form method="POST" action="<?= BASE_URL ?>rest-config/guardar" enctype="multipart/form-data" accept-charset="UTF-8">
 
+      <div style="font-weight:700;font-size:.95rem;color:#111827;margin-bottom:6px;
+                  display:flex;align-items:center;gap:8px">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14h6m-6 4h6M5 6h14M7 2h10a2 2 0 012 2v16l-4-2-3 2-3-2-4 2V4a2 2 0 012-2z"/></svg>
+        Facturacion
+      </div>
+      <div style="font-size:.8rem;color:#6B7280;margin-bottom:14px">
+        Activa la captura de solicitudes de factura en la app y configura los datos fiscales del emisor.
+      </div>
+
+      <div style="background:#F9FAFB;border:1.5px solid #E5E7EB;border-radius:12px;padding:16px 18px;margin-bottom:20px">
+        <label style="display:flex;align-items:center;gap:12px;cursor:pointer;margin-bottom:14px">
+          <input type="checkbox" name="facturacion_habilitada" value="1"
+                 <?= !empty($facturacionConfig['habilitada']) ? 'checked' : '' ?>
+                 style="width:16px;height:16px;accent-color:#C8102E">
+          <div>
+            <div style="font-weight:600;font-size:.88rem;color:#111827">Activar facturacion</div>
+            <div style="font-size:.75rem;color:#6B7280">Si esta apagada, la app no mostrara el toggle para solicitar factura.</div>
+          </div>
+        </label>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="form-group">
+            <label class="form-label">RFC emisor</label>
+            <input type="text" name="facturacion_rfc" class="form-input" maxlength="13"
+                   value="<?= htmlspecialchars($facturacionConfig['rfc'] ?? '') ?>"
+                   placeholder="AAA010101AAA" style="text-transform:uppercase">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Razon social / nombre fiscal</label>
+            <input type="text" name="facturacion_nombre_fiscal" class="form-input"
+                   value="<?= htmlspecialchars($facturacionConfig['nombre_fiscal'] ?? '') ?>"
+                   placeholder="Restaurante Demo SA de CV">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Regimen fiscal</label>
+            <input type="text" name="facturacion_regimen_fiscal" class="form-input" maxlength="10"
+                   value="<?= htmlspecialchars($facturacionConfig['regimen_fiscal'] ?? '') ?>"
+                   placeholder="601">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Codigo postal / lugar de expedicion</label>
+            <input type="text" name="facturacion_codigo_postal" class="form-input" maxlength="10"
+                   value="<?= htmlspecialchars($facturacionConfig['codigo_postal'] ?? '') ?>"
+                   placeholder="64000">
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Email administrativo para avisos</label>
+          <input type="email" name="facturacion_email_notificacion" class="form-input"
+                 value="<?= htmlspecialchars($facturacionConfig['email_notificacion'] ?? '') ?>"
+                 placeholder="facturacion@restaurante.com">
+        </div>
+      </div>
+
       <?php if (!empty($bloqueadoPorCarniHub)): ?>
       <div style="background:#EFF6FF;border:1.5px solid #BFDBFE;border-radius:12px;padding:12px 14px;margin-bottom:16px;
                   font-size:.82rem;color:#1E40AF;line-height:1.45">

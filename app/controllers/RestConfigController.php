@@ -235,6 +235,95 @@ class RestConfigController extends BaseController
         }
     }
 
+    private function facturacionConfig(int $restauranteId): array
+    {
+        try {
+            $db = \Database::getInstance();
+            $stmt = $db->prepare(
+                "SELECT facturacion_habilitada, facturacion_emisor_json, facturacion_email_notificacion
+                 FROM rest_configuracion
+                 WHERE restaurante_id = ?
+                 LIMIT 1"
+            );
+            $stmt->execute([$restauranteId]);
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC) ?: [];
+            $emisor = json_decode((string)($row['facturacion_emisor_json'] ?? ''), true);
+            if (!is_array($emisor)) {
+                $emisor = [];
+            }
+            return [
+                'habilitada' => !empty($row['facturacion_habilitada']),
+                'rfc' => $emisor['rfc'] ?? '',
+                'nombre_fiscal' => $emisor['nombre_fiscal'] ?? '',
+                'regimen_fiscal' => $emisor['regimen_fiscal'] ?? '',
+                'codigo_postal' => $emisor['codigo_postal'] ?? '',
+                'email_notificacion' => $row['facturacion_email_notificacion'] ?? '',
+            ];
+        } catch (\Throwable $e) {
+            return [
+                'habilitada' => false,
+                'rfc' => '',
+                'nombre_fiscal' => '',
+                'regimen_fiscal' => '',
+                'codigo_postal' => '',
+                'email_notificacion' => '',
+            ];
+        }
+    }
+
+    private function guardarFacturacionConfig(int $restauranteId, array $facturacion): void
+    {
+        try {
+            $db = \Database::getInstance();
+            $emisorJson = json_encode([
+                'rfc' => $facturacion['facturacion_rfc'] ?? null,
+                'nombre_fiscal' => $facturacion['facturacion_nombre_fiscal'] ?? null,
+                'regimen_fiscal' => $facturacion['facturacion_regimen_fiscal'] ?? null,
+                'codigo_postal' => $facturacion['facturacion_codigo_postal'] ?? null,
+            ]);
+
+            $stmt = $db->prepare("SELECT id FROM rest_configuracion WHERE restaurante_id = ? LIMIT 1");
+            $stmt->execute([$restauranteId]);
+            $id = (int)$stmt->fetchColumn();
+
+            if ($id > 0) {
+                $upd = $db->prepare(
+                    "UPDATE rest_configuracion
+                     SET facturacion_habilitada = ?,
+                         facturacion_emisor_json = ?,
+                         facturacion_email_notificacion = ?,
+                         config_version = config_version + 1
+                     WHERE restaurante_id = ?"
+                );
+                $upd->execute([
+                    !empty($facturacion['facturacion_habilitada']) ? 1 : 0,
+                    $emisorJson,
+                    $facturacion['facturacion_email_notificacion'] ?? null,
+                    $restauranteId,
+                ]);
+                return;
+            }
+
+            $ins = $db->prepare(
+                "INSERT INTO rest_configuracion
+                    (restaurante_id, metodos_pago, tipos_entrega, costo_envio, pedido_minimo,
+                     exclusiones_habilitadas, extras_habilitados, config_version, activo,
+                     facturacion_habilitada, facturacion_emisor_json, facturacion_email_notificacion)
+                 VALUES (?, ?, ?, 0.00, 0.00, 1, 1, 1, 1, ?, ?, ?)"
+            );
+            $ins->execute([
+                $restauranteId,
+                json_encode(['card', 'cash']),
+                json_encode(['delivery', 'pickup']),
+                !empty($facturacion['facturacion_habilitada']) ? 1 : 0,
+                $emisorJson,
+                $facturacion['facturacion_email_notificacion'] ?? null,
+            ]);
+        } catch (\Throwable $e) {
+            error_log('[RestConfig facturacion] No se pudo guardar rest_configuracion: ' . $e->getMessage());
+        }
+    }
+
     public function __construct()
     {
         parent::__construct();
@@ -289,9 +378,10 @@ class RestConfigController extends BaseController
         }
 
         $pageTitle  = 'Configuración del Restaurante';
+        $facturacionConfig = $this->facturacionConfig((int)$restauranteId);
         $activeMenu = 'rest_config';
         $this->render('restaurante/config/index',
-            compact('restaurante','flash','pageTitle','activeMenu','mapsApiKey','cfgPagos','cfgCarniHub','bloqueadoPorCarniHub'));
+            compact('restaurante','flash','pageTitle','activeMenu','mapsApiKey','cfgPagos','cfgCarniHub','bloqueadoPorCarniHub','facturacionConfig'));
     }
 
     public function guardar(?string $p = null): void
@@ -327,6 +417,14 @@ class RestConfigController extends BaseController
         $appBackgroundColor = $this->normalizeHexColor($this->post('app_background_color'), '#FFFFFF');
         $appButtonColor = $this->normalizeHexColor($this->post('app_button_color'), $colorPrimario);
         $appButtonTextColor = $this->normalizeHexColor($this->post('app_button_text_color'), '#FFFFFF');
+        $facturacion = [
+            'facturacion_habilitada' => $this->post('facturacion_habilitada') ? 1 : 0,
+            'facturacion_rfc' => strtoupper(trim((string)$this->post('facturacion_rfc', ''))) ?: null,
+            'facturacion_nombre_fiscal' => trim((string)$this->normalizeUtf8Input($this->post('facturacion_nombre_fiscal', ''))) ?: null,
+            'facturacion_regimen_fiscal' => trim((string)$this->post('facturacion_regimen_fiscal', '')) ?: null,
+            'facturacion_codigo_postal' => trim((string)$this->post('facturacion_codigo_postal', '')) ?: null,
+            'facturacion_email_notificacion' => trim((string)$this->post('facturacion_email_notificacion', '')) ?: null,
+        ];
 
         $base = [
             'nombre'          => $nombre,
@@ -423,6 +521,8 @@ class RestConfigController extends BaseController
         }
 
         // ── Configuración de pagos (global_settings) ──────────────
+        $this->guardarFacturacionConfig((int)$restauranteId, $facturacion);
+
         $clavesPagos = ['stripe_public_key','stripe_secret_key','metodos_pago_habilitados',
                         'notif_email_pago','notif_email_pago_destino'];
         try {
@@ -556,7 +656,8 @@ class RestConfigController extends BaseController
                         'button_text_color' => $appButtonTextColor,
                     ],
                     (bool)$exclusionesApp,
-                    (bool)$extrasApp
+                    (bool)$extrasApp,
+                    $facturacion
                 );
                 if ($syncError === null && $modifierSaveError === null) {
                     $bulkSync = (new AmareModifierSyncService())->syncTodos($restauranteId);
@@ -711,7 +812,8 @@ class RestConfigController extends BaseController
         string $pedidoMinimo,
         array $appColors = [],
         bool $exclusionesHabilitadas = false,
-        bool $extrasHabilitados = false
+        bool $extrasHabilitados = false,
+        array $facturacion = []
     ): ?string {
         $branchId = $restauranteId;
         $sucursalColumn = $this->getSucursalColumn();
@@ -734,6 +836,16 @@ class RestConfigController extends BaseController
             'modificadores' => [
                 'exclusiones_habilitadas' => $exclusionesHabilitadas,
                 'extras_habilitados' => $extrasHabilitados,
+            ],
+            'facturacion' => [
+                'habilitada' => !empty($facturacion['facturacion_habilitada']),
+                'emisor' => [
+                    'rfc' => $facturacion['facturacion_rfc'] ?? null,
+                    'nombre_fiscal' => $facturacion['facturacion_nombre_fiscal'] ?? null,
+                    'regimen_fiscal' => $facturacion['facturacion_regimen_fiscal'] ?? null,
+                    'codigo_postal' => $facturacion['facturacion_codigo_postal'] ?? null,
+                ],
+                'email_notificacion' => $facturacion['facturacion_email_notificacion'] ?? null,
             ],
         ]);
 

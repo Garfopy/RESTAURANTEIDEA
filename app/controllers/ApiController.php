@@ -1289,6 +1289,9 @@ class ApiController extends BaseController
             case 'promotions':
                 $this->adminPromotionsRouter($method, $id, $subAct, $jwtUser);
                 break;
+            case 'invoice-requests':
+                $this->adminInvoiceRequestsRouter($method, $id, $jwtUser);
+                break;
             default:
                 $this->adminApiError('Recurso no encontrado: ' . ($resType ?? 'null'), 404);
         }
@@ -1345,11 +1348,22 @@ class ApiController extends BaseController
                 $this->adminApiOk('Modificadores obtenidos correctamente', $payload);
             }
             if ($method === 'GET' && $subAct === 'config') {
-                $configStmt = $db->prepare("SELECT metodos_pago, tipos_entrega, costo_envio, pedido_minimo, modificadores_config FROM sucursales WHERE id=?");
-                $configStmt->execute([$branchId]);
-                $config = $configStmt->fetch(\PDO::FETCH_ASSOC) ?: [];
-                $platillos = [];
+                $config = [];
                 $restauranteId = $restauranteId ?: $this->restauranteIdPorSucursal($db, $branchId);
+                if ($restauranteId) {
+                    $configStmt = $db->prepare(
+                        "SELECT metodos_pago, tipos_entrega, costo_envio, pedido_minimo
+                           FROM rest_configuracion
+                          WHERE restaurante_id = ?
+                          LIMIT 1"
+                    );
+                    $configStmt->execute([$restauranteId]);
+                    $config = $configStmt->fetch(\PDO::FETCH_ASSOC) ?: [];
+                }
+                $modsStmt = $db->prepare("SELECT modificadores_config FROM sucursales WHERE id=? LIMIT 1");
+                $modsStmt->execute([$branchId]);
+                $modsConfig = $modsStmt->fetch(\PDO::FETCH_ASSOC) ?: [];
+                $platillos = [];
                 if ($restauranteId) {
                     $menuStmt = $db->prepare(
                         "SELECT id FROM rest_platillos WHERE restaurante_id=? AND activo=1 ORDER BY id"
@@ -1365,7 +1379,8 @@ class ApiController extends BaseController
                     'tipos_entrega' => json_decode($config['tipos_entrega'] ?? '[]', true) ?: [],
                     'costo_envio' => (float)($config['costo_envio'] ?? 0),
                     'pedido_minimo' => (float)($config['pedido_minimo'] ?? 0),
-                    'modificadores' => json_decode($config['modificadores_config'] ?? '{}', true) ?: [],
+                    'modificadores' => json_decode($modsConfig['modificadores_config'] ?? '{}', true) ?: [],
+                    'facturacion' => $this->branchFacturacionConfig($db, $restauranteId),
                     'platillos_modificadores' => $platillos,
                 ]);
             }
@@ -1394,13 +1409,54 @@ class ApiController extends BaseController
             if (isset($body['pedido_minimo'])) { $sets[] = 'pedido_minimo = ?'; $params[] = (float)$body['pedido_minimo']; }
             if (isset($body['activo']))        { $sets[] = 'activo = ?';        $params[] = $body['activo'] ? 1 : 0; }
             if (isset($body['modificadores']) && is_array($body['modificadores'])) {
-                $sets[] = 'modificadores_config = ?';
-                $params[] = json_encode([
+                $modifierConfig = [
                     'exclusiones_habilitadas' => !empty($body['modificadores']['exclusiones_habilitadas']),
                     'extras_habilitados' => !empty($body['modificadores']['extras_habilitados']),
-                ]);
+                ];
+                $modStmt = $db->prepare("UPDATE sucursales SET modificadores_config = ? WHERE id = ?");
+                $modStmt->execute([json_encode($modifierConfig), $branchId]);
             }
-            if (!empty($sets)) { $params[] = $branchId; $db->prepare("UPDATE sucursales SET " . implode(', ', $sets) . " WHERE id = ?")->execute($params); }
+            if (!empty($sets)) {
+                if (!$restauranteId) {
+                    $this->adminApiError('La sucursal no tiene un restaurante vinculado.', 404);
+                }
+                $row = $db->prepare("SELECT id FROM rest_configuracion WHERE restaurante_id = ? LIMIT 1");
+                $row->execute([$restauranteId]);
+                if ((int)$row->fetchColumn() > 0) {
+                    $params[] = $restauranteId;
+                    $db->prepare(
+                        "UPDATE rest_configuracion
+                         SET " . implode(', ', $sets) . ",
+                             config_version = config_version + 1
+                         WHERE restaurante_id = ?"
+                    )->execute($params);
+                } else {
+                    $payload = [
+                        'metodos_pago' => json_encode($body['metodos_pago'] ?? ['card', 'cash']),
+                        'tipos_entrega' => json_encode($body['tipos_entrega'] ?? ['delivery', 'pickup']),
+                        'costo_envio' => (float)($body['costo_envio'] ?? 0),
+                        'pedido_minimo' => (float)($body['pedido_minimo'] ?? 0),
+                        'activo' => isset($body['activo']) ? ($body['activo'] ? 1 : 0) : 1,
+                    ];
+                    $stmt = $db->prepare(
+                        "INSERT INTO rest_configuracion
+                            (restaurante_id, metodos_pago, tipos_entrega, costo_envio, pedido_minimo,
+                             exclusiones_habilitadas, extras_habilitados, config_version, activo)
+                         VALUES (?, ?, ?, ?, ?, 1, 1, 1, ?)"
+                    );
+                    $stmt->execute([
+                        $restauranteId,
+                        $payload['metodos_pago'],
+                        $payload['tipos_entrega'],
+                        $payload['costo_envio'],
+                        $payload['pedido_minimo'],
+                        $payload['activo'],
+                    ]);
+                }
+            }
+            if (isset($body['facturacion']) && is_array($body['facturacion']) && $restauranteId) {
+                $this->actualizarBranchFacturacion($db, $restauranteId, $body['facturacion']);
+            }
             $this->adminApiOk('Configuración de sucursal actualizada correctamente');
         } catch (\InvalidArgumentException $e) {
             if ($db->inTransaction()) $db->rollBack();
@@ -1436,6 +1492,105 @@ class ApiController extends BaseController
             return $id > 0 ? $id : null;
         }
         return null;
+    }
+
+    private function branchFacturacionConfig(\PDO $db, ?int $restauranteId): array
+    {
+        if (!$restauranteId) {
+            return [
+                'habilitada' => false,
+                'modo' => 'solicitud',
+                'emisor_configurado' => false,
+                'emisor' => null,
+                'email_notificacion' => null,
+            ];
+        }
+
+        try {
+            $stmt = $db->prepare(
+                "SELECT facturacion_habilitada, facturacion_emisor_json, facturacion_email_notificacion
+                   FROM rest_configuracion
+                  WHERE restaurante_id = ?
+                  LIMIT 1"
+            );
+            $stmt->execute([$restauranteId]);
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC) ?: [];
+        } catch (\Throwable $e) {
+            $row = [];
+        }
+
+        $emisorJson = json_decode((string)($row['facturacion_emisor_json'] ?? ''), true);
+        if (!is_array($emisorJson)) {
+            $emisorJson = [];
+        }
+        $emisor = [
+            'rfc' => $emisorJson['rfc'] ?? null,
+            'nombre_fiscal' => $emisorJson['nombre_fiscal'] ?? null,
+            'regimen_fiscal' => $emisorJson['regimen_fiscal'] ?? null,
+            'codigo_postal' => $emisorJson['codigo_postal'] ?? null,
+        ];
+        $emisorConfigurado = trim((string)$emisor['rfc']) !== ''
+            && trim((string)$emisor['nombre_fiscal']) !== ''
+            && trim((string)$emisor['regimen_fiscal']) !== ''
+            && trim((string)$emisor['codigo_postal']) !== '';
+
+        return [
+            'habilitada' => !empty($row['facturacion_habilitada']),
+            'modo' => 'solicitud',
+            'emisor_configurado' => $emisorConfigurado,
+            'emisor' => $emisor,
+            'email_notificacion' => $row['facturacion_email_notificacion'] ?? null,
+        ];
+    }
+
+    private function actualizarBranchFacturacion(\PDO $db, int $restauranteId, array $facturacion): void
+    {
+        $emisor = is_array($facturacion['emisor'] ?? null) ? $facturacion['emisor'] : [];
+        try {
+            $emisorJson = json_encode([
+                'rfc' => strtoupper(trim((string)($emisor['rfc'] ?? ''))) ?: null,
+                'nombre_fiscal' => trim((string)($emisor['nombre_fiscal'] ?? '')) ?: null,
+                'regimen_fiscal' => trim((string)($emisor['regimen_fiscal'] ?? '')) ?: null,
+                'codigo_postal' => trim((string)($emisor['codigo_postal'] ?? '')) ?: null,
+            ]);
+            $row = $db->prepare("SELECT id FROM rest_configuracion WHERE restaurante_id = ? LIMIT 1");
+            $row->execute([$restauranteId]);
+            if ((int)$row->fetchColumn() > 0) {
+                $stmt = $db->prepare(
+                    "UPDATE rest_configuracion
+                     SET facturacion_habilitada = ?,
+                         facturacion_emisor_json = ?,
+                         facturacion_email_notificacion = ?,
+                         config_version = config_version + 1
+                     WHERE restaurante_id = ?"
+                );
+                $stmt->execute([
+                    !empty($facturacion['habilitada']) ? 1 : 0,
+                    $emisorJson,
+                    trim((string)($facturacion['email_notificacion'] ?? '')) ?: null,
+                    $restauranteId,
+                ]);
+                return;
+            }
+
+            $stmt = $db->prepare(
+                "INSERT INTO rest_configuracion
+                    (restaurante_id, metodos_pago, tipos_entrega, costo_envio, pedido_minimo,
+                     exclusiones_habilitadas, extras_habilitados, config_version, activo,
+                     facturacion_habilitada, facturacion_emisor_json, facturacion_email_notificacion)
+                 VALUES (?, ?, ?, 0.00, 0.00, 1, 1, 1, 1, ?, ?, ?)"
+            );
+            $stmt->execute([
+                $restauranteId,
+                json_encode(['card', 'cash']),
+                json_encode(['delivery', 'pickup']),
+                !empty($facturacion['habilitada']) ? 1 : 0,
+                $emisorJson,
+                trim((string)($facturacion['email_notificacion'] ?? '')) ?: null,
+            ]);
+        } catch (\Throwable $e) {
+            error_log('[ApiController facturacion config] ' . $e->getMessage());
+        }
     }
 
     private function sincronizarModificadoresOficiales(
@@ -1654,6 +1809,129 @@ class ApiController extends BaseController
     }
 
     // ── Admin: Promotions CRUD ───────────────────────────────────
+
+    private function adminInvoiceRequestsRouter(string $method, ?int $id, array $jwtUser): void
+    {
+        if ($id === null) {
+            if ($method !== 'GET') $this->adminApiError('Metodo no permitido', 405);
+            $this->adminListInvoiceRequests($jwtUser);
+            return;
+        }
+
+        match ($method) {
+            'GET' => $this->adminGetInvoiceRequest($id, $jwtUser),
+            'PUT' => $this->adminUpdateInvoiceRequest($id, $jwtUser),
+            default => $this->adminApiError('Metodo no permitido', 405),
+        };
+    }
+
+    private function adminListInvoiceRequests(array $jwtUser): void
+    {
+        $empresaId = (int)$jwtUser['empresa_id'];
+        $restauranteId = (int)$this->get('restaurant_id', 0);
+        $db = Database::getInstance();
+        $where = ['r.empresa_id = ?'];
+        $params = [$empresaId];
+
+        if ($restauranteId > 0) {
+            $where[] = 'fs.restaurante_id = ?';
+            $params[] = $restauranteId;
+        }
+        $estado = (string)$this->get('estado', '');
+        if ($estado !== '' && in_array($estado, ['pendiente','en_proceso','facturada','cancelada'], true)) {
+            $where[] = 'fs.estado = ?';
+            $params[] = $estado;
+        }
+        foreach (['from' => '>=', 'to' => '<='] as $key => $op) {
+            $value = trim((string)$this->get($key, ''));
+            if ($value !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
+                $where[] = "DATE(fs.created_at) {$op} ?";
+                $params[] = $value;
+            }
+        }
+
+        $page = max(1, (int)$this->get('page', 1));
+        $perPage = min(100, max(1, (int)$this->get('per_page', 20)));
+        $offset = ($page - 1) * $perPage;
+        $whereSql = implode(' AND ', $where);
+
+        $count = $db->prepare("SELECT COUNT(*) FROM facturacion_solicitudes fs JOIN rest_restaurantes r ON r.id = fs.restaurante_id WHERE {$whereSql}");
+        $count->execute($params);
+        $total = (int)$count->fetchColumn();
+
+        $stmt = $db->prepare(
+            "SELECT fs.*,
+                    fs.receptor_nombre AS receptor_nombre_fiscal,
+                    fs.uso_cfdi AS receptor_uso_cfdi,
+                    NULL AS ticket_id,
+                    r.nombre AS restaurante_nombre
+               FROM facturacion_solicitudes fs
+               JOIN rest_restaurantes r ON r.id = fs.restaurante_id
+              WHERE {$whereSql}
+              ORDER BY fs.created_at DESC, fs.id DESC
+              LIMIT {$perPage} OFFSET {$offset}"
+        );
+        $stmt->execute($params);
+        $model = new RestFacturaSolicitudModel();
+        $items = array_map([$model, 'normalizar'], $stmt->fetchAll(\PDO::FETCH_ASSOC));
+
+        $this->adminApiOk('Solicitudes de factura obtenidas correctamente', [
+            'items' => $items,
+            'pagination' => [
+                'page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'last_page' => (int)ceil($total / $perPage),
+            ],
+        ]);
+    }
+
+    private function adminGetInvoiceRequest(int $id, array $jwtUser): void
+    {
+        $row = $this->adminInvoiceRequestRow($id, (int)$jwtUser['empresa_id']);
+        if (!$row) $this->adminApiError('Solicitud de factura no encontrada', 404);
+        $this->adminApiOk('Solicitud de factura obtenida correctamente', (new RestFacturaSolicitudModel())->normalizar($row));
+    }
+
+    private function adminUpdateInvoiceRequest(int $id, array $jwtUser): void
+    {
+        $row = $this->adminInvoiceRequestRow($id, (int)$jwtUser['empresa_id']);
+        if (!$row) $this->adminApiError('Solicitud de factura no encontrada', 404);
+        $body = json_decode(file_get_contents('php://input'), true) ?? [];
+
+        try {
+            (new RestFacturaSolicitudModel())->actualizarEstado($id, (int)$row['restaurante_id'], [
+                'estado' => $body['estado'] ?? $row['estado'],
+                'cfdi_uuid' => $body['cfdi_uuid'] ?? $row['cfdi_uuid'],
+                'pdf_url' => $body['pdf_url'] ?? $row['pdf_url'],
+                'xml_url' => $body['xml_url'] ?? $row['xml_url'],
+                'notas' => $body['notas'] ?? $row['notas'],
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            $this->adminApiError($e->getMessage(), 422);
+        }
+
+        $updated = $this->adminInvoiceRequestRow($id, (int)$jwtUser['empresa_id']);
+        $this->adminApiOk('Solicitud de factura actualizada correctamente', (new RestFacturaSolicitudModel())->normalizar($updated));
+    }
+
+    private function adminInvoiceRequestRow(int $id, int $empresaId): ?array
+    {
+        $stmt = Database::getInstance()->prepare(
+            "SELECT fs.*,
+                    fs.receptor_nombre AS receptor_nombre_fiscal,
+                    fs.uso_cfdi AS receptor_uso_cfdi,
+                    NULL AS ticket_id,
+                    r.nombre AS restaurante_nombre
+               FROM facturacion_solicitudes fs
+               JOIN rest_restaurantes r ON r.id = fs.restaurante_id
+              WHERE fs.id = ? AND r.empresa_id = ?
+              LIMIT 1"
+        );
+        $stmt->execute([$id, $empresaId]);
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+        return $row ?: null;
+    }
 
     private function adminPromotionsRouter(string $method, ?int $id, ?string $subAction, array $jwtUser): void
     {

@@ -146,6 +146,10 @@ $_isMesero = in_array($_rol, ['mesero', 'comprador'], true);            // opera
        href="<?= BASE_URL ?>rest-finanzas/cortes" style="padding-left:38px;font-size:.82rem">
       Corte de Caja
     </a>
+    <a class="rst-nav-link <?= $activeMenu === 'rest_facturas' ? 'active' : '' ?>"
+       href="<?= BASE_URL ?>rest-factura/index" style="padding-left:38px;font-size:.82rem">
+      Facturas
+    </a>
 
     <div class="rst-nav-section">Cocina & Menú</div>
     <a class="rst-nav-link <?= $activeMenu === 'rest_menu' ? 'active' : '' ?>"
