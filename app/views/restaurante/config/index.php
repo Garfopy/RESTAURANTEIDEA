@@ -55,6 +55,38 @@
                  value="<?= htmlspecialchars($facturacionConfig['email_notificacion'] ?? '') ?>"
                  placeholder="facturacion@restaurante.com">
         </div>
+
+        <div style="border-top:1px solid #E5E7EB;margin-top:16px;padding-top:16px">
+          <div style="font-weight:700;font-size:.88rem;color:#111827;margin-bottom:6px">FacturAPI</div>
+          <div style="font-size:.75rem;color:#6B7280;margin-bottom:12px">
+            Pega aqui tu llave de pruebas sk_test para habilitar el timbrado desde Solicitudes de factura.
+          </div>
+          <div class="form-group">
+            <label class="form-label">Llave secreta FacturAPI</label>
+            <input type="password" name="facturapi_secret_key" class="form-input"
+                   placeholder="<?= !empty($facturacionConfig['facturapi_key_configured']) ? 'Llave configurada - deja vacio para conservarla' : 'sk_test_...' ?>">
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+            <div class="form-group">
+              <label class="form-label">Clave producto SAT</label>
+              <input type="text" name="facturapi_product_key" class="form-input" value="<?= htmlspecialchars(defined('FACTURAPI_PRODUCT_KEY') ? FACTURAPI_PRODUCT_KEY : '90101501') ?>">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Clave unidad SAT</label>
+              <input type="text" name="facturapi_unit_key" class="form-input" value="<?= htmlspecialchars(defined('FACTURAPI_UNIT_KEY') ? FACTURAPI_UNIT_KEY : 'E48') ?>">
+            </div>
+            <div class="form-group">
+              <label class="form-label">IVA</label>
+              <input type="number" step="0.01" min="0" name="facturapi_tax_rate" class="form-input" value="<?= htmlspecialchars((string)(defined('FACTURAPI_TAX_RATE') ? FACTURAPI_TAX_RATE : 0.16)) ?>">
+            </div>
+          </div>
+          <label style="display:flex;gap:8px;align-items:center;cursor:pointer">
+            <input type="checkbox" name="facturapi_tax_included" value="1"
+                   <?= !defined('FACTURAPI_TAX_INCLUDED') || FACTURAPI_TAX_INCLUDED ? 'checked' : '' ?>
+                   style="width:16px;height:16px;accent-color:#C8102E">
+            <span style="font-size:.82rem;color:#374151">El precio del consumo ya incluye IVA</span>
+          </label>
+        </div>
       </div>
 
       <?php if (!empty($bloqueadoPorCarniHub)): ?>

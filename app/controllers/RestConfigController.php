@@ -237,6 +237,7 @@ class RestConfigController extends BaseController
 
     private function facturacionConfig(int $restauranteId): array
     {
+        $facturapiKeyConfigured = false;
         try {
             $db = \Database::getInstance();
             $stmt = $db->prepare(
@@ -251,6 +252,7 @@ class RestConfigController extends BaseController
             if (!is_array($emisor)) {
                 $emisor = [];
             }
+            $facturapiKeyConfigured = $this->facturapiKeyConfigured($db);
             return [
                 'habilitada' => !empty($row['facturacion_habilitada']),
                 'rfc' => $emisor['rfc'] ?? '',
@@ -258,6 +260,7 @@ class RestConfigController extends BaseController
                 'regimen_fiscal' => $emisor['regimen_fiscal'] ?? '',
                 'codigo_postal' => $emisor['codigo_postal'] ?? '',
                 'email_notificacion' => $row['facturacion_email_notificacion'] ?? '',
+                'facturapi_key_configured' => $facturapiKeyConfigured,
             ];
         } catch (\Throwable $e) {
             return [
@@ -267,7 +270,23 @@ class RestConfigController extends BaseController
                 'regimen_fiscal' => '',
                 'codigo_postal' => '',
                 'email_notificacion' => '',
+                'facturapi_key_configured' => $facturapiKeyConfigured,
             ];
+        }
+    }
+
+    private function facturapiKeyConfigured(\PDO $db): bool
+    {
+        if (defined('FACTURAPI_SECRET_KEY') && trim((string)FACTURAPI_SECRET_KEY) !== '') {
+            return true;
+        }
+
+        try {
+            $stmt = $db->prepare("SELECT valor FROM global_settings WHERE clave = 'FACTURAPI_SECRET_KEY' LIMIT 1");
+            $stmt->execute();
+            return trim((string)($stmt->fetchColumn() ?: '')) !== '';
+        } catch (\Throwable $e) {
+            return false;
         }
     }
 
@@ -321,6 +340,40 @@ class RestConfigController extends BaseController
             ]);
         } catch (\Throwable $e) {
             error_log('[RestConfig facturacion] No se pudo guardar rest_configuracion: ' . $e->getMessage());
+        }
+    }
+
+    private function guardarFacturapiSettings(array $facturacion): void
+    {
+        $secretKey = trim((string)($facturacion['facturapi_secret_key'] ?? ''));
+
+        try {
+            $db = \Database::getInstance();
+            $settings = [
+                'FACTURAPI_PRODUCT_KEY' => trim((string)($facturacion['facturapi_product_key'] ?? '')) ?: '90101501',
+                'FACTURAPI_UNIT_KEY' => trim((string)($facturacion['facturapi_unit_key'] ?? '')) ?: 'E48',
+                'FACTURAPI_TAX_RATE' => trim((string)($facturacion['facturapi_tax_rate'] ?? '')) ?: '0.16',
+                'FACTURAPI_TAX_INCLUDED' => !empty($facturacion['facturapi_tax_included']) ? 'true' : 'false',
+            ];
+            if ($secretKey !== '' && !str_starts_with($secretKey, '****') && !str_starts_with($secretKey, '••••')) {
+                $settings = ['FACTURAPI_SECRET_KEY' => $secretKey] + $settings;
+            }
+
+            $stmt = $db->prepare(
+                "INSERT INTO global_settings (clave, valor, tipo, grupo, etiqueta)
+                 VALUES (?, ?, ?, 'facturacion', ?)
+                 ON DUPLICATE KEY UPDATE valor = VALUES(valor), tipo = VALUES(tipo), grupo = VALUES(grupo), etiqueta = VALUES(etiqueta)"
+            );
+            foreach ($settings as $key => $value) {
+                $stmt->execute([
+                    $key,
+                    $value,
+                    $key === 'FACTURAPI_SECRET_KEY' ? 'password' : 'text',
+                    $key,
+                ]);
+            }
+        } catch (\Throwable $e) {
+            error_log('[RestConfig FacturAPI] No se pudo guardar FacturAPI settings: ' . $e->getMessage());
         }
     }
 
@@ -424,6 +477,11 @@ class RestConfigController extends BaseController
             'facturacion_regimen_fiscal' => trim((string)$this->post('facturacion_regimen_fiscal', '')) ?: null,
             'facturacion_codigo_postal' => trim((string)$this->post('facturacion_codigo_postal', '')) ?: null,
             'facturacion_email_notificacion' => trim((string)$this->post('facturacion_email_notificacion', '')) ?: null,
+            'facturapi_secret_key' => trim((string)$this->post('facturapi_secret_key', '')),
+            'facturapi_product_key' => trim((string)$this->post('facturapi_product_key', '')),
+            'facturapi_unit_key' => trim((string)$this->post('facturapi_unit_key', '')),
+            'facturapi_tax_rate' => trim((string)$this->post('facturapi_tax_rate', '')),
+            'facturapi_tax_included' => $this->post('facturapi_tax_included') ? 1 : 0,
         ];
 
         $base = [
@@ -522,6 +580,7 @@ class RestConfigController extends BaseController
 
         // ── Configuración de pagos (global_settings) ──────────────
         $this->guardarFacturacionConfig((int)$restauranteId, $facturacion);
+        $this->guardarFacturapiSettings($facturacion);
 
         $clavesPagos = ['stripe_public_key','stripe_secret_key','metodos_pago_habilitados',
                         'notif_email_pago','notif_email_pago_destino'];

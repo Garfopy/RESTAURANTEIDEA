@@ -96,15 +96,13 @@ class FacturApiService
                 'product' => [
                     'description' => trim((string)($options['description'] ?? 'Consumo en restaurante')),
                     'product_key' => (string)$this->config('FACTURAPI_PRODUCT_KEY', FACTURAPI_PRODUCT_KEY),
+                    'unit_key' => (string)$this->config('FACTURAPI_UNIT_KEY', FACTURAPI_UNIT_KEY),
                     'price' => $total,
                     'tax_included' => $taxIncluded,
                     'taxes' => [[
                         'type' => 'IVA',
                         'rate' => $taxRate,
                     ]],
-                ],
-                'unit' => [
-                    'unit_key' => (string)$this->config('FACTURAPI_UNIT_KEY', FACTURAPI_UNIT_KEY),
                 ],
             ]],
             'payment_form' => $this->paymentForm($options['payment_form'] ?? null, $row['metodo_pago'] ?? null),
