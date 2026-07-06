@@ -43,3 +43,11 @@ define('GOOGLE_MAPS_KEY', getenv('GOOGLE_MAPS_KEY') ?: '');
 // Stripe — pago con tarjeta (MXN)
 define('STRIPE_PUBLIC_KEY', getenv('STRIPE_PUBLIC_KEY') ?: '');
 define('STRIPE_SECRET_KEY', getenv('STRIPE_SECRET_KEY') ?: '');
+
+// FacturAPI - timbrado CFDI en modo prueba/produccion segun la llave usada.
+define('FACTURAPI_SECRET_KEY', getenv('FACTURAPI_SECRET_KEY') ?: '');
+define('FACTURAPI_AUTO_STAMP', filter_var(getenv('FACTURAPI_AUTO_STAMP') ?: false, FILTER_VALIDATE_BOOLEAN));
+define('FACTURAPI_PRODUCT_KEY', getenv('FACTURAPI_PRODUCT_KEY') ?: '90101501');
+define('FACTURAPI_UNIT_KEY', getenv('FACTURAPI_UNIT_KEY') ?: 'E48');
+define('FACTURAPI_TAX_INCLUDED', filter_var(getenv('FACTURAPI_TAX_INCLUDED') ?: true, FILTER_VALIDATE_BOOLEAN));
+define('FACTURAPI_TAX_RATE', (float)(getenv('FACTURAPI_TAX_RATE') ?: 0.16));

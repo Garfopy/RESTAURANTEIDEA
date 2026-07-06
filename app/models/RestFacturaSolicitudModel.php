@@ -6,6 +6,31 @@ class RestFacturaSolicitudModel extends BaseModel
 
     private const ESTADOS = ['pendiente', 'en_proceso', 'facturada', 'cancelada'];
 
+    private static array $columnCache = [];
+
+    private function hasColumn(string $column): bool
+    {
+        if (array_key_exists($column, self::$columnCache)) {
+            return self::$columnCache[$column];
+        }
+
+        try {
+            $stmt = $this->db->prepare(
+                "SELECT COUNT(*)
+                   FROM information_schema.columns
+                  WHERE table_schema = DATABASE()
+                    AND table_name = 'facturacion_solicitudes'
+                    AND column_name = ?"
+            );
+            $stmt->execute([$column]);
+            self::$columnCache[$column] = (int)$stmt->fetchColumn() > 0;
+        } catch (\Throwable $e) {
+            self::$columnCache[$column] = false;
+        }
+
+        return self::$columnCache[$column];
+    }
+
     public function listar(int $restauranteId, array $filtros = []): array
     {
         $page = max(1, (int)($filtros['page'] ?? 1));
@@ -105,6 +130,13 @@ class RestFacturaSolicitudModel extends BaseModel
             $restauranteId,
         ];
 
+        foreach (['facturapi_invoice_id', 'facturapi_status', 'facturapi_livemode'] as $field) {
+            if ($this->hasColumn($field) && array_key_exists($field, $data)) {
+                $sets[] = $field . ' = ?';
+                array_splice($params, -2, 0, [$data[$field]]);
+            }
+        }
+
         return $this->execute(
             "UPDATE facturacion_solicitudes SET " . implode(', ', $sets) . " WHERE id = ? AND restaurante_id = ?",
             $params
@@ -138,6 +170,9 @@ class RestFacturaSolicitudModel extends BaseModel
             'cfdi_uuid' => $row['cfdi_uuid'],
             'pdf_url' => $row['pdf_url'],
             'xml_url' => $row['xml_url'],
+            'facturapi_invoice_id' => $row['facturapi_invoice_id'] ?? null,
+            'facturapi_status' => $row['facturapi_status'] ?? null,
+            'facturapi_livemode' => isset($row['facturapi_livemode']) ? (bool)$row['facturapi_livemode'] : null,
             'notas' => $row['notas'],
             'created_at' => $row['created_at'],
             'updated_at' => $row['updated_at'] ?? null,

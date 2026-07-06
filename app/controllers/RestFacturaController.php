@@ -112,4 +112,49 @@ class RestFacturaController extends BaseController
 
         $this->redirect('rest-factura/detalle/' . $id);
     }
+
+    public function timbrarFacturapi(?string $id = null): void
+    {
+        if (!$this->isPost()) {
+            $this->redirect('rest-factura/detalle/' . (int)$id);
+        }
+
+        $id = (int)$id;
+        $restauranteId = (int)$this->restauranteId();
+        try {
+            $actual = $this->model->buscarParaRestaurante($id, $restauranteId);
+            if (!$actual) {
+                throw new \RuntimeException('Solicitud de factura no encontrada.');
+            }
+
+            $restaurante = (new RestauranteModel())->find($restauranteId);
+            (new FacturApiService())->stampInvoiceRequest($id, (int)($restaurante['empresa_id'] ?? 0), [
+                'payment_form' => $this->post('payment_form', ''),
+                'use' => $this->post('use', ''),
+                'description' => $this->post('description', 'Consumo en restaurante'),
+                'tax_rate' => $this->post('tax_rate', FACTURAPI_TAX_RATE),
+                'tax_included' => $this->post('tax_included', '1') ? true : false,
+            ]);
+            $this->flash('success', 'Factura timbrada con FacturAPI.');
+        } catch (\Throwable $e) {
+            error_log('[RestFactura FacturAPI] ' . $e->getMessage());
+            try {
+                $actual = $this->model->buscarParaRestaurante($id, $restauranteId);
+                if ($actual) {
+                    $this->model->actualizarEstado($id, $restauranteId, [
+                        'estado' => 'en_proceso',
+                        'cfdi_uuid' => $actual['cfdi_uuid'] ?? '',
+                        'pdf_url' => $actual['pdf_url'] ?? '',
+                        'xml_url' => $actual['xml_url'] ?? '',
+                        'notas' => 'Error FacturAPI: ' . mb_substr($e->getMessage(), 0, 500),
+                    ]);
+                }
+            } catch (\Throwable $ignored) {
+                // El error principal se muestra abajo.
+            }
+            $this->flash('error', 'No se pudo timbrar con FacturAPI: ' . $e->getMessage());
+        }
+
+        $this->redirect('rest-factura/detalle/' . $id);
+    }
 }

@@ -1290,7 +1290,7 @@ class ApiController extends BaseController
                 $this->adminPromotionsRouter($method, $id, $subAct, $jwtUser);
                 break;
             case 'invoice-requests':
-                $this->adminInvoiceRequestsRouter($method, $id, $jwtUser);
+                $this->adminInvoiceRequestsRouter($method, $id, $subAct, $jwtUser);
                 break;
             default:
                 $this->adminApiError('Recurso no encontrado: ' . ($resType ?? 'null'), 404);
@@ -1810,11 +1810,16 @@ class ApiController extends BaseController
 
     // ── Admin: Promotions CRUD ───────────────────────────────────
 
-    private function adminInvoiceRequestsRouter(string $method, ?int $id, array $jwtUser): void
+    private function adminInvoiceRequestsRouter(string $method, ?int $id, ?string $subAction, array $jwtUser): void
     {
         if ($id === null) {
             if ($method !== 'GET') $this->adminApiError('Metodo no permitido', 405);
             $this->adminListInvoiceRequests($jwtUser);
+            return;
+        }
+
+        if ($method === 'POST' && $subAction === 'facturapi-stamp') {
+            $this->adminStampInvoiceRequest($id, $jwtUser);
             return;
         }
 
@@ -1913,6 +1918,31 @@ class ApiController extends BaseController
 
         $updated = $this->adminInvoiceRequestRow($id, (int)$jwtUser['empresa_id']);
         $this->adminApiOk('Solicitud de factura actualizada correctamente', (new RestFacturaSolicitudModel())->normalizar($updated));
+    }
+
+    private function adminStampInvoiceRequest(int $id, array $jwtUser): void
+    {
+        $body = json_decode(file_get_contents('php://input'), true) ?? [];
+
+        try {
+            (new FacturApiService())->stampInvoiceRequest($id, (int)$jwtUser['empresa_id'], is_array($body) ? $body : []);
+        } catch (\Throwable $e) {
+            error_log('[FacturAPI admin stamp] ' . $e->getMessage());
+            $row = $this->adminInvoiceRequestRow($id, (int)$jwtUser['empresa_id']);
+            if ($row) {
+                (new RestFacturaSolicitudModel())->actualizarEstado($id, (int)$row['restaurante_id'], [
+                    'estado' => 'en_proceso',
+                    'cfdi_uuid' => $row['cfdi_uuid'] ?? '',
+                    'pdf_url' => $row['pdf_url'] ?? '',
+                    'xml_url' => $row['xml_url'] ?? '',
+                    'notas' => 'Error FacturAPI: ' . mb_substr($e->getMessage(), 0, 500),
+                ]);
+            }
+            $this->adminApiError($e->getMessage(), 422);
+        }
+
+        $updated = $this->adminInvoiceRequestRow($id, (int)$jwtUser['empresa_id']);
+        $this->adminApiOk('Solicitud timbrada correctamente con FacturAPI', (new RestFacturaSolicitudModel())->normalizar($updated));
     }
 
     private function adminInvoiceRequestRow(int $id, int $empresaId): ?array
