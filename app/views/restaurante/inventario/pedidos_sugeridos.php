@@ -66,7 +66,7 @@
   </div>
   <div style="display:flex;gap:8px;flex-wrap:wrap">
     <a href="<?= BASE_URL ?>rest-inventario/proyecciones" class="btn btn-primary btn-sm">📊 Ir a Proyecciones</a>
-    <a href="<?= BASE_URL ?>rest-inventario/index" class="btn btn-outline btn-sm">← Inventario</a>
+    <a href="<?= BASE_URL ?>rest-inventario/index" class="rst-back-link" style="margin-bottom:0">&larr; Inventario</a>
   </div>
 </div>
 

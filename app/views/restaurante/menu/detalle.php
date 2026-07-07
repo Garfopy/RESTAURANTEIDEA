@@ -18,9 +18,8 @@
 .rec-total td { border-top:2px solid #E5E7EB!important;font-weight:700;background:#F9FAFB!important }
 </style>
 
-<a href="<?= BASE_URL ?>rest-menu/index"
-   style="font-size:.85rem;color:#6B7280;text-decoration:none;display:inline-flex;align-items:center;gap:4px;margin-bottom:18px">
-  ← Volver a Recetas
+<a href="<?= BASE_URL ?>rest-menu/index" class="rst-back-link">
+  &larr; Volver a Recetas
 </a>
 
 <!-- Header platillo -->

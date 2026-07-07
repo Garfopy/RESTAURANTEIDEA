@@ -203,6 +203,7 @@ $publicPaths = [
     'api/pedidos',
     'api/pedidosconfirmados',
     'api/productos',
+    'api/promociones',
     'api/precios',
     'api/chat',
     'api/tracking',

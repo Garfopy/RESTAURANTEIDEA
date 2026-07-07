@@ -1,6 +1,6 @@
 <?php ob_start(); ?>
 <div style="max-width:700px">
-  <a href="<?= BASE_URL ?>rest-pedido/index" style="font-size:.85rem;color:#6B7280;text-decoration:none;display:inline-flex;align-items:center;gap:4px;margin-bottom:20px">← Pedidos</a>
+  <a href="<?= BASE_URL ?>rest-pedido/index" class="rst-back-link">&larr; Pedidos</a>
 
   <div style="background:#fff;border-radius:12px;border:1px solid #E5E7EB;padding:24px;margin-bottom:16px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">

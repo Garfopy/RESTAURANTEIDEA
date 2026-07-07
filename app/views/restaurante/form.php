@@ -58,13 +58,25 @@ $title = ($isEdit ? 'Editar local' : 'Crear local') . ' - CarniHub';
     .back-link {
       display: inline-flex;
       align-items: center;
-      gap: 8px;
-      color: #4B5563;
+      gap: 10px;
+      color: #334155;
       text-decoration: none;
-      font-size: .86rem;
-      font-weight: 700;
+      font-size: 1rem;
+      font-weight: 800;
+      padding: 9px 14px 9px 10px;
+      border: 1px solid #E2E8F0;
+      border-radius: 999px;
+      background: rgba(255,255,255,.86);
+      box-shadow: 0 8px 20px rgba(15,23,42,.06);
+      transition: color .15s, border-color .15s, background .15s, transform .15s, box-shadow .15s;
     }
-    .back-link:hover { color: var(--cp); }
+    .back-link:hover {
+      color: var(--cp);
+      border-color: color-mix(in srgb, var(--cp) 34%, #CBD5E1);
+      background: color-mix(in srgb, var(--cp-light) 45%, white);
+      box-shadow: 0 12px 26px rgba(15,23,42,.1);
+      transform: translateX(-2px);
+    }
     .shell {
       display: grid;
       grid-template-columns: minmax(0, 1fr) 340px;

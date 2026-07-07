@@ -23,10 +23,10 @@
       <?php foreach ($data as $c): ?>
       <tr style="border-bottom:1px solid #F3F4F6">
         <td style="padding:12px 16px;font-weight:500"><?= htmlspecialchars($c['turno']) ?></td>
-        <td style="padding:12px 16px;text-align:right;color:#10B981;font-weight:600">$<?= number_format((float)$c['ingresos'],2) ?></td>
-        <td style="padding:12px 16px;text-align:right;color:#EF4444;font-weight:600">$<?= number_format((float)$c['gastos'],2) ?></td>
-        <td style="padding:12px 16px;text-align:right;color:#F59E0B;font-weight:600">$<?= number_format((float)$c['retiros'],2) ?></td>
-        <td style="padding:12px 16px;text-align:right;font-weight:700;color:<?= (float)$c['utilidad_neta'] >= 0 ? '#10B981' : '#EF4444' ?>">
+        <td style="padding:12px 16px;text-align:right;color:#111827;font-weight:600">$<?= number_format((float)$c['ingresos'],2) ?></td>
+        <td style="padding:12px 16px;text-align:right;color:#111827;font-weight:600">$<?= number_format((float)$c['gastos'],2) ?></td>
+        <td style="padding:12px 16px;text-align:right;color:#111827;font-weight:600">$<?= number_format((float)$c['retiros'],2) ?></td>
+        <td style="padding:12px 16px;text-align:right;font-weight:700;color:#111827">
           $<?= number_format((float)$c['utilidad_neta'],2) ?>
         </td>
         <td style="padding:12px 16px;color:#6B7280"><?= date('d/m/Y H:i', strtotime($c['created_at'])) ?></td>

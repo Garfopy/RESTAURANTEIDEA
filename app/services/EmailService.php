@@ -18,6 +18,7 @@ class EmailService
     private string $smtpFromEmail;
     private string $smtpFromName;
     private bool $configured;
+    private bool $nativeMailAvailable;
 
     // Cache estático para evitar múltiples consultas DB por request
     private static ?array $configCache = null;
@@ -50,12 +51,85 @@ class EmailService
         $this->smtpPassword   = self::$configCache['password'];
         $this->smtpFromEmail  = self::$configCache['from_email'];
         $this->smtpFromName   = self::$configCache['from_name'];
+        $this->nativeMailAvailable = function_exists('mail');
 
         // Verificar si la configuración está completa
         $this->configured = !empty($this->smtpHost)
                          && !empty($this->smtpUsername)
                          && !empty($this->smtpPassword)
                          && !empty($this->smtpFromEmail);
+    }
+
+    private function fromEmail(): string
+    {
+        if (!empty($this->smtpFromEmail)) {
+            return $this->smtpFromEmail;
+        }
+
+        if (!empty($this->smtpUsername) && filter_var($this->smtpUsername, FILTER_VALIDATE_EMAIL)) {
+            return $this->smtpUsername;
+        }
+
+        $host = preg_replace('/^www\./', '', (string)($_SERVER['HTTP_HOST'] ?? 'localhost'));
+        $host = preg_replace('/:\d+$/', '', $host);
+        return 'no-reply@' . ($host ?: 'localhost');
+    }
+
+    private function fromName(): string
+    {
+        return $this->smtpFromName ?: 'CarniHub';
+    }
+
+    private function encodeHeader(string $text): string
+    {
+        if (function_exists('mb_encode_mimeheader')) {
+            return mb_encode_mimeheader($text, 'UTF-8', 'B', "\r\n");
+        }
+
+        return $text;
+    }
+
+    private function enviarConMailNativo(
+        string $destEmail,
+        string $subject,
+        string $htmlBody,
+        string $altBody,
+        ?string $replyTo = null
+    ): bool {
+        if (!$this->nativeMailAvailable || !$destEmail) {
+            return false;
+        }
+
+        $fromEmail = $this->fromEmail();
+        $fromName  = $this->fromName();
+        $replyTo   = $replyTo ?: $fromEmail;
+
+        $headers = [
+            'MIME-Version: 1.0',
+            'Content-Type: text/html; charset=UTF-8',
+            'From: ' . $this->encodeHeader($fromName) . ' <' . $fromEmail . '>',
+            'Reply-To: ' . $replyTo,
+            'X-Mailer: PHP/' . PHP_VERSION,
+        ];
+
+        $ok = @mail(
+            $destEmail,
+            $this->encodeHeader($subject),
+            $htmlBody,
+            implode("\r\n", $headers)
+        );
+
+        if ($ok) {
+            error_log("[EmailService] Email enviado via mail() nativo a: $destEmail");
+            return true;
+        }
+
+        error_log("[EmailService] mail() nativo fallo para: $destEmail");
+        if ($altBody !== '') {
+            error_log('[EmailService] AltBody diagnostico: ' . mb_substr($altBody, 0, 180));
+        }
+
+        return false;
     }
 
     /**
@@ -285,7 +359,7 @@ class EmailService
         array $restaurante,
         array $reserva
     ): bool {
-        if (!$this->configured || !$destEmail) return false;
+        if (!$destEmail) return false;
 
         $restNombre = htmlspecialchars($restaurante['nombre'] ?? '');
         $nombre     = htmlspecialchars($reserva['nombre'] ?? '');
@@ -297,19 +371,7 @@ class EmailService
         $urlAdmin   = BASE_URL . 'rest-reserva/index';
 
         try {
-            $mail = new PHPMailer(true);
-            $mail->isSMTP();
-            $mail->Host        = $this->smtpHost;
-            $mail->SMTPAuth    = true;
-            $mail->Username    = $this->smtpUsername;
-            $mail->Password    = $this->smtpPassword;
-            $mail->Port        = (int)$this->smtpPort;
-            $mail->Timeout     = 10;
-            $mail->SMTPOptions = ['ssl' => ['verify_peer' => false, 'verify_peer_name' => false, 'allow_self_signed' => true]];
-            if ($this->smtpEncryption === 'tls')     $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-            elseif ($this->smtpEncryption === 'ssl') $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
-
-            $mail->setFrom($this->smtpFromEmail, $this->smtpFromName);
+            $mail = $this->nuevoMailer();
             $mail->addAddress($destEmail, $destNombre);
             $mail->isHTML(true);
             $mail->CharSet = 'UTF-8';
@@ -375,7 +437,7 @@ class EmailService
         array $reserva,
         string $cancelUrl
     ): bool {
-        if (!$this->configured || !$destEmail) return false;
+        if (!$destEmail) return false;
 
         $restNombre = htmlspecialchars($restaurante['nombre'] ?? '');
         $color      = htmlspecialchars($restaurante['color_primario'] ?? '#C8102E');
@@ -449,7 +511,7 @@ class EmailService
         array $reserva,
         string $cancelUrl
     ): bool {
-        if (!$this->configured || !$destEmail) return false;
+        if (!$destEmail) return false;
 
         $restNombre = htmlspecialchars($restaurante['nombre'] ?? '');
         $color      = htmlspecialchars($restaurante['color_primario'] ?? '#C8102E');
@@ -505,17 +567,28 @@ class EmailService
     private function nuevoMailer(): PHPMailer
     {
         $mail = new PHPMailer(true);
-        $mail->isSMTP();
-        $mail->Host        = $this->smtpHost;
-        $mail->SMTPAuth    = true;
-        $mail->Username    = $this->smtpUsername;
-        $mail->Password    = $this->smtpPassword;
-        $mail->Port        = (int)$this->smtpPort;
         $mail->Timeout     = 10;
-        $mail->SMTPOptions = ['ssl' => ['verify_peer' => false, 'verify_peer_name' => false, 'allow_self_signed' => true]];
-        if ($this->smtpEncryption === 'tls')     $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-        elseif ($this->smtpEncryption === 'ssl') $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
-        $mail->setFrom($this->smtpFromEmail, $this->smtpFromName);
+
+        if ($this->configured) {
+            $mail->isSMTP();
+            $mail->Host        = $this->smtpHost;
+            $mail->SMTPAuth    = true;
+            $mail->Username    = $this->smtpUsername;
+            $mail->Password    = $this->smtpPassword;
+            $mail->Port        = (int)$this->smtpPort;
+            $mail->SMTPOptions = ['ssl' => ['verify_peer' => false, 'verify_peer_name' => false, 'allow_self_signed' => true]];
+            if ($this->smtpEncryption === 'tls') {
+                $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+            } elseif ($this->smtpEncryption === 'ssl') {
+                $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
+            }
+        } else {
+            $mail->isMail();
+            error_log('[EmailService] SMTP no configurado. Se intentará enviar con mail() nativo.');
+        }
+
+        $mail->setFrom($this->fromEmail(), $this->fromName());
+        $mail->addReplyTo($this->fromEmail(), $this->fromName());
         return $mail;
     }
 

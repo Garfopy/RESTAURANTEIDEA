@@ -1,39 +1,88 @@
 <?php ob_start(); ?>
-<div style="background:#fff;border-radius:12px;border:1px solid #E5E7EB;overflow:hidden;margin-bottom:20px">
-  <table style="width:100%;border-collapse:collapse;font-size:.875rem">
-    <thead>
-      <tr style="background:#F9FAFB;border-bottom:1px solid #E5E7EB">
-        <th style="padding:12px 16px;text-align:left;font-weight:600;color:#374151">Nombre</th>
-        <th style="padding:12px 16px;text-align:left;font-weight:600;color:#374151">Correo</th>
-        <th style="padding:12px 16px;text-align:right;font-weight:600;color:#374151">Visitas</th>
-        <th style="padding:12px 16px;text-align:right;font-weight:600;color:#374151">Total gastado</th>
-        <th style="padding:12px 16px;text-align:left;font-weight:600;color:#374151">Última visita</th>
-        <th style="padding:12px 16px;text-align:left;font-weight:600;color:#374151">Detalle</th>
-      </tr>
-    </thead>
-    <tbody>
-      <?php foreach ($data as $c): ?>
-      <?php
-        $visitas = (int)($c['num_visitas'] ?? $c['total_visitas'] ?? 0);
-        $gasto   = (float)($c['gasto_total'] ?? $c['total_gastado'] ?? 0);
-        $ult     = $c['ultima_visita_real'] ?? $c['ultima_visita'] ?? null;
-      ?>
-      <tr style="border-bottom:1px solid #F3F4F6">
-        <td style="padding:12px 16px;font-weight:500"><?= htmlspecialchars($c['nombre'] ?? 'Visitante') ?></td>
-        <td style="padding:12px 16px;color:#6B7280"><?= htmlspecialchars($c['email'] ?? '—') ?: '—' ?></td>
-        <td style="padding:12px 16px;text-align:right"><?= $visitas ?></td>
-        <td style="padding:12px 16px;text-align:right;font-weight:600">$<?= number_format($gasto, 2) ?></td>
-        <td style="padding:12px 16px;color:#6B7280;font-size:.8rem"><?= $ult ? date('d/m/Y', strtotime($ult)) : '—' ?></td>
-        <td style="padding:12px 16px">
-          <a href="<?= BASE_URL ?>rest-cliente/detalle/<?= $c['id'] ?>" style="font-size:.8rem;color:var(--color-primary);font-weight:500">Ver →</a>
-        </td>
-      </tr>
+<?php
+$tipo = in_array(($tipo ?? 'todos'), ['todos', 'web', 'mobile'], true) ? $tipo : 'todos';
+$filtros = [
+  'todos' => 'Todos',
+  'web' => 'Web',
+  'mobile' => 'App movil',
+];
+?>
+<div class="client-page">
+  <div class="client-toolbar">
+    <div class="client-filter-tabs">
+      <?php foreach ($filtros as $key => $label): ?>
+        <?php $activo = $tipo === $key; ?>
+        <a href="<?= BASE_URL ?>rest-cliente/index/<?= $key ?>"
+           class="client-filter-tab <?= $activo ? 'active' : '' ?>">
+          <?= htmlspecialchars($label) ?>
+        </a>
       <?php endforeach; ?>
-      <?php if (empty($data)): ?>
-      <tr><td colspan="6" style="padding:32px;text-align:center;color:#9CA3AF">No hay comensales registrados.</td></tr>
-      <?php endif; ?>
-    </tbody>
-  </table>
+    </div>
+  </div>
+
+  <div class="rst-table-wrap client-table-shell">
+    <table class="rst-table client-table">
+      <thead>
+        <tr>
+          <th>Nombre</th>
+          <th>Telefono</th>
+          <th style="text-align:right">Visitas</th>
+          <th style="text-align:right">Total gastado</th>
+          <th>Ultima visita</th>
+          <th>Detalle</th>
+        </tr>
+      </thead>
+      <tbody>
+        <?php foreach ($data as $c): ?>
+        <?php
+          $visitas = (int)($c['num_visitas'] ?? $c['total_visitas'] ?? 0);
+          $gasto = (float)($c['gasto_total'] ?? $c['total_gastado'] ?? 0);
+          $ult = $c['ultima_visita_real'] ?? $c['ultima_visita'] ?? null;
+          $nombre = trim((string)($c['nombre'] ?? ''))
+            ?: trim((string)($c['mobile_nombre'] ?? ''))
+            ?: trim((string)($c['mobile_email'] ?? ''))
+            ?: 'Usuario app';
+          $telefono = trim((string)($c['telefono'] ?? '')) ?: trim((string)($c['mobile_telefono'] ?? ''));
+          $detalleId = (string)($c['detalle_id'] ?? $c['id'] ?? '');
+          $esMobile = ($c['origen'] ?? '') === 'mobile';
+          $tieneApp = !empty($c['mobile_usuario_id']);
+          if ($esMobile && $tieneApp) {
+            $detalleId = 'app-' . abs((int)$c['mobile_usuario_id']);
+          } elseif (($detalleId === '' || $detalleId === '0') && $tieneApp) {
+            $detalleId = 'app-' . abs((int)$c['mobile_usuario_id']);
+          }
+        ?>
+        <tr>
+          <td>
+            <div class="client-name-cell">
+              <?= htmlspecialchars($nombre) ?>
+              <?php if (!$esMobile): ?>
+                <span class="client-source-badge web">Web</span>
+              <?php endif; ?>
+              <?php if ($tieneApp): ?>
+                <span class="client-source-badge app">App</span>
+              <?php endif; ?>
+            </div>
+          </td>
+          <td class="client-muted"><?= $telefono !== '' ? htmlspecialchars($telefono) : '&mdash;' ?></td>
+          <td style="text-align:right"><?= $visitas ?></td>
+          <td style="text-align:right;font-weight:800">$<?= number_format($gasto, 2) ?></td>
+          <td class="client-muted" style="font-size:.82rem"><?= $ult ? date('d/m/Y', strtotime($ult)) : '&mdash;' ?></td>
+          <td>
+            <?php if ($detalleId !== '' && $detalleId !== '0'): ?>
+              <a href="<?= BASE_URL ?>rest-cliente/detalle/<?= urlencode($detalleId) ?>" class="client-detail-link">Ver &rarr;</a>
+            <?php else: ?>
+              <span class="client-empty-link">Sin detalle</span>
+            <?php endif; ?>
+          </td>
+        </tr>
+        <?php endforeach; ?>
+        <?php if (empty($data)): ?>
+        <tr><td colspan="6" class="empty-state">No hay comensales registrados.</td></tr>
+        <?php endif; ?>
+      </tbody>
+    </table>
+  </div>
 </div>
 <?php
 $content = ob_get_clean();

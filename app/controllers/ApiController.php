@@ -93,6 +93,31 @@ class ApiController extends BaseController
         $this->json(['planes' => $planes, 'hash' => $hash]);
     }
 
+    /** GET /api/promociones?usuario_id=X - promociones activas para la app movil */
+    public function promociones(?string $p = null): void
+    {
+        header('Access-Control-Allow-Origin: *');
+
+        $mobileUsuarioId = (int)(
+            $this->get('usuario_id')
+            ?: $this->get('mobile_usuario_id')
+            ?: $this->get('user_id')
+            ?: 0
+        );
+
+        if ($mobileUsuarioId <= 0) {
+            $this->json(['ok' => false, 'error' => 'usuario_id requerido'], 400);
+        }
+
+        $model = new RestClienteModel();
+        $this->json([
+            'ok' => true,
+            'data' => [
+                'promociones' => $model->getPromocionesMobileActivas($mobileUsuarioId),
+            ],
+        ]);
+    }
+
     // ── GPS Tracking ──────────────────────────────────────────────
 
     /** GET /api/tracking/{pedido_id} — posición actual del repartidor */
@@ -593,6 +618,10 @@ class ApiController extends BaseController
                 $this->v1DetalleProducto($token, $id);
                 break;
 
+            case 'GET:promociones':
+                $this->v1PromocionesMobile();
+                break;
+
             default:
                 $this->apiError('Recurso o método no encontrado', 404);
         }
@@ -611,6 +640,25 @@ class ApiController extends BaseController
         http_response_code($code);
         echo json_encode(['ok' => false, 'error' => $message]);
         exit;
+    }
+
+    private function v1PromocionesMobile(): void
+    {
+        $mobileUsuarioId = (int)(
+            $this->get('usuario_id')
+            ?: $this->get('mobile_usuario_id')
+            ?: $this->get('user_id')
+            ?: 0
+        );
+
+        if ($mobileUsuarioId <= 0) {
+            $this->apiError('usuario_id requerido', 400);
+        }
+
+        $model = new RestClienteModel();
+        $this->apiOk([
+            'promociones' => $model->getPromocionesMobileActivas($mobileUsuarioId),
+        ]);
     }
 
     private function requireApiToken(array $scopesRequired): array
@@ -1202,8 +1250,9 @@ class ApiController extends BaseController
 
             $usuario = $_SESSION['usuario'];
             
-            // Solo admin puede generar JWT para APIs
-            $rolValido = ($usuario['rol'] === 'admin' || ($usuario['rol_slug'] ?? '') === 'admin_restaurante');
+            // Usuarios del portal restaurante que pueden consumir la Admin API.
+            $rolActual = $usuario['rol_slug'] ?? $usuario['rol'] ?? '';
+            $rolValido = in_array($rolActual, ['admin', 'admin_restaurante', 'comprador', 'admin_local', 'superadmin'], true);
             if (!$rolValido) {
                 $this->adminApiError('Acceso denegado. Se requiere rol de administrador.', 403);
             }
@@ -1211,7 +1260,13 @@ class ApiController extends BaseController
             // Generar JWT y devolverlo
             $token = $this->generateJWT($usuario);
             $this->adminApiOk('Token generado', [
-                'user'  => ['id' => (int)$usuario['id'], 'nombre' => $usuario['nombre'], 'email' => $usuario['email'], 'rol' => $usuario['rol']],
+                'user'  => [
+                    'id' => (int)$usuario['id'],
+                    'nombre' => $usuario['nombre'],
+                    'email' => $usuario['email'],
+                    'rol' => $rolActual,
+                    'rol_slug' => $usuario['rol_slug'] ?? $rolActual,
+                ],
                 'token' => $token,
             ]);
             return;
@@ -1732,7 +1787,7 @@ class ApiController extends BaseController
         }
         $payload = $this->validateJWT($m[1]);
         if (!$payload) { $this->adminApiError('Token inválido o expirado', 401); }
-        if ($requireAdmin && !in_array($payload['rol'] ?? '', ['admin', 'admin_restaurante'], true)) {
+        if ($requireAdmin && !in_array($payload['rol'] ?? '', ['admin', 'admin_restaurante', 'comprador', 'admin_local', 'superadmin'], true)) {
             $this->adminApiError('Acceso denegado. Se requiere rol de administrador.', 403);
         }
         return $payload;
@@ -1745,7 +1800,7 @@ class ApiController extends BaseController
         $now     = time();
         $payload = self::b64e(json_encode([
             'sub' => (int)$user['id'], 'nombre' => $user['nombre'], 'email' => $user['email'],
-            'rol' => $user['rol'] ?? $user['rol_slug'] ?? 'unknown', 'empresa_id' => (int)($user['empresa_id'] ?? 0),
+            'rol' => $user['rol_slug'] ?? $user['rol'] ?? 'unknown', 'empresa_id' => (int)($user['empresa_id'] ?? 0),
             'iat' => $now, 'exp' => $now + 86400,
         ]));
         $sig = self::b64e(hash_hmac('sha256', "$header.$payload", $this->jwtSecret, true));

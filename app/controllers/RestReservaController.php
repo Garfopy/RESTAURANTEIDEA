@@ -12,6 +12,69 @@ class RestReservaController extends BaseController
         $this->model = new RestReservaModel();
     }
 
+    private function enviarConfirmacionReservaSiAplica(array $restaurante, array $reserva): void
+    {
+        $reservaId = (int)($reserva['id'] ?? 0);
+        $email     = trim((string)($reserva['email'] ?? ''));
+        $estado    = (string)($reserva['estado'] ?? '');
+        $slug      = trim((string)($restaurante['slug'] ?? ''));
+
+        if (!$reservaId || !$email || $estado !== 'confirmada' || !$slug) {
+            return;
+        }
+
+        if (!empty($reserva['confirmacion_enviada'])) {
+            return;
+        }
+
+        try {
+            $emailSvc = new EmailService();
+            if (false) {
+                error_log("[Reserva #$reservaId] SMTP no configurado — no se envía confirmación a $email");
+            }
+            $cancelUrl = BASE_URL . 'menu/' . $slug . '/cancelarReserva/' . $reservaId;
+            $ok = $emailSvc->enviarConfirmacionReserva(
+                $email,
+                $restaurante,
+                [
+                    'nombre'      => $reserva['nombre'] ?? '',
+                    'fecha'       => $reserva['fecha'] ?? '',
+                    'hora'        => $reserva['hora'] ?? '',
+                    'personas'    => (int)($reserva['personas'] ?? 1),
+                    'mesa_nombre' => $this->obtenerNombreMesa((int)($reserva['mesa_id'] ?? 0)),
+                ],
+                $cancelUrl
+            );
+
+            if ($ok) {
+                $this->model->marcarConfirmacionEnviada($reservaId);
+                error_log("[Reserva #$reservaId] Confirmación enviada a $email");
+                return;
+            }
+
+            error_log("[Reserva #$reservaId] FALLO al enviar confirmación a $email (revisa logs SMTP)");
+        } catch (\Throwable $e) {
+            error_log("[Reserva #$reservaId] Excepción enviando confirmación a $email: " . $e->getMessage());
+        }
+    }
+
+    private function obtenerNombreMesa(int $mesaId): string
+    {
+        if ($mesaId <= 0) {
+            return 'Por asignar';
+        }
+
+        try {
+            $db   = Database::getInstance();
+            $stmt = $db->prepare("SELECT nombre FROM rest_mesas WHERE id = ? LIMIT 1");
+            $stmt->execute([$mesaId]);
+            $nombre = $stmt->fetchColumn();
+            return $nombre ? (string)$nombre : 'Por asignar';
+        } catch (\Throwable $e) {
+            return 'Por asignar';
+        }
+    }
+
     public function index(?string $p = null): void
     {
         $restauranteId = $this->restauranteId();
@@ -93,9 +156,20 @@ class RestReservaController extends BaseController
                     "UPDATE rest_reservaciones SET mesero_id = ? WHERE id = ? AND mesero_id IS NULL"
                 )->execute([$meseroId, $id]);
             }
+
+            $reservaActualizada = $this->model->find($id);
+            if ($reservaActualizada) {
+                $this->enviarConfirmacionReservaSiAplica($restaurante, $reservaActualizada);
+            }
         } else {
             $data['mesero_id'] = $meseroId;
-            $this->model->insert($data);
+            $newId = (int)$this->model->insert($data);
+            if ($newId > 0) {
+                $reservaNueva = $this->model->find($newId);
+                if ($reservaNueva) {
+                    $this->enviarConfirmacionReservaSiAplica($restaurante, $reservaNueva);
+                }
+            }
         }
 
         $this->flash('success', 'Reservación guardada.' . ($meseroId ? ' Mesero auto-asignado.' : ''));
@@ -155,6 +229,12 @@ class RestReservaController extends BaseController
             $this->model->cambiarEstado($reservaId, 'confirmada');
         }
 
+        $reservaActualizada = $this->model->find($reservaId);
+        $restaurante        = (new RestauranteModel())->find($restauranteId);
+        if ($reservaActualizada && $restaurante) {
+            $this->enviarConfirmacionReservaSiAplica($restaurante, $reservaActualizada);
+        }
+
         $this->flash('success', 'Mesa y mesero asignados. Reservación confirmada.');
         $this->redirect('rest-reserva/index');
     }
@@ -163,6 +243,15 @@ class RestReservaController extends BaseController
     {
         $estado = $this->post('estado') ?? $this->get('estado');
         $this->model->cambiarEstado((int)$id, $estado);
+
+        if ($estado === 'confirmada') {
+            $reserva     = $this->model->find((int)$id);
+            $restaurante = (new RestauranteModel())->find($this->restauranteId());
+            if ($reserva && $restaurante) {
+                $this->enviarConfirmacionReservaSiAplica($restaurante, $reserva);
+            }
+        }
+
         $this->flash('success', 'Estado actualizado.');
         $this->redirect('rest-reserva/index');
     }

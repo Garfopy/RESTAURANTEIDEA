@@ -147,12 +147,12 @@ $_appName   = $_cfgForgot->get('app_name', APP_NAME);
     .flash-box svg { flex-shrink: 0; margin-top: 1px; }
 
     .back-link {
-      display: flex; align-items: center; gap: 6px;
+      display: flex; align-items: center; gap: 9px;
       margin-top: 20px; text-align: center; justify-content: center;
-      font-size: .8rem; color: #6B7280; text-decoration: none;
-      transition: color .15s;
+      font-size: .92rem; color: #374151; text-decoration: none; font-weight: 700;
+      transition: color .15s, transform .15s;
     }
-    .back-link:hover { color: #374151; }
+    .back-link:hover { color: #111827; transform: translateX(-2px); }
 
     @media (max-width: 768px) {
       .login-card-wrap { border-radius: 16px; min-height: auto; flex-direction: column; }

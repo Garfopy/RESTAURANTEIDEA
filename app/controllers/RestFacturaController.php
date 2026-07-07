@@ -3,30 +3,40 @@ require_once ROOT_PATH . '/app/controllers/BaseController.php';
 
 class RestFacturaController extends BaseController
 {
-    private RestFacturaSolicitudModel $model;
+    private ?object $model = null;
 
     public function __construct()
     {
         parent::__construct();
         $this->requireRestaurante();
-        $this->model = new RestFacturaSolicitudModel();
+
+        if (class_exists('RestFacturaSolicitudModel')) {
+            $this->model = new RestFacturaSolicitudModel();
+        }
     }
 
     public function index(?string $p = null): void
     {
+        $flash = $this->getFlash();
+        $pageTitle = 'Facturas';
+        $activeMenu = 'rest_facturas';
+
+        if (!$this->model) {
+            $this->render('restaurante/facturas/index', compact('flash', 'pageTitle', 'activeMenu'));
+            return;
+        }
+
         $restauranteId = (int)$this->restauranteId();
         $restaurante = (new RestauranteModel())->find($restauranteId);
         $filtros = [
-            'estado' => $this->get('estado', ''),
-            'from' => $this->get('from', ''),
-            'to' => $this->get('to', ''),
-            'page' => $this->get('page', 1),
-            'per_page' => $this->get('per_page', 20),
+            'estado' => trim((string)$this->get('estado', '')),
+            'from' => trim((string)$this->get('from', '')),
+            'to' => trim((string)$this->get('to', '')),
+            'page' => max(1, (int)$this->get('page', 1)),
+            'per_page' => max(1, min(100, (int)$this->get('per_page', 20))),
         ];
         $solicitudes = $this->model->listar($restauranteId, $filtros);
-        $flash = $this->getFlash();
         $pageTitle = 'Solicitudes de factura';
-        $activeMenu = 'rest_facturas';
 
         $this->render('restaurante/facturas/index', compact(
             'restaurante',
@@ -40,11 +50,28 @@ class RestFacturaController extends BaseController
 
     public function detalle(?string $id = null): void
     {
+        if (!$this->model) {
+            $this->flash('error', 'El modulo de solicitudes de factura aun no esta instalado.');
+            $this->redirect('rest-factura/index');
+        }
+
         $restauranteId = (int)$this->restauranteId();
+        $solicitudId = (int)$id;
+        if ($solicitudId <= 0) {
+            $this->flash('error', 'Solicitud de factura no valida.');
+            $this->redirect('rest-factura/index');
+        }
+
         $restaurante = (new RestauranteModel())->find($restauranteId);
-        $solicitud = $this->model->buscarParaRestaurante((int)$id, $restauranteId);
+        $solicitud = $this->model->buscarParaRestaurante($solicitudId, $restauranteId);
         if (!$solicitud) {
             $this->flash('error', 'Solicitud de factura no encontrada.');
+            $this->redirect('rest-factura/index');
+        }
+
+        $viewFile = ROOT_PATH . '/app/views/restaurante/facturas/detalle.php';
+        if (!file_exists($viewFile)) {
+            $this->flash('error', 'La vista de detalle de facturas no esta instalada.');
             $this->redirect('rest-factura/index');
         }
 
@@ -63,20 +90,30 @@ class RestFacturaController extends BaseController
 
     public function actualizar(?string $id = null): void
     {
+        $id = (int)$id;
         if (!$this->isPost()) {
-            $this->redirect('rest-factura/detalle/' . (int)$id);
+            $this->redirect('rest-factura/detalle/' . $id);
+        }
+
+        if (!$this->model) {
+            $this->flash('error', 'El modulo de solicitudes de factura aun no esta instalado.');
+            $this->redirect('rest-factura/index');
+        }
+
+        if ($id <= 0) {
+            $this->flash('error', 'Solicitud de factura no valida.');
+            $this->redirect('rest-factura/index');
         }
 
         $restauranteId = (int)$this->restauranteId();
-        $id = (int)$id;
 
         try {
             $this->model->actualizarEstado($id, $restauranteId, [
-                'estado' => $this->post('estado', 'pendiente'),
-                'cfdi_uuid' => $this->post('cfdi_uuid', ''),
-                'pdf_url' => $this->post('pdf_url', ''),
-                'xml_url' => $this->post('xml_url', ''),
-                'notas' => $this->post('notas', ''),
+                'estado' => trim((string)$this->post('estado', 'pendiente')),
+                'cfdi_uuid' => trim((string)$this->post('cfdi_uuid', '')),
+                'pdf_url' => trim((string)$this->post('pdf_url', '')),
+                'xml_url' => trim((string)$this->post('xml_url', '')),
+                'notas' => trim((string)$this->post('notas', '')),
             ]);
             $this->flash('success', 'Solicitud actualizada.');
         } catch (\InvalidArgumentException $e) {
@@ -91,22 +128,41 @@ class RestFacturaController extends BaseController
 
     public function marcarProceso(?string $id = null): void
     {
+        $id = (int)$id;
         if (!$this->isPost()) {
-            $this->redirect('rest-factura/detalle/' . (int)$id);
+            $this->redirect('rest-factura/detalle/' . $id);
         }
 
-        $id = (int)$id;
+        if (!$this->model) {
+            $this->flash('error', 'El modulo de solicitudes de factura aun no esta instalado.');
+            $this->redirect('rest-factura/index');
+        }
+
+        if ($id <= 0) {
+            $this->flash('error', 'Solicitud de factura no valida.');
+            $this->redirect('rest-factura/index');
+        }
+
+        $restauranteId = (int)$this->restauranteId();
+
         try {
-            $actual = $this->model->buscarParaRestaurante($id, (int)$this->restauranteId());
-            $this->model->actualizarEstado($id, (int)$this->restauranteId(), [
+            $actual = $this->model->buscarParaRestaurante($id, $restauranteId);
+            if (!$actual) {
+                throw new \InvalidArgumentException('Solicitud de factura no encontrada.');
+            }
+
+            $this->model->actualizarEstado($id, $restauranteId, [
                 'estado' => 'en_proceso',
                 'cfdi_uuid' => $actual['cfdi_uuid'] ?? '',
                 'pdf_url' => $actual['pdf_url'] ?? '',
                 'xml_url' => $actual['xml_url'] ?? '',
-                'notas' => $this->post('notas', $actual['notas'] ?? ''),
+                'notas' => trim((string)$this->post('notas', $actual['notas'] ?? '')),
             ]);
             $this->flash('success', 'Solicitud marcada en proceso.');
+        } catch (\InvalidArgumentException $e) {
+            $this->flash('error', $e->getMessage());
         } catch (\Throwable $e) {
+            error_log('[RestFacturaController::marcarProceso] ' . $e->getMessage());
             $this->flash('error', 'No se pudo marcar en proceso.');
         }
 
@@ -115,12 +171,23 @@ class RestFacturaController extends BaseController
 
     public function timbrarFacturapi(?string $id = null): void
     {
+        $id = (int)$id;
         if (!$this->isPost()) {
-            $this->redirect('rest-factura/detalle/' . (int)$id);
+            $this->redirect('rest-factura/detalle/' . $id);
         }
 
-        $id = (int)$id;
+        if (!$this->model) {
+            $this->flash('error', 'El modulo de solicitudes de factura aun no esta instalado.');
+            $this->redirect('rest-factura/index');
+        }
+
+        if ($id <= 0) {
+            $this->flash('error', 'Solicitud de factura no valida.');
+            $this->redirect('rest-factura/index');
+        }
+
         $restauranteId = (int)$this->restauranteId();
+
         try {
             $actual = $this->model->buscarParaRestaurante($id, $restauranteId);
             if (!$actual) {
@@ -129,9 +196,9 @@ class RestFacturaController extends BaseController
 
             $restaurante = (new RestauranteModel())->find($restauranteId);
             (new FacturApiService())->stampInvoiceRequest($id, (int)($restaurante['empresa_id'] ?? 0), [
-                'payment_form' => $this->post('payment_form', ''),
-                'use' => $this->post('use', ''),
-                'description' => $this->post('description', 'Consumo en restaurante'),
+                'payment_form' => trim((string)$this->post('payment_form', '')),
+                'use' => trim((string)$this->post('use', '')),
+                'description' => trim((string)$this->post('description', 'Consumo en restaurante')),
                 'tax_rate' => $this->post('tax_rate', FACTURAPI_TAX_RATE),
                 'tax_included' => $this->post('tax_included', '1') ? true : false,
             ]);

@@ -57,9 +57,9 @@ if (empty($_SESSION['usuario'])) {
 
 $usuario = $_SESSION['usuario'];
 
-// Validar rol (admin o admin_restaurante)
-$rol = $usuario['rol'] ?? $usuario['rol_slug'] ?? '';
-$rolValido = ($rol === 'admin' || $rol === 'admin_restaurante');
+// Validar rol del portal restaurante
+$rol = $usuario['rol_slug'] ?? $usuario['rol'] ?? '';
+$rolValido = in_array($rol, ['admin', 'admin_restaurante', 'comprador', 'admin_local', 'superadmin'], true);
 if (!$rolValido) {
     http_response_code(403);
     echo json_encode([

@@ -51,6 +51,20 @@
     .mn-tab.active { background:var(--accent); border-color:var(--accent); color:#fff; box-shadow:0 8px 20px color-mix(in srgb, var(--accent) 28%, transparent); }
     .mn-tab.active .mn-tab-count { background:rgba(255,255,255,.25); color:#fff; }
 
+    /* ── Buscador ───────────────────────────────── */
+    .mn-search-wrap { position:sticky; top:63px; z-index:18; padding:10px 14px 8px; background:rgba(247,248,250,.92); backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px); border-bottom:1px solid var(--line); }
+    .mn-search { max-width:1120px; margin:0 auto; position:relative; }
+    .mn-search .mn-icon { position:absolute; left:13px; top:50%; transform:translateY(-50%); color:#667085; pointer-events:none; }
+    .mn-search-input { width:100%; height:42px; border:1px solid #DEE3EA; border-radius:999px; background:#fff; color:var(--text-main); font:600 .88rem 'Inter',system-ui,sans-serif; outline:none; padding:0 46px 0 40px; transition:border-color .18s, box-shadow .18s, background .18s; box-shadow:0 1px 0 rgba(15,23,42,.02); }
+    .mn-search-input::placeholder { color:#98A2B3; font-weight:600; }
+    .mn-search-input:focus { border-color:var(--accent-line); box-shadow:0 0 0 4px color-mix(in srgb, var(--accent) 12%, transparent); }
+    .mn-search-clear { position:absolute; right:8px; top:50%; transform:translateY(-50%); width:30px; height:30px; border:0; border-radius:999px; background:#F2F4F7; color:#667085; cursor:pointer; display:none; align-items:center; justify-content:center; transition:background .15s, color .15s; }
+    .mn-search-clear:hover { background:#E8EDF4; color:#111827; }
+    .mn-search-clear.visible { display:flex; }
+    .mn-search-empty { display:none; margin:18px 14px 0; padding:28px 18px; text-align:center; background:#fff; border:1px dashed #CBD5E1; border-radius:8px; color:var(--text-muted); }
+    .mn-search-empty.visible { display:block; }
+    .mn-search-empty strong { display:block; color:var(--text-main); font-size:.95rem; margin-bottom:5px; }
+
     /* ── Secciones ──────────────────────────────── */
     .mn-section { margin:18px 0 4px; }
     .mn-section-title {
@@ -58,7 +72,7 @@
       margin:0 0 10px;
       padding:8px 2px;
       background:transparent;
-      position:sticky; top:63px; z-index:10;
+      position:sticky; top:116px; z-index:10;
       backdrop-filter:blur(10px);
     }
     .mn-section-icon { width:34px; height:34px; border-radius:8px; display:inline-flex; align-items:center; justify-content:center; color:var(--accent); background:var(--accent-soft); border:1px solid var(--accent-line); }
@@ -142,6 +156,7 @@
     /* ── Responsive: pantallas grandes ─────────── */
     @media (min-width:640px) {
       .mn-page { padding-left:20px; padding-right:20px; }
+      .mn-search-wrap { padding-left:20px; padding-right:20px; }
       .mn-list { grid-template-columns:1fr 1fr; gap:14px; }
       .mn-card { min-height:154px; }
       .mn-card-thumb { width:132px; height:132px; }
@@ -241,6 +256,20 @@ foreach ($categorias as $cat) {
   <?php endforeach; ?>
 </div>
 
+<?php if (!empty($platillos)): ?>
+<div class="mn-search-wrap">
+  <div class="mn-search">
+    <?= mnIcon('search', 'mn-icon') ?>
+    <input id="mnSearchInput" class="mn-search-input" type="search" autocomplete="off" placeholder="Buscar platillo, bebida o ingrediente">
+    <button id="mnSearchClear" class="mn-search-clear" type="button" aria-label="Limpiar busqueda"><?= mnIcon('x', 'mn-icon') ?></button>
+  </div>
+</div>
+<div id="mnSearchEmpty" class="mn-search-empty">
+  <strong>Sin resultados</strong>
+  Prueba con otro nombre, ingrediente o categoria.
+</div>
+<?php endif; ?>
+
 <!-- Platillos por sección -->
 <?php if (empty($platillos)): ?>
 <div class="mn-empty">
@@ -280,8 +309,15 @@ $catNombres = array_column($categorias, 'nombre', 'id');
     $icon  = $catIconos[$cid] ?? 'utensils';
     $desc  = trim($p['descripcion'] ?? '');
     $alerg = array_filter(array_map('trim', explode(',', $p['alergenos'] ?? '')));
+    $ingredientesBusqueda = array_map(fn($r) => (string)($r['ingrediente_nombre'] ?? ''), $ings);
+    $searchText = implode(' ', array_filter(array_merge([
+        (string)($p['nombre'] ?? ''),
+        $desc,
+        (string)($catNombres[$cid] ?? ''),
+        (string)($p['contiene'] ?? ''),
+    ], $alerg, $ingredientesBusqueda)));
   ?>
-  <div class="mn-card <?= $esSinIng ? 'mn-card--visual' : '' ?>" data-cat="<?= $cid ?>" onclick="abrirModal(<?= $pId ?>)">
+  <div class="mn-card <?= $esSinIng ? 'mn-card--visual' : '' ?>" data-cat="<?= $cid ?>" data-search="<?= htmlspecialchars($searchText, ENT_QUOTES, 'UTF-8') ?>" onclick="abrirModal(<?= $pId ?>)">
     <div class="mn-card-body">
       <div class="mn-card-name"><?= htmlspecialchars($p['nombre']) ?></div>
       <?php if ($desc !== ''): ?>
@@ -369,20 +405,59 @@ const MENU = <?= json_encode(array_combine(
   }, $platillos)
 ), JSON_UNESCAPED_UNICODE) ?>;
 
+let activeCat = '';
+const searchInput = document.getElementById('mnSearchInput');
+const searchClear = document.getElementById('mnSearchClear');
+const searchEmpty = document.getElementById('mnSearchEmpty');
+
 document.querySelectorAll('.mn-tab').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.mn-tab').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    const cat = btn.dataset.cat;
-    document.querySelectorAll('.mn-card').forEach(c => {
-      c.style.display = (!cat || String(c.dataset.cat) === String(cat)) ? '' : 'none';
-    });
-    document.querySelectorAll('.mn-section').forEach(sec => {
-      const vis = [...sec.querySelectorAll('.mn-card')].some(c => c.style.display !== 'none');
-      sec.style.display = (cat && !vis) ? 'none' : '';
-    });
+    activeCat = btn.dataset.cat || '';
+    aplicarFiltros();
   });
 });
+
+if (searchInput) {
+  searchInput.addEventListener('input', aplicarFiltros);
+}
+if (searchClear) {
+  searchClear.addEventListener('click', () => {
+    searchInput.value = '';
+    searchInput.focus();
+    aplicarFiltros();
+  });
+}
+
+function normalizarBusqueda(str) {
+  return String(str || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+function aplicarFiltros() {
+  const query = normalizarBusqueda(searchInput ? searchInput.value : '');
+  let visibles = 0;
+
+  document.querySelectorAll('.mn-card').forEach(card => {
+    const coincideCat = !activeCat || String(card.dataset.cat) === String(activeCat);
+    const hayTexto = !query || normalizarBusqueda(card.dataset.search).includes(query);
+    const visible = coincideCat && hayTexto;
+    card.style.display = visible ? '' : 'none';
+    if (visible) visibles++;
+  });
+
+  document.querySelectorAll('.mn-section').forEach(sec => {
+    const vis = [...sec.querySelectorAll('.mn-card')].some(card => card.style.display !== 'none');
+    sec.style.display = vis ? '' : 'none';
+  });
+
+  if (searchClear) searchClear.classList.toggle('visible', query.length > 0);
+  if (searchEmpty) searchEmpty.classList.toggle('visible', visibles === 0);
+}
 
 function abrirModal(id) {
   const d = MENU[id]; if (!d) return;

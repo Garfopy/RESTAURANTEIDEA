@@ -1015,9 +1015,8 @@ class RestPublicoController extends BaseController
         if ($email && $newId) {
             try {
                 $emailSvc = new EmailService();
-                if (!$emailSvc->isConfigured()) {
+                $cancelUrl = BASE_URL . 'menu/' . $slug . '/cancelarReserva/' . $newId;
                     error_log("[Reserva #$newId] SMTP no configurado — no se envía confirmación a $email");
-                } else {
                     $cancelUrl = BASE_URL . 'menu/' . $slug . '/cancelarReserva/' . $newId;
                     $ok = $emailSvc->enviarConfirmacionReserva(
                         $email,
@@ -1032,7 +1031,6 @@ class RestPublicoController extends BaseController
                     } else {
                         error_log("[Reserva #$newId] FALLO al enviar confirmación a $email (revisa logs SMTP)");
                     }
-                }
             } catch (\Throwable $e) {
                 error_log("[Reserva #$newId] Excepción enviando confirmación a $email: " . $e->getMessage());
             }

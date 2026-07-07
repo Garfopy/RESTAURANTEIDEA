@@ -6,11 +6,39 @@
 [id^="qr-"] canvas,
 [id^="qr-"] img { display: block !important; width: 80px !important; height: 80px !important; }
 </style>
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
-  <div style="font-size:.85rem;color:#6B7280">
-    <?= count($mesas) ?> mesa<?= count($mesas) !== 1 ? 's' : '' ?>
+<style>
+.mesa-page-head{align-items:center;background:rgba(255,255,255,.86);border:1px solid #E5E7EB;border-radius:22px;box-shadow:0 18px 55px rgba(15,23,42,.06);display:flex;justify-content:space-between;gap:18px;margin-bottom:18px;padding:18px 20px}
+.mesa-page-title{color:#111827;font-size:1.35rem;font-weight:900;letter-spacing:-.03em;margin-bottom:4px}
+.mesa-page-subtitle{color:#64748B;font-size:.86rem}
+.mesa-actions-top{display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end}
+.mesa-tabs{background:rgba(255,255,255,.76);border:1px solid #E5E7EB;border-radius:999px;display:inline-flex;gap:4px;margin-bottom:16px;padding:5px;box-shadow:0 12px 34px rgba(15,23,42,.05)}
+.mesa-tab{border-radius:999px;color:#64748B;font-size:.84rem;font-weight:800;padding:9px 16px;text-decoration:none}
+.mesa-tab.active{background:#111827;color:#fff}
+.mesa-tab span{color:inherit;opacity:.72}
+.mesa-table-wrap{border-radius:22px;box-shadow:0 18px 55px rgba(15,23,42,.07)}
+.mesa-table th,.mesa-table td{text-align:center;vertical-align:middle}
+.mesa-table th{color:#334155;font-size:.76rem;letter-spacing:.03em;text-transform:uppercase}
+.mesa-table tbody tr{background:rgba(255,255,255,.98)}
+.mesa-table tbody tr:hover{background:#F8FAFC}
+.mesa-name{color:#111827;font-size:.95rem;font-weight:900}
+.mesa-zone{color:#64748B;font-weight:600}
+.mesa-capacity{background:#F1F5F9;border-radius:999px;color:#334155;display:inline-flex;font-size:.82rem;font-weight:900;justify-content:center;min-width:34px;padding:5px 10px}
+.qr-cell{vertical-align:middle;width:150px}
+.qr-mini{align-items:center;background:#fff;border:1px solid #E2E8F0;border-radius:16px;display:inline-flex;justify-content:center;padding:8px;box-shadow:0 10px 24px rgba(15,23,42,.06)}
+[id^="qr-"]{width:86px!important;height:86px!important;overflow:hidden}
+[id^="qr-"] canvas,[id^="qr-"] img{display:block!important;width:86px!important;height:86px!important}
+.mesa-qr-links{align-items:center;display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:8px}
+.mesa-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+@media (max-width:768px){.mesa-page-head{align-items:stretch;flex-direction:column}.mesa-actions-top{justify-content:stretch}.mesa-actions-top .btn{flex:1}.mesa-tabs{border-radius:18px;overflow-x:auto;width:100%}.mesa-tab{flex:1;text-align:center;white-space:nowrap}.mesa-table-wrap{overflow-x:auto}.mesa-table{min-width:860px}}
+</style>
+<div class="mesa-page-head">
+  <div>
+    <div class="mesa-page-title">Mesas</div>
+    <div class="mesa-page-subtitle">
+      <?= count($mesas) ?> mesa<?= count($mesas) !== 1 ? 's' : '' ?> configurada<?= count($mesas) !== 1 ? 's' : '' ?> para operar con QR.
+    </div>
   </div>
-  <div style="display:flex;gap:10px">
+  <div class="mesa-actions-top">
     <button onclick="rstModal('modalZona')"
       class="btn btn-outline btn-sm">
       + Zona
@@ -23,7 +51,7 @@
 </div>
 
 <!-- Tabs filtro estado -->
-<div style="display:flex;gap:6px;margin-bottom:14px;border-bottom:1px solid #E5E7EB">
+<div class="mesa-tabs">
   <?php
     $tabs = [
       'activas'   => ['Activas',   (int)($countActivas ?? 0)],
@@ -34,18 +62,15 @@
   ?>
   <?php foreach ($tabs as $key => [$label, $cnt]): ?>
     <a href="<?= BASE_URL ?>rest-mesa/index?estado=<?= $key ?>"
-       style="padding:8px 14px;font-size:.85rem;text-decoration:none;
-              border-bottom:2px solid <?= $filtroActual === $key ? '#111827' : 'transparent' ?>;
-              color:<?= $filtroActual === $key ? '#111827' : '#6B7280' ?>;
-              font-weight:<?= $filtroActual === $key ? '600' : '500' ?>">
-      <?= $label ?> <span style="color:#9CA3AF">(<?= $cnt ?>)</span>
+       class="mesa-tab <?= $filtroActual === $key ? 'active' : '' ?>">
+      <?= $label ?> <span>(<?= $cnt ?>)</span>
     </a>
   <?php endforeach; ?>
 </div>
 
 <!-- Tabla mesas -->
-<div class="rst-table-wrap">
-  <table class="rst-table">
+<div class="rst-table-wrap mesa-table-wrap">
+  <table class="rst-table mesa-table">
     <thead>
       <tr>
         <th>Mesa / Silla</th>
@@ -92,13 +117,13 @@
         $rowStyle = $esInactiva ? 'opacity:.55;background:#F9FAFB' : '';
       ?>
       <tr style="<?= $rowStyle ?>">
-        <td style="font-weight:600"><?= htmlspecialchars($m['nombre']) ?></td>
+        <td><span class="mesa-name"><?= htmlspecialchars($m['nombre']) ?></span></td>
         <td style="color:#6B7280"><?= htmlspecialchars($m['zona_nombre'] ?? '—') ?></td>
-        <td style="text-align:center"><?= (int)$m['capacidad'] ?></td>
+        <td><span class="mesa-capacity"><?= (int)$m['capacidad'] ?></span></td>
         <td data-estado-mesa="<?= (int)$m['id'] ?>"><?= $badgeCls ? "<span class=\"badge $badgeCls\">$badgeTxt</span>" : $badgeTxt ?></td>
         <td class="qr-cell">
-          <div id="qr-<?= $m['id'] ?>"></div>
-          <div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <div class="qr-mini"><div id="qr-<?= $m['id'] ?>"></div></div>
+          <div class="mesa-qr-links">
             <button type="button" onclick="verQR(<?= $m['id'] ?>, '<?= htmlspecialchars($m['nombre'], ENT_QUOTES) ?>')"
                     style="font-size:.7rem;color:#6B7280;background:#F3F4F6;border:none;
                            padding:3px 8px;border-radius:5px;cursor:pointer">
@@ -112,7 +137,7 @@
           </div>
         </td>
         <td>
-          <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <div class="mesa-actions">
             <button onclick='editMesa(<?= htmlspecialchars(json_encode($m), ENT_QUOTES) ?>)'
                     class="btn btn-outline btn-sm">Editar</button>
             <?php if ($esInactiva): ?>
