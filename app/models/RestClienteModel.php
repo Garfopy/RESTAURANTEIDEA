@@ -1057,11 +1057,24 @@ class RestClienteModel extends BaseModel
         $productoSelect = $this->columnExists('mobile_promociones', 'producto_id')
             ? 'producto_id, producto_id AS platillo_id,'
             : 'NULL AS producto_id, NULL AS platillo_id,';
+        $ruleSelects = [
+            $this->columnExists('mobile_promociones', 'tipo_descuento') ? 'tipo_descuento' : "'porcentaje' AS tipo_descuento",
+            $this->columnExists('mobile_promociones', 'valor_descuento') ? 'valor_descuento' : '0 AS valor_descuento',
+            $this->columnExists('mobile_promociones', 'scope_tipo') ? 'scope_tipo' : "'all' AS scope_tipo",
+            $this->columnExists('mobile_promociones', 'scope_ids') ? 'scope_ids' : 'NULL AS scope_ids',
+            $this->columnExists('mobile_promociones', 'buy_qty') ? 'buy_qty' : 'NULL AS buy_qty',
+            $this->columnExists('mobile_promociones', 'pay_qty') ? 'pay_qty' : 'NULL AS pay_qty',
+            $this->columnExists('mobile_promociones', 'min_subtotal') ? 'min_subtotal' : '0 AS min_subtotal',
+            $this->columnExists('mobile_promociones', 'max_uses') ? 'max_uses' : 'NULL AS max_uses',
+            $this->columnExists('mobile_promociones', 'combinable') ? 'combinable' : '0 AS combinable',
+        ];
+        $ruleSelect = implode(",\n                    ", $ruleSelects) . ',';
 
         return $this->query(
             "SELECT id,
                     usuario_id,
                     {$productoSelect}
+                    {$ruleSelect}
                     titulo,
                     descripcion,
                     imagen,

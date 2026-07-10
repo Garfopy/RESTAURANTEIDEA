@@ -29,9 +29,6 @@ class RestReservaController extends BaseController
 
         try {
             $emailSvc = new EmailService();
-            if (false) {
-                error_log("[Reserva #$reservaId] SMTP no configurado — no se envía confirmación a $email");
-            }
             $cancelUrl = BASE_URL . 'menu/' . $slug . '/cancelarReserva/' . $reservaId;
             $ok = $emailSvc->enviarConfirmacionReserva(
                 $email,
@@ -48,7 +45,6 @@ class RestReservaController extends BaseController
 
             if ($ok) {
                 $this->model->marcarConfirmacionEnviada($reservaId);
-                error_log("[Reserva #$reservaId] Confirmación enviada a $email");
                 return;
             }
 

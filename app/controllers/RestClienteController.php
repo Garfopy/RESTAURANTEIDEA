@@ -337,18 +337,15 @@ class RestClienteController extends BaseController
             }
         }
 
-        if (!$column) {
-            return null;
-        }
-
-        $stmt = $db->prepare("SELECT {$column}, empresa_id FROM rest_restaurantes WHERE id = ? LIMIT 1");
+        $branchSelect = $column ? "{$column} AS branch_ref" : "NULL AS branch_ref";
+        $stmt = $db->prepare("SELECT id, {$branchSelect}, empresa_id FROM rest_restaurantes WHERE id = ? LIMIT 1");
         $stmt->execute([$restauranteId]);
         $restaurante = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$restaurante) {
             return null;
         }
 
-        $value = $restaurante[$column] ?? null;
+        $value = $restaurante['branch_ref'] ?? null;
         if ($value) {
             return (int)$value;
         }
@@ -358,10 +355,22 @@ class RestClienteController extends BaseController
             return null;
         }
 
-        $stmt = $db->prepare("SELECT id FROM sucursales WHERE empresa_id = ? AND activo = 1 ORDER BY id ASC LIMIT 1");
-        $stmt->execute([$empresaId]);
-        $fallback = $stmt->fetchColumn();
-        return $fallback ? (int)$fallback : null;
+        try {
+            $stmt = $db->prepare("SHOW TABLES LIKE 'sucursales'");
+            $stmt->execute();
+            if ($stmt->fetch()) {
+                $stmt = $db->prepare("SELECT id FROM sucursales WHERE empresa_id = ? AND activo = 1 ORDER BY id ASC LIMIT 1");
+                $stmt->execute([$empresaId]);
+                $fallback = $stmt->fetchColumn();
+                if ($fallback) {
+                    return (int)$fallback;
+                }
+            }
+        } catch (\Throwable $e) {
+            // Si no hay tabla de sucursales, se usa el restaurante local.
+        }
+
+        return (int)$restaurante['id'];
     }
 
     private function callAmareApi(string $method, string $endpoint, ?array $body = null): array

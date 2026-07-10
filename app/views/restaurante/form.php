@@ -2,14 +2,16 @@
 $isEdit = !empty($restaurante);
 $nombre = $restaurante['nombre'] ?? '';
 $descripcion = $restaurante['descripcion'] ?? '';
-$telefono = $restaurante['telefono'] ?? '';
+$telefono = substr(preg_replace('/\D+/', '', (string)($restaurante['telefono'] ?? '')), 0, 10);
 $direccion = $restaurante['direccion'] ?? '';
+$lat = $restaurante['lat'] ?? '';
+$lng = $restaurante['lng'] ?? '';
 $horarioApertura = $restaurante['horario_apertura'] ?? '';
 $horarioCierre = $restaurante['horario_cierre'] ?? '';
 $colorPrimario = $restaurante['color_primario'] ?? '#C8102E';
 $colorSecundario = $restaurante['color_secundario'] ?? '#1F2937';
 $formAction = BASE_URL . ($isEdit ? 'restaurante/actualizar/' . (int)$restaurante['id'] : 'restaurante/guardar');
-$cancelUrl = BASE_URL . ($isEdit ? 'restaurante/dashboard' : 'restaurante/seleccionar');
+$cancelUrl = BASE_URL . ($isEdit || !empty($_SESSION['restaurante_activo_id']) ? 'restaurante/dashboard' : 'restaurante/seleccionar');
 $title = ($isEdit ? 'Editar local' : 'Crear local') . ' - CarniHub';
 ?>
 <!DOCTYPE html>
@@ -194,6 +196,61 @@ $title = ($isEdit ? 'Editar local' : 'Crear local') . ' - CarniHub';
       color: #6B7280;
       font-size: .76rem;
       line-height: 1.4;
+    }
+    .address-wrap {
+      position: relative;
+    }
+    .address-suggestions {
+      display: none;
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      z-index: 30;
+      max-height: 220px;
+      overflow-y: auto;
+      background: #fff;
+      border: 1px solid #E5E7EB;
+      border-radius: 8px;
+      box-shadow: 0 12px 28px rgba(17,24,39,.12);
+    }
+    .address-option {
+      padding: 10px 12px;
+      border-bottom: 1px solid #F3F4F6;
+      color: #374151;
+      cursor: pointer;
+      font-size: .82rem;
+      line-height: 1.35;
+    }
+    .address-option:hover {
+      background: #F9FAFB;
+      color: var(--cp);
+    }
+    .map-shell {
+      min-height: 230px;
+      border: 1px solid #D1D5DB;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #F3F4F6;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .map-placeholder {
+      padding: 22px;
+      color: #6B7280;
+      font-size: .84rem;
+      text-align: center;
+    }
+    .coords {
+      display: none;
+      margin-top: 8px;
+      color: #4B5563;
+      font-size: .76rem;
+      line-height: 1.45;
+    }
+    .coords strong {
+      color: #111827;
     }
     .color-grid {
       display: grid;
@@ -491,10 +548,14 @@ $title = ($isEdit ? 'Editar local' : 'Crear local') . ' - CarniHub';
                     type="tel"
                     name="telefono"
                     value="<?= htmlspecialchars($telefono) ?>"
-                    maxlength="30"
+                    maxlength="10"
+                    minlength="10"
+                    inputmode="numeric"
+                    pattern="[0-9]{10}"
                     autocomplete="tel"
                     placeholder="442 123 4567"
                   >
+                  <div class="hint">Usa solo 10 digitos.</div>
                 </div>
 
                 <div class="field">
@@ -519,15 +580,32 @@ $title = ($isEdit ? 'Editar local' : 'Crear local') . ' - CarniHub';
 
                 <div class="field full">
                   <label for="direccion">Direccion</label>
-                  <input
-                    id="direccion"
-                    type="text"
-                    name="direccion"
-                    value="<?= htmlspecialchars($direccion) ?>"
-                    maxlength="255"
-                    autocomplete="street-address"
-                    placeholder="Calle, numero, colonia, ciudad"
-                  >
+                  <div class="address-wrap">
+                    <input
+                      id="direccion"
+                      type="text"
+                      name="direccion"
+                      value="<?= htmlspecialchars($direccion) ?>"
+                      maxlength="255"
+                      autocomplete="street-address"
+                      placeholder="Calle, numero, colonia, ciudad"
+                    >
+                    <div id="addressSuggestions" class="address-suggestions"></div>
+                  </div>
+                  <input type="hidden" name="lat" id="lat" value="<?= htmlspecialchars((string)$lat) ?>">
+                  <input type="hidden" name="lng" id="lng" value="<?= htmlspecialchars((string)$lng) ?>">
+                  <div class="coords" id="coordsBox">
+                    <strong>Coordenadas:</strong>
+                    <span id="coordLat"><?= htmlspecialchars((string)($lat ?: '')) ?></span>,
+                    <span id="coordLng"><?= htmlspecialchars((string)($lng ?: '')) ?></span>
+                  </div>
+                </div>
+
+                <div class="field full">
+                  <label>Ubicacion en mapa</label>
+                  <div id="restaurantMap" class="map-shell" data-initial-lat="<?= htmlspecialchars((string)$lat) ?>" data-initial-lng="<?= htmlspecialchars((string)$lng) ?>">
+                    <div class="map-placeholder">Escribe la direccion para cargar la ubicacion en el mapa.</div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -637,7 +715,8 @@ $title = ($isEdit ? 'Editar local' : 'Crear local') . ' - CarniHub';
     const updatePreview = () => {
       const nombre = fields.nombre.value.trim();
       const descripcion = fields.descripcion.value.trim();
-      const telefono = fields.telefono.value.trim();
+      const telefono = fields.telefono.value.replace(/\D/g, '').slice(0, 10);
+      if (fields.telefono.value !== telefono) fields.telefono.value = telefono;
       const apertura = fields.apertura.value;
       const cierre = fields.cierre.value;
       const direccion = fields.direccion.value.trim();
@@ -665,6 +744,151 @@ $title = ($isEdit ? 'Editar local' : 'Crear local') . ' - CarniHub';
       field.addEventListener('input', updatePreview);
       field.addEventListener('change', updatePreview);
     });
+
+    const mapEl = document.getElementById('restaurantMap');
+    const suggestionsEl = document.getElementById('addressSuggestions');
+    const latInput = document.getElementById('lat');
+    const lngInput = document.getElementById('lng');
+    const coordLat = document.getElementById('coordLat');
+    const coordLng = document.getElementById('coordLng');
+    const coordsBox = document.getElementById('coordsBox');
+    let leafletMap = null;
+    let leafletMarker = null;
+    let addressTimer = null;
+    let leafletLoading = false;
+    const leafletCallbacks = [];
+
+    const ensureLeaflet = (callback) => {
+      if (window.L) {
+        callback();
+        return;
+      }
+      leafletCallbacks.push(callback);
+      if (leafletLoading) return;
+      leafletLoading = true;
+
+      const css = document.createElement('link');
+      css.rel = 'stylesheet';
+      css.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      document.head.appendChild(css);
+
+      const script = document.createElement('script');
+      script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+      script.onload = () => {
+        while (leafletCallbacks.length) leafletCallbacks.shift()();
+      };
+      document.head.appendChild(script);
+    };
+
+    const setMapPlaceholder = (message) => {
+      if (!mapEl || leafletMap) return;
+      mapEl.style.display = 'flex';
+      mapEl.innerHTML = `<div class="map-placeholder">${message}</div>`;
+    };
+
+    const renderMap = (lat, lng, label) => {
+      if (!mapEl || !isFinite(lat) || !isFinite(lng)) return;
+      ensureLeaflet(() => {
+        mapEl.style.display = 'block';
+        if (!leafletMap) {
+          mapEl.innerHTML = '';
+          leafletMap = L.map(mapEl).setView([lat, lng], 16);
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: 'OpenStreetMap',
+            maxZoom: 19
+          }).addTo(leafletMap);
+          leafletMarker = L.marker([lat, lng]).addTo(leafletMap);
+        } else {
+          leafletMap.setView([lat, lng], 16);
+          leafletMarker.setLatLng([lat, lng]);
+        }
+        if (label) leafletMarker.bindPopup(label);
+        setTimeout(() => leafletMap.invalidateSize(), 80);
+      });
+    };
+
+    const setAddressCoords = (lat, lng, label) => {
+      const latFixed = Number(lat).toFixed(6);
+      const lngFixed = Number(lng).toFixed(6);
+      latInput.value = latFixed;
+      lngInput.value = lngFixed;
+      coordLat.textContent = latFixed;
+      coordLng.textContent = lngFixed;
+      coordsBox.style.display = 'block';
+      renderMap(Number(latFixed), Number(lngFixed), label);
+    };
+
+    const clearAddressCoords = () => {
+      latInput.value = '';
+      lngInput.value = '';
+      coordLat.textContent = '';
+      coordLng.textContent = '';
+      coordsBox.style.display = 'none';
+      if (!leafletMap) setMapPlaceholder('Escribe la direccion para cargar la ubicacion en el mapa.');
+    };
+
+    const escapeAttr = (value) => String(value)
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+
+    const geocodeAddress = (query, showSuggestions) => {
+      fetch('https://nominatim.openstreetmap.org/search?format=json&limit=5&addressdetails=0&q=' + encodeURIComponent(query))
+        .then(response => response.json())
+        .then(data => {
+          if (!Array.isArray(data) || !data.length) {
+            if (showSuggestions) suggestionsEl.style.display = 'none';
+            if (!leafletMap) setMapPlaceholder('No se encontro la direccion en el mapa.');
+            return;
+          }
+
+          const first = data[0];
+          setAddressCoords(parseFloat(first.lat), parseFloat(first.lon), first.display_name);
+
+          if (showSuggestions) {
+            suggestionsEl.innerHTML = data.map(item => {
+              const name = escapeAttr(item.display_name);
+              return `<div class="address-option" onmousedown="selectAddress(event, this)" data-value="${name}" data-lat="${escapeAttr(item.lat)}" data-lng="${escapeAttr(item.lon)}">${name}</div>`;
+            }).join('');
+            suggestionsEl.style.display = 'block';
+          }
+        })
+        .catch(() => {
+          if (showSuggestions) suggestionsEl.style.display = 'none';
+          if (!leafletMap) setMapPlaceholder('No se pudo cargar el mapa.');
+        });
+    };
+
+    window.selectAddress = (event, el) => {
+      event.preventDefault();
+      fields.direccion.value = el.dataset.value;
+      setAddressCoords(parseFloat(el.dataset.lat), parseFloat(el.dataset.lng), el.dataset.value);
+      suggestionsEl.style.display = 'none';
+      updatePreview();
+    };
+
+    fields.direccion.addEventListener('input', () => {
+      clearTimeout(addressTimer);
+      clearAddressCoords();
+      const query = fields.direccion.value.trim();
+      if (query.length < 4) {
+        suggestionsEl.style.display = 'none';
+        return;
+      }
+      addressTimer = setTimeout(() => geocodeAddress(query, true), 550);
+    });
+    fields.direccion.addEventListener('blur', () => {
+      setTimeout(() => { suggestionsEl.style.display = 'none'; }, 160);
+    });
+
+    const initialLat = parseFloat(mapEl?.dataset.initialLat || '');
+    const initialLng = parseFloat(mapEl?.dataset.initialLng || '');
+    if (isFinite(initialLat) && isFinite(initialLng)) {
+      setAddressCoords(initialLat, initialLng, fields.direccion.value.trim());
+    } else if (fields.direccion.value.trim().length >= 4) {
+      geocodeAddress(fields.direccion.value.trim(), false);
+    }
 
     form.addEventListener('submit', () => {
       form.querySelector('button[type="submit"]').disabled = true;

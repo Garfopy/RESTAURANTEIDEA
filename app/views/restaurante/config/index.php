@@ -116,8 +116,10 @@
 
       <div class="form-group">
         <label class="form-label">Teléfono</label>
-        <input type="text" name="telefono" class="form-input"
-               value="<?= htmlspecialchars($restaurante['telefono'] ?? '') ?>">
+        <input type="tel" name="telefono" id="inpTelefono" class="form-input"
+               value="<?= htmlspecialchars(substr(preg_replace('/\D+/', '', (string)($restaurante['telefono'] ?? '')), 0, 10)) ?>"
+               maxlength="10" minlength="10" inputmode="numeric" pattern="[0-9]{10}">
+        <div style="font-size:.72rem;color:#9CA3AF;margin-top:4px">Usa solo 10 digitos.</div>
       </div>
 
       <!-- Dirección + Mapa lado a lado -->
@@ -143,7 +145,7 @@
             <input type="hidden" name="lng" id="inpLng" value="<?= htmlspecialchars($restaurante['lng'] ?? '') ?>">
           </div>
           <div id="mapNote" style="font-size:.72rem;color:#9CA3AF;margin-top:6px">
-            Guarda para actualizar el mapa.
+            El mapa se actualiza mientras escribes o al elegir una sugerencia.
           </div>
         </div>
         <div>
@@ -160,91 +162,6 @@
           </div>
         </div>
       </div>
-      <?php if (!empty($restaurante['direccion'])): ?>
-      <?php if (!empty($mapsApiKey)): ?>
-      <!-- Nominatim geocoding + Google Maps display -->
-      <script>
-      window._mapCoords = null;
-
-      function initMap() {
-        // Called when Google Maps SDK loads — render if Nominatim already resolved
-        if (window._mapCoords) _renderGoogleMap(window._mapCoords.lat, window._mapCoords.lng);
-      }
-
-      function _renderGoogleMap(lat, lng) {
-        var el = document.getElementById('rstMap');
-        var dir = el.dataset.direccion;
-        el.innerHTML = '';
-        var map = new google.maps.Map(el, { center:{lat:lat,lng:lng}, zoom:16 });
-        new google.maps.Marker({ position:{lat:lat,lng:lng}, map:map, title:dir });
-      }
-
-      (function(){
-        var el  = document.getElementById('rstMap');
-        var dir = el.dataset.direccion;
-        fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(dir))
-          .then(function(r){ return r.json(); })
-          .then(function(data) {
-            if (data[0]) {
-              var lat = parseFloat(data[0].lat), lng = parseFloat(data[0].lon);
-              document.getElementById('coordLat').textContent = lat.toFixed(6);
-              document.getElementById('coordLng').textContent = lng.toFixed(6);
-              document.getElementById('inpLat').value = lat.toFixed(6);
-              document.getElementById('inpLng').value = lng.toFixed(6);
-              document.getElementById('coordsBox').style.display = 'block';
-              window._mapCoords = {lat:lat, lng:lng};
-              if (window.google && window.google.maps) _renderGoogleMap(lat, lng);
-            } else {
-              el.innerHTML = '<div style="padding:20px;text-align:center;color:#9CA3AF;font-size:.82rem">No se encontró la dirección en el mapa.</div>';
-            }
-          })
-          .catch(function(){ el.innerHTML = '<div style="padding:20px;text-align:center;color:#9CA3AF;font-size:.82rem">No se pudo cargar el mapa.</div>'; });
-      })();
-      </script>
-      <script src="https://maps.googleapis.com/maps/api/js?key=<?= htmlspecialchars($mapsApiKey) ?>&callback=initMap" async defer></script>
-      <?php else: ?>
-      <!-- Nominatim + Leaflet (sin API key) -->
-      <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-      <script>
-      (function(){
-        var sc = document.createElement('script');
-        sc.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-        sc.onload = function() {
-          var markerIcon = L.divIcon({
-            className: 'rst-map-pin',
-            html: '<div style="width:22px;height:22px;border-radius:50% 50% 50% 0;background:var(--cp);transform:rotate(-45deg);box-shadow:0 2px 8px rgba(0,0,0,.25);border:2px solid #fff;position:relative"><div style="position:absolute;inset:6px;background:#fff;border-radius:50%"></div></div>',
-            iconSize: [22, 22],
-            iconAnchor: [11, 22],
-            popupAnchor: [0, -18]
-          });
-          var el  = document.getElementById('rstMap');
-          var dir = el.dataset.direccion;
-          el.innerHTML = '';
-          fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(dir))
-            .then(function(r){ return r.json(); })
-            .then(function(data) {
-              if (data[0]) {
-                var lat = parseFloat(data[0].lat), lng = parseFloat(data[0].lon);
-                var map = L.map(el).setView([lat, lng], 16);
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  { attribution: '© OpenStreetMap', maxZoom: 19 }).addTo(map);
-                L.marker([lat, lng], { icon: markerIcon }).addTo(map).bindPopup(dir).openPopup();
-                document.getElementById('coordLat').textContent = lat.toFixed(6);
-                document.getElementById('coordLng').textContent = lng.toFixed(6);
-                document.getElementById('inpLat').value = lat.toFixed(6);
-                document.getElementById('inpLng').value = lng.toFixed(6);
-                document.getElementById('coordsBox').style.display = 'block';
-              } else {
-                el.innerHTML = '<div style="padding:20px;text-align:center;color:#9CA3AF;font-size:.82rem">No se encontró la dirección en el mapa.</div>';
-              }
-            })
-            .catch(function(){ el.innerHTML = '<div style="padding:20px;text-align:center;color:#9CA3AF;font-size:.82rem">No se pudo cargar el mapa.</div>'; });
-        };
-        document.head.appendChild(sc);
-      })();
-      </script>
-      <?php endif; ?>
-      <?php endif; ?>
 
       <!-- Horarios por día de la semana -->
       <div style="border-top:1px solid #F3F4F6;padding-top:20px;margin-bottom:20px">
@@ -733,22 +650,38 @@
         btn.disabled = true; spinner.style.display = 'inline';
 
         try {
-          // 1. Intentar registrar (Amare-App espera "name", no "nombre")
-          const registerUrl = url + '/auth/register';
-          console.log('[Amare] Registrando en:', registerUrl);
-          let res = await fetch(registerUrl, {
+          // 1. Intentar login con una cuenta existente.
+          let res = await fetch(url + '/auth/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: nameVal, email, password: pass })
+            body: JSON.stringify({ email, password: pass })
           });
           let data = await res.json();
 
-          // Si ya existe (409 Conflict u otro), no es error — seguimos al login
-          if (!res.ok && res.status !== 409 && res.status !== 422) {
+          // Si el login falla por credenciales, intentamos crear la cuenta.
+          if (!res.ok && res.status !== 401 && res.status !== 403 && res.status !== 409 && res.status !== 422) {
             throw new Error(data.message || data.error || 'Error al registrar');
           }
 
-          // 2. Hacer login para obtener el token
+          // 2. Registrar solo cuando el login no devolvio token.
+          if (!res.ok || data.success === false || !(data.data?.token || data.token || data.access_token)) {
+            res = await fetch(url + '/auth/register', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name: nameVal, email, password: pass })
+            });
+            data = await res.json();
+
+            const msgRegistro = (data.message || data.error || '').toString();
+            const cuentaExistente = res.status === 409 || /exist|registr|taken|uso|usado|email/i.test(msgRegistro);
+            if (!res.ok || data.success === false) {
+              if (cuentaExistente) {
+                throw new Error('La cuenta ya existe. Ingresa la contrasena correcta o usa otro email.');
+              }
+              throw new Error(msgRegistro || 'Error al registrar');
+            }
+          }
+
           res = await fetch(url + '/auth/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -756,11 +689,11 @@
           });
           data = await res.json();
 
-          if (!res.ok || !data.success) {
+          if (!res.ok || data.success === false) {
             throw new Error(data.message || data.error || 'Error al iniciar sesión');
           }
 
-          const token = data.data?.token || data.token;
+          const token = data.data?.token || data.token || data.access_token;
           if (!token) throw new Error('No se recibió el token');
 
           // 3. Guardar token y email en campos ocultos
@@ -1045,6 +978,64 @@
 
 <script>
 const BASE = '<?= BASE_URL ?>';
+let rstLeafletMap = null;
+let rstLeafletMarker = null;
+let rstLeafletLoading = false;
+const rstLeafletCallbacks = [];
+
+function ensureRstLeaflet(callback) {
+  if (window.L) {
+    callback();
+    return;
+  }
+  rstLeafletCallbacks.push(callback);
+  if (rstLeafletLoading) return;
+  rstLeafletLoading = true;
+
+  const css = document.createElement('link');
+  css.rel = 'stylesheet';
+  css.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+  document.head.appendChild(css);
+
+  const script = document.createElement('script');
+  script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+  script.onload = function() {
+    while (rstLeafletCallbacks.length) rstLeafletCallbacks.shift()();
+  };
+  document.head.appendChild(script);
+}
+
+function setMapPlaceholder(message) {
+  const el = document.getElementById('rstMap');
+  if (!el || rstLeafletMap) return;
+  el.style.display = 'flex';
+  el.innerHTML = '<div style="text-align:center;color:#9CA3AF;font-size:.82rem;padding:20px">' + message + '</div>';
+}
+
+function renderAddressMap(lat, lng, label) {
+  const el = document.getElementById('rstMap');
+  lat = parseFloat(lat);
+  lng = parseFloat(lng);
+  if (!el || !isFinite(lat) || !isFinite(lng)) return;
+
+  ensureRstLeaflet(function() {
+    el.style.display = 'block';
+    if (!rstLeafletMap) {
+      el.innerHTML = '';
+      rstLeafletMap = L.map(el).setView([lat, lng], 16);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: 'OpenStreetMap',
+        maxZoom: 19
+      }).addTo(rstLeafletMap);
+      rstLeafletMarker = L.marker([lat, lng]).addTo(rstLeafletMap);
+    } else {
+      rstLeafletMap.setView([lat, lng], 16);
+      rstLeafletMarker.setLatLng([lat, lng]);
+    }
+    if (label) rstLeafletMarker.bindPopup(label);
+    setTimeout(function(){ rstLeafletMap.invalidateSize(); }, 80);
+  });
+}
 // ── CarniHub: método de pago + tarjeta guardada ──────────────────────────────
 function chOnMetodoChange(val) {
   document.getElementById('chTransfPanel').style.display     = val === 'transferencia' ? 'block' : 'none';
@@ -1228,7 +1219,16 @@ bindColorPair('appBtnTextPicker', 'txtAppBtnTextColor');
       fetch('https://nominatim.openstreetmap.org/search?format=json&limit=6&addressdetails=0&q=' + encodeURIComponent(q))
         .then(function(r){ return r.json(); })
         .then(function(data) {
-          if (!data || !data.length) { sugg.style.display = 'none'; return; }
+          if (!data || !data.length) {
+            sugg.style.display = 'none';
+            setMapPlaceholder('No se encontro la direccion en el mapa.');
+            return;
+          }
+          var firstLat = parseFloat(data[0].lat);
+          var firstLng = parseFloat(data[0].lon);
+          if (isFinite(firstLat) && isFinite(firstLng)) {
+            setAddressCoords(firstLat.toFixed(6), firstLng.toFixed(6), data[0].display_name);
+          }
           sugg.innerHTML = data.map(function(item) {
             var name = item.display_name.replace(/</g,'&lt;').replace(/>/g,'&gt;');
             var lat = parseFloat(item.lat);
@@ -1242,7 +1242,10 @@ bindColorPair('appBtnTextPicker', 'txtAppBtnTextColor');
           }).join('');
           sugg.style.display = 'block';
         })
-        .catch(function(){ sugg.style.display = 'none'; });
+        .catch(function(){
+          sugg.style.display = 'none';
+          setMapPlaceholder('No se pudo cargar el mapa.');
+        });
     }, 420);
   });
   inp.addEventListener('blur', function() {
@@ -1252,17 +1255,23 @@ bindColorPair('appBtnTextPicker', 'txtAppBtnTextColor');
     if (sugg.innerHTML && this.value.length >= 4) sugg.style.display = 'block';
   });
 })();
-function setAddressCoords(lat, lng) {
+function setAddressCoords(lat, lng, label) {
   const coordLat = document.getElementById('coordLat');
   const coordLng = document.getElementById('coordLng');
   const inpLat = document.getElementById('inpLat');
   const inpLng = document.getElementById('inpLng');
   const box = document.getElementById('coordsBox');
-  if (coordLat) coordLat.textContent = lat;
-  if (coordLng) coordLng.textContent = lng;
-  if (inpLat) inpLat.value = lat;
-  if (inpLng) inpLng.value = lng;
+  lat = parseFloat(lat);
+  lng = parseFloat(lng);
+  if (!isFinite(lat) || !isFinite(lng)) return;
+  const latFixed = lat.toFixed(6);
+  const lngFixed = lng.toFixed(6);
+  if (coordLat) coordLat.textContent = latFixed;
+  if (coordLng) coordLng.textContent = lngFixed;
+  if (inpLat) inpLat.value = latFixed;
+  if (inpLng) inpLng.value = lngFixed;
   if (box) box.style.display = 'block';
+  renderAddressMap(latFixed, lngFixed, label || document.getElementById('inpDireccion')?.value || '');
 }
 function clearAddressCoords() {
   const coordLat = document.getElementById('coordLat');
@@ -1275,12 +1284,13 @@ function clearAddressCoords() {
   if (inpLat) inpLat.value = '';
   if (inpLng) inpLng.value = '';
   if (box) box.style.display = 'none';
+  setMapPlaceholder('Escribe la direccion para cargar la ubicacion en el mapa.');
 }
 function addrSelect(e, el) {
   e.preventDefault();
   document.getElementById('inpDireccion').value = el.dataset.val;
   if (el.dataset.lat && el.dataset.lng) {
-    setAddressCoords(el.dataset.lat, el.dataset.lng);
+    setAddressCoords(el.dataset.lat, el.dataset.lng, el.dataset.val);
   } else {
     clearAddressCoords();
   }
@@ -1294,6 +1304,38 @@ document.addEventListener('mouseover', function(e) {
 document.addEventListener('mouseout', function(e) {
   if (e.target.closest('.addr-opt')) e.target.closest('.addr-opt').style.background = '';
 });
+
+(function() {
+  const phone = document.getElementById('inpTelefono');
+  if (phone) {
+    phone.addEventListener('input', function() {
+      this.value = this.value.replace(/\D/g, '').slice(0, 10);
+    });
+  }
+
+  const inp = document.getElementById('inpDireccion');
+  const lat = document.getElementById('inpLat')?.value;
+  const lng = document.getElementById('inpLng')?.value;
+  if (lat && lng) {
+    setAddressCoords(lat, lng, inp?.value || '');
+    return;
+  }
+  if (inp && inp.value.trim().length >= 4) {
+    fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&addressdetails=0&q=' + encodeURIComponent(inp.value.trim()))
+      .then(function(r){ return r.json(); })
+      .then(function(data) {
+        if (data && data[0]) {
+          setAddressCoords(data[0].lat, data[0].lon, data[0].display_name);
+        } else {
+          setMapPlaceholder('No se encontro la direccion en el mapa.');
+        }
+      })
+      .catch(function(){ setMapPlaceholder('No se pudo cargar el mapa.'); });
+  } else {
+    setMapPlaceholder('Escribe la direccion para cargar la ubicacion en el mapa.');
+  }
+})();
+
 (function() {
   const script = document.createElement('script');
   script.src = 'https://unpkg.com/qrcodejs@1.0.0/qrcode.min.js';

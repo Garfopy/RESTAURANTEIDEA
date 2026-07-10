@@ -1016,21 +1016,18 @@ class RestPublicoController extends BaseController
             try {
                 $emailSvc = new EmailService();
                 $cancelUrl = BASE_URL . 'menu/' . $slug . '/cancelarReserva/' . $newId;
-                    error_log("[Reserva #$newId] SMTP no configurado — no se envía confirmación a $email");
-                    $cancelUrl = BASE_URL . 'menu/' . $slug . '/cancelarReserva/' . $newId;
-                    $ok = $emailSvc->enviarConfirmacionReserva(
-                        $email,
-                        $restaurante,
-                        ['nombre' => $nombre, 'fecha' => $fecha, 'hora' => $hora,
-                         'personas' => $personas, 'mesa_nombre' => $mesa['nombre']],
-                        $cancelUrl
-                    );
-                    if ($ok) {
-                        $reservaModel->marcarConfirmacionEnviada((int)$newId);
-                        error_log("[Reserva #$newId] Confirmación enviada a $email");
-                    } else {
-                        error_log("[Reserva #$newId] FALLO al enviar confirmación a $email (revisa logs SMTP)");
-                    }
+                $ok = $emailSvc->enviarConfirmacionReserva(
+                    $email,
+                    $restaurante,
+                    ['nombre' => $nombre, 'fecha' => $fecha, 'hora' => $hora,
+                     'personas' => $personas, 'mesa_nombre' => $mesa['nombre']],
+                    $cancelUrl
+                );
+                if ($ok) {
+                    $reservaModel->marcarConfirmacionEnviada((int)$newId);
+                } else {
+                    error_log("[Reserva #$newId] FALLO al enviar confirmación a $email (revisa logs SMTP)");
+                }
             } catch (\Throwable $e) {
                 error_log("[Reserva #$newId] Excepción enviando confirmación a $email: " . $e->getMessage());
             }
@@ -1094,6 +1091,18 @@ class RestPublicoController extends BaseController
             }
 
             $reservaModel->cambiarEstado($reservaId, 'cancelada');
+            if (!empty($reserva['email'])) {
+                try {
+                    (new EmailService())->enviarCancelacionReservaCliente(
+                        $reserva['email'],
+                        $restaurante,
+                        $reserva,
+                        BASE_URL . 'menu/' . $slug . '/reservar'
+                    );
+                } catch (\Throwable $e) {
+                    error_log("[Reserva #$reservaId] Error enviando cancelacion a {$reserva['email']}: " . $e->getMessage());
+                }
+            }
             $cancelada = true;
             $flash     = null;
             $this->render('publico/cancelar_reserva', compact('restaurante', 'pageTitle', 'reservaId', 'cancelada', 'flash'));

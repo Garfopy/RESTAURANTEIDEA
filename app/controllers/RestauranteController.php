@@ -5,6 +5,27 @@ class RestauranteController extends BaseController
 {
     private RestauranteModel $model;
 
+    private function normalizarTelefono(?string $telefono): string
+    {
+        return substr(preg_replace('/\D+/', '', (string)$telefono), 0, 10);
+    }
+
+    private function telefonoValido(string $telefono): bool
+    {
+        return $telefono === '' || strlen($telefono) === 10;
+    }
+
+    private function normalizeCoordinate($value, float $min, float $max): ?float
+    {
+        $value = trim((string)$value);
+        if ($value === '' || !is_numeric($value)) {
+            return null;
+        }
+
+        $coordinate = (float)$value;
+        return ($coordinate >= $min && $coordinate <= $max) ? $coordinate : null;
+    }
+
     public function __construct()
     {
         parent::__construct();
@@ -159,9 +180,17 @@ class RestauranteController extends BaseController
             $this->redirect('restaurante/crear');
         }
 
+        $telefono = $this->normalizarTelefono($this->post('telefono', ''));
+        if (!$this->telefonoValido($telefono)) {
+            $this->flash('error', 'El telefono debe tener exactamente 10 digitos.');
+            $this->redirect('restaurante/crear');
+        }
+
         $compradorId = $this->usuarioId();
         $usuario     = $_SESSION['usuario'];
         $slug        = $this->model->generarSlugUnico($nombre);
+        $lat         = $this->normalizeCoordinate($this->post('lat'), -90, 90);
+        $lng         = $this->normalizeCoordinate($this->post('lng'), -180, 180);
 
         $id = $this->model->insert([
             'empresa_id'      => $usuario['empresa_id'],
@@ -171,8 +200,10 @@ class RestauranteController extends BaseController
             'color_primario'  => $this->post('color_primario', '#C8102E'),
             'color_secundario'=> $this->post('color_secundario', '#1f2937'),
             'descripcion'     => $this->post('descripcion'),
-            'telefono'        => $this->post('telefono'),
+            'telefono'        => $telefono,
             'direccion'       => $this->post('direccion'),
+            'lat'             => $lat,
+            'lng'             => $lng,
             'horario_apertura'=> $this->post('horario_apertura') ?: null,
             'horario_cierre'  => $this->post('horario_cierre') ?: null,
         ]);
@@ -219,13 +250,27 @@ class RestauranteController extends BaseController
             $this->flash('error', 'Sin acceso.'); $this->redirect('restaurante/seleccionar');
         }
 
+        $nombre = trim($this->post('nombre', ''));
+        if (!$nombre) {
+            $this->flash('error', 'El nombre es obligatorio.');
+            $this->redirect('restaurante/editar/' . $restauranteId);
+        }
+
+        $telefono = $this->normalizarTelefono($this->post('telefono', ''));
+        if (!$this->telefonoValido($telefono)) {
+            $this->flash('error', 'El telefono debe tener exactamente 10 digitos.');
+            $this->redirect('restaurante/editar/' . $restauranteId);
+        }
+
         $this->model->update($restauranteId, [
-            'nombre'          => trim($this->post('nombre', '')),
+            'nombre'          => $nombre,
             'color_primario'  => $this->post('color_primario', '#C8102E'),
             'color_secundario'=> $this->post('color_secundario', '#1f2937'),
             'descripcion'     => $this->post('descripcion'),
-            'telefono'        => $this->post('telefono'),
+            'telefono'        => $telefono,
             'direccion'       => $this->post('direccion'),
+            'lat'             => $this->normalizeCoordinate($this->post('lat'), -90, 90),
+            'lng'             => $this->normalizeCoordinate($this->post('lng'), -180, 180),
             'horario_apertura'=> $this->post('horario_apertura') ?: null,
             'horario_cierre'  => $this->post('horario_cierre') ?: null,
         ]);

@@ -19,6 +19,7 @@ class EmailService
     private string $smtpFromName;
     private bool $configured;
     private bool $nativeMailAvailable;
+    private bool $phpMailerAvailable;
 
     // Cache estático para evitar múltiples consultas DB por request
     private static ?array $configCache = null;
@@ -28,17 +29,27 @@ class EmailService
         // Cargar configuración una sola vez por request
         if (self::$configCache === null) {
             $db = Database::getInstance();
-            $get = fn(string $k, string $default = '') =>
-                $db->query("SELECT valor FROM global_settings WHERE clave = '$k' LIMIT 1")->fetchColumn() ?: $default;
+            $stmt = $db->prepare("SELECT valor FROM global_settings WHERE clave = ? LIMIT 1");
+            $get = function (array $keys, string $default = '') use ($stmt): string {
+                foreach ($keys as $key) {
+                    $stmt->execute([$key]);
+                    $value = $stmt->fetchColumn();
+                    if ($value !== false && $value !== null && trim((string)$value) !== '') {
+                        return (string)$value;
+                    }
+                }
+
+                return $default;
+            };
 
             self::$configCache = [
-                'host'       => $get('smtp_host'),
-                'port'       => $get('smtp_port', '587'),
-                'encryption' => $get('smtp_encryption', 'tls'),
-                'username'   => $get('smtp_username'),
-                'password'   => $get('smtp_password'),
-                'from_email' => $get('smtp_from_email'),
-                'from_name'  => $get('smtp_from_name', 'CarniHub'),
+                'host'       => $get(['smtp_host']),
+                'port'       => $get(['smtp_port'], '587'),
+                'encryption' => $this->normalizarEncryption($get(['smtp_encryption'], 'tls')),
+                'username'   => $get(['smtp_username', 'smtp_user']),
+                'password'   => $get(['smtp_password', 'smtp_pass']),
+                'from_email' => $get(['smtp_from_email', 'smtp_from', 'smtp_username', 'smtp_user']),
+                'from_name'  => $get(['smtp_from_name', 'app_name'], 'CarniHub'),
             ];
 
             self::$configCache['from_email'] = self::$configCache['from_email'] ?: self::$configCache['username'];
@@ -52,12 +63,34 @@ class EmailService
         $this->smtpFromEmail  = self::$configCache['from_email'];
         $this->smtpFromName   = self::$configCache['from_name'];
         $this->nativeMailAvailable = function_exists('mail');
+        $this->phpMailerAvailable = class_exists(PHPMailer::class);
 
         // Verificar si la configuración está completa
         $this->configured = !empty($this->smtpHost)
                          && !empty($this->smtpUsername)
                          && !empty($this->smtpPassword)
                          && !empty($this->smtpFromEmail);
+    }
+
+    private function registrarFallbackMailer(string $contexto): void
+    {
+        if (defined('EMAIL_DEBUG') && EMAIL_DEBUG) {
+            error_log("[EmailService] PHPMailer no esta instalado. $contexto se intentara enviar con mail() nativo.");
+        }
+    }
+
+    private function normalizarEncryption(string $value): string
+    {
+        $value = strtolower(trim($value));
+
+        switch ($value) {
+            case 'starttls':
+                return 'tls';
+            case 'smtps':
+                return 'ssl';
+            default:
+                return $value;
+        }
     }
 
     private function fromEmail(): string
@@ -120,7 +153,9 @@ class EmailService
         );
 
         if ($ok) {
-            error_log("[EmailService] Email enviado via mail() nativo a: $destEmail");
+            if (defined('EMAIL_DEBUG') && EMAIL_DEBUG) {
+                error_log("[EmailService] Email enviado via mail() nativo a: $destEmail");
+            }
             return true;
         }
 
@@ -370,6 +405,46 @@ class EmailService
         $notas      = htmlspecialchars($reserva['notas'] ?? '');
         $urlAdmin   = BASE_URL . 'rest-reserva/index';
 
+        if (!$this->phpMailerAvailable) {
+            $this->registrarFallbackMailer('La notificacion de nueva reserva');
+            $subject = "Nueva solicitud de reservacion - $restNombre";
+            $notasRow = $notas ? "<tr><td style='color:#6B7280;padding:10px 14px;background:#F9FAFB'>Notas</td><td style='padding:10px 14px;font-style:italic'>$notas</td></tr>" : '';
+            $htmlBody = '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#F3F4F6;font-family:Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#F3F4F6;padding:24px 0;">
+<tr><td align="center">
+<table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08);">
+  <tr><td style="background:#1F2937;padding:28px 30px;">
+    <p style="margin:0;color:#9CA3AF;font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;">' . $restNombre . '</p>
+    <h1 style="margin:6px 0 0;color:#fff;font-size:1.25rem;font-weight:700;">Nueva solicitud de reservacion</h1>
+  </td></tr>
+  <tr><td style="padding:28px 30px;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #E5E7EB;border-radius:8px;font-size:.88rem;border-collapse:collapse;">
+      <tr><td style="color:#6B7280;padding:10px 14px;width:38%">Nombre</td><td style="padding:10px 14px;font-weight:700">' . $nombre . '</td></tr>
+      <tr style="background:#F9FAFB"><td style="color:#6B7280;padding:10px 14px">Telefono</td><td style="padding:10px 14px">' . $telefono . '</td></tr>
+      <tr><td style="color:#6B7280;padding:10px 14px">Fecha</td><td style="padding:10px 14px;font-weight:700">' . date('d/m/Y', strtotime($fecha)) . '</td></tr>
+      <tr style="background:#F9FAFB"><td style="color:#6B7280;padding:10px 14px">Hora</td><td style="padding:10px 14px;font-weight:700">' . $hora . '</td></tr>
+      <tr><td style="color:#6B7280;padding:10px 14px">Personas</td><td style="padding:10px 14px">' . $personas . '</td></tr>
+      ' . $notasRow . '
+    </table>
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:24px;">
+      <tr><td align="center">
+        <a href="' . $urlAdmin . '" style="display:inline-block;background:#1F2937;color:#fff;text-decoration:none;padding:12px 32px;border-radius:8px;font-weight:700;font-size:.95rem;">
+          Ver en panel de reservaciones
+        </a>
+      </td></tr>
+    </table>
+  </td></tr>
+  <tr><td style="background:#F9FAFB;padding:16px 30px;text-align:center;border-top:1px solid #E5E7EB;">
+    <p style="margin:0;color:#9CA3AF;font-size:.72rem;">(c) ' . date('Y') . ' CarniHub</p>
+  </td></tr>
+</table>
+</td></tr></table>
+</body></html>';
+            $altBody = "Nueva solicitud de reservacion en $restNombre\n\nNombre: {$reserva['nombre']}\nTelefono: {$reserva['telefono']}\nFecha: $fecha\nHora: $hora\nPersonas: $personas" . ($reserva['notas'] ? "\nNotas: {$reserva['notas']}" : '') . "\n\nVer panel: $urlAdmin";
+            return $this->enviarConMailNativo($destEmail, $subject, $htmlBody, $altBody);
+        }
+
         try {
             $mail = $this->nuevoMailer();
             $mail->addAddress($destEmail, $destNombre);
@@ -423,6 +498,7 @@ class EmailService
             return true;
         } catch (\Exception $e) {
             error_log("[EmailService] Error enviarNuevaReserva a $destEmail: {$mail->ErrorInfo}");
+            error_log("[EmailService] Excepcion enviarNuevaReserva a $destEmail: {$e->getMessage()}");
             return false;
         }
     }
@@ -448,7 +524,32 @@ class EmailService
         $hora       = substr($reserva['hora'] ?? '', 0, 5);
         $personas   = (int)($reserva['personas'] ?? 1);
         $mesa       = htmlspecialchars($reserva['mesa_nombre'] ?? 'Por asignar');
+        $cancelUrlRaw = $cancelUrl;
         $cancelUrl  = htmlspecialchars($cancelUrl);
+
+        if (!$this->phpMailerAvailable) {
+            $this->registrarFallbackMailer('La confirmacion de reservacion');
+            $subject = "Reservacion confirmada - $restNombre";
+            $htmlBody = $this->plantillaReservaAmare(
+                $restNombre,
+                'Reserva confirmada',
+                'Tu mesa esta lista',
+                'Hola <strong>' . $nombre . '</strong>, preparamos los detalles de tu visita para que llegues con calma.',
+                [
+                    'Fecha' => date('d/m/Y', strtotime($fecha)),
+                    'Hora' => $hora,
+                    'Personas' => (string)$personas,
+                    'Mesa' => $mesa,
+                    'Direccion' => $direccion,
+                    'Telefono' => $telRest,
+                ],
+                'Cancelar reservacion',
+                $cancelUrl,
+                'Si tus planes cambian, puedes cancelar desde este enlace.'
+            );
+            $altBody = "Tu reservacion en $restNombre esta confirmada.\nFecha: " . date('d/m/Y', strtotime($fecha)) . "\nHora: $hora\nPersonas: $personas\nMesa: $mesa" . ($direccion ? "\nDireccion: $direccion" : '') . ($telRest ? "\nTelefono: $telRest" : '') . "\n\nCancelar: $cancelUrlRaw";
+            return $this->enviarConMailNativo($destEmail, $subject, $htmlBody, $altBody);
+        }
 
         try {
             $mail = $this->nuevoMailer();
@@ -498,6 +599,7 @@ class EmailService
             return true;
         } catch (\Exception $e) {
             error_log("[EmailService] Error enviarConfirmacionReserva a $destEmail: {$mail->ErrorInfo}");
+            error_log("[EmailService] Excepcion enviarConfirmacionReserva a $destEmail: {$e->getMessage()}");
             return false;
         }
     }
@@ -519,7 +621,36 @@ class EmailService
         $hora       = substr($reserva['hora'] ?? '', 0, 5);
         $personas   = (int)($reserva['personas'] ?? 1);
         $mesa       = htmlspecialchars($reserva['mesa_nombre'] ?? 'Por asignar');
+        $cancelUrlRaw = $cancelUrl;
         $cancelUrl  = htmlspecialchars($cancelUrl);
+
+        if (!$this->phpMailerAvailable) {
+            $this->registrarFallbackMailer('El recordatorio de reservacion');
+            $subject = "Recordatorio de reservacion - $restNombre";
+            $htmlBody = '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#F3F4F6;font-family:Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#F3F4F6;padding:24px 0;"><tr><td align="center">
+<table width="560" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08);">
+  <tr><td style="background:' . $color . ';padding:28px 30px;">
+    <p style="margin:0;color:rgba(255,255,255,.8);font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;">' . $restNombre . '</p>
+    <h1 style="margin:6px 0 0;color:#fff;font-size:1.35rem;font-weight:700;">Recordatorio: manana tienes reservacion</h1>
+  </td></tr>
+  <tr><td style="padding:28px 30px;">
+    <p style="margin:0 0 18px;color:#374151;font-size:.95rem;">Hola <strong>' . $nombre . '</strong>, te recordamos tu reservacion para manana.</p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #E5E7EB;border-radius:8px;font-size:.88rem;border-collapse:collapse;">
+      <tr><td style="color:#6B7280;padding:10px 14px;width:38%">Hora</td><td style="padding:10px 14px;font-weight:700">' . $hora . '</td></tr>
+      <tr style="background:#F9FAFB"><td style="color:#6B7280;padding:10px 14px">Personas</td><td style="padding:10px 14px">' . $personas . '</td></tr>
+      <tr><td style="color:#6B7280;padding:10px 14px">Mesa</td><td style="padding:10px 14px;font-weight:700">' . $mesa . '</td></tr>
+    </table>
+    <p style="margin:24px 0 0;color:#6B7280;font-size:.82rem;text-align:center;">
+      Imprevisto? <a href="' . $cancelUrl . '" style="color:' . $color . ';font-weight:600">Cancela tu reservacion aqui</a>
+    </p>
+  </td></tr>
+</table>
+</td></tr></table></body></html>';
+            $altBody = "Recordatorio de reservacion en $restNombre.\nHora: $hora\nPersonas: $personas\nMesa: $mesa\n\nCancelar: $cancelUrlRaw";
+            return $this->enviarConMailNativo($destEmail, $subject, $htmlBody, $altBody);
+        }
 
         try {
             $mail = $this->nuevoMailer();
@@ -559,13 +690,131 @@ class EmailService
             return true;
         } catch (\Exception $e) {
             error_log("[EmailService] Error enviarRecordatorioReserva a $destEmail: {$mail->ErrorInfo}");
+            error_log("[EmailService] Excepcion enviarRecordatorioReserva a $destEmail: {$e->getMessage()}");
             return false;
         }
     }
 
+    /**
+     * Confirma al comensal que su reservacion fue cancelada correctamente.
+     */
+    public function enviarCancelacionReservaCliente(
+        string $destEmail,
+        array $restaurante,
+        array $reserva,
+        string $reservarUrl
+    ): bool {
+        if (!$destEmail) return false;
+
+        $restNombre = htmlspecialchars($restaurante['nombre'] ?? 'AMARE');
+        $nombre     = htmlspecialchars($reserva['nombre'] ?? '');
+        $fecha      = $reserva['fecha'] ?? '';
+        $hora       = substr($reserva['hora'] ?? '', 0, 5);
+        $personas   = (int)($reserva['personas'] ?? 1);
+        $mesa       = htmlspecialchars($reserva['mesa_nombre'] ?? 'Por asignar');
+        $reservarUrlEsc = htmlspecialchars($reservarUrl);
+
+        $subject = "Reservacion cancelada - $restNombre";
+        $htmlBody = $this->plantillaReservaAmare(
+            $restNombre,
+            'Reserva cancelada',
+            'Tu reservacion quedo cancelada',
+            'Hola <strong>' . $nombre . '</strong>, procesamos la cancelacion de tu visita. Cuando quieras volver, estaremos listos para recibirte.',
+            [
+                'Fecha' => $fecha ? date('d/m/Y', strtotime($fecha)) : '',
+                'Hora' => $hora,
+                'Personas' => (string)$personas,
+                'Mesa' => $mesa,
+            ],
+            'Reservar otra vez',
+            $reservarUrlEsc,
+            'Este correo confirma que ya no tienes una mesa activa para ese horario.'
+        );
+        $altBody = "Tu reservacion en $restNombre fue cancelada.\n"
+            . ($fecha ? "Fecha: " . date('d/m/Y', strtotime($fecha)) . "\n" : '')
+            . "Hora: $hora\nPersonas: $personas\nMesa: $mesa\n\n"
+            . "Reservar otra vez: $reservarUrl";
+
+        if (!$this->phpMailerAvailable) {
+            return $this->enviarConMailNativo($destEmail, $subject, $htmlBody, $altBody);
+        }
+
+        try {
+            $mail = $this->nuevoMailer();
+            $mail->addAddress($destEmail, $nombre);
+            $mail->isHTML(true);
+            $mail->CharSet = 'UTF-8';
+            $mail->Subject = $subject;
+            $mail->Body = $htmlBody;
+            $mail->AltBody = $altBody;
+            $mail->send();
+            return true;
+        } catch (\Exception $e) {
+            error_log("[EmailService] Error enviarCancelacionReservaCliente a $destEmail: {$mail->ErrorInfo}");
+            error_log("[EmailService] Excepcion enviarCancelacionReservaCliente a $destEmail: {$e->getMessage()}");
+            return false;
+        }
+    }
+
+    private function plantillaReservaAmare(
+        string $restNombre,
+        string $eyebrow,
+        string $titulo,
+        string $introHtml,
+        array $rows,
+        string $ctaTexto,
+        string $ctaUrl,
+        string $nota
+    ): string {
+        $rowHtml = '';
+        foreach ($rows as $label => $value) {
+            $value = trim((string)$value);
+            if ($value === '') {
+                continue;
+            }
+
+            $rowHtml .= '<tr>'
+                . '<td style="padding:14px 18px;border-bottom:1px solid rgba(212,168,90,.12);color:#b5aa96;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;width:34%;vertical-align:top;">' . htmlspecialchars((string)$label) . '</td>'
+                . '<td style="padding:14px 18px;border-bottom:1px solid rgba(212,168,90,.12);color:#fff8ed;font-size:16px;line-height:1.65;font-weight:700;vertical-align:top;">' . $value . '</td>'
+                . '</tr>';
+        }
+
+        return '<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#050403;font-family:Georgia,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#050403;padding:28px 12px;">
+    <tr><td align="center">
+      <table width="640" cellpadding="0" cellspacing="0" style="width:100%;max-width:640px;background:#0b0907;border:1px solid rgba(212,168,90,.22);border-radius:24px;overflow:hidden;">
+        <tr>
+          <td style="padding:36px 34px 28px;background:#050403;border-bottom:1px solid rgba(212,168,90,.16);">
+            <div style="display:inline-block;padding:7px 13px;border:1px solid rgba(212,168,90,.38);border-radius:999px;color:#d4a85a;font-family:Arial,sans-serif;font-size:10px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;">' . htmlspecialchars($eyebrow) . '</div>
+            <div style="margin-top:22px;color:#f8efe2;font-family:Arial,sans-serif;font-size:13px;font-weight:800;letter-spacing:.28em;text-transform:uppercase;">' . $restNombre . '</div>
+            <h1 style="margin:10px 0 0;color:#fff7eb;font-size:34px;line-height:1.12;font-weight:700;">' . htmlspecialchars($titulo) . '</h1>
+            <p style="margin:18px 0 0;color:#d6c9b6;font-family:Arial,sans-serif;font-size:16px;line-height:1.7;">' . $introHtml . '</p>
+          </td>
+        </tr>
+        <tr><td style="padding:28px 34px 10px;background:#0b0907;">
+          <table width="100%" cellpadding="0" cellspacing="0" style="background:#14100c;border:1px solid rgba(212,168,90,.16);border-radius:18px;overflow:hidden;">' . $rowHtml . '</table>
+        </td></tr>
+        <tr><td align="center" style="padding:22px 34px 8px;background:#0b0907;">
+          <a href="' . $ctaUrl . '" style="display:inline-block;background:#d4a85a;color:#120f0c;text-decoration:none;padding:14px 28px;border-radius:999px;font-family:Arial,sans-serif;font-weight:900;font-size:13px;letter-spacing:.12em;text-transform:uppercase;">' . htmlspecialchars($ctaTexto) . '</a>
+        </td></tr>
+        <tr><td style="padding:12px 34px 30px;background:#0b0907;color:#9f927d;font-family:Arial,sans-serif;font-size:12px;line-height:1.7;text-align:center;">' . htmlspecialchars($nota) . '<br>(c) ' . date('Y') . ' ' . $restNombre . '</td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>';
+    }
+
     /** Construye un PHPMailer SMTP con la configuración cacheada. */
-    private function nuevoMailer(): PHPMailer
+    private function nuevoMailer()
     {
+        if (!$this->phpMailerAvailable) {
+            throw new \RuntimeException('PHPMailer no esta instalado en este entorno.');
+        }
+
         $mail = new PHPMailer(true);
         $mail->Timeout     = 10;
 
