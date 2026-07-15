@@ -749,9 +749,11 @@ class ApiController extends BaseController
         $eligibleUnits = [];
         $scopeTipo = (string)($promotion['scope_tipo'] ?? 'all');
         $scopeIds = $this->parsePromotionScopeIds($promotion['scope_ids'] ?? null);
+        $promotionProductId = (int)($promotion['producto_id'] ?? $promotion['platillo_id'] ?? 0);
 
-        if ($scopeTipo === 'products' && empty($scopeIds) && !empty($promotion['producto_id'])) {
-            $scopeIds = [(int)$promotion['producto_id']];
+        if ($promotionProductId > 0 && empty($scopeIds) && ($scopeTipo === '' || $scopeTipo === 'all' || $scopeTipo === 'products')) {
+            $scopeTipo = 'products';
+            $scopeIds = [$promotionProductId];
         }
 
         foreach ($normalizedItems as $item) {
@@ -2382,6 +2384,7 @@ class ApiController extends BaseController
         }
         match (true) {
             $method === 'GET'                               => $this->adminGetPromotion($id, $jwtUser),
+            $method === 'POST' && $subAction === 'notify'   => $this->adminNotifyPromotion($id, $jwtUser),
             $method === 'PUT' && $subAction === 'deactivate' => $this->adminDeactivatePromotion($id, $jwtUser),
             $method === 'PUT'                               => $this->adminUpdatePromotion($id, $jwtUser),
             $method === 'DELETE'                            => $this->adminDeletePromotion($id, $jwtUser),
@@ -2619,6 +2622,41 @@ class ApiController extends BaseController
         }
 
         $this->adminApiOk('Promoción eliminada correctamente');
+    }
+
+    private function adminNotifyPromotion(int $id, array $jwtUser): void
+    {
+        $empresaId = (int)$jwtUser['empresa_id'];
+        $promotion = $this->adminLocalGetPromotion($id, $empresaId);
+        if (!$promotion) {
+            $this->adminApiError('Promoción no encontrada', 404);
+        }
+
+        $usuarioId = (int)($promotion['usuario_id'] ?? 0);
+        if ($usuarioId <= 0) {
+            $this->adminApiError('La promoción no tiene usuario asignado.', 422);
+        }
+
+        if (empty($this->adminPromotionPushTokens($usuarioId))) {
+            $this->adminLogPromotionNotification(
+                $id,
+                $usuarioId,
+                null,
+                null,
+                'skipped',
+                (string)($promotion['titulo'] ?? 'Nueva promocion'),
+                (string)($promotion['descripcion'] ?? 'Tienes una nueva promocion en Amare.'),
+                null,
+                'no_push_token'
+            );
+            $this->adminApiError('El usuario no tiene token push activo.', 422);
+        }
+
+        $this->adminSendPromotionNotification($promotion, $promotion);
+        $this->adminApiOk('Notificación enviada o registrada para revisión.', [
+            'promotion' => $this->adminLocalGetPromotion($id, $empresaId),
+            'notification' => $this->adminLatestPromotionNotificationLog($id),
+        ]);
     }
 
     private function adminDeactivatePromotion(int $id, array $jwtUser): void
@@ -3342,7 +3380,14 @@ class ApiController extends BaseController
                       FROM mobile_promociones mp{$join}{$notificationJoin}
                      ORDER BY mp.id DESC
                      LIMIT 100";
-            return $db->query($sql)->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            $rows = $db->query($sql)->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            foreach ($rows as &$row) {
+                $tokens = $this->adminPromotionPushTokens((int)($row['usuario_id'] ?? 0));
+                $row['push_token_count'] = count($tokens);
+                $row['has_push_token'] = !empty($tokens) ? 1 : 0;
+            }
+            unset($row);
+            return $rows;
         }
 
         if (!$restauranteId || !$this->adminTableExists('rest_promociones')) {
@@ -3402,7 +3447,7 @@ class ApiController extends BaseController
                 'titulo' => (string)($body['titulo'] ?? ''),
                 'descripcion' => (string)($body['descripcion'] ?? ''),
                 'imagen' => (string)($body['imagen'] ?? ''),
-                'deep_link' => 'amare://promociones/' . rawurlencode($code),
+                'deep_link' => $this->adminPromotionDeepLink($code),
                 'code' => $code,
                 'tipo_descuento' => $body['tipo_descuento'] ?? 'porcentaje',
                 'valor_descuento' => (float)($body['valor_descuento'] ?? 0),
@@ -3444,6 +3489,14 @@ class ApiController extends BaseController
         $promotion = $this->adminLocalGetPromotion($promotionId, $empresaId) ?? ['id' => $promotionId];
         $this->adminSendPromotionNotification($promotion, $body);
         return $promotion;
+    }
+
+    private function adminPromotionDeepLink(string $code): string
+    {
+        $code = trim($code);
+        return $code !== ''
+            ? 'amare://promociones?code=' . rawurlencode($code)
+            : 'amare://promociones';
     }
 
     private function adminEnsureMobilePromocionesTable(): bool
@@ -3573,6 +3626,8 @@ class ApiController extends BaseController
         $activo = array_key_exists('activo', $promotion) ? (int)$promotion['activo'] : (int)($body['activo'] ?? 1);
         $title = trim((string)($promotion['titulo'] ?? $body['titulo'] ?? 'Nueva promocion'));
         $message = trim((string)($promotion['descripcion'] ?? $body['descripcion'] ?? 'Tienes una nueva promocion en Amare.'));
+        $code = trim((string)($promotion['code'] ?? $body['code'] ?? ''));
+        $deepLink = $this->adminPromotionDeepLink($code);
 
         if ($title === '') {
             $title = 'Nueva promocion';
@@ -3620,6 +3675,7 @@ class ApiController extends BaseController
                 continue;
             }
 
+            $platform = strtolower(trim((string)($tokenRow['platform'] ?? '')));
             $payload = [
                 'to' => $token,
                 'priority' => 'high',
@@ -3631,10 +3687,25 @@ class ApiController extends BaseController
                     'type' => 'promotion',
                     'promotion_id' => (string)$promotionId,
                     'usuario_id' => (string)$usuarioId,
-                    'code' => (string)($promotion['code'] ?? $body['code'] ?? ''),
-                    'deep_link' => (string)($promotion['deep_link'] ?? ''),
+                    'code' => $code,
+                    'promo_code' => $code,
+                    'route' => '/promociones',
+                    'screen' => 'promociones',
+                    'deep_link' => $deepLink,
                 ],
             ];
+            if ($platform === 'ios') {
+                $payload['apns'] = [
+                    'headers' => [
+                        'apns-priority' => '10',
+                    ],
+                    'payload' => [
+                        'aps' => [
+                            'sound' => 'default',
+                        ],
+                    ],
+                ];
+            }
 
             try {
                 $result = $this->adminPostFcm($payload);
@@ -3652,6 +3723,7 @@ class ApiController extends BaseController
                     error_log('[adminSendPromotionNotification] FCM failed usuario=' . $usuarioId
                         . ' promotion=' . $promotionId
                         . ' token_id=' . ((int)($tokenRow['id'] ?? 0) ?: 'null')
+                        . ' platform=' . ($platform !== '' ? $platform : 'unknown')
                         . ' error=' . ($error ?? 'unknown')
                         . ' response=' . substr((string)($result['body'] ?? ''), 0, 900));
                 }
@@ -3667,6 +3739,14 @@ class ApiController extends BaseController
                     $result['body'] ?? '',
                     $error
                 );
+                if ($status === 'failed' && $this->adminFcmTokenIsInvalid($error)) {
+                    $this->adminDisablePromotionPushToken(
+                        (string)($tokenRow['_table'] ?? ''),
+                        (int)($tokenRow['id'] ?? 0),
+                        $usuarioId,
+                        $token
+                    );
+                }
             } catch (\Throwable $e) {
                 $this->adminLogPromotionNotification(
                     $promotionId,
@@ -3686,6 +3766,10 @@ class ApiController extends BaseController
 
     private function adminPromotionPushTokens(int $usuarioId): array
     {
+        if ($usuarioId <= 0) {
+            return [];
+        }
+
         $table = $this->adminFindTableByColumns(
             ['usuario_id', 'fcm_token'],
             ['mobile_push_tokens', 'push_tokens', 'mobile_tokens', 'mobile_fcm_tokens']
@@ -3697,6 +3781,7 @@ class ApiController extends BaseController
 
         $enabledCol = $this->adminFirstExistingColumn($table, ['enabled', 'activo', 'active', 'is_active']);
         $idCol = $this->adminColumnExists($table, 'id') ? 'id' : null;
+        $platformCol = $this->adminFirstExistingColumn($table, ['platform', 'plataforma', 'os']);
         $where = ['usuario_id = ?'];
         if ($enabledCol) {
             $where[] = "COALESCE(`{$enabledCol}`, 1) = 1";
@@ -3704,14 +3789,55 @@ class ApiController extends BaseController
 
         $db = Database::getInstance();
         $stmt = $db->prepare(
-            "SELECT " . ($idCol ? "`{$idCol}` AS id," : "NULL AS id,") . " fcm_token AS token
+            "SELECT " . ($idCol ? "`{$idCol}` AS id," : "NULL AS id,")
+                . ($platformCol ? " `{$platformCol}` AS platform," : " NULL AS platform,")
+                . " fcm_token AS token
                FROM `{$table}`
               WHERE " . implode(' AND ', $where) . "
                 AND fcm_token <> ''
               ORDER BY " . ($idCol ? "`{$idCol}`" : "usuario_id") . " DESC"
         );
         $stmt->execute([$usuarioId]);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        foreach ($rows as &$row) {
+            $row['_table'] = $table;
+        }
+        unset($row);
+        return $rows;
+    }
+
+    private function adminFcmTokenIsInvalid(?string $error): bool
+    {
+        $error = strtoupper((string)$error);
+        return str_contains($error, 'UNREGISTERED')
+            || str_contains($error, 'REGISTRATION TOKEN')
+            || str_contains($error, 'REQUESTED ENTITY WAS NOT FOUND');
+    }
+
+    private function adminDisablePromotionPushToken(string $table, int $tokenId, int $usuarioId, string $token): void
+    {
+        if ($table === '' || !preg_match('/^[a-zA-Z0-9_]+$/', $table) || !$this->adminTableExists($table)) {
+            return;
+        }
+
+        $enabledCol = $this->adminFirstExistingColumn($table, ['enabled', 'activo', 'active', 'is_active']);
+        if (!$enabledCol) {
+            return;
+        }
+
+        try {
+            $db = Database::getInstance();
+            if ($tokenId > 0 && $this->adminColumnExists($table, 'id')) {
+                $stmt = $db->prepare("UPDATE `{$table}` SET `{$enabledCol}` = 0 WHERE id = ?");
+                $stmt->execute([$tokenId]);
+            } else {
+                $stmt = $db->prepare("UPDATE `{$table}` SET `{$enabledCol}` = 0 WHERE usuario_id = ? AND fcm_token = ?");
+                $stmt->execute([$usuarioId, $token]);
+            }
+            error_log('[adminDisablePromotionPushToken] Token FCM invalido desactivado usuario=' . $usuarioId . ' token_id=' . ($tokenId ?: 'null'));
+        } catch (\Throwable $e) {
+            error_log('[adminDisablePromotionPushToken] No se pudo desactivar token invalido: ' . $e->getMessage());
+        }
     }
 
     private function adminFcmErrorMessage(array $error): string
@@ -3945,6 +4071,9 @@ class ApiController extends BaseController
                 ],
             ],
         ];
+        if (!empty($payload['apns']) && is_array($payload['apns'])) {
+            $message['message']['apns'] = $payload['apns'];
+        }
 
         $json = json_encode($message, JSON_UNESCAPED_UNICODE);
         if ($json === false) {
@@ -4113,6 +4242,29 @@ class ApiController extends BaseController
         }
     }
 
+    private function adminLatestPromotionNotificationLog(int $promotionId): ?array
+    {
+        if ($promotionId <= 0 || !$this->adminTableExists('mobile_notification_logs')) {
+            return null;
+        }
+
+        try {
+            $stmt = Database::getInstance()->prepare(
+                "SELECT id, promotion_id, usuario_id, fcm_token_id, provider, status, error, sent_at, created_at
+                   FROM mobile_notification_logs
+                  WHERE promotion_id = ?
+                  ORDER BY id DESC
+                  LIMIT 1"
+            );
+            $stmt->execute([$promotionId]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            return $row ?: null;
+        } catch (\Throwable $e) {
+            error_log('[adminLatestPromotionNotificationLog] No se pudo leer ultimo log: ' . $e->getMessage());
+            return null;
+        }
+    }
+
     private function adminLocalUpdatePromotion(int $id, int $empresaId, array $body): ?array
     {
         $db = Database::getInstance();
@@ -4129,7 +4281,7 @@ class ApiController extends BaseController
                 }
             }
             if (isset($values['code']) && $this->adminColumnExists('mobile_promociones', 'deep_link')) {
-                $values['deep_link'] = 'amare://promociones/' . rawurlencode((string)$values['code']);
+                $values['deep_link'] = $this->adminPromotionDeepLink((string)$values['code']);
             }
             $this->adminUpdateExistingColumns('mobile_promociones', $id, $values);
             return $this->adminLocalGetPromotion($id, $empresaId);

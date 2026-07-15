@@ -20,13 +20,67 @@ class RestMenuController extends BaseController
         $flash      = $this->getFlash();
         $pageTitle  = 'Menú';
         $activeMenu = 'rest_menu';
-        $sucursales = (new RestauranteModel())->getByComprador($this->usuarioId());
+        $restModel = new RestauranteModel();
+        $sucursales = $this->rolActual() === 'admin_restaurante'
+            ? $restModel->getByEmpresa((int)$this->empresaId())
+            : $restModel->getByComprador((int)$this->usuarioId());
+        $restaurante = $restModel->find((int)$restauranteId) ?: [];
+        $menuPrincipal = !empty($restaurante['empresa_id'])
+            ? $restModel->getMenuPrincipalPorEmpresa((int)$restaurante['empresa_id'])
+            : null;
         try {
             $this->model->prepararSelectorUnificado($restauranteId);
         } catch (\Throwable $e) {
             if (!$flash) $flash = ['type' => 'error', 'message' => $e->getMessage()];
         }
-        $this->render('restaurante/menu/index', compact('platillos','categorias','flash','pageTitle','activeMenu','sucursales'));
+        $this->render('restaurante/menu/index', compact('platillos','categorias','flash','pageTitle','activeMenu','sucursales','restaurante','menuPrincipal'));
+    }
+
+    public function importarPrincipal(?string $p = null): void
+    {
+        if (!$this->isPost()) $this->redirect('rest-menu/index');
+        $destinoId = (int)$this->restauranteId();
+        $restModel = new RestauranteModel();
+        $destino = $restModel->find($destinoId);
+        if (!$destino || !$this->usuarioPuedeAdministrarRestaurante($destino)) {
+            $this->flash('error', 'No tienes permiso para importar menu en esta sucursal.');
+            $this->redirect('rest-menu/index');
+        }
+
+        $principal = $restModel->getMenuPrincipalPorEmpresa((int)$destino['empresa_id']);
+        if (!$principal || (int)$principal['id'] === $destinoId) {
+            $this->flash('error', 'Marca otra sucursal como principal antes de importar.');
+            $this->redirect('rest-menu/index');
+        }
+
+        try {
+            $stats = $this->model->importarMenuDesdePrincipal((int)$principal['id'], $destinoId);
+            $limpieza = !empty($stats['platillos_incompletos_desactivados'])
+                ? ' Se desactivaron ' . (int)$stats['platillos_incompletos_desactivados'] . ' registros incompletos del intento anterior.'
+                : '';
+            $this->flash(
+                'success',
+                'Menu importado desde ' . (string)$principal['nombre'] . ': '
+                . (int)$stats['platillos_creados'] . ' platillos nuevos, '
+                . (int)$stats['platillos_actualizados'] . ' actualizados.'
+                . $limpieza
+            );
+        } catch (\Throwable $e) {
+            $this->flash('error', 'No se pudo importar el menu principal: ' . $e->getMessage());
+        }
+        $this->redirect('rest-menu/index');
+    }
+
+    private function usuarioPuedeAdministrarRestaurante(array $restaurante): bool
+    {
+        $rol = $this->rolActual();
+        if ($rol === 'admin_restaurante') {
+            return (int)($restaurante['empresa_id'] ?? 0) === (int)$this->empresaId();
+        }
+        if ($rol === 'admin_local') {
+            return (int)($restaurante['id'] ?? 0) === (int)$this->restauranteId();
+        }
+        return (int)($restaurante['comprador_id'] ?? 0) === (int)$this->usuarioId();
     }
 
     public function form(?string $id = null): void

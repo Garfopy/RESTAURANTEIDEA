@@ -46,10 +46,21 @@
   display:block;padding:7px 10px;border-radius:7px;font-size:.75rem;
   text-decoration:none;margin:2px 0;
 }
+.menu-chain-panel {
+  background:#F9FAFB;border:1px solid #E5E7EB;border-radius:10px;padding:9px 12px;
+  margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;
+  gap:10px;flex-wrap:wrap;
+}
+.menu-chain-panel strong { color:#111827; }
+.menu-chain-panel p { margin:0;color:#64748B;font-size:.78rem;line-height:1.35; }
+.menu-chain-actions { display:flex;gap:8px;align-items:center;flex-wrap:wrap; }
+.menu-chain-actions form { margin:0; }
 </style>
 
 <?php
 $restauranteId = $_SESSION['restaurante_activo_id'] ?? 0;
+$menuPrincipalId = (int)($menuPrincipal['id'] ?? 0);
+$esMenuPrincipal = $menuPrincipalId > 0 && $menuPrincipalId === (int)$restauranteId;
 ?>
 
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
@@ -62,6 +73,31 @@ $restauranteId = $_SESSION['restaurante_activo_id'] ?? 0;
     Ver menú público ↗
   </a>
 </div>
+
+<?php if (!empty($sucursales) && count($sucursales) > 1 && !$esMenuPrincipal): ?>
+<div class="menu-chain-panel">
+  <div>
+    <p>
+      Menu de cadena:
+      <strong><?= $menuPrincipalId ? htmlspecialchars((string)($menuPrincipal['nombre'] ?? 'Sucursal principal')) : 'sin principal' ?></strong>
+    </p>
+  </div>
+  <div class="menu-chain-actions">
+    <?php if ($menuPrincipalId): ?>
+    <form method="POST" action="<?= BASE_URL ?>rest-menu/importarPrincipal"
+          onsubmit="return confirm('Importar el menu principal a esta sucursal? No se borraran platillos locales y se conservara la disponibilidad de los existentes.')">
+      <button type="submit" class="btn btn-outline" style="padding:6px 10px;font-size:.76rem">
+        Importar
+      </button>
+    </form>
+    <?php else: ?>
+    <a href="<?= BASE_URL ?>rest-config/index" style="font-size:.76rem;color:#6B7280;text-decoration:none">
+      Definir en configuracion
+    </a>
+    <?php endif; ?>
+  </div>
+</div>
+<?php endif; ?>
 
 <?php if (empty($categorias)): ?>
 <div style="background:#FEF3C7;border:1px solid #FCD34D;border-radius:10px;padding:16px;margin-bottom:16px;font-size:.875rem;color:#92400E">

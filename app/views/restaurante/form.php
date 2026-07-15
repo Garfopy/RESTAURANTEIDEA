@@ -242,6 +242,26 @@ $title = ($isEdit ? 'Editar local' : 'Crear local') . ' - CarniHub';
       font-size: .84rem;
       text-align: center;
     }
+    .map-pin {
+      position: relative;
+      width: 24px;
+      height: 24px;
+      transform: rotate(-45deg);
+      border-radius: 50% 50% 50% 0;
+      background: var(--cp);
+      border: 2px solid #fff;
+      box-shadow: 0 8px 18px rgba(17,24,39,.28);
+    }
+    .map-pin::after {
+      content: "";
+      position: absolute;
+      top: 6px;
+      left: 6px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #fff;
+    }
     .coords {
       display: none;
       margin-top: 8px;
@@ -791,13 +811,20 @@ $title = ($isEdit ? 'Editar local' : 'Crear local') . ' - CarniHub';
       ensureLeaflet(() => {
         mapEl.style.display = 'block';
         if (!leafletMap) {
+          const markerIcon = L.divIcon({
+            className: '',
+            html: '<div class="map-pin"></div>',
+            iconSize: [24, 24],
+            iconAnchor: [12, 24],
+            popupAnchor: [0, -22]
+          });
           mapEl.innerHTML = '';
           leafletMap = L.map(mapEl).setView([lat, lng], 16);
           L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: 'OpenStreetMap',
             maxZoom: 19
           }).addTo(leafletMap);
-          leafletMarker = L.marker([lat, lng]).addTo(leafletMap);
+          leafletMarker = L.marker([lat, lng], { icon: markerIcon }).addTo(leafletMap);
         } else {
           leafletMap.setView([lat, lng], 16);
           leafletMarker.setLatLng([lat, lng]);

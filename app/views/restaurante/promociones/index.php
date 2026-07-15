@@ -2,9 +2,42 @@
 
 <style>
   .promo-list-shell{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px}
-  .promo-table-card{display:none;background:#fff;border-radius:14px;border:1px solid #E5E7EB;overflow:hidden;box-shadow:0 10px 24px rgba(15,23,42,.06)}
-  .promo-code-pill{display:inline-block;border:1px solid #E5E7EB;background:#F8FAFC;border-radius:999px;padding:5px 9px;font-family:monospace;font-size:.78rem}
-  .promo-rule-pill{display:inline-block;border-radius:999px;padding:5px 10px;background:#EEF2FF;color:#3730A3;font-weight:700;font-size:.76rem}
+  .promo-table-card{display:none;background:rgba(255,255,255,.96);border-radius:18px;border:1px solid #E2E8F0;overflow:hidden;box-shadow:0 18px 55px rgba(15,23,42,.08)}
+  .promo-table-scroll{width:100%;overflow-x:auto;padding:0 14px 14px;scrollbar-color:#CBD5E1 #F8FAFC}
+  .promo-table{width:100%;min-width:1040px;border-collapse:separate;border-spacing:0 10px;font-size:.875rem;table-layout:fixed}
+  .promo-table thead th{position:sticky;top:0;z-index:1;background:#fff!important;padding:16px 12px 10px!important;font-size:.72rem!important;font-weight:800!important;color:#64748B!important;letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid #EEF2F7}
+  .promo-table thead th.is-center{text-align:center}
+  .promo-table thead th.is-right{text-align:right}
+  .promo-row td{background:#fff;border-top:1px solid #EAF0F6;border-bottom:1px solid #EAF0F6;padding:14px 12px;vertical-align:middle}
+  .promo-row td:first-child{border-left:1px solid #EAF0F6;border-radius:12px 0 0 12px}
+  .promo-row td:last-child{border-right:1px solid #EAF0F6;border-radius:0 12px 12px 0}
+  .promo-row:hover td{background:#FBFCFE;border-color:#DDE6F1;box-shadow:0 10px 24px rgba(15,23,42,.04)}
+  .promo-title{font-weight:800;color:#111827;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .promo-desc{font-size:.78rem;color:#64748B;margin-top:4px;max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .promo-user{font-weight:600;color:#334155;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .promo-date{font-weight:700;color:#64748B;text-align:center;white-space:nowrap}
+  .promo-code-pill{display:inline-flex;max-width:100%;align-items:center;border:1px solid #DDE4EE;background:#F8FAFC;border-radius:999px;padding:6px 10px;font-family:ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace;font-size:.76rem;color:#0F172A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .promo-rule-pill{display:inline-flex;border-radius:999px;padding:6px 11px;background:#EEF2FF;color:#3730A3;font-weight:800;font-size:.76rem;white-space:nowrap}
+  .promo-status-cell{text-align:center}
+  .promo-state-badge{display:inline-flex;align-items:center;justify-content:center;padding:5px 11px;border-radius:99px;font-size:.75rem;font-weight:800;white-space:nowrap}
+  .promo-push-label{margin-top:7px;font-size:.72rem;font-weight:800;line-height:1.15}
+  .promo-push-detail{margin-top:3px;font-size:.68rem;color:#64748B;line-height:1.2}
+  .promo-actions{display:flex;justify-content:flex-end;align-items:center;gap:7px;flex-wrap:wrap}
+  .promo-action{appearance:none;border:1px solid transparent;border-radius:8px;background:#F8FAFC;color:#334155;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-size:.77rem;font-weight:800;line-height:1;padding:8px 10px;text-decoration:none;transition:background .16s,border-color .16s,color .16s,transform .16s}
+  .promo-action:hover{transform:translateY(-1px)}
+  .promo-action-primary{background:#EFF6FF;color:#2563EB;border-color:#DBEAFE}
+  .promo-action-primary:hover{background:#DBEAFE}
+  .promo-action-warning{background:#FFFBEB;color:#B45309;border-color:#FDE68A}
+  .promo-action-warning:hover{background:#FEF3C7}
+  .promo-action-edit{background:var(--cp-light);color:var(--cp);border-color:color-mix(in srgb,var(--cp) 18%,#fff)}
+  .promo-action-edit:hover{background:var(--cp-mid)}
+  .promo-action-danger{background:#FEF2F2;color:#DC2626;border-color:#FECACA}
+  .promo-action-danger:hover{background:#FEE2E2}
+  @media (max-width:768px){
+    .promo-table-scroll{padding:0 10px 10px}
+    .promo-table{min-width:980px}
+    .promo-table thead th,.promo-row td{padding-left:10px;padding-right:10px}
+  }
 </style>
 
 <div class="promo-list-shell">
@@ -30,19 +63,19 @@
 
 <!-- Tabla de promociones (oculta hasta que carguen datos) -->
 <div id="promo-table" class="promo-table-card">
-  <div style="width:100%;overflow-x:auto">
-  <table style="width:100%;min-width:900px;border-collapse:collapse;font-size:.875rem;table-layout:fixed">
+  <div class="promo-table-scroll">
+  <table class="promo-table">
     <colgroup>
-      <col style="width:25%">
-      <col style="width:16%">
+      <col style="width:24%">
       <col style="width:15%">
-      <col style="width:11%">
-      <col style="width:11%">
       <col style="width:12%">
+      <col style="width:13%">
       <col style="width:10%">
+      <col style="width:13%">
+      <col style="width:13%">
     </colgroup>
     <thead>
-      <tr style="background:#F9FAFB;border-bottom:1px solid #E5E7EB">
+      <tr>
         <th style="padding:12px 16px;text-align:left;font-weight:600;color:#374151">Promoción</th>
         <th style="padding:12px 16px;text-align:left;font-weight:600;color:#374151">Usuario</th>
         <th style="padding:12px 16px;text-align:center;font-weight:600;color:#374151">Regla</th>
@@ -93,6 +126,8 @@
       eliminarPromocion(id, titulo);
     } else if (btn.getAttribute('data-action') === 'deactivate') {
       desactivarPromocion(id, titulo);
+    } else if (btn.getAttribute('data-action') === 'notify') {
+      enviarPushPromocion(id, titulo);
     }
   });
 
@@ -164,34 +199,43 @@
 
     // Botones de acción: Editar y Eliminar siempre; Desactivar solo si activa y no expirada
     var btnDesactivar = '';
+    var btnEnviarPush = '';
     var activo = parseInt(p.activo) === 1;
+    if (activo && parseInt(p.has_push_token || 0, 10) === 1) {
+      btnEnviarPush = '<button type="button" data-action="notify" data-id="' + id + '" data-title="' + escAttr(rawTitulo) + '" ' +
+                      'class="promo-action promo-action-primary">' +
+                      'Enviar push</button>';
+    }
     if (activo && p.expires_at) {
       var expiraDate = new Date(p.expires_at.replace(' ', 'T'));
       if (expiraDate >= new Date()) {
         btnDesactivar = '<button type="button" data-action="deactivate" data-id="' + id + '" data-title="' + escAttr(rawTitulo) + '" ' +
-                        'style="background:none;border:none;color:#D97706;font-size:.82rem;font-weight:500;cursor:pointer;padding:0;margin-right:12px">' +
+                        'class="promo-action promo-action-warning">' +
                         'Desactivar</button>';
       }
     }
 
-    return '<tr style="border-bottom:1px solid #F3F4F6">'
-      + '<td style="padding:12px 16px;min-width:0">'
-      +   '<div style="font-weight:600;color:#111827;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + titulo + '</div>'
-      +   (desc ? '<div style="font-size:.78rem;color:#6B7280;margin-top:2px;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + desc + '</div>' : '')
+    return '<tr class="promo-row">'
+      + '<td>'
+      +   '<div class="promo-title">' + titulo + '</div>'
+      +   (desc ? '<div class="promo-desc">' + desc + '</div>' : '')
       + '</td>'
-      + '<td style="padding:12px 16px;font-size:.82rem;color:#374151;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + usuario + '</td>'
-      + '<td style="padding:12px 16px;text-align:center"><span class="promo-rule-pill">' + esc(regla) + '</span></td>'
-      + '<td style="padding:12px 16px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><span class="promo-code-pill">' + code + '</span></td>'
-      + '<td style="padding:12px 16px;text-align:center;font-size:.78rem;color:#6B7280">' + expira + '</td>'
-      + '<td style="padding:12px 16px;text-align:center">'
-      +   '<span style="display:inline-block;padding:4px 10px;border-radius:99px;font-size:.75rem;font-weight:600;background:' + badgeBg + ';color:' + badgeColor + '">' + badgeText + '</span>'
-      +   (pushInfo.label ? '<div title="' + escAttr(pushInfo.title) + '" style="margin-top:6px;font-size:.72rem;font-weight:600;color:' + pushInfo.color + '">' + pushInfo.label + '</div>' : '')
-      +   (pushInfo.detail ? '<div title="' + escAttr(pushInfo.title) + '" style="margin-top:3px;font-size:.68rem;color:#6B7280;line-height:1.2">' + esc(pushInfo.detail) + '</div>' : '')
+      + '<td><div class="promo-user">' + usuario + '</div></td>'
+      + '<td style="text-align:center"><span class="promo-rule-pill">' + esc(regla) + '</span></td>'
+      + '<td style="text-align:center"><span class="promo-code-pill">' + code + '</span></td>'
+      + '<td class="promo-date">' + expira + '</td>'
+      + '<td class="promo-status-cell">'
+      +   '<span class="promo-state-badge" style="background:' + badgeBg + ';color:' + badgeColor + '">' + badgeText + '</span>'
+      +   (pushInfo.label ? '<div class="promo-push-label" title="' + escAttr(pushInfo.title) + '" style="color:' + pushInfo.color + '">' + pushInfo.label + '</div>' : '')
+      +   (pushInfo.detail ? '<div class="promo-push-detail" title="' + escAttr(pushInfo.title) + '">' + esc(pushInfo.detail) + '</div>' : '')
       + '</td>'
-      + '<td style="padding:12px 16px;text-align:right;white-space:nowrap">'
-      +   btnDesactivar
-      +   '<a href="<?= BASE_URL ?>rest-promocion/editar/' + id + '" style="font-size:.82rem;color:var(--cp);font-weight:500;text-decoration:none;margin-right:12px">Editar</a>'
-      +   '<button type="button" data-action="delete" data-id="' + id + '" data-title="' + escAttr(rawTitulo) + '" style="background:none;border:none;color:#EF4444;font-size:.82rem;font-weight:500;cursor:pointer;padding:0">Eliminar</button>'
+      + '<td>'
+      +   '<div class="promo-actions">'
+      +     btnEnviarPush
+      +     btnDesactivar
+      +     '<a href="<?= BASE_URL ?>rest-promocion/editar/' + id + '" class="promo-action promo-action-edit">Editar</a>'
+      +     '<button type="button" data-action="delete" data-id="' + id + '" data-title="' + escAttr(rawTitulo) + '" class="promo-action promo-action-danger">Eliminar</button>'
+      +   '</div>'
       + '</td>'
       + '</tr>';
   }
@@ -249,8 +293,12 @@
   function getPushInfo(p) {
     var status = (p.notification_status || '').toString().toLowerCase();
     var error = p.notification_error || '';
+    var hasToken = parseInt(p.has_push_token || 0, 10) === 1;
 
     if (!status) {
+      if (hasToken) {
+        return { label: 'Token listo', detail: 'Push pendiente', color: '#2563EB', title: 'El usuario tiene token push activo' };
+      }
       return { label: '', detail: '', color: '#6B7280', title: '' };
     }
     if (status === 'sent') {
@@ -263,6 +311,9 @@
       var label = 'Push no enviada';
       if (error === 'missing_fcm_config') label = 'Falta FCM';
       if (error === 'no_push_token') label = 'Sin token';
+      if (error === 'no_push_token' && hasToken) {
+        return { label: 'Token listo', detail: 'Reintenta el envio', color: '#2563EB', title: 'Antes no habia token, pero ahora el usuario tiene token push activo' };
+      }
       return { label: label, detail: getPushErrorHint(error), color: '#D97706', title: error || 'Envio omitido' };
     }
     return { label: 'Push pendiente', detail: '', color: '#6B7280', title: error || 'Pendiente' };
@@ -351,6 +402,26 @@
         errorMsg = 'Token de Amare expirado. Reconecta en Configuración.';
       }
       ApiClient.flash('error', 'Error al desactivar: ' + errorMsg);
+    }
+  };
+
+  window.enviarPushPromocion = async function(id, titulo) {
+    if (!confirm('¿Enviar notificación push de "' + titulo + '" ahora?')) return;
+
+    var resp = await ApiClient.post('/admin/promotions/' + id + '/notify', {});
+
+    if (resp.success) {
+      var notification = resp.data && resp.data.notification ? resp.data.notification : null;
+      if (notification && notification.status === 'failed') {
+        ApiClient.flash('error', 'Push fallida: ' + (notification.error || 'Firebase rechazó el envío'));
+      } else if (notification && notification.status === 'skipped') {
+        ApiClient.flash('error', 'Push no enviada: ' + (notification.error || 'Sin detalle'));
+      } else {
+        ApiClient.flash('success', 'Push enviada correctamente.');
+      }
+      cargarPromociones();
+    } else {
+      ApiClient.flash('error', 'Error al enviar push: ' + (resp.message || 'Error desconocido'));
     }
   };
 

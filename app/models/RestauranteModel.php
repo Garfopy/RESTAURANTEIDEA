@@ -2,9 +2,93 @@
 class RestauranteModel extends BaseModel
 {
     protected string $table = 'rest_restaurantes';
+    private static array $columnCache = [];
+
+    private function columnExists(string $column): bool
+    {
+        $key = $this->table . '.' . $column;
+        if (array_key_exists($key, self::$columnCache)) {
+            return self::$columnCache[$key];
+        }
+
+        try {
+            $stmt = $this->db->query("SHOW COLUMNS FROM `{$this->table}`");
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                if (strcasecmp((string)($row['Field'] ?? ''), $column) === 0) {
+                    return self::$columnCache[$key] = true;
+                }
+            }
+            return self::$columnCache[$key] = false;
+        } catch (\Throwable $e) {
+            return self::$columnCache[$key] = false;
+        }
+    }
+
+    private function indexExists(string $index): bool
+    {
+        $key = $this->table . '.idx.' . $index;
+        if (array_key_exists($key, self::$columnCache)) {
+            return self::$columnCache[$key];
+        }
+
+        try {
+            $stmt = $this->db->query("SHOW INDEX FROM `{$this->table}`");
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                if (strcasecmp((string)($row['Key_name'] ?? ''), $index) === 0) {
+                    return self::$columnCache[$key] = true;
+                }
+            }
+            return self::$columnCache[$key] = false;
+        } catch (\Throwable $e) {
+            return self::$columnCache[$key] = false;
+        }
+    }
+
+    private function mysqlErrorCode(\Throwable $e): int
+    {
+        $info = $e instanceof \PDOException ? ($e->errorInfo ?? []) : [];
+        return (int)($info[1] ?? $e->getCode());
+    }
+
+    public function ensureMenuPrincipalColumn(): void
+    {
+        if (!$this->columnExists('menu_principal')) {
+            try {
+                $this->execute(
+                    "ALTER TABLE rest_restaurantes
+                     ADD COLUMN menu_principal TINYINT(1) NOT NULL DEFAULT 0"
+                );
+                self::$columnCache[$this->table . '.menu_principal'] = true;
+            } catch (\Throwable $e) {
+                if ($this->mysqlErrorCode($e) === 1060) {
+                    self::$columnCache[$this->table . '.menu_principal'] = true;
+                } else {
+                    error_log('[RestauranteModel] No se pudo agregar menu_principal: ' . $e->getMessage());
+                    return;
+                }
+            }
+        }
+
+        if (!$this->indexExists('idx_rest_menu_principal')) {
+            try {
+                $this->execute(
+                    "ALTER TABLE rest_restaurantes
+                     ADD KEY idx_rest_menu_principal (empresa_id, menu_principal)"
+                );
+                self::$columnCache[$this->table . '.idx.idx_rest_menu_principal'] = true;
+            } catch (\Throwable $e) {
+                if ($this->mysqlErrorCode($e) === 1061) {
+                    self::$columnCache[$this->table . '.idx.idx_rest_menu_principal'] = true;
+                } else {
+                    error_log('[RestauranteModel] No se pudo agregar idx_rest_menu_principal: ' . $e->getMessage());
+                }
+            }
+        }
+    }
 
     public function getByComprador(int $compradorId): array
     {
+        $this->ensureMenuPrincipalColumn();
         return $this->query(
             "SELECT * FROM rest_restaurantes WHERE comprador_id = ? ORDER BY nombre",
             [$compradorId]
@@ -13,8 +97,53 @@ class RestauranteModel extends BaseModel
 
     public function getByEmpresa(int $empresaId): array
     {
+        $this->ensureMenuPrincipalColumn();
         return $this->query(
             "SELECT * FROM rest_restaurantes WHERE empresa_id = ? ORDER BY nombre",
+            [$empresaId]
+        );
+    }
+
+    public function marcarMenuPrincipal(int $restauranteId, int $empresaId): bool
+    {
+        $this->ensureMenuPrincipalColumn();
+        if (!$this->columnExists('menu_principal')) {
+            return false;
+        }
+
+        $this->db->beginTransaction();
+        try {
+            $this->execute(
+                "UPDATE rest_restaurantes SET menu_principal = 0 WHERE empresa_id = ?",
+                [$empresaId]
+            );
+            $this->execute(
+                "UPDATE rest_restaurantes SET menu_principal = 1 WHERE id = ? AND empresa_id = ?",
+                [$restauranteId, $empresaId]
+            );
+            $this->db->commit();
+            return true;
+        } catch (\Throwable $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            error_log('[RestauranteModel] No se pudo marcar menu principal: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    public function getMenuPrincipalPorEmpresa(int $empresaId): ?array
+    {
+        $this->ensureMenuPrincipalColumn();
+        if (!$this->columnExists('menu_principal')) {
+            return null;
+        }
+
+        return $this->queryOne(
+            "SELECT * FROM rest_restaurantes
+             WHERE empresa_id = ? AND menu_principal = 1 AND activo = 1
+             ORDER BY id ASC
+             LIMIT 1",
             [$empresaId]
         );
     }

@@ -902,14 +902,21 @@ class RestClienteModel extends BaseModel
         $vigencia = date('d/m/Y', strtotime($vence));
         $tituloApp = $favorito ? 'Tu favorito con 10% off' : 'Un detalle especial para ti';
         $descripcion = $favorito
-            ? "Sabemos que disfrutas {$favorito}. Te dejamos 10% de descuento para tu proxima visita. Valido hasta {$vigencia}."
+            ? "Sabemos que disfrutas {$favorito}. Te dejamos 10% de descuento en ese platillo para tu proxima visita. Valido hasta {$vigencia}."
             : "Tenemos una promocion especial para tu proxima visita a Amare. Recibe 10% de descuento. Valido hasta {$vigencia}.";
 
         if ($motivo === 'reactivacion') {
             $tituloApp = 'Te extranamos en Amare';
-            $descripcion = 'Vuelve a Amare y recibe 10% de descuento en tu proxima visita. '
-                . ($favorito ? 'Ideal para disfrutar de nuevo: ' . $favorito . '. ' : '')
+            $descripcion = 'Vuelve a Amare y recibe 10% de descuento '
+                . ($favorito ? 'en ' . $favorito . ' durante tu proxima visita. ' : 'en tu proxima visita. ')
                 . 'Valido hasta ' . $vigencia . '.';
+        }
+
+        $scopeTipo = 'all';
+        $scopeIds = [];
+        if ($favoritoProductoId > 0) {
+            $scopeTipo = 'products';
+            $scopeIds = [$favoritoProductoId];
         }
 
         return [
@@ -926,6 +933,15 @@ class RestClienteModel extends BaseModel
             'expires_at' => $vence . ' 23:59:59',
             'activo' => 1,
             'motivo' => $motivo,
+            'tipo_descuento' => $tipo,
+            'scope_tipo' => $scopeTipo,
+            'scope_ids' => $scopeIds,
+            'producto_ids' => $scopeIds,
+            'buy_qty' => null,
+            'pay_qty' => null,
+            'min_subtotal' => 0,
+            'max_uses' => 1,
+            'combinable' => 0,
             'producto_favorito' => $favorito,
             'producto_id' => $favoritoProductoId ?: null,
             'platillo_id' => $favoritoProductoId ?: null,
@@ -969,21 +985,48 @@ class RestClienteModel extends BaseModel
             $imagen = (string)($payload['producto_imagen'] ?? '');
             $imagen = $imagen !== '' ? $imagen : $this->normalizarImagenPromocion('');
             $productoId = (int)($payload['producto_id'] ?? $payload['platillo_id'] ?? 0);
+            $scopeIds = $payload['scope_ids'] ?? [];
+            if (!is_array($scopeIds)) {
+                $decodedScopeIds = json_decode((string)$scopeIds, true);
+                $scopeIds = is_array($decodedScopeIds) ? $decodedScopeIds : [];
+            }
+            $scopeIds = array_values(array_unique(array_filter(array_map('intval', $scopeIds))));
 
+            $columns = [
+                'usuario_id' => $mobileId,
+                'producto_id' => $productoId > 0 ? $productoId : null,
+                'platillo_id' => $productoId > 0 ? $productoId : null,
+                'titulo' => (string)$payload['titulo'],
+                'descripcion' => (string)$payload['descripcion'],
+                'imagen' => $imagen,
+                'deep_link' => 'amare://promociones?code=' . rawurlencode((string)$payload['code']),
+                'code' => (string)$payload['code'],
+                'tipo_descuento' => (string)($payload['tipo_descuento'] ?? $payload['tipo'] ?? 'porcentaje'),
+                'valor_descuento' => (float)($payload['valor_descuento'] ?? 0),
+                'scope_tipo' => (string)($payload['scope_tipo'] ?? ($productoId > 0 ? 'products' : 'all')),
+                'scope_ids' => $scopeIds ? json_encode($scopeIds) : null,
+                'buy_qty' => isset($payload['buy_qty']) ? (int)$payload['buy_qty'] : null,
+                'pay_qty' => isset($payload['pay_qty']) ? (int)$payload['pay_qty'] : null,
+                'min_subtotal' => (float)($payload['min_subtotal'] ?? 0),
+                'max_uses' => isset($payload['max_uses']) ? (int)$payload['max_uses'] : null,
+                'combinable' => !empty($payload['combinable']) ? 1 : 0,
+                'activo' => 1,
+                'expires_at' => (string)$payload['expires_at'],
+                'created_at' => date('Y-m-d H:i:s'),
+            ];
+            $available = [];
+            foreach ($columns as $column => $value) {
+                if ($this->columnExists('mobile_promociones', $column)) {
+                    $available[$column] = $value;
+                }
+            }
+
+            $names = array_keys($available);
+            $sqlColumns = implode(', ', array_map(fn($column) => "`{$column}`", $names));
+            $placeholders = implode(', ', array_fill(0, count($names), '?'));
             $this->execute(
-                "INSERT INTO mobile_promociones
-                    (usuario_id, producto_id, titulo, descripcion, imagen, deep_link, code, activo, expires_at, created_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, NOW())",
-                [
-                    $mobileId,
-                    $productoId > 0 ? $productoId : null,
-                    (string)$payload['titulo'],
-                    (string)$payload['descripcion'],
-                    $imagen,
-                    'amare://promociones/' . rawurlencode((string)$payload['code']),
-                    (string)$payload['code'],
-                    (string)$payload['expires_at'],
-                ]
+                "INSERT INTO mobile_promociones ({$sqlColumns}) VALUES ({$placeholders})",
+                array_values($available)
             );
 
             return (int)$this->db->lastInsertId();
@@ -1002,15 +1045,29 @@ class RestClienteModel extends BaseModel
                 'activo' => 1,
             ];
 
-            foreach (['code', 'expires_at', 'imagen', 'producto_id', 'platillo_id'] as $column) {
+            foreach (['code', 'expires_at', 'imagen', 'producto_id', 'platillo_id', 'tipo_descuento', 'scope_tipo', 'scope_ids', 'buy_qty', 'pay_qty', 'min_subtotal', 'max_uses', 'combinable'] as $column) {
                 if ($this->columnExists('rest_promociones', $column)) {
                     if ($column === 'imagen') {
                         $columns[$column] = (string)($payload['producto_imagen'] ?? '');
                     } elseif (in_array($column, ['producto_id', 'platillo_id'], true)) {
                         $productoId = (int)($payload['producto_id'] ?? $payload['platillo_id'] ?? 0);
                         $columns[$column] = $productoId > 0 ? $productoId : null;
+                    } elseif ($column === 'scope_ids') {
+                        $scopeIds = $payload['scope_ids'] ?? [];
+                        if (!is_array($scopeIds)) {
+                            $decodedScopeIds = json_decode((string)$scopeIds, true);
+                            $scopeIds = is_array($decodedScopeIds) ? $decodedScopeIds : [];
+                        }
+                        $scopeIds = array_values(array_unique(array_filter(array_map('intval', $scopeIds))));
+                        $columns[$column] = $scopeIds ? json_encode($scopeIds) : null;
+                    } elseif (in_array($column, ['buy_qty', 'pay_qty', 'max_uses'], true)) {
+                        $columns[$column] = isset($payload[$column]) ? (int)$payload[$column] : null;
+                    } elseif ($column === 'min_subtotal') {
+                        $columns[$column] = (float)($payload[$column] ?? 0);
+                    } elseif ($column === 'combinable') {
+                        $columns[$column] = !empty($payload[$column]) ? 1 : 0;
                     } else {
-                        $columns[$column] = (string)$payload[$column];
+                        $columns[$column] = isset($payload[$column]) ? (string)$payload[$column] : null;
                     }
                 }
             }
@@ -1032,6 +1089,7 @@ class RestClienteModel extends BaseModel
     private function ensureMobilePromocionesProductoColumn(): void
     {
         if (!$this->tableExists('mobile_promociones') || $this->columnExists('mobile_promociones', 'producto_id')) {
+            $this->ensureMobilePromocionesRuleColumns();
             return;
         }
 
@@ -1045,6 +1103,39 @@ class RestClienteModel extends BaseModel
             $this->execute("ALTER TABLE mobile_promociones ADD KEY idx_producto_id (producto_id)");
         } catch (\Throwable $e) {
             error_log('[mobile_promociones] No se pudo crear indice producto_id: ' . $e->getMessage());
+        }
+
+        $this->ensureMobilePromocionesRuleColumns();
+    }
+
+    private function ensureMobilePromocionesRuleColumns(): void
+    {
+        if (!$this->tableExists('mobile_promociones')) {
+            return;
+        }
+
+        $columns = [
+            'tipo_descuento' => "ALTER TABLE mobile_promociones ADD COLUMN tipo_descuento varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'porcentaje'",
+            'valor_descuento' => "ALTER TABLE mobile_promociones ADD COLUMN valor_descuento decimal(10,2) NOT NULL DEFAULT 0.00",
+            'scope_tipo' => "ALTER TABLE mobile_promociones ADD COLUMN scope_tipo varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'all'",
+            'scope_ids' => "ALTER TABLE mobile_promociones ADD COLUMN scope_ids text COLLATE utf8mb4_unicode_ci DEFAULT NULL",
+            'buy_qty' => "ALTER TABLE mobile_promociones ADD COLUMN buy_qty int(10) UNSIGNED DEFAULT NULL",
+            'pay_qty' => "ALTER TABLE mobile_promociones ADD COLUMN pay_qty int(10) UNSIGNED DEFAULT NULL",
+            'min_subtotal' => "ALTER TABLE mobile_promociones ADD COLUMN min_subtotal decimal(10,2) NOT NULL DEFAULT 0.00",
+            'max_uses' => "ALTER TABLE mobile_promociones ADD COLUMN max_uses int(10) UNSIGNED DEFAULT NULL",
+            'combinable' => "ALTER TABLE mobile_promociones ADD COLUMN combinable tinyint(1) NOT NULL DEFAULT 0",
+        ];
+
+        foreach ($columns as $column => $sql) {
+            if ($this->columnExists('mobile_promociones', $column)) {
+                continue;
+            }
+            try {
+                $this->execute($sql);
+                self::$schemaCache['column:mobile_promociones.' . $column] = true;
+            } catch (\Throwable $e) {
+                error_log('[mobile_promociones] No se pudo agregar ' . $column . ': ' . $e->getMessage());
+            }
         }
     }
 

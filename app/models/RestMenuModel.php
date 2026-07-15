@@ -2,6 +2,27 @@
 class RestMenuModel extends BaseModel
 {
     protected string $table = 'rest_platillos';
+    private static array $columnCache = [];
+
+    private function tableColumnExists(string $table, string $column): bool
+    {
+        $key = $table . '.' . $column;
+        if (array_key_exists($key, self::$columnCache)) {
+            return self::$columnCache[$key];
+        }
+
+        try {
+            $stmt = $this->db->query("SHOW COLUMNS FROM `{$table}`");
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                if (strcasecmp((string)($row['Field'] ?? ''), $column) === 0) {
+                    return self::$columnCache[$key] = true;
+                }
+            }
+            return self::$columnCache[$key] = false;
+        } catch (\Throwable $e) {
+            return self::$columnCache[$key] = false;
+        }
+    }
 
     public function soportaSelectorUnificado(): bool
     {
@@ -78,6 +99,235 @@ class RestMenuModel extends BaseModel
              ORDER BY c.orden, p.nombre",
             [$restauranteId]
         );
+    }
+
+    public function importarMenuDesdePrincipal(int $origenRestauranteId, int $destinoRestauranteId): array
+    {
+        if ($origenRestauranteId <= 0 || $destinoRestauranteId <= 0 || $origenRestauranteId === $destinoRestauranteId) {
+            throw new \InvalidArgumentException('Selecciona una sucursal principal diferente a la sucursal actual.');
+        }
+
+        $stats = [
+            'categorias_creadas' => 0,
+            'categorias_actualizadas' => 0,
+            'platillos_creados' => 0,
+            'platillos_actualizados' => 0,
+            'platillos_incompletos_desactivados' => 0,
+        ];
+
+        $this->db->beginTransaction();
+        try {
+            $categoriasMap = $this->importarCategoriasMenu($origenRestauranteId, $destinoRestauranteId, $stats);
+            $stats['platillos_incompletos_desactivados'] = $this->desactivarPlatillosSinNombre($destinoRestauranteId);
+            $this->importarPlatillosMenu($origenRestauranteId, $destinoRestauranteId, $categoriasMap, $stats);
+            $this->db->commit();
+            return $stats;
+        } catch (\Throwable $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
+        }
+    }
+
+    private function importarCategoriasMenu(int $origenRestauranteId, int $destinoRestauranteId, array &$stats): array
+    {
+        $origen = $this->query(
+            "SELECT id, nombre, descripcion, imagen, orden, activo
+             FROM rest_categorias_menu
+             WHERE restaurante_id = ? AND activo = 1
+             ORDER BY orden, nombre",
+            [$origenRestauranteId]
+        );
+        $destino = $this->query(
+            "SELECT id, nombre
+             FROM rest_categorias_menu
+             WHERE restaurante_id = ?",
+            [$destinoRestauranteId]
+        );
+
+        $destinoPorNombre = [];
+        foreach ($destino as $cat) {
+            $destinoPorNombre[mb_strtolower(trim((string)$cat['nombre']))] = (int)$cat['id'];
+        }
+
+        $map = [];
+        foreach ($origen as $cat) {
+            $key = mb_strtolower(trim((string)$cat['nombre']));
+            if (isset($destinoPorNombre[$key])) {
+                $destinoId = $destinoPorNombre[$key];
+                $this->execute(
+                    "UPDATE rest_categorias_menu
+                     SET descripcion = ?, imagen = ?, orden = ?, activo = 1
+                     WHERE id = ? AND restaurante_id = ?",
+                    [
+                        $cat['descripcion'] ?? null,
+                        $cat['imagen'] ?? null,
+                        (int)($cat['orden'] ?? 0),
+                        $destinoId,
+                        $destinoRestauranteId,
+                    ]
+                );
+                $stats['categorias_actualizadas']++;
+            } else {
+                $this->execute(
+                    "INSERT INTO rest_categorias_menu
+                        (restaurante_id, nombre, descripcion, imagen, orden, activo)
+                     VALUES (?, ?, ?, ?, ?, 1)",
+                    [
+                        $destinoRestauranteId,
+                        (string)$cat['nombre'],
+                        $cat['descripcion'] ?? null,
+                        $cat['imagen'] ?? null,
+                        (int)($cat['orden'] ?? 0),
+                    ]
+                );
+                $destinoId = (int)$this->db->lastInsertId();
+                $destinoPorNombre[$key] = $destinoId;
+                $stats['categorias_creadas']++;
+            }
+            $map[(int)$cat['id']] = $destinoId;
+        }
+
+        return $map;
+    }
+
+    private function desactivarPlatillosSinNombre(int $restauranteId): int
+    {
+        if (!$this->tableColumnExists('rest_platillos', 'nombre') || !$this->tableColumnExists('rest_platillos', 'activo')) {
+            return 0;
+        }
+
+        $stmt = $this->db->prepare(
+            "UPDATE rest_platillos
+             SET activo = 0
+             WHERE restaurante_id = ?
+               AND activo = 1
+               AND (nombre IS NULL OR TRIM(nombre) = '')"
+        );
+        $stmt->execute([$restauranteId]);
+        return $stmt->rowCount();
+    }
+
+    private function importarPlatillosMenu(int $origenRestauranteId, int $destinoRestauranteId, array $categoriasMap, array &$stats): void
+    {
+        $sourceColumns = [
+            'codigo', 'es_armado', 'categoria_id', 'nombre', 'descripcion', 'alergenos', 'contiene',
+            'precio', 'imagen', 'tiempo_preparacion_min', 'disponible', 'activo', 'ingrediente_directo_id',
+        ];
+        $selectColumns = ['id'];
+        foreach ($sourceColumns as $column) {
+            if ($this->tableColumnExists('rest_platillos', $column)) {
+                $selectColumns[] = $column;
+            }
+        }
+
+        $platillos = $this->query(
+            "SELECT " . implode(', ', array_map(fn($column) => "`{$column}`", $selectColumns)) . "
+             FROM rest_platillos
+             WHERE restaurante_id = ? AND activo = 1
+             ORDER BY nombre",
+            [$origenRestauranteId]
+        );
+        $destinoSelect = ['id', 'nombre'];
+        foreach (['codigo', 'categoria_id'] as $column) {
+            if ($this->tableColumnExists('rest_platillos', $column)) {
+                $destinoSelect[] = $column;
+            }
+        }
+        $destino = $this->query(
+            "SELECT " . implode(', ', array_map(fn($column) => "`{$column}`", $destinoSelect)) . "
+             FROM rest_platillos
+             WHERE restaurante_id = ?",
+            [$destinoRestauranteId]
+        );
+
+        $destinoPorCodigo = [];
+        $destinoPorNombreCategoria = [];
+        foreach ($destino as $platillo) {
+            $codigo = trim((string)($platillo['codigo'] ?? ''));
+            if ($codigo !== '') {
+                $destinoPorCodigo[mb_strtolower($codigo)] = (int)$platillo['id'];
+            }
+            $nombreDestino = trim((string)($platillo['nombre'] ?? ''));
+            if ($nombreDestino !== '') {
+                $destinoPorNombreCategoria[$this->platilloKey($nombreDestino, (int)($platillo['categoria_id'] ?? 0))] = (int)$platillo['id'];
+            }
+        }
+
+        foreach ($platillos as $platillo) {
+            $nombreOrigen = trim((string)($platillo['nombre'] ?? ''));
+            if ($nombreOrigen === '') {
+                continue;
+            }
+            $categoriaDestinoId = isset($platillo['categoria_id'])
+                ? ($categoriasMap[(int)$platillo['categoria_id']] ?? null)
+                : null;
+            $codigo = trim((string)($platillo['codigo'] ?? ''));
+            $destinoId = 0;
+            if ($codigo !== '' && isset($destinoPorCodigo[mb_strtolower($codigo)])) {
+                $destinoId = $destinoPorCodigo[mb_strtolower($codigo)];
+            }
+            if (!$destinoId) {
+                $key = $this->platilloKey($nombreOrigen, (int)($categoriaDestinoId ?? 0));
+                $destinoId = $destinoPorNombreCategoria[$key] ?? 0;
+            }
+
+            $data = $this->menuPlatilloImportData($platillo, $categoriaDestinoId, false);
+            if ($destinoId > 0) {
+                if (!$data) {
+                    throw new \RuntimeException('No se pudieron detectar las columnas de platillos para actualizar el menu.');
+                }
+                $sets = implode(', ', array_map(fn($column) => "`{$column}` = ?", array_keys($data)));
+                $values = array_values($data);
+                $values[] = $destinoId;
+                $values[] = $destinoRestauranteId;
+                $this->execute("UPDATE rest_platillos SET {$sets} WHERE id = ? AND restaurante_id = ?", $values);
+                $stats['platillos_actualizados']++;
+                continue;
+            }
+
+            $data = ['restaurante_id' => $destinoRestauranteId] + $this->menuPlatilloImportData($platillo, $categoriaDestinoId, true);
+            if (count($data) <= 1) {
+                throw new \RuntimeException('No se pudieron detectar las columnas de platillos para importar el menu.');
+            }
+            $columns = array_keys($data);
+            $this->execute(
+                "INSERT INTO rest_platillos (" . implode(', ', array_map(fn($column) => "`{$column}`", $columns)) . ")
+                 VALUES (" . implode(', ', array_fill(0, count($columns), '?')) . ")",
+                array_values($data)
+            );
+            $stats['platillos_creados']++;
+        }
+    }
+
+    private function menuPlatilloImportData(array $platillo, ?int $categoriaDestinoId, bool $nuevo): array
+    {
+        $data = [];
+        $copyColumns = ['codigo', 'es_armado', 'nombre', 'descripcion', 'alergenos', 'contiene', 'precio', 'imagen', 'tiempo_preparacion_min'];
+        foreach ($copyColumns as $column) {
+            if ($this->tableColumnExists('rest_platillos', $column) && array_key_exists($column, $platillo)) {
+                $data[$column] = $platillo[$column];
+            }
+        }
+        if ($this->tableColumnExists('rest_platillos', 'categoria_id')) {
+            $data['categoria_id'] = $categoriaDestinoId;
+        }
+        if ($nuevo && $this->tableColumnExists('rest_platillos', 'disponible')) {
+            $data['disponible'] = (int)($platillo['disponible'] ?? 1);
+        }
+        if ($nuevo && $this->tableColumnExists('rest_platillos', 'activo')) {
+            $data['activo'] = 1;
+        }
+        if ($nuevo && $this->tableColumnExists('rest_platillos', 'ingrediente_directo_id')) {
+            $data['ingrediente_directo_id'] = null;
+        }
+        return $data;
+    }
+
+    private function platilloKey(string $nombre, int $categoriaId): string
+    {
+        return mb_strtolower(trim($nombre)) . '|' . $categoriaId;
     }
 
     // ── Recetas ───────────────────────────────────────────────────

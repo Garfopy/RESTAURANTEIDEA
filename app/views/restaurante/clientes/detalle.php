@@ -19,6 +19,7 @@ $promocionSugerida = $promocionSugerida ?? [
 $promocionApp = $promocionApp ?? [];
 $detalleParam = $detalleParam ?? (string)($comensal['id'] ?? '');
 $puedeEnviarPromoApp = !empty($comensal['mobile_usuario_id']) && !empty($promocionApp['code']);
+$promoProductoObjetivo = trim((string)($promocionApp['producto_favorito'] ?? ''));
 $maxCantidad = 1;
 foreach ($productosFavoritos as $producto) {
   $maxCantidad = max($maxCantidad, (float)($producto['cantidad_total'] ?? 0));
@@ -97,7 +98,7 @@ foreach ($productosFavoritos as $producto) {
       <div class="client-promo-mechanic">
         <?php if (!empty($promocionApp)): ?>
           <div style="display:grid;gap:8px">
-            <div><strong>Descuento:</strong> <?= number_format((float)$promocionApp['valor_descuento'], 0) ?>% sobre la proxima visita</div>
+            <div><strong>Descuento:</strong> <?= number_format((float)$promocionApp['valor_descuento'], 0) ?>%<?= $promoProductoObjetivo !== '' ? ' en ' . htmlspecialchars($promoProductoObjetivo) : ' sobre la proxima visita' ?></div>
             <div><strong>Codigo:</strong> <span style="font-family:monospace;letter-spacing:.08em"><?= htmlspecialchars((string)$promocionApp['code']) ?></span></div>
             <div><strong>Vigencia:</strong> <?= date('d/m/Y', strtotime((string)$promocionApp['fecha_inicio'])) ?> al <?= date('d/m/Y', strtotime((string)$promocionApp['fecha_fin'])) ?></div>
           </div>

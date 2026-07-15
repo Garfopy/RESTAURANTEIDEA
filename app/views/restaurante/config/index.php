@@ -1,4 +1,9 @@
 <?php ob_start(); ?>
+<?php
+$menuPrincipalId = (int)($menuPrincipal['id'] ?? 0);
+$esMenuPrincipal = $menuPrincipalId > 0 && $menuPrincipalId === (int)($restaurante['id'] ?? 0);
+$hayCadenaMenu = !empty($sucursales) && count($sucursales) > 1;
+?>
 <div>
   <div class="rst-card">
     <form method="POST" action="<?= BASE_URL ?>rest-config/guardar" enctype="multipart/form-data" accept-charset="UTF-8">
@@ -945,6 +950,32 @@
         <?php endif; ?>
       </div>
     </form>
+
+    <?php if ($hayCadenaMenu): ?>
+    <div style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:10px;padding:12px 14px;margin-top:14px">
+      <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap">
+        <div>
+          <div style="font-weight:700;font-size:.86rem;color:#111827">Menu principal de cadena</div>
+          <div style="font-size:.75rem;color:#6B7280;margin-top:2px">
+            Actual: <?= $menuPrincipalId ? htmlspecialchars((string)($menuPrincipal['nombre'] ?? 'Sucursal principal')) : 'sin asignar' ?>.
+          </div>
+        </div>
+        <?php if ($esMenuPrincipal): ?>
+        <span style="font-size:.76rem;font-weight:700;color:#166534;background:#DCFCE7;border-radius:999px;padding:5px 10px">
+          Esta sucursal es principal
+        </span>
+        <?php else: ?>
+        <form method="POST" action="<?= BASE_URL ?>rest-config/marcarPrincipal"
+              onsubmit="return confirm('Marcar esta sucursal como menu principal de la cadena?')"
+              style="margin:0">
+          <button type="submit" class="btn btn-outline" style="padding:7px 12px;font-size:.78rem">
+            Marcar como principal
+          </button>
+        </form>
+        <?php endif; ?>
+      </div>
+    </div>
+    <?php endif; ?>
   </div>
 
   <!-- QR del restaurante -->
@@ -1021,13 +1052,20 @@ function renderAddressMap(lat, lng, label) {
   ensureRstLeaflet(function() {
     el.style.display = 'block';
     if (!rstLeafletMap) {
+      const markerIcon = L.divIcon({
+        className: '',
+        html: '<div style="position:relative;width:24px;height:24px;transform:rotate(-45deg);border-radius:50% 50% 50% 0;background:var(--cp);border:2px solid #fff;box-shadow:0 8px 18px rgba(17,24,39,.28)"><div style="position:absolute;top:6px;left:6px;width:8px;height:8px;border-radius:50%;background:#fff"></div></div>',
+        iconSize: [24, 24],
+        iconAnchor: [12, 24],
+        popupAnchor: [0, -22]
+      });
       el.innerHTML = '';
       rstLeafletMap = L.map(el).setView([lat, lng], 16);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: 'OpenStreetMap',
         maxZoom: 19
       }).addTo(rstLeafletMap);
-      rstLeafletMarker = L.marker([lat, lng]).addTo(rstLeafletMap);
+      rstLeafletMarker = L.marker([lat, lng], { icon: markerIcon }).addTo(rstLeafletMap);
     } else {
       rstLeafletMap.setView([lat, lng], 16);
       rstLeafletMarker.setLatLng([lat, lng]);

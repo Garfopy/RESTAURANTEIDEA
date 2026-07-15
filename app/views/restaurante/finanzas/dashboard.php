@@ -124,6 +124,10 @@ ob_start();
   grid-template-columns: minmax(0, 1.25fr) minmax(360px, .75fr);
   gap: 20px;
 }
+.finance-grid-2 > *,
+.finance-grid-3 > * {
+  min-width: 0;
+}
 .finance-grid-3 {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -194,7 +198,26 @@ ob_start();
   color: #111827;
 }
 .finance-chart {
-  min-height: 300px;
+  min-height: 0;
+  overflow: hidden;
+}
+.finance-chart-body {
+  --finance-chart-height: 300px;
+  contain: layout size;
+  position: relative;
+  height: var(--finance-chart-height);
+  min-height: 0;
+  max-height: var(--finance-chart-height);
+  overflow: hidden;
+}
+.finance-chart-body--sm {
+  --finance-chart-height: 260px;
+}
+.finance-chart-body canvas {
+  display: block;
+  width: 100% !important;
+  height: var(--finance-chart-height) !important;
+  max-height: var(--finance-chart-height) !important;
 }
 .finance-pill {
   display: inline-flex;
@@ -250,6 +273,12 @@ ob_start();
   .finance-hero {
     padding: 20px;
   }
+  .finance-chart-body {
+    --finance-chart-height: 260px;
+  }
+  .finance-chart-body--sm {
+    --finance-chart-height: 240px;
+  }
 }
 </style>
 
@@ -281,7 +310,9 @@ ob_start();
         <h2 style="margin:0">Ingresos vs egresos</h2>
         <a class="finance-action" href="<?= BASE_URL ?>rest-finanzas/ventas?desde=<?= urlencode($desde) ?>&hasta=<?= urlencode($hasta) ?>">Ver ventas</a>
       </div>
-      <canvas id="chartIngEgr"></canvas>
+      <div class="finance-chart-body">
+        <canvas id="chartIngEgr"></canvas>
+      </div>
     </div>
 
     <div class="finance-card">
@@ -325,7 +356,9 @@ ob_start();
     <div class="finance-card finance-chart">
       <h3>Metodos de pago</h3>
       <?php if (!empty($metodosVista)): ?>
-      <canvas id="chartMetodosPago"></canvas>
+      <div class="finance-chart-body finance-chart-body--sm">
+        <canvas id="chartMetodosPago"></canvas>
+      </div>
       <?php else: ?>
       <div class="finance-empty">Sin pagos registrados en el periodo.</div>
       <?php endif; ?>

@@ -4,16 +4,27 @@
  * Auto-detects BASE_URL regardless of subdirectory installation.
  */
 
-// Detect protocol
-$protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
-$host     = $_SERVER['HTTP_HOST'] ?? 'localhost';
+// In CLI/cron there is no reliable HTTP_HOST/SCRIPT_NAME. Allow cPanel cron
+// to inject the public URL with APP_URL, BASE_URL or CARNIHUB_BASE_URL.
+$configuredBaseUrl = getenv('APP_URL') ?: getenv('BASE_URL') ?: getenv('CARNIHUB_BASE_URL') ?: '';
 
-// Detect base path from actual script location
-$scriptDir = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/'));
-$basePath  = ($scriptDir === '/') ? '/' : rtrim($scriptDir, '/') . '/';
+if ($configuredBaseUrl !== '') {
+    $parsedPath = parse_url($configuredBaseUrl, PHP_URL_PATH);
+    $basePath   = $parsedPath ? '/' . trim($parsedPath, '/') . '/' : '/';
+    define('BASE_URL', rtrim($configuredBaseUrl, '/') . '/');
+    define('BASE_URL_PATH', $basePath);
+} else {
+    // Detect protocol
+    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
+    $host     = $_SERVER['HTTP_HOST'] ?? 'localhost';
 
-define('BASE_URL',      $protocol . $host . $basePath);
-define('BASE_URL_PATH', $basePath);
+    // Detect base path from actual script location
+    $scriptDir = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/'));
+    $basePath  = ($scriptDir === '/') ? '/' : rtrim($scriptDir, '/') . '/';
+
+    define('BASE_URL',      $protocol . $host . $basePath);
+    define('BASE_URL_PATH', $basePath);
+}
 define('BASE_PATH',     dirname(__DIR__));   // project root
 
 // Application

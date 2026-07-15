@@ -9,9 +9,13 @@ class RestConfigController extends BaseController
     {
         try {
             $db = \Database::getInstance();
-            $stmt = $db->prepare("SHOW COLUMNS FROM `{$table}` LIKE ?");
-            $stmt->execute([$column]);
-            return (bool)$stmt->fetch(\PDO::FETCH_ASSOC);
+            $stmt = $db->query("SHOW COLUMNS FROM `{$table}`");
+            while ($row = $stmt->fetch(\PDO::FETCH_ASSOC)) {
+                if (strcasecmp((string)($row['Field'] ?? ''), $column) === 0) {
+                    return true;
+                }
+            }
+            return false;
         } catch (\Throwable $e) {
             return false;
         }
@@ -377,6 +381,61 @@ class RestConfigController extends BaseController
         }
     }
 
+    private function guardarConfiguracionMovilLocal(
+        \PDO $db,
+        int $restauranteId,
+        array $tiposEntrega,
+        array $metodosPago,
+        string $costoEnvio,
+        string $pedidoMinimo,
+        bool $exclusionesHabilitadas,
+        bool $extrasHabilitados
+    ): void {
+        $row = $db->prepare("SELECT id FROM rest_configuracion WHERE restaurante_id = ? LIMIT 1");
+        $row->execute([$restauranteId]);
+
+        $payload = [
+            json_encode(array_values($metodosPago)),
+            json_encode(array_values($tiposEntrega)),
+            (float)$costoEnvio,
+            (float)$pedidoMinimo,
+            $exclusionesHabilitadas ? 1 : 0,
+            $extrasHabilitados ? 1 : 0,
+        ];
+
+        if ((int)$row->fetchColumn() > 0) {
+            $stmt = $db->prepare(
+                "UPDATE rest_configuracion
+                 SET metodos_pago = ?,
+                     tipos_entrega = ?,
+                     costo_envio = ?,
+                     pedido_minimo = ?,
+                     exclusiones_habilitadas = ?,
+                     extras_habilitados = ?,
+                     config_version = config_version + 1
+                 WHERE restaurante_id = ?"
+            );
+            $stmt->execute(array_merge($payload, [$restauranteId]));
+            return;
+        }
+
+        $stmt = $db->prepare(
+            "INSERT INTO rest_configuracion
+                (restaurante_id, metodos_pago, tipos_entrega, costo_envio, pedido_minimo,
+                 exclusiones_habilitadas, extras_habilitados, config_version, activo)
+             VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1)"
+        );
+        $stmt->execute([
+            $restauranteId,
+            $payload[0],
+            $payload[1],
+            $payload[2],
+            $payload[3],
+            $payload[4],
+            $payload[5],
+        ]);
+    }
+
     public function __construct()
     {
         parent::__construct();
@@ -416,6 +475,21 @@ class RestConfigController extends BaseController
                 $cfgPagos[$clave] = $r2['valor'] ?? '';
             }
 
+            $cfgMovilLocal = $db->prepare(
+                "SELECT metodos_pago, tipos_entrega, costo_envio, pedido_minimo
+                 FROM rest_configuracion
+                 WHERE restaurante_id = ?
+                 LIMIT 1"
+            );
+            $cfgMovilLocal->execute([$restauranteId]);
+            $cfgMovilRow = $cfgMovilLocal->fetch(\PDO::FETCH_ASSOC) ?: [];
+            if ($cfgMovilRow) {
+                $cfgPagos['metodos_pago_app_habilitados'] = $cfgMovilRow['metodos_pago'] ?? $cfgPagos['metodos_pago_app_habilitados'];
+                $cfgPagos['tipos_entrega_habilitados'] = $cfgMovilRow['tipos_entrega'] ?? $cfgPagos['tipos_entrega_habilitados'];
+                $cfgPagos['costo_envio_app'] = (string)($cfgMovilRow['costo_envio'] ?? $cfgPagos['costo_envio_app']);
+                $cfgPagos['pedido_minimo_app'] = (string)($cfgMovilRow['pedido_minimo'] ?? $cfgPagos['pedido_minimo_app']);
+            }
+
             // CarniHub API config
             $s3 = $db->prepare("SELECT * FROM carnihub_api_config WHERE restaurante_id = :rid LIMIT 1");
             $s3->execute([':rid' => $restauranteId]);
@@ -432,9 +506,17 @@ class RestConfigController extends BaseController
 
         $pageTitle  = 'Configuración del Restaurante';
         $facturacionConfig = $this->facturacionConfig((int)$restauranteId);
+        $sucursales = [];
+        $menuPrincipal = null;
+        if (!empty($restaurante['empresa_id'])) {
+            $sucursales = $this->rolActual() === 'admin_restaurante'
+                ? $this->model->getByEmpresa((int)$restaurante['empresa_id'])
+                : $this->model->getByComprador((int)$this->usuarioId());
+            $menuPrincipal = $this->model->getMenuPrincipalPorEmpresa((int)$restaurante['empresa_id']);
+        }
         $activeMenu = 'rest_config';
         $this->render('restaurante/config/index',
-            compact('restaurante','flash','pageTitle','activeMenu','mapsApiKey','cfgPagos','cfgCarniHub','bloqueadoPorCarniHub','facturacionConfig'));
+            compact('restaurante','flash','pageTitle','activeMenu','mapsApiKey','cfgPagos','cfgCarniHub','bloqueadoPorCarniHub','facturacionConfig','sucursales','menuPrincipal'));
     }
 
     public function guardar(?string $p = null): void
@@ -504,6 +586,8 @@ class RestConfigController extends BaseController
         $exclusionesApp = $this->post('exclusiones_app_habilitadas') ? 1 : 0;
         $extrasApp = $this->post('extras_app_habilitados') ? 1 : 0;
         $modifierSaveError = null;
+        $menuPrincipalError = null;
+        $menuPrincipalMarcado = false;
         try {
             $dbModos = \Database::getInstance();
             $dbModos->prepare(
@@ -665,6 +749,17 @@ class RestConfigController extends BaseController
             );
             $upsertMinimo->execute([':v' => $pedidoMinimo, ':v2' => $pedidoMinimo]);
 
+            $this->guardarConfiguracionMovilLocal(
+                $db,
+                (int)$restauranteId,
+                $tiposEntregaPost,
+                $metodosAppPost,
+                $costoEnvio,
+                $pedidoMinimo,
+                (bool)$exclusionesApp,
+                (bool)$extrasApp
+            );
+
             // URL y token de Amare-App API
             $amareUrl = trim((string)$this->post('amare_api_url', ''));
             $amareToken = trim((string)$this->post('amare_api_token', ''));
@@ -757,14 +852,53 @@ class RestConfigController extends BaseController
             }
         } catch (\Exception $e) { /* columns may not exist yet */ }
 
-        if ($modifierSaveError) {
+        if ($this->post('menu_principal')) {
+            $restActual = $this->model->find($restauranteId) ?: [];
+            $empresaId = (int)($restActual['empresa_id'] ?? 0);
+            if ($empresaId <= 0) {
+                $menuPrincipalError = 'Configuracion guardada, pero esta sucursal no tiene empresa/cadena asociada para marcar menu principal.';
+            } elseif ($this->model->marcarMenuPrincipal((int)$restauranteId, $empresaId)) {
+                $menuPrincipalMarcado = true;
+            } else {
+                $menuPrincipalError = 'Configuracion guardada, pero no se pudo marcar esta sucursal como menu principal.';
+            }
+        }
+
+        if ($menuPrincipalError) {
+            $this->flash('error', $menuPrincipalError);
+        } elseif ($modifierSaveError) {
             $this->flash('error', $modifierSaveError);
         } elseif ($syncError) {
             $this->flash('error', $syncError);
         } elseif (is_array($bulkSync)) {
-            $this->flash('success', 'Configuracion guardada y ' . (int)$bulkSync['sincronizados'] . ' platillos preparados para Amare-App.');
+            $msg = 'Configuracion guardada y ' . (int)$bulkSync['sincronizados'] . ' platillos preparados para Amare-App.';
+            if ($menuPrincipalMarcado) {
+                $msg .= ' Esta sucursal quedo como menu principal.';
+            }
+            $this->flash('success', $msg);
         } else {
             $this->flash('success', 'Configuración guardada.');
+        }
+        $this->redirect('rest-config/index');
+    }
+
+    public function marcarPrincipal(?string $p = null): void
+    {
+        if (!$this->isPost()) $this->redirect('rest-config/index');
+
+        $restauranteId = (int)$this->restauranteId();
+        $restaurante = $this->model->find($restauranteId);
+        $empresaId = (int)($restaurante['empresa_id'] ?? 0);
+
+        if (!$restaurante || $empresaId <= 0) {
+            $this->flash('error', 'Esta sucursal no tiene empresa/cadena asociada para marcar menu principal.');
+            $this->redirect('rest-config/index');
+        }
+
+        if ($this->model->marcarMenuPrincipal($restauranteId, $empresaId)) {
+            $this->flash('success', 'Esta sucursal quedo como menu principal de la cadena.');
+        } else {
+            $this->flash('error', 'No se pudo marcar esta sucursal como menu principal.');
         }
         $this->redirect('rest-config/index');
     }
