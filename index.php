@@ -117,6 +117,7 @@ if ($path === '') {
 $routes = [
     // Landing AMARE (público)
     'landing'       => 'LandingController',
+    'legal'         => 'LegalController',
     // Auth (público)
     'auth'          => 'AuthController',
     // Portal admin del restaurante
@@ -153,6 +154,8 @@ $routes = [
 // ── Auth guard ────────────────────────────────────────────────────────────────
 $publicPaths = [
     'landing/index',
+    'legal/index',
+    'legal/terminos',
     'auth/login',
     'auth/dologin',
     'auth/index',
@@ -195,6 +198,8 @@ $publicPaths = [
     'api/auth/login',
     'api/auth/token',
     'api/admin',
+    'api/legal',
+    'api/legal/terminos',
     'api/admin/users',
     'api/admin/promotions',
     'api/branches',

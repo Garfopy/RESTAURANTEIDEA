@@ -1166,6 +1166,54 @@ class ApiController extends BaseController
         $this->json(['ok' => true, 'page' => $page, 'limit' => $limit, 'productos' => $productos]);
     }
 
+    /**
+     * GET /api/legal/terminos?slug={restaurante}
+     * Terminos publicos para app movil o clientes web.
+     */
+    public function legal(?string $resource = null): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+
+        $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+        header('Access-Control-Allow-Origin: ' . ($origin ?: '*'));
+        header('Access-Control-Allow-Methods: GET, OPTIONS');
+        header('Access-Control-Allow-Headers: Authorization, Content-Type');
+
+        if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+            http_response_code(204);
+            exit;
+        }
+
+        if ($_SERVER['REQUEST_METHOD'] !== 'GET' || !in_array($resource, ['terminos', 'terms', null, ''], true)) {
+            $this->json(['ok' => false, 'message' => 'Ruta legal no encontrada'], 404);
+        }
+
+        $restaurante = null;
+        $slug = trim((string)$this->get('slug', ''));
+        if ($slug !== '') {
+            try {
+                $restaurante = (new RestauranteModel())->getBySlug($slug) ?: null;
+            } catch (\Throwable $e) {
+                $restaurante = null;
+            }
+        }
+
+        $terms = (new LegalContentService())->getTerms($restaurante);
+        $this->json([
+            'ok' => true,
+            'data' => [
+                'title'      => $terms['title'],
+                'version'    => $terms['version'],
+                'updated_at' => $terms['updated_at'],
+                'brand'      => $terms['brand'],
+                'html'       => $terms['html'],
+                'plain_text' => $terms['plain_text'],
+                'web_url'    => BASE_URL . 'legal/terminos' . ($slug !== '' ? '?slug=' . rawurlencode($slug) : ''),
+            ],
+        ]);
+    }
+
     // ══════════════════════════════════════════════════════════════════
     // Admin API v1 — Endpoints para el sitio web admin (JWT Bearer)
     // Autenticación: POST /api/auth/login devuelve JWT
