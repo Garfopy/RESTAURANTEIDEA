@@ -1,6 +1,13 @@
 <?php ob_start(); ?>
 
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+<style>
+  .promo-list-shell{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px}
+  .promo-table-card{display:none;background:#fff;border-radius:14px;border:1px solid #E5E7EB;overflow:hidden;box-shadow:0 10px 24px rgba(15,23,42,.06)}
+  .promo-code-pill{display:inline-block;border:1px solid #E5E7EB;background:#F8FAFC;border-radius:999px;padding:5px 9px;font-family:monospace;font-size:.78rem}
+  .promo-rule-pill{display:inline-block;border-radius:999px;padding:5px 10px;background:#EEF2FF;color:#3730A3;font-weight:700;font-size:.76rem}
+</style>
+
+<div class="promo-list-shell">
   <div>
     <h2 style="margin:0;font-size:1.15rem;color:#111827">🎁 Promociones</h2>
     <p style="margin:4px 0 0;font-size:.82rem;color:#6B7280">
@@ -22,21 +29,23 @@
 </div>
 
 <!-- Tabla de promociones (oculta hasta que carguen datos) -->
-<div id="promo-table" style="display:none;background:#fff;border-radius:12px;border:1px solid #E5E7EB;overflow:hidden">
+<div id="promo-table" class="promo-table-card">
   <div style="width:100%;overflow-x:auto">
-  <table style="width:100%;min-width:760px;border-collapse:collapse;font-size:.875rem;table-layout:fixed">
+  <table style="width:100%;min-width:900px;border-collapse:collapse;font-size:.875rem;table-layout:fixed">
     <colgroup>
-      <col style="width:28%">
-      <col style="width:18%">
+      <col style="width:25%">
+      <col style="width:16%">
+      <col style="width:15%">
+      <col style="width:11%">
+      <col style="width:11%">
       <col style="width:12%">
-      <col style="width:12%">
-      <col style="width:12%">
-      <col style="width:18%">
+      <col style="width:10%">
     </colgroup>
     <thead>
       <tr style="background:#F9FAFB;border-bottom:1px solid #E5E7EB">
         <th style="padding:12px 16px;text-align:left;font-weight:600;color:#374151">Promoción</th>
         <th style="padding:12px 16px;text-align:left;font-weight:600;color:#374151">Usuario</th>
+        <th style="padding:12px 16px;text-align:center;font-weight:600;color:#374151">Regla</th>
         <th style="padding:12px 16px;text-align:center;font-weight:600;color:#374151">Código</th>
         <th style="padding:12px 16px;text-align:center;font-weight:600;color:#374151">Expira</th>
         <th style="padding:12px 16px;text-align:center;font-weight:600;color:#374151">Estado</th>
@@ -146,10 +155,12 @@
     var expira = p.expires_at ? formatearFecha(p.expires_at) : 'Sin expiración';
     var rawTitulo = p.titulo || 'Sin título';
 
+    var regla = getRuleLabel(p);
     var estadoInfo = getEstadoInfo(p);
     var badgeColor = estadoInfo.color;
     var badgeBg    = estadoInfo.bg;
     var badgeText  = estadoInfo.label;
+    var pushInfo = getPushInfo(p);
 
     // Botones de acción: Editar y Eliminar siempre; Desactivar solo si activa y no expirada
     var btnDesactivar = '';
@@ -169,10 +180,13 @@
       +   (desc ? '<div style="font-size:.78rem;color:#6B7280;margin-top:2px;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + desc + '</div>' : '')
       + '</td>'
       + '<td style="padding:12px 16px;font-size:.82rem;color:#374151;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + usuario + '</td>'
-      + '<td style="padding:12px 16px;text-align:center;font-family:monospace;font-size:.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + code + '</td>'
+      + '<td style="padding:12px 16px;text-align:center"><span class="promo-rule-pill">' + esc(regla) + '</span></td>'
+      + '<td style="padding:12px 16px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><span class="promo-code-pill">' + code + '</span></td>'
       + '<td style="padding:12px 16px;text-align:center;font-size:.78rem;color:#6B7280">' + expira + '</td>'
       + '<td style="padding:12px 16px;text-align:center">'
       +   '<span style="display:inline-block;padding:4px 10px;border-radius:99px;font-size:.75rem;font-weight:600;background:' + badgeBg + ';color:' + badgeColor + '">' + badgeText + '</span>'
+      +   (pushInfo.label ? '<div title="' + escAttr(pushInfo.title) + '" style="margin-top:6px;font-size:.72rem;font-weight:600;color:' + pushInfo.color + '">' + pushInfo.label + '</div>' : '')
+      +   (pushInfo.detail ? '<div title="' + escAttr(pushInfo.title) + '" style="margin-top:3px;font-size:.68rem;color:#6B7280;line-height:1.2">' + esc(pushInfo.detail) + '</div>' : '')
       + '</td>'
       + '<td style="padding:12px 16px;text-align:right;white-space:nowrap">'
       +   btnDesactivar
@@ -180,6 +194,17 @@
       +   '<button type="button" data-action="delete" data-id="' + id + '" data-title="' + escAttr(rawTitulo) + '" style="background:none;border:none;color:#EF4444;font-size:.82rem;font-weight:500;cursor:pointer;padding:0">Eliminar</button>'
       + '</td>'
       + '</tr>';
+  }
+
+  function getRuleLabel(p) {
+    var type = (p.tipo_descuento || 'porcentaje').toString();
+    if (type === 'bxgy') {
+      return (p.buy_qty || 2) + 'x' + (p.pay_qty || 1);
+    }
+    if (type === 'monto_fijo') {
+      return '$' + Number(p.valor_descuento || 0).toFixed(2);
+    }
+    return Number(p.valor_descuento || 0).toFixed(0) + '% OFF';
   }
 
   /**
@@ -219,6 +244,56 @@
 
     // Activa: en todos los otros casos
     return { color: '#059669', bg: '#ECFDF5', label: 'Activa' };
+  }
+
+  function getPushInfo(p) {
+    var status = (p.notification_status || '').toString().toLowerCase();
+    var error = p.notification_error || '';
+
+    if (!status) {
+      return { label: '', detail: '', color: '#6B7280', title: '' };
+    }
+    if (status === 'sent') {
+      return { label: 'Push enviada', detail: '', color: '#059669', title: p.notification_sent_at ? ('Enviada: ' + p.notification_sent_at) : 'Notificacion enviada' };
+    }
+    if (status === 'failed') {
+      return { label: 'Push fallida', detail: getPushErrorHint(error), color: '#EF4444', title: error ? ('Error: ' + error) : 'Firebase rechazo el envio' };
+    }
+    if (status === 'skipped') {
+      var label = 'Push no enviada';
+      if (error === 'missing_fcm_config') label = 'Falta FCM';
+      if (error === 'no_push_token') label = 'Sin token';
+      return { label: label, detail: getPushErrorHint(error), color: '#D97706', title: error || 'Envio omitido' };
+    }
+    return { label: 'Push pendiente', detail: '', color: '#6B7280', title: error || 'Pendiente' };
+  }
+
+  function getPushErrorHint(error) {
+    error = (error || '').toString();
+    var lower = error.toLowerCase();
+    if (!error) return '';
+    if (lower.indexOf('third_party_auth_error') >= 0 || lower.indexOf('apns') >= 0) {
+      return 'Revisar APNs iOS';
+    }
+    if (lower.indexOf('missing required authentication') >= 0 || lower.indexOf('oauth 2 access token') >= 0) {
+      return 'Revisar OAuth Firebase';
+    }
+    if (lower.indexOf('sender') >= 0 || lower.indexOf('mismatch') >= 0) {
+      return 'Proyecto Firebase distinto';
+    }
+    if (lower.indexOf('unregistered') >= 0 || lower.indexOf('registration token') >= 0 || lower.indexOf('invalid') >= 0) {
+      return 'Token invalido';
+    }
+    if (lower.indexOf('permission') >= 0 || lower.indexOf('not found') >= 0) {
+      return 'Revisar Firebase';
+    }
+    if (lower.indexOf('missing_fcm_config') >= 0) {
+      return 'Configurar Firebase';
+    }
+    if (lower.indexOf('no_push_token') >= 0) {
+      return 'Abrir app y permitir push';
+    }
+    return error.length > 34 ? error.substring(0, 34) + '...' : error;
   }
 
   function formatearFecha(fechaStr) {
@@ -280,15 +355,21 @@
   };
 
   // Exponer recarga para que pueda llamarse desde fuera
-  window.adminRecargarPromociones = cargarPromociones;
-
-  // Obtener JWT automáticamente si ya estamos logueados (sesión PHP)
-  if (!ApiClient.isLoggedIn()) {
-    ApiClient.getTokenFromSession();
+  async function asegurarSesionApi() {
+    if (!ApiClient.isLoggedIn()) {
+      await ApiClient.getTokenFromSession();
+    }
   }
 
+  async function recargarPromociones() {
+    await asegurarSesionApi();
+    return cargarPromociones();
+  }
+
+  window.adminRecargarPromociones = recargarPromociones;
+
   // Cargar al iniciar
-  cargarPromociones();
+  recargarPromociones();
 })();
 </script>
 

@@ -36,7 +36,7 @@
     </a>
 
     <div style="margin-top:24px">
-      <a href="<?= BASE_URL ?>comprador/inicio" style="font-size:.85rem;color:#9CA3AF">← Volver al portal comprador</a>
+      <a href="<?= BASE_URL ?>comprador/inicio" style="display:inline-flex;align-items:center;gap:9px;font-size:1rem;font-weight:800;color:#334155;text-decoration:none;background:#fff;border:1px solid #E2E8F0;border-radius:999px;padding:9px 14px 9px 10px;box-shadow:0 8px 20px rgba(15,23,42,.06)">&larr; Volver al portal comprador</a>
     </div>
   </div>
 </body>

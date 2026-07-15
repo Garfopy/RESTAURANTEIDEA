@@ -1,6 +1,6 @@
 <?php ob_start(); ?>
 <div style="max-width:600px;margin:0 auto">
-  <a href="<?= BASE_URL ?>rest-ticket/index" style="font-size:.85rem;color:#6B7280;text-decoration:none;display:inline-flex;align-items:center;gap:4px;margin-bottom:20px">&larr; Tickets</a>
+  <a href="<?= BASE_URL ?>rest-ticket/index" class="rst-back-link">&larr; Tickets</a>
 
   <div style="background:#fff;border-radius:12px;border:1px solid #E5E7EB;padding:28px">
     <div style="text-align:center;margin-bottom:20px">

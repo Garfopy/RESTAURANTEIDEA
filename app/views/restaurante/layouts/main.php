@@ -142,6 +142,10 @@ $_isMesero = in_array($_rol, ['mesero', 'comprador'], true);            // opera
        href="<?= BASE_URL ?>rest-finanzas/egresos" style="padding-left:38px;font-size:.82rem">
       Gastos y Retiros
     </a>
+    <a class="rst-nav-link <?= $activeMenu === 'rest_ventas_finanzas' ? 'active' : '' ?>"
+       href="<?= BASE_URL ?>rest-finanzas/ventas" style="padding-left:38px;font-size:.82rem">
+      Ventas
+    </a>
     <a class="rst-nav-link <?= $activeMenu === 'rest_cortes' ? 'active' : '' ?>"
        href="<?= BASE_URL ?>rest-finanzas/cortes" style="padding-left:38px;font-size:.82rem">
       Corte de Caja
@@ -225,36 +229,15 @@ $_isMesero = in_array($_rol, ['mesero', 'comprador'], true);            // opera
 
 <!-- Main content -->
 <div class="rst-main">
-  <header class="rst-topbar">
-    <div style="display:flex;align-items:center;gap:12px">
-      <!-- Mobile menu toggle -->
-      <button onclick="document.getElementById('rstSidebar').classList.toggle('open')"
-              style="display:none;background:none;border:none;cursor:pointer;padding:4px"
-              id="menuToggle">
-        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
-      </button>
-      <div style="font-weight:600;font-size:.95rem;color:#111827">
-        <?= htmlspecialchars($pageTitle ?? '') ?>
-      </div>
-    </div>
-    <div style="display:flex;align-items:center;gap:14px">
-      <?php if (!empty($restaurante['slug'])): ?>
-      <a href="<?= BASE_URL ?>menu/<?= htmlspecialchars($restaurante['slug']) ?>"
-         target="_blank"
-         style="font-size:.8rem;color:var(--cp);font-weight:600;text-decoration:none;
-                display:flex;align-items:center;gap:4px">
-        <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
-        Ver menú
-      </a>
-      <span style="width:1px;height:16px;background:#E5E7EB"></span>
-      <?php endif; ?>
-      <span style="font-size:.82rem;color:#6B7280">
-        <?= htmlspecialchars($usuario['nombre'] ?? '') ?>
-      </span>
-    </div>
-  </header>
-
   <div class="rst-page page-content">
+    <div id="menuToggleWrap" style="display:none;margin-bottom:12px">
+      <button onclick="document.getElementById('rstSidebar').classList.toggle('open')"
+              style="background:#fff;border:1px solid #E5E7EB;border-radius:10px;cursor:pointer;padding:8px 10px;display:flex;align-items:center;gap:8px;color:#111827"
+              id="menuToggle">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        <span style="font-size:.82rem;font-weight:600">Menu</span>
+      </button>
+    </div>
     <?php if (!empty($flash)): ?>
     <div class="flash flash-<?= $flash['type'] === 'success' ? 'success' : 'error' ?>"
          data-flash="<?= htmlspecialchars(md5(($flash['type'] ?? '') . '|' . ($flash['message'] ?? ''))) ?>"
@@ -269,7 +252,7 @@ $_isMesero = in_array($_rol, ['mesero', 'comprador'], true);            // opera
 <script>
 // Mobile: muestra toggle en pantallas pequeñas
 if (window.innerWidth <= 768) {
-  document.getElementById('menuToggle').style.display = 'flex';
+  document.getElementById('menuToggleWrap').style.display = 'block';
 }
 // Cerrar sidebar al hacer click fuera (mobile)
 document.addEventListener('click', e => {

@@ -15,7 +15,25 @@ $activo      = ($formData['activo'] ?? $promo['activo'] ?? 1) ? true : false;
 $promoId     = (int)($promoId ?? $promo['id'] ?? 0);
 ?>
 
-<div style="max-width:800px;margin:0 auto;padding:20px">
+<style>
+  .promo-shell{max-width:980px;margin:0 auto;padding:20px}
+  .promo-card{background:#fff;border:1px solid #E5E7EB;border-radius:14px;padding:24px;margin-bottom:20px;box-shadow:0 10px 24px rgba(15,23,42,.06)}
+  .promo-card-header{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+  .promo-card-header h2{margin:0;font-size:1.1rem;font-weight:700;color:#111827}
+  .promo-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .promo-label{display:block;font-weight:700;font-size:.9rem;color:#374151;margin-bottom:8px}
+  .promo-help{font-size:.75rem;color:#9CA3AF;margin-top:5px}
+  .promo-segment{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:16px}
+  .promo-segment button{border:1.5px solid #D1D5DB;background:#fff;border-radius:10px;padding:12px;color:#374151;font-weight:700;cursor:pointer;text-align:left}
+  .promo-segment button.is-active{border-color:var(--cp);background:#F8FAFC;color:#111827;box-shadow:inset 0 0 0 1px var(--cp)}
+  .promo-pill-row{display:flex;gap:8px;flex-wrap:wrap}
+  .promo-pill-row button{border:1px solid #D1D5DB;background:#fff;border-radius:999px;padding:8px 12px;font-weight:700;color:#374151;cursor:pointer}
+  .promo-summary{background:#F8FAFC;border:1px solid #E5E7EB;border-radius:12px;padding:14px;color:#374151;font-size:.9rem}
+  .promo-multiselect{min-height:168px}
+  @media (max-width:760px){.promo-shell{padding:14px}.promo-grid-2,.promo-segment{grid-template-columns:1fr}}
+</style>
+
+<div class="promo-shell">
   <!-- Header -->
   <div style="display:flex;align-items:center;gap:16px;margin-bottom:32px;flex-wrap:wrap">
     <a href="<?= BASE_URL ?>rest-promocion/index"
@@ -45,8 +63,8 @@ $promoId     = (int)($promoId ?? $promo['id'] ?? 0);
     <?php endif; ?>
 
     <!-- Card: Información Básica -->
-    <div style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:24px;margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+    <div class="promo-card">
+      <div class="promo-card-header">
         <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color:var(--cp)">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
         </svg>
@@ -83,8 +101,8 @@ $promoId     = (int)($promoId ?? $promo['id'] ?? 0);
     </div>
 
     <!-- Card: Imagen -->
-    <div style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:24px;margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+    <div class="promo-card">
+      <div class="promo-card-header">
         <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color:var(--cp)">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
         </svg>
@@ -134,8 +152,8 @@ $promoId     = (int)($promoId ?? $promo['id'] ?? 0);
     </div>
 
     <!-- Card: Código y Expiración -->
-    <div style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:24px;margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+    <div class="promo-card">
+      <div class="promo-card-header">
         <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color:var(--cp)">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
         </svg>
@@ -175,9 +193,106 @@ $promoId     = (int)($promoId ?? $promo['id'] ?? 0);
       </div>
     </div>
 
+    <!-- Card: Regla de descuento -->
+    <div class="promo-card">
+      <div class="promo-card-header">
+        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color:var(--cp)">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m5 5h.01M19 5l-2 14-5-3-5 3-2-14 4 2 3-2 3 2 4-2z"/>
+        </svg>
+        <h2>Regla de descuento</h2>
+      </div>
+
+      <input type="hidden" id="inpTipoDescuento" name="tipo_descuento" value="porcentaje">
+
+      <label class="promo-label">Tipo de promocion</label>
+      <div class="promo-segment" role="group" aria-label="Tipo de promocion">
+        <button type="button" data-discount-type="porcentaje" class="is-active">
+          <span style="display:block;font-size:1rem">Porcentaje</span>
+          <span style="display:block;font-size:.74rem;color:#6B7280;margin-top:3px">Ej. 15% OFF</span>
+        </button>
+        <button type="button" data-discount-type="monto_fijo">
+          <span style="display:block;font-size:1rem">Monto fijo</span>
+          <span style="display:block;font-size:.74rem;color:#6B7280;margin-top:3px">Ej. $50 MXN</span>
+        </button>
+        <button type="button" data-discount-type="bxgy">
+          <span style="display:block;font-size:1rem">Paquete</span>
+          <span style="display:block;font-size:.74rem;color:#6B7280;margin-top:3px">2x1, 3x2 u otro</span>
+        </button>
+      </div>
+
+      <div id="discount-value-panel" class="promo-grid-2">
+        <div>
+          <label class="promo-label" id="lblValorDescuento">Porcentaje de descuento</label>
+          <input type="number" id="inpValorDescuento" name="valor_descuento" class="promo-input" min="0" max="100" step="0.01" value="10"
+                 style="width:100%;padding:12px 14px;border:1.5px solid #D1D5DB;border-radius:8px;font-size:.95rem">
+          <div class="promo-help" id="helpValorDescuento">Usa valores de 1 a 100.</div>
+        </div>
+        <div>
+          <label class="promo-label">Minimo de compra</label>
+          <input type="number" id="inpMinSubtotal" name="min_subtotal" class="promo-input" min="0" step="0.01" value="0"
+                 style="width:100%;padding:12px 14px;border:1.5px solid #D1D5DB;border-radius:8px;font-size:.95rem">
+          <div class="promo-help">Opcional. En 0 aplica sin minimo.</div>
+        </div>
+      </div>
+
+      <div id="discount-bxgy-panel" style="display:none">
+        <div class="promo-pill-row" style="margin-bottom:12px">
+          <button type="button" onclick="presetBxgy(2,1)">2x1</button>
+          <button type="button" onclick="presetBxgy(3,2)">3x2</button>
+          <button type="button" onclick="presetBxgy(4,3)">4x3</button>
+        </div>
+        <div class="promo-grid-2">
+          <div>
+            <label class="promo-label">Compra</label>
+            <input type="number" id="inpBuyQty" name="buy_qty" class="promo-input" min="2" step="1" value="2"
+                   style="width:100%;padding:12px 14px;border:1.5px solid #D1D5DB;border-radius:8px;font-size:.95rem">
+          </div>
+          <div>
+            <label class="promo-label">Paga</label>
+            <input type="number" id="inpPayQty" name="pay_qty" class="promo-input" min="1" step="1" value="1"
+                   style="width:100%;padding:12px 14px;border:1.5px solid #D1D5DB;border-radius:8px;font-size:.95rem">
+          </div>
+        </div>
+      </div>
+
+      <div style="height:1px;background:#E5E7EB;margin:20px 0"></div>
+
+      <label class="promo-label">Aplicar descuento a</label>
+      <div class="promo-segment" role="group" aria-label="Alcance de promocion">
+        <button type="button" data-scope-type="all" class="is-active">
+          <span style="display:block;font-size:1rem">Todo el menu</span>
+          <span style="display:block;font-size:.74rem;color:#6B7280;margin-top:3px">Cualquier producto</span>
+        </button>
+        <button type="button" data-scope-type="products">
+          <span style="display:block;font-size:1rem">Productos</span>
+          <span style="display:block;font-size:.74rem;color:#6B7280;margin-top:3px">Platillos especificos</span>
+        </button>
+        <button type="button" data-scope-type="categories">
+          <span style="display:block;font-size:1rem">Categorias</span>
+          <span style="display:block;font-size:.74rem;color:#6B7280;margin-top:3px">Grupo completo</span>
+        </button>
+      </div>
+      <input type="hidden" id="inpScopeTipo" name="scope_tipo" value="all">
+
+      <div id="scope-products-panel" style="display:none;margin-bottom:16px">
+        <label class="promo-label">Productos participantes</label>
+        <select id="inpProductos" name="producto_ids[]" class="promo-input promo-multiselect" multiple
+                style="width:100%;padding:10px 14px;border:1.5px solid #D1D5DB;border-radius:8px;font-size:.92rem;background:#fff"></select>
+        <div class="promo-help">Puedes seleccionar mas de uno con Ctrl/Cmd + clic.</div>
+      </div>
+
+      <div id="scope-categories-panel" style="display:none;margin-bottom:16px">
+        <label class="promo-label">Categorias participantes</label>
+        <select id="inpCategorias" name="categoria_ids[]" class="promo-input promo-multiselect" multiple
+                style="width:100%;padding:10px 14px;border:1.5px solid #D1D5DB;border-radius:8px;font-size:.92rem;background:#fff"></select>
+      </div>
+
+      <div id="promo-rule-summary" class="promo-summary"></div>
+    </div>
+
     <!-- Card: Usuario y Estado -->
-    <div style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:24px;margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,0.1)">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+    <div class="promo-card">
+      <div class="promo-card-header">
         <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color:var(--cp)">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
         </svg>
@@ -187,15 +302,15 @@ $promoId     = (int)($promoId ?? $promo['id'] ?? 0);
       <!-- Usuario -->
       <div style="margin-bottom:20px">
         <label style="display:block;font-weight:600;font-size:.9rem;color:#374151;margin-bottom:8px">
-          Usuario Receptor <span style="color:#EF4444">*</span>
+          Usuarios Receptores <span style="color:#EF4444">*</span>
         </label>
-        <select id="inpUsuario" name="usuario_id" class="promo-input" required
+        <select id="inpUsuario" name="usuario_ids[]" class="promo-input" required <?= $isEdit ? '' : 'multiple size="10"' ?>
                 style="width:100%;padding:12px 14px;border:1.5px solid #D1D5DB;border-radius:8px;
-                       font-size:.95rem;cursor:pointer;background-color:#fff;transition:border-color 0.2s"
+                       font-size:.95rem;cursor:pointer;background-color:#fff;transition:border-color 0.2s;line-height:1.6"
                 onchange="validarCampo(this)">
           <option value="">Cargando usuarios...</option>
         </select>
-        <div style="font-size:.75rem;color:#9CA3AF;margin-top:4px">Selecciona a quién irá dirigida esta promoción.</div>
+        <div style="font-size:.75rem;color:#9CA3AF;margin-top:4px"><?= $isEdit ? 'Selecciona el usuario registrado en la app m&oacute;vil.' : 'Selecciona uno o varios usuarios registrados en la app m&oacute;vil.' ?></div>
         <div class="promo-error" style="display:none;font-size:.8rem;color:#EF4444;margin-top:4px"></div>
       </div>
 
@@ -243,6 +358,8 @@ $promoId     = (int)($promoId ?? $promo['id'] ?? 0);
   var currentImagen = <?= json_encode($imagenUrl ?? '', JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
   var imagenQuitada = false;
   var pendingUsuarioId = '';
+  var pendingScopeIds = [];
+  var promoCatalog = { products: [], categories: [] };
 
   // ──────────────────────────────────────────────────────────────
   // Carga inicial
@@ -251,19 +368,27 @@ $promoId     = (int)($promoId ?? $promo['id'] ?? 0);
   async function cargarUsuarios() {
     var select = document.getElementById('inpUsuario');
     try {
-      var resp = await ApiClient.get('/admin/users');
+      var resp = await ApiClient.get('/admin/users?per_page=100');
       if (!resp.success) {
         select.innerHTML = '<option value="">Error cargando usuarios</option>';
         return;
       }
 
       var users = resp.data.users || [];
-      select.innerHTML = '<option value="">Selecciona un usuario</option>';
+      select.innerHTML = <?= $isEdit ? '\'<option value="">Selecciona un usuario de la app</option>\'' : "''" ?>;
+      if (users.length === 0) {
+        select.innerHTML = '<option value="">No hay usuarios registrados en la app movil</option>';
+        return;
+      }
 
       users.forEach(function(user) {
         var option = document.createElement('option');
         option.value = user.id;
-        option.textContent = user.nombre + ' (' + user.email + ')';
+        var nombre = user.nombre || user.name || user.full_name || ('Usuario ' + user.id);
+        var telefono = user.phone || user.telefono || '';
+        var correo = user.email || user.correo || '';
+        var contacto = telefono || correo || '';
+        option.textContent = contacto ? (nombre + '  |  ' + contacto) : nombre;
         select.appendChild(option);
       });
 
@@ -271,6 +396,49 @@ $promoId     = (int)($promoId ?? $promo['id'] ?? 0);
     } catch (e) {
       select.innerHTML = '<option value="">Error cargando usuarios</option>';
     }
+  }
+
+  async function cargarCatalogoPromos() {
+    try {
+      var resp = await ApiClient.get('/admin/promo-catalog');
+      if (!resp.success) {
+        promoCatalog = { products: [], categories: [] };
+        pintarCatalogoPromos();
+        return;
+      }
+      promoCatalog.products = (resp.data && resp.data.products) || [];
+      promoCatalog.categories = (resp.data && resp.data.categories) || [];
+      pintarCatalogoPromos();
+    } catch (e) {
+      promoCatalog = { products: [], categories: [] };
+      pintarCatalogoPromos();
+    }
+  }
+
+  function pintarCatalogoPromos() {
+    var productsSelect = document.getElementById('inpProductos');
+    var categoriesSelect = document.getElementById('inpCategorias');
+    productsSelect.innerHTML = '';
+    categoriesSelect.innerHTML = '';
+
+    promoCatalog.products.forEach(function(product) {
+      var option = document.createElement('option');
+      option.value = product.id;
+      var categoria = product.categoria_nombre ? (' - ' + product.categoria_nombre) : '';
+      var precio = product.precio ? ('  $' + Number(product.precio).toFixed(2)) : '';
+      option.textContent = (product.nombre || ('Producto ' + product.id)) + categoria + precio;
+      productsSelect.appendChild(option);
+    });
+
+    promoCatalog.categories.forEach(function(category) {
+      var option = document.createElement('option');
+      option.value = category.id;
+      option.textContent = category.nombre || ('Categoria ' + category.id);
+      categoriesSelect.appendChild(option);
+    });
+
+    aplicarScopePendiente();
+    actualizarResumenPromo();
   }
 
   async function cargarPromocionParaEditar() {
@@ -307,6 +475,16 @@ $promoId     = (int)($promoId ?? $promo['id'] ?? 0);
     pendingUsuarioId = String(p.usuario_id || p.user_id || (p.usuario && p.usuario.id) || '');
     seleccionarUsuarioPendiente();
 
+    setDiscountType(p.tipo_descuento || 'porcentaje');
+    document.getElementById('inpValorDescuento').value = p.valor_descuento || 10;
+    document.getElementById('inpBuyQty').value = p.buy_qty || 2;
+    document.getElementById('inpPayQty').value = p.pay_qty || 1;
+    document.getElementById('inpMinSubtotal').value = p.min_subtotal || 0;
+    setScopeType(p.scope_tipo || 'all');
+    pendingScopeIds = parseScopeIds(p.scope_ids);
+    aplicarScopePendiente();
+    actualizarResumenPromo();
+
     currentImagen = p.imagen || '';
     imagenQuitada = false;
     document.getElementById('inpRemoveImagen').value = '0';
@@ -321,7 +499,121 @@ $promoId     = (int)($promoId ?? $promo['id'] ?? 0);
     if (!pendingUsuarioId) return;
     var select = document.getElementById('inpUsuario');
     if (!select || !select.options || select.options.length <= 1) return;
-    select.value = pendingUsuarioId;
+    for (var i = 0; i < select.options.length; i++) {
+      select.options[i].selected = String(select.options[i].value) === pendingUsuarioId;
+    }
+  }
+
+  function setDiscountType(type) {
+    type = ['porcentaje', 'monto_fijo', 'bxgy'].indexOf(type) >= 0 ? type : 'porcentaje';
+    document.getElementById('inpTipoDescuento').value = type;
+    document.querySelectorAll('[data-discount-type]').forEach(function(btn) {
+      btn.classList.toggle('is-active', btn.getAttribute('data-discount-type') === type);
+    });
+    var valuePanel = document.getElementById('discount-value-panel');
+    var bxgyPanel = document.getElementById('discount-bxgy-panel');
+    var label = document.getElementById('lblValorDescuento');
+    var help = document.getElementById('helpValorDescuento');
+    var valueInput = document.getElementById('inpValorDescuento');
+
+    if (type === 'bxgy') {
+      valuePanel.style.display = 'none';
+      bxgyPanel.style.display = 'block';
+    } else {
+      valuePanel.style.display = 'grid';
+      bxgyPanel.style.display = 'none';
+      label.textContent = type === 'monto_fijo' ? 'Monto de descuento' : 'Porcentaje de descuento';
+      help.textContent = type === 'monto_fijo' ? 'Monto en MXN que se descontara.' : 'Usa valores de 1 a 100.';
+      valueInput.max = type === 'monto_fijo' ? '' : '100';
+      if (!valueInput.value || Number(valueInput.value) <= 0) {
+        valueInput.value = type === 'monto_fijo' ? '50' : '10';
+      }
+    }
+    actualizarResumenPromo();
+  }
+
+  function setScopeType(type) {
+    type = ['all', 'products', 'categories'].indexOf(type) >= 0 ? type : 'all';
+    document.getElementById('inpScopeTipo').value = type;
+    document.querySelectorAll('[data-scope-type]').forEach(function(btn) {
+      btn.classList.toggle('is-active', btn.getAttribute('data-scope-type') === type);
+    });
+    document.getElementById('scope-products-panel').style.display = type === 'products' ? 'block' : 'none';
+    document.getElementById('scope-categories-panel').style.display = type === 'categories' ? 'block' : 'none';
+    actualizarResumenPromo();
+  }
+
+  function aplicarScopePendiente() {
+    var type = document.getElementById('inpScopeTipo').value || 'all';
+    if (!pendingScopeIds.length || type === 'all') return;
+    var select = type === 'products' ? document.getElementById('inpProductos') : document.getElementById('inpCategorias');
+    setSelectedValues(select, pendingScopeIds);
+  }
+
+  function parseScopeIds(value) {
+    if (!value) return [];
+    if (Array.isArray(value)) return value.map(Number).filter(Boolean);
+    try {
+      var parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) return parsed.map(Number).filter(Boolean);
+    } catch (e) {}
+    return String(value).split(/[,\s]+/).map(Number).filter(Boolean);
+  }
+
+  function setSelectedValues(select, values) {
+    if (!select) return;
+    var lookup = {};
+    values.forEach(function(value) { lookup[String(value)] = true; });
+    for (var i = 0; i < select.options.length; i++) {
+      select.options[i].selected = !!lookup[String(select.options[i].value)];
+    }
+  }
+
+  function getSelectedValues(id) {
+    var select = document.getElementById(id);
+    if (!select) return [];
+    var values = [];
+    for (var i = 0; i < select.options.length; i++) {
+      if (select.options[i].selected) {
+        var value = parseInt(select.options[i].value, 10);
+        if (value > 0) values.push(value);
+      }
+    }
+    return values;
+  }
+
+  window.presetBxgy = function(buy, pay) {
+    document.getElementById('inpBuyQty').value = buy;
+    document.getElementById('inpPayQty').value = pay;
+    actualizarResumenPromo();
+  };
+
+  function actualizarResumenPromo() {
+    var type = document.getElementById('inpTipoDescuento').value || 'porcentaje';
+    var scope = document.getElementById('inpScopeTipo').value || 'all';
+    var resumen = '';
+    if (type === 'bxgy') {
+      resumen = 'Cliente compra ' + (document.getElementById('inpBuyQty').value || 2) +
+        ' y paga ' + (document.getElementById('inpPayQty').value || 1) + '.';
+    } else if (type === 'monto_fijo') {
+      resumen = 'Descuento de $' + Number(document.getElementById('inpValorDescuento').value || 0).toFixed(2) + ' MXN.';
+    } else {
+      resumen = 'Descuento de ' + Number(document.getElementById('inpValorDescuento').value || 0).toFixed(2) + '%.';
+    }
+
+    if (scope === 'products') {
+      resumen += ' Aplica a ' + getSelectedValues('inpProductos').length + ' producto(s).';
+    } else if (scope === 'categories') {
+      resumen += ' Aplica a ' + getSelectedValues('inpCategorias').length + ' categoria(s).';
+    } else {
+      resumen += ' Aplica a todo el menu.';
+    }
+
+    var min = Number(document.getElementById('inpMinSubtotal').value || 0);
+    if (min > 0) {
+      resumen += ' Compra minima: $' + min.toFixed(2) + ' MXN.';
+    }
+    document.getElementById('promo-rule-summary').textContent = resumen;
   }
 
   // ──────────────────────────────────────────────────────────────
@@ -445,6 +737,24 @@ $promoId     = (int)($promoId ?? $promo['id'] ?? 0);
 
   window.validarCampo = validarCampo;
 
+  document.querySelectorAll('[data-discount-type]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      setDiscountType(btn.getAttribute('data-discount-type'));
+    });
+  });
+  document.querySelectorAll('[data-scope-type]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      setScopeType(btn.getAttribute('data-scope-type'));
+    });
+  });
+  ['inpValorDescuento', 'inpBuyQty', 'inpPayQty', 'inpMinSubtotal', 'inpProductos', 'inpCategorias'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('input', actualizarResumenPromo);
+      el.addEventListener('change', actualizarResumenPromo);
+    }
+  });
+
   function mostrarError(msg) {
     var container = document.getElementById('promo-alerts');
     var html = '<div style="background:#FEF2F2;border:1.5px solid #FECACA;border-radius:10px;' +
@@ -486,7 +796,11 @@ $promoId     = (int)($promoId ?? $promo['id'] ?? 0);
     setSubmitState(true, 'Guardando...', '⏳');
 
     var titulo = document.getElementById('inpTitulo').value.trim();
-    var usuarioId = parseInt(document.getElementById('inpUsuario').value) || 0;
+    var usuarioIds = getUsuariosSeleccionados();
+    var usuarioId = usuarioIds.length ? usuarioIds[0] : 0;
+    var scopeTipo = document.getElementById('inpScopeTipo').value || 'all';
+    var productoIds = getSelectedValues('inpProductos');
+    var categoriaIds = getSelectedValues('inpCategorias');
 
     if (!titulo) {
       setSubmitState(false, isEdit ? 'Guardar cambios' : 'Crear promoción', '💾');
@@ -496,7 +810,21 @@ $promoId     = (int)($promoId ?? $promo['id'] ?? 0);
 
     if (!usuarioId) {
       setSubmitState(false, isEdit ? 'Guardar cambios' : 'Crear promoción', '💾');
-      mostrarError('Debes seleccionar un usuario');
+      mostrarError('Debes seleccionar al menos un usuario');
+      return false;
+    }
+
+    if (scopeTipo === 'products' && productoIds.length === 0) {
+      setSubmitState(false, isEdit ? 'Guardar cambios' : 'Crear promociÃ³n', 'ðŸ’¾');
+      setSubmitState(false, isEdit ? 'Guardar cambios' : 'Crear promocion', 'Guardar');
+      mostrarError('Selecciona al menos un producto para esta promocion');
+      return false;
+    }
+
+    if (scopeTipo === 'categories' && categoriaIds.length === 0) {
+      setSubmitState(false, isEdit ? 'Guardar cambios' : 'Crear promociÃ³n', 'ðŸ’¾');
+      setSubmitState(false, isEdit ? 'Guardar cambios' : 'Crear promocion', 'Guardar');
+      mostrarError('Selecciona al menos una categoria para esta promocion');
       return false;
     }
 
@@ -510,10 +838,19 @@ $promoId     = (int)($promoId ?? $promo['id'] ?? 0);
 
     var payload = {
       usuario_id: usuarioId,
+      usuario_ids: usuarioIds,
       titulo: titulo,
       descripcion: document.getElementById('inpDescripcion').value.trim(),
       code: document.getElementById('inpCode').value.trim() || null,
       expires_at: expiresAt || null,
+      tipo_descuento: document.getElementById('inpTipoDescuento').value,
+      valor_descuento: document.getElementById('inpValorDescuento').value || 0,
+      scope_tipo: scopeTipo,
+      producto_ids: productoIds,
+      categoria_ids: categoriaIds,
+      buy_qty: document.getElementById('inpBuyQty').value || null,
+      pay_qty: document.getElementById('inpPayQty').value || null,
+      min_subtotal: document.getElementById('inpMinSubtotal').value || 0,
       activo: document.getElementById('inpActivo').checked ? 1 : 0
     };
     var imagen = document.getElementById('inpImagen').files[0];
@@ -589,8 +926,27 @@ $promoId     = (int)($promoId ?? $promo['id'] ?? 0);
   function appendPayload(fd, payload) {
     for (var key in payload) {
       if (!payload.hasOwnProperty(key)) continue;
+      if (Array.isArray(payload[key])) {
+        payload[key].forEach(function(value) {
+          fd.append(key + '[]', value);
+        });
+        continue;
+      }
       fd.append(key, payload[key] == null ? '' : payload[key]);
     }
+  }
+
+  function getUsuariosSeleccionados() {
+    var select = document.getElementById('inpUsuario');
+    if (!select) return [];
+    var values = [];
+    for (var i = 0; i < select.options.length; i++) {
+      if (select.options[i].selected) {
+        var id = parseInt(select.options[i].value, 10);
+        if (id > 0) values.push(id);
+      }
+    }
+    return values;
   }
 
   function setSubmitState(disabled, text, icon) {
@@ -619,7 +975,11 @@ $promoId     = (int)($promoId ?? $promo['id'] ?? 0);
     }
 
     await cargarUsuarios();
+    await cargarCatalogoPromos();
     await cargarPromocionParaEditar();
+    setDiscountType(document.getElementById('inpTipoDescuento').value || 'porcentaje');
+    setScopeType(document.getElementById('inpScopeTipo').value || 'all');
+    actualizarResumenPromo();
   }
 
   iniciar();

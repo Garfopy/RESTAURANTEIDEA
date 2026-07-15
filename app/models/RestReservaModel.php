@@ -247,9 +247,11 @@ class RestReservaModel extends BaseModel
     public function getParaCancelar(int $id, int $restauranteId, string $telefono): ?array
     {
         return $this->queryOne(
-            "SELECT * FROM rest_reservaciones
-             WHERE id = ? AND restaurante_id = ? AND telefono = ?
-               AND estado IN ('pendiente','confirmada')",
+            "SELECT r.*, m.nombre AS mesa_nombre
+             FROM rest_reservaciones r
+             LEFT JOIN rest_mesas m ON m.id = r.mesa_id
+             WHERE r.id = ? AND r.restaurante_id = ? AND r.telefono = ?
+               AND r.estado IN ('pendiente','confirmada')",
             [$id, $restauranteId, $telefono]
         );
     }

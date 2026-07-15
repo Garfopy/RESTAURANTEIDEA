@@ -1,5 +1,5 @@
 <?php ob_start(); ?>
-<a href="<?= BASE_URL ?>rest-inventario/index" style="font-size:.85rem;color:#6B7280;text-decoration:none;margin-bottom:20px;display:inline-block">← Inventario</a>
+<a href="<?= BASE_URL ?>rest-inventario/index" class="rst-back-link">&larr; Inventario</a>
 
 <div style="background:#fff;border-radius:12px;border:1px solid #E5E7EB;overflow:hidden">
   <table style="width:100%;border-collapse:collapse;font-size:.875rem">

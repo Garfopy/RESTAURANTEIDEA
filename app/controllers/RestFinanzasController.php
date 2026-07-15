@@ -37,6 +37,64 @@ class RestFinanzasController extends BaseController
         $this->redirect('rest-finanzas/egresos?tab=gastos');
     }
 
+    public function ventas(?string $p = null): void
+    {
+        $restauranteId = $this->restauranteId();
+        $periodoParam = (string)$this->get('periodo', '');
+        $periodosValidos = ['hoy', 'semana', 'mes', 'trimestre', 'rango'];
+        $periodo = in_array($periodoParam, $periodosValidos, true)
+            ? $periodoParam
+            : (($this->get('desde') || $this->get('hasta')) ? 'rango' : 'mes');
+        $fechas = $this->ventasPeriodoFechas($periodo);
+        $desde = $periodo === 'rango' ? $this->get('desde', $fechas['desde']) : $fechas['desde'];
+        $hasta = $periodo === 'rango' ? $this->get('hasta', $fechas['hasta']) : $fechas['hasta'];
+        $ordenProductos = strtolower((string)$this->get('orden', 'desc'));
+        $ordenProductos = in_array($ordenProductos, ['desc', 'asc'], true) ? $ordenProductos : 'desc';
+        $limiteProductos = max(5, min(100, (int)$this->get('limite', 20)));
+        $limiteProductos = (int)(ceil($limiteProductos / 5) * 5);
+        $estacionProductos = strtolower((string)$this->get('estacion', 'todas'));
+        $estacionProductos = in_array($estacionProductos, ['todas', 'primavera', 'verano', 'otono', 'invierno'], true)
+            ? $estacionProductos
+            : 'todas';
+        $ventas = $this->model->ventasDashboard(
+            $restauranteId,
+            $desde,
+            $hasta,
+            $ordenProductos,
+            $limiteProductos,
+            $estacionProductos
+        );
+
+        $flash = $this->getFlash();
+        $pageTitle = 'Ventas';
+        $activeMenu = 'rest_ventas_finanzas';
+        $this->render('restaurante/finanzas/ventas', compact(
+            'ventas',
+            'desde',
+            'hasta',
+            'periodo',
+            'ordenProductos',
+            'limiteProductos',
+            'estacionProductos',
+            'flash',
+            'pageTitle',
+            'activeMenu'
+        ));
+    }
+
+    private function ventasPeriodoFechas(string $periodo): array
+    {
+        $hoy = date('Y-m-d');
+
+        return match ($periodo) {
+            'hoy' => ['desde' => $hoy, 'hasta' => $hoy],
+            'semana' => ['desde' => date('Y-m-d', strtotime('monday this week')), 'hasta' => $hoy],
+            'trimestre' => ['desde' => date('Y-m-d', strtotime('-3 months')), 'hasta' => $hoy],
+            'rango' => ['desde' => date('Y-m-01'), 'hasta' => $hoy],
+            default => ['desde' => date('Y-m-01'), 'hasta' => $hoy],
+        };
+    }
+
     public function retiros(?string $p = null): void
     {
         $this->redirect('rest-finanzas/egresos?tab=retiros');

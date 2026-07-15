@@ -1,8 +1,7 @@
 <?php ob_start(); ?>
 <div>
-  <a href="<?= BASE_URL ?>rest-menu/index"
-     style="font-size:.85rem;color:#6B7280;text-decoration:none;display:inline-flex;align-items:center;gap:4px;margin-bottom:18px">
-    ← Volver al menú
+  <a href="<?= BASE_URL ?>rest-menu/index" class="rst-back-link">
+    &larr; Volver al menú
   </a>
 
   <!-- Indicador de pasos -->
@@ -125,7 +124,7 @@
         </div>
 
         <!-- Info para el cliente -->
-        <div style="border:1.5px solid #E0E7FF;border-radius:12px;padding:16px;margin-top:8px;background:#F5F3FF">
+        <div style="display:none">
           <div style="font-weight:700;color:#4C1D95;font-size:.9rem;margin-bottom:4px">
             🏷 Información para el cliente
           </div>

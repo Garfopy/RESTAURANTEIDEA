@@ -88,13 +88,13 @@
     },
 
     /**
-     * GET /api/auth/token.php — Obtener JWT si ya tienes sesión PHP
+     * GET /api/auth/token — Obtener JWT si ya tienes sesión PHP
      * Uso: Después de login en /restaurante/, llama esto para obtener JWT
      * @returns {Promise<boolean>} true si obtuvo token, false si no
      */
     getTokenFromSession: async function() {
       try {
-        var resp = await fetch(BASE_URL + 'api/auth/token.php', {
+        var resp = await fetch(BASE_URL + 'api/auth/token', {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include'  // Enviar cookies de sesión PHP
@@ -205,20 +205,34 @@
 
       }
 
-      // Usar /api_restaurante/ que ya funciona en el servidor (mod_rewrite no está habilitado)
-      // Endpoints como /admin/promotions se construirán como /api_restaurante/admin/promotions
+      // Usar el front controller local.
+      // Endpoints como /admin/promotions se construyen como /api/admin/promotions.
       var url = endpoint;
-      if (url.indexOf('api_restaurante/') !== 0 && url.indexOf('/api_restaurante/') !== 0) {
-        url = BASE_URL + 'api_restaurante' + (url.substr(0,1) === '/' ? url : '/' + url);
-      } else if (url.indexOf('/api_restaurante/') === 0) {
+      if (/^https?:\/\//i.test(url)) {
+        // URL absoluta: se usa tal cual.
+      } else if (url.indexOf('/api/') === 0) {
         url = BASE_URL + url.substr(1);
-      } else if (url.indexOf('api_restaurante/') === 0) {
+      } else if (url.indexOf('api/') === 0) {
         url = BASE_URL + url;
+      } else {
+        url = BASE_URL + 'api' + (url.substr(0,1) === '/' ? url : '/' + url);
       }
 
       try {
         var resp = await fetch(url, opts);
-        var data = await resp.json();
+        var contentType = resp.headers.get('content-type') || '';
+        var data;
+        if (contentType.indexOf('application/json') !== -1) {
+          data = await resp.json();
+        } else {
+          var text = await resp.text();
+          return {
+            success: false,
+            httpCode: resp.status,
+            message: 'La API devolvio una respuesta no valida (' + resp.status + ').',
+            raw: text
+          };
+        }
 
         // Si el token expiró (401), limpiar sesión
         if (resp.status === 401 && this.isLoggedIn()) {
@@ -229,6 +243,7 @@
           }
         }
 
+        data.httpCode = resp.status;
         return data;
       } catch (err) {
         return { success: false, message: 'Error de conexión: ' + err.message };

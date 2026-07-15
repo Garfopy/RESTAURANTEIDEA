@@ -1,135 +1,413 @@
-<?php ob_start(); ?>
-<!-- Filtro de fechas -->
-<form method="GET" action="<?= BASE_URL ?>rest-finanzas/dashboard"
-      style="display:flex;gap:10px;align-items:center;margin-bottom:20px">
-  <input type="date" name="desde" value="<?= htmlspecialchars($desde) ?>"
-    style="padding:8px 12px;border:1px solid #D1D5DB;border-radius:8px;font-size:.875rem">
-  <span style="color:#6B7280">—</span>
-  <input type="date" name="hasta" value="<?= htmlspecialchars($hasta) ?>"
-    style="padding:8px 12px;border:1px solid #D1D5DB;border-radius:8px;font-size:.875rem">
-  <button type="submit"
-    style="padding:8px 16px;background:var(--color-primary);color:#fff;border:none;border-radius:8px;font-size:.85rem;font-weight:500;cursor:pointer">
-    Filtrar
-  </button>
-</form>
+<?php
+$money = static fn($value): string => '$' . number_format((float)$value, 2);
+$number = static fn($value): string => number_format((float)$value, 0);
 
-<!-- KPI Cards principales -->
-<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px">
-  <?php $kpiCards = [
-    ['label'=>'Ingresos Totales', 'val'=>'$'.number_format($kpis['ingresos'],2), 'color'=>'#10B981','icon'=>'↑'],
-    ['label'=>'Gastos Totales',   'val'=>'$'.number_format($kpis['gastos'],2),   'color'=>'#EF4444','icon'=>'↓'],
-    ['label'=>'Retiros',          'val'=>'$'.number_format($kpis['retiros'],2),   'color'=>'#F59E0B','icon'=>'↕'],
-    ['label'=>'Utilidad Neta',    'val'=>'$'.number_format($kpis['utilidad'],2),  'color'=>'#6366F1','icon'=>'='],
-  ]; foreach ($kpiCards as $c): ?>
-  <div style="background:#fff;border-radius:12px;padding:20px;border:1px solid #E5E7EB">
-    <div style="font-size:.8rem;color:#6B7280;margin-bottom:4px"><?= $c['label'] ?></div>
-    <div style="font-size:1.5rem;font-weight:700;color:<?= $c['color'] ?>"><?= $c['val'] ?></div>
-  </div>
-  <?php endforeach; ?>
-</div>
+$ingresos = (float)($kpis['ingresos'] ?? 0);
+$gastos = (float)($kpis['gastos'] ?? 0);
+$retiros = (float)($kpis['retiros'] ?? 0);
+$utilidad = (float)($kpis['utilidad'] ?? 0);
+$ingresosTickets = (float)($kpis['ingresosTickets'] ?? 0);
+$ingresosPedidosApp = (float)($kpis['ingresosPedidosApp'] ?? 0);
+$ingresosRecargasAmare = (float)($kpis['ingresosRecargasAmare'] ?? 0);
 
-<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px">
-  <div style="background:#fff;border-radius:12px;padding:20px;border:1px solid #E5E7EB">
-    <div style="font-size:.8rem;color:#6B7280">Margen de Ganancia</div>
-    <div style="font-size:1.4rem;font-weight:700;color:#111827"><?= $kpis['margen'] ?>%</div>
-  </div>
-  <div style="background:#fff;border-radius:12px;padding:20px;border:1px solid #E5E7EB">
-    <div style="font-size:.8rem;color:#6B7280">Total Tickets Pagados</div>
-    <div style="font-size:1.4rem;font-weight:700;color:#111827"><?= $kpis['totalTickets'] ?></div>
-  </div>
-  <div style="background:#fff;border-radius:12px;padding:20px;border:1px solid #E5E7EB">
-    <div style="font-size:.8rem;color:#6B7280">Propinas</div>
-    <div style="font-size:1.4rem;font-weight:700;color:#10B981">$<?= number_format($kpis['propinas'],2) ?></div>
-  </div>
-  <div style="background:#fff;border-radius:12px;padding:20px;border:1px solid #E5E7EB">
-    <div style="font-size:.8rem;color:#6B7280">Pendiente por Cobrar</div>
-    <div style="font-size:1.4rem;font-weight:700;color:#EF4444">$<?= number_format($kpis['pendiente'],2) ?></div>
-  </div>
-</div>
+$metodoPagoLabel = static function (?string $metodo): string {
+  $key = strtolower(trim((string)$metodo));
+  $labels = [
+    'amare_wallet' => 'Saldo Amare',
+    'saldo_amare' => 'Saldo Amare',
+    'wallet' => 'Saldo Amare',
+    'app movil' => 'App movil',
+    'app_movil' => 'App movil',
+    'social_cover' => 'Social Cover',
+  ];
 
-<div style="display:grid;grid-template-columns:2fr 1fr;gap:20px;margin-bottom:24px">
-  <!-- Gráfica ingresos vs egresos -->
-  <div style="background:#fff;border-radius:12px;border:1px solid #E5E7EB;padding:20px">
-    <div style="font-weight:600;margin-bottom:14px">Ingresos vs Egresos</div>
-    <canvas id="chartIngEgr" height="120"></canvas>
-  </div>
+  return $labels[$key] ?? ucfirst(str_replace('_', ' ', $key ?: 'efectivo'));
+};
 
-  <!-- Gastos por categoría -->
-  <div style="background:#fff;border-radius:12px;border:1px solid #E5E7EB;padding:20px">
-    <div style="font-weight:600;margin-bottom:14px">Gastos por Categoría</div>
-    <?php foreach ($catGastos as $cg): ?>
-    <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #F3F4F6;font-size:.85rem">
-      <span style="color:#374151"><?= htmlspecialchars($cg['categoria']) ?></span>
-      <span style="font-weight:600">$<?= number_format((float)$cg['total'],2) ?></span>
-    </div>
-    <?php endforeach; ?>
-    <?php if (empty($catGastos)): ?><p style="color:#9CA3AF;font-size:.85rem">Sin gastos en el período.</p><?php endif; ?>
-  </div>
-</div>
+$metodosVista = array_map(static function (array $m) use ($metodoPagoLabel): array {
+  $m['metodo_pago_label'] = $metodoPagoLabel($m['metodo_pago'] ?? 'efectivo');
+  return $m;
+}, $metodos);
 
-<!-- Métodos de pago y actividad reciente -->
-<div style="display:grid;grid-template-columns:1fr 2fr;gap:20px">
-  <div style="background:#fff;border-radius:12px;border:1px solid #E5E7EB;padding:20px">
-    <div style="font-weight:600;margin-bottom:14px">Métodos de Pago</div>
-    <?php if (!empty($metodos)): ?>
-    <div style="position:relative;height:180px;margin-bottom:12px">
-      <canvas id="chartMetodosPago"></canvas>
-    </div>
-    <?php endif; ?>
-    <?php foreach ($metodos as $mp): ?>
-    <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #F3F4F6;font-size:.85rem">
-      <span style="color:#374151"><?= htmlspecialchars($mp['metodo_pago'] ?? 'efectivo') ?></span>
-      <span style="font-weight:600">$<?= number_format((float)$mp['total'],2) ?> <span style="color:#9CA3AF">(<?= $mp['cantidad'] ?>)</span></span>
-    </div>
-    <?php endforeach; ?>
-    <?php if (empty($metodos)): ?>
-    <p style="color:#9CA3AF;font-size:.85rem">Sin pagos registrados en el período.</p>
-    <?php endif; ?>
-  </div>
+$ingresoBreakdown = [
+  ['label' => 'Tickets de mesa', 'value' => $ingresosTickets],
+  ['label' => 'Pedidos app', 'value' => $ingresosPedidosApp],
+  ['label' => 'Recargas Saldo Amare', 'value' => $ingresosRecargasAmare],
+];
 
-  <div style="background:#fff;border-radius:12px;border:1px solid #E5E7EB;padding:20px">
-    <div style="font-weight:600;margin-bottom:14px">Actividad Reciente</div>
-    <?php foreach ($reciente as $act): ?>
-    <?php $colors=['gasto'=>['#FEE2E2','#991B1B'],'retiro'=>['#FEF3C7','#92400E'],'corte'=>['#DBEAFE','#1E40AF']]; $cs=$colors[$act['tipo']]??['#F3F4F6','#374151']; ?>
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #F3F4F6;font-size:.85rem">
+ob_start();
+?>
+<style>
+.finance-page {
+  display: grid;
+  gap: 22px;
+}
+.finance-hero {
+  border-radius: 30px;
+  padding: 28px;
+  color: #fff;
+  background:
+    radial-gradient(circle at 12% 18%, rgba(215,180,106,.22), transparent 28%),
+    radial-gradient(circle at 86% 14%, rgba(16,185,129,.16), transparent 26%),
+    linear-gradient(135deg, #0B1220 0%, #141E31 100%);
+  box-shadow: 0 28px 80px rgba(15,23,42,.20);
+}
+.finance-hero-top,
+.finance-filter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.finance-title {
+  margin: 0 0 7px;
+  font-size: 2rem;
+  line-height: 1.05;
+  font-weight: 900;
+}
+.finance-subtitle {
+  margin: 0;
+  color: rgba(255,255,255,.66);
+  max-width: 760px;
+}
+.finance-filter {
+  background: rgba(255,255,255,.10);
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 18px;
+  padding: 10px;
+}
+.finance-filter input {
+  background: rgba(255,255,255,.96);
+  border: 0;
+  border-radius: 12px;
+  padding: 10px 12px;
+  color: #111827;
+  font-weight: 700;
+}
+.finance-filter button,
+.finance-action {
+  border: 0;
+  border-radius: 12px;
+  padding: 10px 14px;
+  background: #D7B46A;
+  color: #111827;
+  font-weight: 900;
+  cursor: pointer;
+  text-decoration: none;
+}
+.finance-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 24px;
+}
+.finance-kpi {
+  border: 1px solid rgba(255,255,255,.16);
+  background: rgba(255,255,255,.10);
+  border-radius: 20px;
+  padding: 18px;
+}
+.finance-kpi span {
+  display: block;
+  color: rgba(255,255,255,.66);
+  font-size: .82rem;
+}
+.finance-kpi strong {
+  display: block;
+  margin-top: 7px;
+  color: #fff;
+  font-size: 1.55rem;
+}
+.finance-grid-2 {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(360px, .75fr);
+  gap: 20px;
+}
+.finance-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+.finance-card {
+  background: rgba(255,255,255,.97);
+  border: 1px solid #E5E7EB;
+  border-radius: 22px;
+  padding: 20px;
+  box-shadow: 0 18px 50px rgba(15,23,42,.06);
+}
+.finance-card h2,
+.finance-card h3 {
+  margin: 0 0 14px;
+  color: #111827;
+}
+.finance-card h2 {
+  font-size: 1.15rem;
+}
+.finance-card h3 {
+  font-size: 1rem;
+}
+.finance-breakdown {
+  display: grid;
+  gap: 12px;
+}
+.finance-line {
+  display: grid;
+  gap: 7px;
+}
+.finance-line-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: #334155;
+  font-size: .92rem;
+}
+.finance-bar {
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: #E2E8F0;
+}
+.finance-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #0F172A, #D7B46A);
+}
+.finance-mini {
+  display: grid;
+  gap: 10px;
+}
+.finance-mini-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid #F1F5F9;
+  color: #334155;
+}
+.finance-mini-row:last-child {
+  border-bottom: 0;
+}
+.finance-mini-row strong {
+  color: #111827;
+}
+.finance-chart {
+  min-height: 300px;
+}
+.finance-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 10px;
+  background: #F1F5F9;
+  color: #475569;
+  font-size: .78rem;
+  font-weight: 800;
+}
+.finance-activity {
+  display: grid;
+  gap: 10px;
+}
+.finance-activity-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #EEF2F7;
+  border-radius: 16px;
+  background: #F8FAFC;
+}
+.finance-activity-row p {
+  margin: 4px 0 0;
+  color: #64748B;
+  font-size: .84rem;
+}
+.finance-empty {
+  color: #94A3B8;
+  font-size: .9rem;
+  text-align: center;
+  padding: 18px;
+  border-radius: 16px;
+  background: #F8FAFC;
+}
+@media (max-width: 1100px) {
+  .finance-kpis,
+  .finance-grid-3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .finance-grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 680px) {
+  .finance-kpis,
+  .finance-grid-3 {
+    grid-template-columns: 1fr;
+  }
+  .finance-hero {
+    padding: 20px;
+  }
+}
+</style>
+
+<div class="finance-page">
+  <section class="finance-hero">
+    <div class="finance-hero-top">
       <div>
-        <span style="padding:1px 7px;border-radius:99px;font-size:.7rem;font-weight:600;background:<?= $cs[0] ?>;color:<?= $cs[1] ?>;margin-right:8px"><?= $act['tipo'] ?></span>
-        <?= htmlspecialchars($act['descripcion'] ?? '') ?>
+        <h1 class="finance-title">Dashboard financiero</h1>
+        <p class="finance-subtitle">Vista ejecutiva del periodo: ingresos reales, egresos, utilidad, pagos, ventas app y recargas de Saldo Amare.</p>
       </div>
-      <span style="font-weight:600">$<?= number_format((float)($act['monto'] ?? 0), 2) ?></span>
+      <form class="finance-filter" method="GET" action="<?= BASE_URL ?>rest-finanzas/dashboard">
+        <input type="date" name="desde" value="<?= htmlspecialchars($desde) ?>">
+        <input type="date" name="hasta" value="<?= htmlspecialchars($hasta) ?>">
+        <button type="submit">Filtrar</button>
+      </form>
     </div>
-    <?php endforeach; ?>
-  </div>
+
+    <div class="finance-kpis">
+      <div class="finance-kpi"><span>Ingresos contables</span><strong><?= $money($ingresos) ?></strong></div>
+      <div class="finance-kpi"><span>Utilidad estimada</span><strong><?= $money($utilidad) ?></strong></div>
+      <div class="finance-kpi"><span>Gastos</span><strong><?= $money($gastos) ?></strong></div>
+      <div class="finance-kpi"><span>Margen</span><strong><?= number_format((float)($kpis['margen'] ?? 0), 1) ?>%</strong></div>
+    </div>
+  </section>
+
+  <section class="finance-grid-2">
+    <div class="finance-card finance-chart">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px">
+        <h2 style="margin:0">Ingresos vs egresos</h2>
+        <a class="finance-action" href="<?= BASE_URL ?>rest-finanzas/ventas?desde=<?= urlencode($desde) ?>&hasta=<?= urlencode($hasta) ?>">Ver ventas</a>
+      </div>
+      <canvas id="chartIngEgr"></canvas>
+    </div>
+
+    <div class="finance-card">
+      <h2>Ingresos por fuente</h2>
+      <div class="finance-breakdown">
+        <?php foreach ($ingresoBreakdown as $row): ?>
+        <?php $pct = $ingresos > 0 ? min(100, ((float)$row['value'] / $ingresos) * 100) : 0; ?>
+        <div class="finance-line">
+          <div class="finance-line-top">
+            <span><?= htmlspecialchars($row['label']) ?></span>
+            <strong><?= $money($row['value']) ?></strong>
+          </div>
+          <div class="finance-bar"><span style="width:<?= number_format($pct, 2) ?>%"></span></div>
+        </div>
+        <?php endforeach; ?>
+      </div>
+    </div>
+  </section>
+
+  <section class="finance-grid-3">
+    <div class="finance-card">
+      <h3>Operacion</h3>
+      <div class="finance-mini">
+        <div class="finance-mini-row"><span>Tickets pagados</span><strong><?= $number($kpis['totalTickets'] ?? 0) ?></strong></div>
+        <div class="finance-mini-row"><span>Pedidos app</span><strong><?= $number($kpis['totalPedidosApp'] ?? 0) ?></strong></div>
+        <div class="finance-mini-row"><span>Ticket promedio mesa</span><strong><?= $money($kpis['ticketPromedio'] ?? 0) ?></strong></div>
+        <div class="finance-mini-row"><span>Pendiente por cobrar</span><strong><?= $money($kpis['pendiente'] ?? 0) ?></strong></div>
+      </div>
+    </div>
+
+    <div class="finance-card">
+      <h3>Egresos</h3>
+      <div class="finance-mini">
+        <div class="finance-mini-row"><span>Gastos</span><strong><?= $money($gastos) ?></strong></div>
+        <div class="finance-mini-row"><span>Retiros</span><strong><?= $money($retiros) ?></strong></div>
+        <div class="finance-mini-row"><span>Propinas</span><strong><?= $money($kpis['propinas'] ?? 0) ?></strong></div>
+        <div class="finance-mini-row"><span>Utilidad despues de egresos</span><strong><?= $money($utilidad) ?></strong></div>
+      </div>
+    </div>
+
+    <div class="finance-card finance-chart">
+      <h3>Metodos de pago</h3>
+      <?php if (!empty($metodosVista)): ?>
+      <canvas id="chartMetodosPago"></canvas>
+      <?php else: ?>
+      <div class="finance-empty">Sin pagos registrados en el periodo.</div>
+      <?php endif; ?>
+    </div>
+  </section>
+
+  <section class="finance-grid-2">
+    <div class="finance-card">
+      <h2>Gastos por categoria</h2>
+      <?php if (!empty($catGastos)): ?>
+      <div class="finance-mini">
+        <?php foreach ($catGastos as $cg): ?>
+        <div class="finance-mini-row">
+          <span><?= htmlspecialchars((string)$cg['categoria']) ?></span>
+          <strong><?= $money($cg['total'] ?? 0) ?></strong>
+        </div>
+        <?php endforeach; ?>
+      </div>
+      <?php else: ?>
+      <div class="finance-empty">Sin gastos en el periodo.</div>
+      <?php endif; ?>
+    </div>
+
+    <div class="finance-card">
+      <h2>Actividad reciente</h2>
+      <?php if (!empty($reciente)): ?>
+      <div class="finance-activity">
+        <?php foreach ($reciente as $act): ?>
+        <div class="finance-activity-row">
+          <div>
+            <span class="finance-pill"><?= htmlspecialchars((string)($act['tipo'] ?? 'movimiento')) ?></span>
+            <p><?= htmlspecialchars((string)($act['descripcion'] ?? '')) ?></p>
+          </div>
+          <strong><?= $money($act['monto'] ?? 0) ?></strong>
+        </div>
+        <?php endforeach; ?>
+      </div>
+      <?php else: ?>
+      <div class="finance-empty">Sin actividad reciente.</div>
+      <?php endif; ?>
+    </div>
+  </section>
 </div>
 
 <script>
 (function() {
-  const ingData  = <?= json_encode(array_map(fn($r) => ['x'=>$r['dia'],'y'=> (float)$r['total']], $grafica['ingresos'])) ?>;
-  const egrData  = <?= json_encode(array_map(fn($r) => ['x'=>$r['dia'],'y'=> (float)$r['total']], $grafica['egresos'])) ?>;
-  const allDates = [...new Set([...ingData.map(d=>d.x), ...egrData.map(d=>d.x)])].sort();
-  const toMap = arr => Object.fromEntries(arr.map(d=>[d.x, d.y]));
-  const imap = toMap(ingData), emap = toMap(egrData);
+  const money = value => '$' + Number(value || 0).toLocaleString('es-MX', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  const ingData = <?= json_encode(array_map(fn($r) => ['x' => $r['dia'], 'y' => (float)$r['total']], $grafica['ingresos'])) ?>;
+  const egrData = <?= json_encode(array_map(fn($r) => ['x' => $r['dia'], 'y' => (float)$r['total']], $grafica['egresos'])) ?>;
+  const allDates = [...new Set([...ingData.map(d => d.x), ...egrData.map(d => d.x)])].sort();
+  const toMap = arr => Object.fromEntries(arr.map(d => [d.x, d.y]));
+  const imap = toMap(ingData);
+  const emap = toMap(egrData);
 
-  new Chart(document.getElementById('chartIngEgr'), {
-    type: 'bar',
-    data: {
-      labels: allDates,
-      datasets: [
-        {label:'Ingresos', data: allDates.map(d=>imap[d]||0), backgroundColor:'#10B981'},
-        {label:'Egresos',  data: allDates.map(d=>emap[d]||0), backgroundColor:'#EF4444'},
-      ]
-    },
-    options: { responsive: true, plugins: { legend: { position: 'top' } }, scales: { y: { beginAtZero: true } } }
-  });
+  const chartIng = document.getElementById('chartIngEgr');
+  if (chartIng) {
+    new Chart(chartIng, {
+      type: 'bar',
+      data: {
+        labels: allDates,
+        datasets: [
+          {label: 'Ingresos', data: allDates.map(d => imap[d] || 0), backgroundColor: '#0F172A', borderRadius: 8},
+          {label: 'Egresos', data: allDates.map(d => emap[d] || 0), backgroundColor: '#D7B46A', borderRadius: 8},
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${money(ctx.parsed.y)}` } } },
+        scales: { y: { beginAtZero: true } }
+      }
+    });
+  }
 
-  // Gráfica de métodos de pago (doughnut)
   const mpCanvas = document.getElementById('chartMetodosPago');
-  const mpData   = <?= json_encode(array_map(fn($m) => [
-                       'label' => $m['metodo_pago'] ?? 'efectivo',
-                       'total' => (float)$m['total'],
-                   ], $metodos)) ?>;
+  const mpData = <?= json_encode(array_map(fn($m) => [
+    'label' => $m['metodo_pago_label'] ?? 'Efectivo',
+    'total' => (float)$m['total'],
+  ], $metodosVista)) ?>;
+
   if (mpCanvas && mpData.length) {
-    const palette = ['#6366F1','#10B981','#F59E0B','#EF4444','#0EA5E9','#8B5CF6','#EC4899'];
+    const palette = ['#0F172A', '#D7B46A', '#10B981', '#64748B', '#F97316', '#2563EB'];
     new Chart(mpCanvas, {
       type: 'doughnut',
       data: {
@@ -137,8 +415,8 @@
         datasets: [{
           data: mpData.map(m => m.total),
           backgroundColor: mpData.map((_, i) => palette[i % palette.length]),
-          borderWidth: 2,
           borderColor: '#fff',
+          borderWidth: 3,
         }]
       },
       options: {
@@ -146,9 +424,7 @@
         maintainAspectRatio: false,
         plugins: {
           legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
-          tooltip: { callbacks: {
-            label: ctx => ctx.label + ': $' + ctx.parsed.toLocaleString('es-MX', {minimumFractionDigits:2, maximumFractionDigits:2})
-          }}
+          tooltip: { callbacks: { label: ctx => `${ctx.label}: ${money(ctx.parsed)}` } }
         }
       }
     });

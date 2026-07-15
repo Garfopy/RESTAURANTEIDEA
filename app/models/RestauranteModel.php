@@ -27,6 +27,38 @@ class RestauranteModel extends BaseModel
         );
     }
 
+    public function getLandingRestaurant(): ?array
+    {
+        $preferredSlugs = ['amare', 'amare-restaurant', 'amare-restaurante'];
+
+        foreach ($preferredSlugs as $slug) {
+            $restaurant = $this->getBySlug($slug);
+            if ($restaurant) {
+                return $restaurant;
+            }
+        }
+
+        $restaurant = $this->queryOne(
+            "SELECT *
+             FROM rest_restaurantes
+             WHERE activo = 1 AND reservas_habilitadas = 1
+             ORDER BY id ASC
+             LIMIT 1"
+        );
+
+        if ($restaurant) {
+            return $restaurant;
+        }
+
+        return $this->queryOne(
+            "SELECT *
+             FROM rest_restaurantes
+             WHERE activo = 1
+             ORDER BY id ASC
+             LIMIT 1"
+        );
+    }
+
     public function verificarAcceso(int $restauranteId, int $compradorId): bool
     {
         $r = $this->queryOne(

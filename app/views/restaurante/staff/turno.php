@@ -18,7 +18,7 @@
     <h2 style="font-size:1.1rem;font-weight:700;color:#111827;margin:0">Turno de hoy</h2>
     <div style="font-size:.82rem;color:#6B7280;margin-top:2px"><?= date('d \d\e F \d\e Y') ?></div>
   </div>
-  <a href="<?= BASE_URL ?>rest-staff/index" class="btn btn-outline btn-sm">← Volver al staff</a>
+  <a href="<?= BASE_URL ?>rest-staff/index" class="rst-back-link" style="margin-bottom:0">&larr; Volver al staff</a>
 </div>
 
 <?php if (empty($meseros)): ?>

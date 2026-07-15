@@ -59,6 +59,10 @@ RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 RewriteCond %{REQUEST_FILENAME} -f
 RewriteRule ^(config|app)/.*$ - [F,L]
 
+# Block Firebase service account files if they are placed in the web root.
+RewriteRule ^firebase/.*$ - [F,L,NC]
+RewriteRule ^(amare-service-account|.*service-account.*)\.json$ - [F,L,NC]
+
 # Serve static files/directories directly
 RewriteCond %{REQUEST_FILENAME} -f [OR]
 RewriteCond %{REQUEST_FILENAME} -d

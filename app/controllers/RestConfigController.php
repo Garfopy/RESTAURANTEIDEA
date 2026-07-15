@@ -461,7 +461,11 @@ class RestConfigController extends BaseController
 
         $nombre      = trim((string)$this->normalizeUtf8Input($this->post('nombre', '')));
         $descripcion = $this->normalizeUtf8Input($this->post('descripcion'));
-        $telefono    = $this->normalizeUtf8Input($this->post('telefono'));
+        $telefono    = substr(preg_replace('/\D+/', '', (string)$this->normalizeUtf8Input($this->post('telefono'))), 0, 10);
+        if ($telefono !== '' && strlen($telefono) !== 10) {
+            $this->flash('error', 'El telefono debe tener exactamente 10 digitos.');
+            $this->redirect('rest-config/index');
+        }
         $direccion   = $this->normalizeUtf8Input($this->post('direccion'));
         $lat         = $this->normalizeCoordinate($this->post('lat'), -90, 90);
         $lng         = $this->normalizeCoordinate($this->post('lng'), -180, 180);
@@ -875,10 +879,30 @@ class RestConfigController extends BaseController
         array $facturacion = []
     ): ?string {
         $branchId = $restauranteId;
+        $restaurante = $this->model->find($restauranteId) ?: [];
         $sucursalColumn = $this->getSucursalColumn();
         if ($sucursalColumn) {
-            $restaurante = $this->model->find($restauranteId);
-            $branchId = max(1, (int)($restaurante[$sucursalColumn] ?? $restauranteId));
+            $linkedBranchId = (int)($restaurante[$sucursalColumn] ?? 0);
+            if ($linkedBranchId > 0) {
+                $branchId = $linkedBranchId;
+            }
+        }
+        if ($branchId === $restauranteId && !empty($restaurante['empresa_id'])) {
+            try {
+                $db = \Database::getInstance();
+                $stmt = $db->prepare("SHOW TABLES LIKE 'sucursales'");
+                $stmt->execute();
+                if ($stmt->fetch()) {
+                    $stmt = $db->prepare("SELECT id FROM sucursales WHERE empresa_id = ? AND activo = 1 ORDER BY id ASC LIMIT 1");
+                    $stmt->execute([(int)$restaurante['empresa_id']]);
+                    $fallback = (int)($stmt->fetchColumn() ?: 0);
+                    if ($fallback > 0) {
+                        $branchId = $fallback;
+                    }
+                }
+            } catch (\Throwable $e) {
+                // Si no hay tabla de sucursales, se usa el restaurante local.
+            }
         }
         $url = rtrim($apiUrl, '/') . '/branches/' . $branchId . '/config';
 

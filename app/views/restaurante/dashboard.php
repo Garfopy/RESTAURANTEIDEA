@@ -52,30 +52,6 @@ $totalPasos  = count($pasos);
 </div>
 <?php endif; ?>
 
-<!-- KPI Cards -->
-<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:24px">
-  <?php
-  $gastosTotales = (float)($kpis['gastos'] ?? 0) + (float)($kpis['retiros'] ?? 0);
-  $cards = [
-    ['label'=>'Ingresos del mes', 'val'=>'$'.number_format($kpis['ingresos'],2), 'color'=>'#10B981'],
-    ['label'=>'Gastos del mes',   'val'=>'$'.number_format($gastosTotales,2),   'color'=>'#EF4444',
-     'hint'=>'Incluye $'.number_format($kpis['gastos'] ?? 0, 2).' en gastos y $'.number_format($kpis['retiros'] ?? 0, 2).' en retiros.'],
-    ['label'=>'Utilidad neta',    'val'=>'$'.number_format($kpis['utilidad'],2),  'color'=>'#6366F1'],
-    ['label'=>'Margen',           'val'=>$kpis['margen'].'%',                    'color'=>'#F59E0B'],
-    ['label'=>'Ticket promedio',  'val'=>'$'.number_format($kpis['ticketPromedio'],2), 'color'=>'#0F766E'],
-  ];
-  foreach ($cards as $c): ?>
-  <div style="background:#fff;border-radius:12px;padding:20px;border:1px solid #E5E7EB"
-       <?= !empty($c['hint']) ? 'title="'.htmlspecialchars($c['hint']).'"' : '' ?>>
-    <div style="font-size:.8rem;color:#6B7280;margin-bottom:6px"><?= $c['label'] ?></div>
-    <div style="font-size:1.5rem;font-weight:700;color:<?= $c['color'] ?>"><?= htmlspecialchars($c['val']) ?></div>
-    <?php if (!empty($c['hint'])): ?>
-    <div style="font-size:.68rem;color:#9CA3AF;margin-top:4px">Incluye gastos + retiros</div>
-    <?php endif; ?>
-  </div>
-  <?php endforeach; ?>
-</div>
-
 <?php
 $ingCmp = (float)($comparativaFinanzas['ingresos'] ?? 0);
 $perCmp = (float)($comparativaFinanzas['perdidas'] ?? 0);
@@ -83,109 +59,220 @@ $netCmp = (float)($comparativaFinanzas['neto'] ?? 0);
 $maxCmp = max($ingCmp, $perCmp, 1);
 $ingPct = min(100, round(($ingCmp / $maxCmp) * 100));
 $perPct = min(100, round(($perCmp / $maxCmp) * 100));
+$ingresosTickets = (float)($kpis['ingresosTickets'] ?? $ingCmp);
+$ingresosPedidosApp = (float)($kpis['ingresosPedidosApp'] ?? 0);
+$ingresosRecargasAmare = (float)($kpis['ingresosRecargasAmare'] ?? 0);
+$ingresosGenerales = $ingresosTickets + $ingresosPedidosApp;
+$perdidasGenerales = (float)($kpis['gastos'] ?? 0) + (float)($kpis['retiros'] ?? 0);
+$saldoAmareUsado = (float)($amareKpis['walletUsado'] ?? 0);
+$perdidasAmare = (float)($amareKpis['perdidaAmare'] ?? 0);
+$maxGeneral = max($ingresosGenerales, $perdidasGenerales, 1);
+$maxAmare = max($ingresosRecargasAmare, $saldoAmareUsado, $perdidasAmare, 1);
+$ingGeneralPct = min(100, round(($ingresosGenerales / $maxGeneral) * 100));
+$perGeneralPct = min(100, round(($perdidasGenerales / $maxGeneral) * 100));
+$recargasAmarePct = min(100, round(($ingresosRecargasAmare / $maxAmare) * 100));
+$saldoAmarePct = min(100, round(($saldoAmareUsado / $maxAmare) * 100));
+$perdidasAmarePct = min(100, round(($perdidasAmare / $maxAmare) * 100));
 $amareCards = [
-  ['label'=>'Saldo Amare', 'val'=>'$'.number_format((float)($amareKpis['saldo'] ?? 0), 2), 'color'=>'#111827', 'sub'=>'Saldo vivo en wallets'],
-  ['label'=>'Recargas del mes', 'val'=>'$'.number_format((float)($amareKpis['recargas'] ?? 0), 2), 'color'=>'#2563EB', 'sub'=>'Topups confirmados'],
-  ['label'=>'Saldo usado', 'val'=>'$'.number_format((float)($amareKpis['walletUsado'] ?? 0), 2), 'color'=>'#0F766E', 'sub'=>'Pagos con Saldo Amare'],
-  ['label'=>'Puntos dados', 'val'=>number_format((int)($amareKpis['puntosDados'] ?? 0)), 'color'=>'#7C3AED', 'sub'=>'Puntos generados'],
-  ['label'=>'Descuentos / puntos', 'val'=>'$'.number_format((float)($amareKpis['perdidaAmare'] ?? 0), 2), 'color'=>'#DC2626', 'sub'=>'Impacto promocional'],
+  [
+    'label'=>'Saldo Amare',
+    'val'=>'$'.number_format((float)($amareKpis['saldo'] ?? 0), 2),
+    'color'=>'#111827',
+    'sub'=>'Disponible en wallets',
+    'info'=>'Saldo total que los clientes todavia tienen disponible para gastar en la app.',
+  ],
+  [
+    'label'=>'Recargas del mes',
+    'val'=>'$'.number_format((float)($amareKpis['recargas'] ?? 0), 2),
+    'color'=>'#111827',
+    'sub'=>'Dinero recargado',
+    'info'=>'Dinero real que entro al restaurante cuando los clientes cargaron Saldo Amare durante este mes.',
+  ],
+  [
+    'label'=>'Saldo usado',
+    'val'=>'$'.number_format((float)($amareKpis['walletUsado'] ?? 0), 2),
+    'color'=>'#111827',
+    'sub'=>'Pagado con wallet',
+    'info'=>'Saldo Amare que los clientes gastaron en pedidos. No se suma otra vez como ingreso porque ya conto al recargarse.',
+  ],
+  [
+    'label'=>'Puntos dados',
+    'val'=>number_format((int)($amareKpis['puntosDados'] ?? 0)),
+    'color'=>'#111827',
+    'sub'=>'Fidelizacion generada',
+    'info'=>'Puntos entregados a clientes por compras o beneficios de la app.',
+  ],
+  [
+    'label'=>'Descuentos / puntos',
+    'val'=>'$'.number_format((float)($amareKpis['perdidaAmare'] ?? 0), 2),
+    'color'=>'#111827',
+    'sub'=>'Costo promocional',
+    'info'=>'Monto absorbido por descuentos, promociones o puntos aplicados durante el mes.',
+  ],
 ];
+$generalCards = [
+  [
+    'label'=>'Ingresos del mes',
+    'val'=>'$'.number_format($ingCmp, 2),
+    'sub'=>'Total contable',
+  ],
+  [
+    'label'=>'Tickets',
+    'val'=>'$'.number_format($ingresosTickets, 2),
+    'sub'=>'Ventas en mesas',
+  ],
+  [
+    'label'=>'Pedido app',
+    'val'=>'$'.number_format($ingresosPedidosApp, 2),
+    'sub'=>'Ventas desde app',
+  ],
+];
+$infoBtn = static function (string $text, string $theme = 'light'): string {
+  $classes = $theme === 'dark' ? 'kpi-info kpi-info-dark' : 'kpi-info';
+  $safeText = htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
+  return '<button type="button" class="'.$classes.'" title="'.$safeText.'" data-tooltip="'.$safeText.'" aria-label="'.$safeText.'">i</button>';
+};
 ?>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;margin-bottom:24px">
   <div style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:18px">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:14px">
       <div>
         <div style="font-weight:800;color:#111827">Metricas Amare</div>
-        <div style="font-size:.78rem;color:#6B7280;margin-top:2px">Saldo, recargas, puntos y descuentos del mes actual.</div>
       </div>
       <span style="font-size:.72rem;color:#6B7280;background:#F3F4F6;border-radius:99px;padding:4px 10px;font-weight:700"><?= date('M Y') ?></span>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px">
       <?php foreach ($amareCards as $c): ?>
       <div style="border:1px solid #EEF2F7;background:#F9FAFB;border-radius:10px;padding:14px;min-height:100px">
-        <div style="font-size:.74rem;color:#6B7280;margin-bottom:8px"><?= htmlspecialchars($c['label']) ?></div>
+        <div style="font-size:.74rem;color:#6B7280;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:8px">
+          <span><?= htmlspecialchars($c['label']) ?></span>
+          <?= $infoBtn($c['info']) ?>
+        </div>
         <div style="font-size:1.25rem;font-weight:800;color:<?= $c['color'] ?>;line-height:1.15"><?= htmlspecialchars($c['val']) ?></div>
         <div style="font-size:.68rem;color:#9CA3AF;margin-top:8px"><?= htmlspecialchars($c['sub']) ?></div>
       </div>
       <?php endforeach; ?>
     </div>
+    <div style="border-top:1px solid #EEF2F7;margin-top:18px;padding-top:16px">
+      <div style="font-weight:800;color:#111827;margin-bottom:12px">Ingresos generales</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px">
+        <?php foreach ($generalCards as $c): ?>
+        <div style="border:1px solid #EEF2F7;background:#F9FAFB;border-radius:10px;padding:14px;min-height:94px">
+          <div style="font-size:.74rem;color:#6B7280;margin-bottom:8px"><?= htmlspecialchars($c['label']) ?></div>
+          <div style="font-size:1.25rem;font-weight:800;color:#111827;line-height:1.15"><?= htmlspecialchars($c['val']) ?></div>
+          <div style="font-size:.68rem;color:#9CA3AF;margin-top:8px"><?= htmlspecialchars($c['sub']) ?></div>
+        </div>
+        <?php endforeach; ?>
+      </div>
+    </div>
   </div>
 
   <div style="background:#111827;color:#F9FAFB;border-radius:12px;padding:18px;border:1px solid #111827">
-    <div style="font-weight:800;margin-bottom:4px">Ingresos vs perdidas</div>
-    <div style="font-size:.76rem;color:#9CA3AF;margin-bottom:18px">Incluye gastos, retiros y descuentos Amare.</div>
+    <div style="font-weight:800;margin-bottom:18px">Resumen por area</div>
 
-    <div style="margin-bottom:14px">
-      <div style="display:flex;justify-content:space-between;font-size:.78rem;margin-bottom:6px">
-        <span style="color:#A7F3D0;font-weight:700">Ingresos</span>
-        <strong>$<?= number_format($ingCmp, 2) ?></strong>
-      </div>
-      <div style="height:9px;background:#374151;border-radius:99px;overflow:hidden">
-        <div style="height:100%;width:<?= $ingPct ?>%;background:#10B981;border-radius:99px"></div>
-      </div>
-    </div>
+    <div style="display:grid;gap:18px">
+      <div style="border:1px solid #253044;background:#151F2E;border-radius:12px;padding:14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <span style="font-weight:800;color:#F9FAFB">Generales</span>
+          <span style="font-size:.72rem;color:#CBD5E1">Ventas del restaurante</span>
+        </div>
 
-    <div style="margin-bottom:16px">
-      <div style="display:flex;justify-content:space-between;font-size:.78rem;margin-bottom:6px">
-        <span style="color:#FCA5A5;font-weight:700">Perdidas</span>
-        <strong>$<?= number_format($perCmp, 2) ?></strong>
-      </div>
-      <div style="height:9px;background:#374151;border-radius:99px;overflow:hidden">
-        <div style="height:100%;width:<?= $perPct ?>%;background:#EF4444;border-radius:99px"></div>
-      </div>
-    </div>
+        <div style="margin-bottom:12px">
+          <div style="display:flex;justify-content:space-between;font-size:.78rem;margin-bottom:6px">
+            <span style="color:#A7F3D0;font-weight:700">Ingresos</span>
+            <strong>$<?= number_format($ingresosGenerales, 2) ?></strong>
+          </div>
+          <div style="height:9px;background:#374151;border-radius:99px;overflow:hidden">
+            <div style="height:100%;width:<?= $ingGeneralPct ?>%;background:#10B981;border-radius:99px"></div>
+          </div>
+          <div style="display:grid;gap:4px;margin-top:8px;font-size:.72rem;color:#D1D5DB">
+            <span>Tickets: $<?= number_format($ingresosTickets, 2) ?></span>
+            <span>Pedido app: $<?= number_format($ingresosPedidosApp, 2) ?></span>
+          </div>
+        </div>
 
-    <div style="border-top:1px solid #374151;padding-top:14px;display:flex;justify-content:space-between;align-items:center;gap:10px">
-      <span style="font-size:.78rem;color:#D1D5DB">Resultado neto</span>
-      <strong style="font-size:1.2rem;color:<?= $netCmp >= 0 ? '#A7F3D0' : '#FCA5A5' ?>">$<?= number_format($netCmp, 2) ?></strong>
+        <div>
+          <div style="display:flex;justify-content:space-between;font-size:.78rem;margin-bottom:6px">
+            <span style="color:#FCA5A5;font-weight:700">Perdidas</span>
+            <strong>$<?= number_format($perdidasGenerales, 2) ?></strong>
+          </div>
+          <div style="height:9px;background:#374151;border-radius:99px;overflow:hidden">
+            <div style="height:100%;width:<?= $perGeneralPct ?>%;background:#EF4444;border-radius:99px"></div>
+          </div>
+          <div style="display:grid;gap:4px;margin-top:8px;font-size:.72rem;color:#D1D5DB">
+            <span>Gastos: $<?= number_format((float)($kpis['gastos'] ?? 0), 2) ?></span>
+            <span>Retiros: $<?= number_format((float)($kpis['retiros'] ?? 0), 2) ?></span>
+          </div>
+        </div>
+      </div>
+
+      <div style="border:1px solid #253044;background:#151F2E;border-radius:12px;padding:14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <span style="font-weight:800;color:#F9FAFB">Amare</span>
+          <span style="font-size:.72rem;color:#CBD5E1">Wallet, puntos y descuentos</span>
+        </div>
+
+        <div style="display:grid;gap:12px">
+          <div>
+            <div style="display:flex;justify-content:space-between;font-size:.78rem;margin-bottom:6px">
+              <span style="color:#A7F3D0;font-weight:700">Recargas</span>
+              <strong>$<?= number_format($ingresosRecargasAmare, 2) ?></strong>
+            </div>
+            <div style="height:9px;background:#374151;border-radius:99px;overflow:hidden">
+              <div style="height:100%;width:<?= $recargasAmarePct ?>%;background:#10B981;border-radius:99px"></div>
+            </div>
+          </div>
+
+          <div>
+            <div style="display:flex;justify-content:space-between;font-size:.78rem;margin-bottom:6px">
+              <span style="color:#CBD5E1;font-weight:700">Saldo usado</span>
+              <strong>$<?= number_format($saldoAmareUsado, 2) ?></strong>
+            </div>
+            <div style="height:9px;background:#374151;border-radius:99px;overflow:hidden">
+              <div style="height:100%;width:<?= $saldoAmarePct ?>%;background:#94A3B8;border-radius:99px"></div>
+            </div>
+          </div>
+
+          <div>
+            <div style="display:flex;justify-content:space-between;font-size:.78rem;margin-bottom:6px">
+              <span style="color:#FCA5A5;font-weight:700">Descuentos / puntos</span>
+              <strong>$<?= number_format($perdidasAmare, 2) ?></strong>
+            </div>
+            <div style="height:9px;background:#374151;border-radius:99px;overflow:hidden">
+              <div style="height:100%;width:<?= $perdidasAmarePct ?>%;background:#EF4444;border-radius:99px"></div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
 
-<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px">
-  <div style="background:#fff;border-radius:12px;padding:20px;border:1px solid #E5E7EB">
-    <div style="font-size:.8rem;color:#6B7280">Mesas activas</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin-bottom:24px">
+  <div style="background:#fff;border-radius:12px;padding:20px;border:1px solid #E5E7EB;min-height:104px;display:flex;flex-direction:column;justify-content:center">
+    <div style="font-size:.8rem;color:#6B7280">Mesas en uso</div>
     <div style="font-size:1.4rem;font-weight:700;color:#111827"><?= (int)($restaurante['mesas_ocupadas'] ?? 0) ?> / <?= (int)($restaurante['total_mesas'] ?? 0) ?></div>
   </div>
-  <div style="background:#fff;border-radius:12px;padding:20px;border:1px solid #E5E7EB">
+  <div style="background:#fff;border-radius:12px;padding:20px;border:1px solid #E5E7EB;min-height:104px;display:flex;flex-direction:column;justify-content:center">
     <div style="font-size:.8rem;color:#6B7280">Pedidos activos</div>
-    <div style="font-size:1.4rem;font-weight:700;color:#F59E0B"><?= count($activos) ?></div>
+    <div style="font-size:1.4rem;font-weight:700;color:#111827"><?= count($activos) ?></div>
   </div>
-  <div style="background:#fff;border-radius:12px;padding:20px;border:1px solid #E5E7EB">
+  <div style="background:#fff;border-radius:12px;padding:20px;border:1px solid #E5E7EB;min-height:104px;display:flex;flex-direction:column;justify-content:center">
     <div style="font-size:.8rem;color:#6B7280">Alertas inventario</div>
-    <div style="font-size:1.4rem;font-weight:700;color:<?= count($alertas) > 0 ? '#EF4444' : '#10B981' ?>"><?= count($alertas) ?></div>
+    <div style="font-size:1.4rem;font-weight:700;color:#111827"><?= count($alertas) ?></div>
   </div>
-  <div style="background:#fff;border-radius:12px;padding:20px;border:1px solid #E5E7EB">
+  <div style="background:#fff;border-radius:12px;padding:20px;border:1px solid #E5E7EB;min-height:104px;display:flex;flex-direction:column;justify-content:center">
     <div style="font-size:.8rem;color:#6B7280">Pendiente por cobrar</div>
-    <div style="font-size:1.4rem;font-weight:700;color:#EF4444">$<?= number_format($kpis['pendiente'],2) ?></div>
+    <div style="font-size:1.4rem;font-weight:700;color:#111827">$<?= number_format($kpis['pendiente'],2) ?></div>
   </div>
 </div>
 
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
-  <!-- Pedidos activos -->
-  <div style="background:#fff;border-radius:12px;padding:20px;border:1px solid #E5E7EB">
-    <div style="font-weight:600;margin-bottom:14px">Pedidos en cocina</div>
-    <?php if (empty($activos)): ?>
-    <p style="color:#9CA3AF;font-size:.875rem">No hay pedidos activos.</p>
-    <?php else: ?>
-    <?php foreach (array_slice($activos, 0, 10) as $item): ?>
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #F3F4F6;font-size:.85rem">
-      <span style="color:#374151"><strong><?= htmlspecialchars($item['folio'] ?? '') ?></strong> — <?= htmlspecialchars($item['mesa_nombre'] ?? '—') ?></span>
-      <span style="padding:2px 8px;border-radius:99px;font-size:.75rem;font-weight:500;
-        background:<?= $item['item_estado']==='en_preparacion' ? '#FEF3C7' : '#DBEAFE' ?>;
-        color:<?= $item['item_estado']==='en_preparacion' ? '#92400E' : '#1E40AF' ?>">
-        <?= htmlspecialchars($item['platillo_nombre']) ?>
-      </span>
-    </div>
-    <?php endforeach; ?>
-    <?php endif; ?>
-  </div>
-
+<div style="display:grid;grid-template-columns:1fr;gap:20px;margin-bottom:20px">
   <!-- Próximas reservas -->
   <div style="background:#fff;border-radius:12px;padding:20px;border:1px solid #E5E7EB">
-    <div style="font-weight:600;margin-bottom:14px">Próximas reservaciones</div>
+    <div style="font-weight:700;color:#111827;margin-bottom:14px">Próximas reservaciones</div>
     <?php if (empty($proximas)): ?>
-    <p style="color:#9CA3AF;font-size:.875rem">Sin reservaciones próximas.</p>
+    <p style="color:#9CA3AF;font-size:.875rem;margin:0">Sin reservaciones próximas.</p>
     <?php else: ?>
     <?php foreach ($proximas as $r): ?>
     <div style="padding:8px 0;border-bottom:1px solid #F3F4F6;font-size:.85rem">
@@ -198,7 +285,7 @@ $amareCards = [
 </div>
 
 <!-- Productos: más / menos vendidos -->
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px">
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:20px">
   <div style="background:#fff;border-radius:12px;padding:20px;border:1px solid #E5E7EB">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
       <div style="font-weight:700;color:#111827">🔥 Más vendidos</div>

@@ -1,8 +1,10 @@
 <?php
 // ═══ EARLY LOGGING: Rastrear si /api/auth/token llega a PHP ═══
-error_log('[EARLY] REQUEST_URI=' . ($_SERVER['REQUEST_URI'] ?? 'NULL'));
-error_log('[EARLY] SCRIPT_NAME=' . ($_SERVER['SCRIPT_NAME'] ?? 'NULL'));
-error_log('[EARLY] REQUEST_METHOD=' . ($_SERVER['REQUEST_METHOD'] ?? 'NULL'));
+if (defined('EMAIL_DEBUG') && EMAIL_DEBUG) {
+    error_log('[EARLY] REQUEST_URI=' . ($_SERVER['REQUEST_URI'] ?? 'NULL'));
+    error_log('[EARLY] SCRIPT_NAME=' . ($_SERVER['SCRIPT_NAME'] ?? 'NULL'));
+    error_log('[EARLY] REQUEST_METHOD=' . ($_SERVER['REQUEST_METHOD'] ?? 'NULL'));
+}
 if (strpos($_SERVER['REQUEST_URI'] ?? '', 'api/auth/token') !== false) {
     error_log('[!CRITICAL] /api/auth/token detected — llegó a index.php');
 }
@@ -208,6 +210,7 @@ $publicPaths = [
     'api/pedidos',
     'api/pedidosconfirmados',
     'api/productos',
+    'api/promociones',
     'api/precios',
     'api/chat',
     'api/tracking',

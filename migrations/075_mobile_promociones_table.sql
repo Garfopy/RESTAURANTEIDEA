@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS `mobile_promociones` (
+  `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT,
+  `usuario_id` int(10) UNSIGNED NOT NULL,
+  `producto_id` int(10) UNSIGNED DEFAULT NULL,
+  `platillo_id` int(11) DEFAULT NULL,
+  `titulo` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `descripcion` text COLLATE utf8mb4_unicode_ci,
+  `imagen` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `deep_link` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `code` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `activo` tinyint(1) NOT NULL DEFAULT 1,
+  `expires_at` datetime DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `created_by` int(11) DEFAULT NULL,
+  `updated_by` int(11) DEFAULT NULL,
+  `updated_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_mobile_promociones_usuario` (`usuario_id`, `activo`, `expires_at`),
+  KEY `idx_mobile_promociones_code` (`code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
