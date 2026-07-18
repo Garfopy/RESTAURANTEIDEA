@@ -14,8 +14,23 @@ require_once ROOT_PATH . '/config/config.php';
 require_once ROOT_PATH . '/app/controllers/ApiController.php';
 
 // Iniciar sesión
-ini_set('session.gc_maxlifetime', 31536000);
-session_set_cookie_params(['lifetime' => 0, 'path' => '/', 'samesite' => 'Lax']);
+if (defined('SESSION_SAVE_PATH')) {
+    if (!is_dir(SESSION_SAVE_PATH)) {
+        @mkdir(SESSION_SAVE_PATH, 0775, true);
+    }
+    if (is_dir(SESSION_SAVE_PATH) && is_writable(SESSION_SAVE_PATH)) {
+        ini_set('session.save_path', SESSION_SAVE_PATH);
+    }
+}
+ini_set('session.gc_maxlifetime', (string)SESSION_LIFETIME_SECONDS);
+ini_set('session.gc_probability', '0');
+session_set_cookie_params([
+    'lifetime' => SESSION_LIFETIME_SECONDS,
+    'path'     => '/',
+    'secure'   => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'),
+    'httponly' => true,
+    'samesite' => 'Lax',
+]);
 session_name(SESSION_NAME);
 session_start();
 

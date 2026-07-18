@@ -980,7 +980,7 @@ class RestPublicoController extends BaseController
         // Auto-asignar mesero según zona/turno
         $meseroId = $reservaModel->meseroAsignadoPorMesa($mesaId, (int)$restaurante['id']);
 
-        $newId = $reservaModel->insert([
+        $newId = $reservaModel->insert($reservaModel->aplicarCanalReserva([
             'restaurante_id' => (int)$restaurante['id'],
             'mesa_id'        => $mesaId,
             'mesero_id'      => $meseroId,
@@ -993,7 +993,7 @@ class RestPublicoController extends BaseController
             'notas'          => $notas,
             'estado'         => 'confirmada',
             'origen'         => 'comensal',
-        ]);
+        ], 'web'));
 
         // Notificar al restaurante (silencioso si falla)
         try {

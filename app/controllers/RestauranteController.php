@@ -146,6 +146,7 @@ class RestauranteController extends BaseController
 
         $reservas   = new RestReservaModel();
         $proximas   = $reservas->getProximas($restauranteId, 3);
+        $reservasCanal = $reservas->getResumenCanal($restauranteId);
 
         $menuModel     = new RestMenuModel();
         $topVendidos   = $menuModel->getTopVendidos($restauranteId, 5);
@@ -158,7 +159,7 @@ class RestauranteController extends BaseController
         $activeMenu = 'rest_dashboard';
         $this->render('restaurante/dashboard', compact(
             'restaurante','kpis','amareKpis','comparativaFinanzas','activos','alertas','proximas',
-            'topVendidos','menosVendidos',
+            'reservasCanal','topVendidos','menosVendidos',
             'linkStaff','linkMenu','flash','pageTitle','activeMenu'
         ));
     }

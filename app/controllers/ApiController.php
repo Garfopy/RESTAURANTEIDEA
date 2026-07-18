@@ -110,10 +110,14 @@ class ApiController extends BaseController
         }
 
         $model = new RestClienteModel();
+        $promociones = array_map(
+            fn(array $promotion): array => $this->mobilePromotionApiResource($promotion),
+            $model->getPromocionesMobileActivas($mobileUsuarioId)
+        );
         $this->json([
             'ok' => true,
             'data' => [
-                'promociones' => $model->getPromocionesMobileActivas($mobileUsuarioId),
+                'promociones' => $promociones,
             ],
         ]);
     }
@@ -586,10 +590,13 @@ class ApiController extends BaseController
             $path = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
             $segs = array_values(array_filter(explode('/', trim($path, '/'))));
         }
-        $id     = (isset($segs[3]) && ctype_digit((string)$segs[3])) ? (int)$segs[3] : null;
+        $resourceParts = array_values(array_filter(explode('/', trim((string)($resource ?? ''), '/'))));
+        $resourceName = $resourceParts[0] ?? $resource;
+        $resourceId = (isset($resourceParts[1]) && ctype_digit((string)$resourceParts[1])) ? (int)$resourceParts[1] : null;
+        $id     = (isset($segs[3]) && ctype_digit((string)$segs[3])) ? (int)$segs[3] : $resourceId;
         $method = $_SERVER['REQUEST_METHOD'];
 
-        $route = strtoupper($method) . ':' . ($resource ?? '') . ($id ? ':id' : '');
+        $route = strtoupper($method) . ':' . ($resourceName ?? '') . ($id ? ':id' : '');
 
         switch ($route) {
             case 'GET:ping':
@@ -603,9 +610,27 @@ class ApiController extends BaseController
                 $this->v1CrearPedido($token);
                 break;
 
+            case 'POST:rest-pedidos':
+                $this->v1CrearRestPedidoMobile();
+                break;
+
+            case 'POST:push-tokens':
+            case 'POST:mobile-push-tokens':
+            case 'POST:notification-tokens':
+                $this->v1RegistrarPushTokenMobile();
+                break;
+
+            case 'POST:reservaciones':
+                $this->v1CrearReservacionMobile();
+                break;
+
             case 'GET:pedidos:id':
                 $token = $this->requireApiToken(['pedidos:leer']);
                 $this->v1ConsultarPedido($token, $id);
+                break;
+
+            case 'GET:rest-pedidos:id':
+                $this->v1ConsultarRestPedidoMobile($id);
                 break;
 
             case 'GET:productos':
@@ -663,8 +688,12 @@ class ApiController extends BaseController
         }
 
         $model = new RestClienteModel();
+        $promociones = array_map(
+            fn(array $promotion): array => $this->mobilePromotionApiResource($promotion),
+            $model->getPromocionesMobileActivas($mobileUsuarioId)
+        );
         $this->apiOk([
-            'promociones' => $model->getPromocionesMobileActivas($mobileUsuarioId),
+            'promociones' => $promociones,
         ]);
     }
 
@@ -696,6 +725,559 @@ class ApiController extends BaseController
         }
 
         $this->apiOk($this->calculatePromotionDiscount($promotion, $items));
+    }
+
+    private function v1RegistrarPushTokenMobile(): void
+    {
+        $body = json_decode(file_get_contents('php://input'), true);
+        if (!is_array($body)) {
+            $body = $_POST;
+        }
+
+        $mobileUsuarioId = (int)($body['usuario_id'] ?? $body['mobile_usuario_id'] ?? $body['user_id'] ?? 0);
+        $fcmToken = trim((string)($body['fcm_token'] ?? $body['token'] ?? $body['device_token'] ?? ''));
+        $platform = strtolower(trim((string)($body['platform'] ?? $body['plataforma'] ?? '')));
+        $deviceId = trim((string)($body['device_id'] ?? $body['deviceId'] ?? $body['installation_id'] ?? ''));
+
+        if ($mobileUsuarioId <= 0) {
+            $this->apiError('usuario_id requerido', 400);
+        }
+        if ($fcmToken === '') {
+            $this->apiError('fcm_token requerido', 400);
+        }
+        if (strlen($fcmToken) > 500) {
+            $this->apiError('fcm_token demasiado largo', 422);
+        }
+        if ($platform !== '' && !in_array($platform, ['ios', 'android', 'web'], true)) {
+            $platform = substr($platform, 0, 30);
+        }
+
+        $token = $this->mobileUpsertPushToken($mobileUsuarioId, $fcmToken, $platform, $deviceId);
+        $this->apiOk([
+            'push_token' => $token,
+            'message' => 'Token push registrado correctamente',
+        ]);
+    }
+
+    private function mobileUpsertPushToken(int $mobileUsuarioId, string $fcmToken, string $platform = '', string $deviceId = ''): array
+    {
+        if (!$this->adminEnsureMobilePushTokensTable()) {
+            $this->apiError('No se pudo preparar la tabla de tokens push', 500);
+        }
+
+        $db = Database::getInstance();
+        $now = date('Y-m-d H:i:s');
+        $platform = $platform !== '' ? substr($platform, 0, 30) : null;
+        $deviceId = $deviceId !== '' ? substr($deviceId, 0, 190) : null;
+
+        $stmt = null;
+        if ($deviceId !== null) {
+            $stmt = $db->prepare(
+                "SELECT id
+                   FROM mobile_push_tokens
+                  WHERE usuario_id = ? AND device_id = ?
+                  ORDER BY id DESC
+                  LIMIT 1"
+            );
+            $stmt->execute([$mobileUsuarioId, $deviceId]);
+        }
+        $existingId = $stmt ? (int)($stmt->fetchColumn() ?: 0) : 0;
+
+        if ($existingId <= 0) {
+            $stmt = $db->prepare(
+                "SELECT id
+                   FROM mobile_push_tokens
+                  WHERE usuario_id = ? AND fcm_token = ?
+                  ORDER BY id DESC
+                  LIMIT 1"
+            );
+            $stmt->execute([$mobileUsuarioId, $fcmToken]);
+            $existingId = (int)($stmt->fetchColumn() ?: 0);
+        }
+
+        if ($existingId > 0) {
+            $stmt = $db->prepare(
+                "UPDATE mobile_push_tokens
+                    SET fcm_token = ?,
+                        platform = COALESCE(?, platform),
+                        device_id = COALESCE(?, device_id),
+                        enabled = 1,
+                        updated_at = ?,
+                        last_seen_at = ?
+                  WHERE id = ?"
+            );
+            $stmt->execute([$fcmToken, $platform, $deviceId, $now, $now, $existingId]);
+            $id = $existingId;
+        } else {
+            $stmt = $db->prepare(
+                "INSERT INTO mobile_push_tokens
+                    (usuario_id, fcm_token, platform, device_id, enabled, created_at, updated_at, last_seen_at)
+                 VALUES (?, ?, ?, ?, 1, ?, ?, ?)"
+            );
+            $stmt->execute([$mobileUsuarioId, $fcmToken, $platform, $deviceId, $now, $now, $now]);
+            $id = (int)$db->lastInsertId();
+        }
+
+        return [
+            'id' => $id,
+            'usuario_id' => $mobileUsuarioId,
+            'platform' => $platform,
+            'device_id' => $deviceId,
+            'enabled' => 1,
+            'last_seen_at' => $now,
+        ];
+    }
+
+    private function adminEnsureMobilePushTokensTable(): bool
+    {
+        try {
+            Database::getInstance()->query("SELECT 1 FROM `mobile_push_tokens` LIMIT 0");
+            return true;
+        } catch (\Throwable $e) {
+            // Continuar e intentar crear la tabla en instalaciones que aun no la tengan.
+        }
+
+        try {
+            Database::getInstance()->exec(
+                "CREATE TABLE IF NOT EXISTS `mobile_push_tokens` (
+                    `id` int(11) NOT NULL AUTO_INCREMENT,
+                    `usuario_id` int(11) NOT NULL,
+                    `fcm_token` varchar(500) COLLATE utf8mb4_unicode_ci NOT NULL,
+                    `platform` varchar(30) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+                    `device_id` varchar(190) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+                    `enabled` tinyint(1) NOT NULL DEFAULT '1',
+                    `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    `last_seen_at` timestamp NULL DEFAULT NULL,
+                    PRIMARY KEY (`id`),
+                    KEY `idx_mobile_push_tokens_usuario` (`usuario_id`,`enabled`),
+                    KEY `idx_mobile_push_tokens_device` (`device_id`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+            );
+            Database::getInstance()->query("SELECT 1 FROM `mobile_push_tokens` LIMIT 0");
+            return true;
+        } catch (\Throwable $e) {
+            error_log('[adminEnsureMobilePushTokensTable] No se pudo crear mobile_push_tokens: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    private function v1CrearReservacionMobile(): void
+    {
+        $body = json_decode(file_get_contents('php://input'), true);
+        if (!is_array($body)) {
+            $body = $_POST;
+        }
+
+        $restauranteId = $this->mobileRestauranteIdFromPayload($body);
+        if ($restauranteId <= 0) {
+            $this->apiError('restaurante_id o branch_id requerido', 400);
+        }
+
+        $restaurante = (new RestauranteModel())->find($restauranteId);
+        if (!$restaurante || empty($restaurante['activo'])) {
+            $this->apiError('Restaurante no encontrado', 404);
+        }
+        if (empty($restaurante['reservas_habilitadas'])) {
+            $this->apiError('Reservaciones no disponibles para este restaurante', 422);
+        }
+
+        $nombre = trim((string)($body['nombre'] ?? $body['cliente_nombre'] ?? $body['customer_name'] ?? ''));
+        $telefono = preg_replace('/\D/', '', (string)($body['telefono'] ?? $body['phone'] ?? $body['cliente_telefono'] ?? ''));
+        $email = trim((string)($body['email'] ?? $body['correo'] ?? $body['cliente_email'] ?? ''));
+        $fecha = trim((string)($body['fecha'] ?? $body['date'] ?? ''));
+        $hora = trim((string)($body['hora'] ?? $body['time'] ?? ''));
+        $personas = max(1, (int)($body['personas'] ?? $body['people'] ?? $body['party_size'] ?? 2));
+        $notas = trim((string)($body['notas'] ?? $body['notes'] ?? ''));
+        $mesaId = (int)($body['mesa_id'] ?? $body['table_id'] ?? 0);
+
+        if ($nombre === '' || $telefono === '' || $fecha === '' || $hora === '') {
+            $this->apiError('nombre, telefono, fecha y hora son requeridos', 422);
+        }
+        if (strlen($telefono) !== 10) {
+            $this->apiError('telefono debe contener 10 digitos', 422);
+        }
+        if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $this->apiError('email invalido', 422);
+        }
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha)) {
+            $this->apiError('fecha debe tener formato YYYY-MM-DD', 422);
+        }
+        if (strlen($hora) === 5) {
+            $hora .= ':00';
+        }
+        if (!preg_match('/^\d{2}:\d{2}:\d{2}$/', $hora)) {
+            $this->apiError('hora debe tener formato HH:MM o HH:MM:SS', 422);
+        }
+
+        $reservaModel = new RestReservaModel();
+        $mesa = $this->mobileResolverMesaReserva($restauranteId, $mesaId, $fecha, $hora, $personas, $reservaModel);
+        if (!$mesa) {
+            $this->apiError('No hay mesa disponible para ese horario', 409);
+        }
+
+        $meseroId = $reservaModel->meseroAsignadoPorMesa((int)$mesa['id'], $restauranteId);
+        $newId = $reservaModel->insert($reservaModel->aplicarCanalReserva([
+            'restaurante_id' => $restauranteId,
+            'mesa_id'        => (int)$mesa['id'],
+            'mesero_id'      => $meseroId,
+            'nombre'         => substr($nombre, 0, 150),
+            'telefono'       => $telefono,
+            'email'          => $email !== '' ? strtolower($email) : null,
+            'fecha'          => $fecha,
+            'hora'           => $hora,
+            'personas'       => $personas,
+            'notas'          => $notas !== '' ? substr($notas, 0, 500) : null,
+            'estado'         => 'confirmada',
+            'origen'         => 'comensal',
+        ], 'movil'));
+
+        $emailResult = $this->mobileEnviarConfirmacionReserva($reservaModel, $restaurante, [
+            'id' => $newId,
+            'nombre' => $nombre,
+            'email' => $email,
+            'fecha' => $fecha,
+            'hora' => $hora,
+            'personas' => $personas,
+            'mesa_id' => (int)$mesa['id'],
+            'mesa_nombre' => (string)($mesa['nombre'] ?? 'Por asignar'),
+            'estado' => 'confirmada',
+        ]);
+
+        $this->apiOk([
+            'reservacion' => [
+                'id' => (int)$newId,
+                'restaurante_id' => $restauranteId,
+                'mesa_id' => (int)$mesa['id'],
+                'mesa_nombre' => (string)($mesa['nombre'] ?? ''),
+                'nombre' => $nombre,
+                'telefono' => $telefono,
+                'email' => $email !== '' ? strtolower($email) : null,
+                'fecha' => $fecha,
+                'hora' => $hora,
+                'personas' => $personas,
+                'estado' => 'confirmada',
+                'origen' => 'comensal',
+                'canal_reserva' => 'movil',
+                'confirmacion_enviada' => $emailResult['sent'],
+            ],
+            'email' => $emailResult,
+        ]);
+    }
+
+    private function mobileResolverMesaReserva(int $restauranteId, int $mesaId, string $fecha, string $hora, int $personas, RestReservaModel $reservaModel): ?array
+    {
+        $db = Database::getInstance();
+        if ($mesaId > 0) {
+            $stmt = $db->prepare(
+                "SELECT id, nombre, capacidad
+                 FROM rest_mesas
+                 WHERE id = ? AND restaurante_id = ? AND activo = 1
+                 LIMIT 1"
+            );
+            $stmt->execute([$mesaId, $restauranteId]);
+            $mesa = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$mesa || (int)$mesa['capacidad'] < $personas || $reservaModel->hayConflicto($mesaId, $fecha, $hora)) {
+                return null;
+            }
+            return $mesa;
+        }
+
+        $mesas = $reservaModel->mesasDisponiblesParaCapacidad($restauranteId, $fecha, $hora, $personas);
+        return $mesas[0] ?? null;
+    }
+
+    private function mobileEnviarConfirmacionReserva(RestReservaModel $reservaModel, array $restaurante, array $reserva): array
+    {
+        $reservaId = (int)($reserva['id'] ?? 0);
+        $email = trim((string)($reserva['email'] ?? ''));
+        $slug = trim((string)($restaurante['slug'] ?? ''));
+        if ($reservaId <= 0 || $email === '' || $slug === '') {
+            return ['sent' => false, 'reason' => $email === '' ? 'missing_email' : 'missing_data'];
+        }
+
+        try {
+            $ok = (new EmailService())->enviarConfirmacionReserva(
+                $email,
+                $restaurante,
+                [
+                    'nombre' => $reserva['nombre'] ?? '',
+                    'fecha' => $reserva['fecha'] ?? '',
+                    'hora' => $reserva['hora'] ?? '',
+                    'personas' => (int)($reserva['personas'] ?? 1),
+                    'mesa_nombre' => $reserva['mesa_nombre'] ?? 'Por asignar',
+                ],
+                BASE_URL . 'menu/' . $slug . '/cancelarReserva/' . $reservaId
+            );
+            if ($ok) {
+                $reservaModel->marcarConfirmacionEnviada($reservaId);
+                return ['sent' => true, 'reason' => null];
+            }
+            error_log("[Reserva #$reservaId] FALLO al enviar confirmacion movil a $email");
+            return ['sent' => false, 'reason' => 'mailer_failed'];
+        } catch (\Throwable $e) {
+            error_log("[Reserva #$reservaId] Excepcion enviando confirmacion movil a $email: " . $e->getMessage());
+            return ['sent' => false, 'reason' => 'exception'];
+        }
+    }
+
+    private function v1CrearRestPedidoMobile(): void
+    {
+        $body = json_decode(file_get_contents('php://input'), true);
+        if (!is_array($body)) {
+            $body = $_POST;
+        }
+
+        $restauranteId = $this->mobileRestauranteIdFromPayload($body);
+        if ($restauranteId <= 0) {
+            $this->apiError('restaurante_id o branch_id requerido', 400);
+        }
+        if (!$this->mobilePickupEnabled($restauranteId)) {
+            $this->apiError('Pickup no esta habilitado para este restaurante', 422);
+        }
+
+        $mobileUsuarioId = (int)($body['usuario_id'] ?? $body['mobile_usuario_id'] ?? $body['user_id'] ?? 0);
+        if ($mobileUsuarioId <= 0) {
+            $this->apiError('usuario_id requerido', 400);
+        }
+
+        $itemsPayload = $body['items'] ?? $body['productos'] ?? [];
+        if (!is_array($itemsPayload) || empty($itemsPayload)) {
+            $this->apiError('items requerido', 422);
+        }
+
+        $appOrderId = trim((string)($body['app_order_id'] ?? $body['mobile_order_id'] ?? $body['order_id'] ?? ''));
+        if ($appOrderId !== '' && $this->adminColumnExists('rest_pedidos', 'app_order_id')) {
+            $stmt = Database::getInstance()->prepare(
+                "SELECT id FROM rest_pedidos WHERE restaurante_id = ? AND app_order_id = ? LIMIT 1"
+            );
+            $stmt->execute([$restauranteId, $appOrderId]);
+            $existingId = (int)($stmt->fetchColumn() ?: 0);
+            if ($existingId > 0) {
+                $pedido = $this->mobileRestPedidoResource($existingId, $mobileUsuarioId);
+                if (!$pedido) {
+                    $this->apiError('app_order_id ya existe para otro usuario', 409);
+                }
+                $this->apiOk(['pedido' => $pedido, 'idempotent' => true]);
+            }
+        }
+
+        $items = [];
+        foreach ($itemsPayload as $idx => $item) {
+            if (!is_array($item)) {
+                $this->apiError("Item {$idx} invalido", 422);
+            }
+            $platilloId = (int)($item['platillo_id'] ?? $item['menu_item_id'] ?? $item['producto_id'] ?? $item['id'] ?? 0);
+            $cantidad = max(1, (int)($item['cantidad'] ?? $item['qty'] ?? 1));
+            if ($platilloId <= 0) {
+                $this->apiError("Item {$idx}: platillo_id requerido", 422);
+            }
+
+            $modificadores = [];
+            foreach ((array)($item['modificadores'] ?? $item['modifiers'] ?? []) as $mod) {
+                if (!is_array($mod)) {
+                    continue;
+                }
+                $modId = (int)($mod['modificador_id'] ?? $mod['modifier_id'] ?? $mod['id'] ?? 0);
+                if ($modId > 0) {
+                    $modificadores[] = [
+                        'modificador_id' => $modId,
+                        'cantidad' => max(1, (int)($mod['cantidad'] ?? $mod['qty'] ?? 1)),
+                    ];
+                }
+            }
+
+            $items[] = [
+                'platillo_id' => $platilloId,
+                'cantidad' => $cantidad,
+                'notas' => isset($item['notas']) ? substr(trim((string)$item['notas']), 0, 255) : null,
+                'modificadores' => $modificadores,
+            ];
+        }
+
+        $tipoEntrega = strtolower(trim((string)($body['tipo_entrega'] ?? $body['tipo_pedido'] ?? 'pickup')));
+        if (!in_array($tipoEntrega, ['pickup', 'pick_up', 'takeaway', 'para_llevar', 'recoger'], true)) {
+            $this->apiError('Este endpoint solo crea pedidos pickup', 422);
+        }
+
+        $clienteNombre = trim((string)($body['comprador_nombre'] ?? $body['cliente_nombre'] ?? $body['nombre'] ?? $body['customer_name'] ?? ''));
+        $compradorTelefono = trim((string)($body['comprador_telefono'] ?? $body['telefono'] ?? $body['phone'] ?? $body['customer_phone'] ?? ''));
+
+        $pedidoData = [
+            'restaurante_id' => $restauranteId,
+            'mesa_id' => null,
+            'visita_id' => null,
+            'mesero_id' => null,
+            'notas' => isset($body['notas']) ? substr(trim((string)$body['notas']), 0, 500) : null,
+            'tipo_origen' => 'app',
+            'tipo_pedido' => 'pickup',
+            'tipo_entrega' => 'pickup',
+            'direccion_entrega' => null,
+            'mobile_usuario_id' => $mobileUsuarioId,
+            'cliente_nombre' => $clienteNombre !== '' ? substr($clienteNombre, 0, 120) : null,
+            'comprador_telefono' => $compradorTelefono !== '' ? substr($compradorTelefono, 0, 30) : null,
+            'comprador_direccion' => null,
+            'metodo_pago' => isset($body['metodo_pago']) ? substr(trim((string)$body['metodo_pago']), 0, 40) : null,
+            'pickup_at' => $this->mobileNormalizeDateTime($body['pickup_at'] ?? $body['hora_recoger'] ?? $body['fecha_recoger'] ?? null),
+            'app_order_id' => $appOrderId !== '' ? substr($appOrderId, 0, 80) : null,
+            'pagado_at' => !empty($body['pagado']) ? date('Y-m-d H:i:s') : null,
+        ];
+
+        try {
+            $pedidoId = (new RestPedidoModel())->crear($pedidoData, $items);
+        } catch (\InvalidArgumentException $e) {
+            $this->apiError($e->getMessage(), 422);
+        } catch (\Throwable $e) {
+            if ($appOrderId !== '' && $this->adminColumnExists('rest_pedidos', 'app_order_id') && stripos($e->getMessage(), 'Duplicate') !== false) {
+                $stmt = Database::getInstance()->prepare(
+                    "SELECT id FROM rest_pedidos WHERE restaurante_id = ? AND app_order_id = ? LIMIT 1"
+                );
+                $stmt->execute([$restauranteId, $appOrderId]);
+                $existingId = (int)($stmt->fetchColumn() ?: 0);
+                if ($existingId > 0) {
+                    $pedido = $this->mobileRestPedidoResource($existingId, $mobileUsuarioId);
+                    if ($pedido) {
+                        $this->apiOk(['pedido' => $pedido, 'idempotent' => true]);
+                    }
+                }
+            }
+            error_log('[v1CrearRestPedidoMobile] Error: ' . $e->getMessage());
+            $this->apiError('Error interno al crear pedido pickup', 500);
+        }
+
+        $pedido = $this->mobileRestPedidoResource($pedidoId, $mobileUsuarioId);
+        $this->apiOk(['pedido' => $pedido, 'idempotent' => false]);
+    }
+
+    private function v1ConsultarRestPedidoMobile(?int $pedidoId): void
+    {
+        $pedidoId = (int)$pedidoId;
+        if ($pedidoId <= 0) {
+            $this->apiError('pedido_id requerido', 400);
+        }
+
+        $mobileUsuarioId = (int)($this->get('usuario_id') ?: $this->get('mobile_usuario_id') ?: 0);
+        if ($mobileUsuarioId <= 0) {
+            $this->apiError('usuario_id requerido', 400);
+        }
+        $pedido = $this->mobileRestPedidoResource($pedidoId, $mobileUsuarioId);
+        if (!$pedido) {
+            $this->apiError('Pedido no encontrado', 404);
+        }
+        $this->apiOk(['pedido' => $pedido]);
+    }
+
+    private function mobileRestauranteIdFromPayload(array $body): int
+    {
+        $restauranteId = (int)($body['restaurante_id'] ?? $body['restaurant_id'] ?? 0);
+        if ($restauranteId > 0) {
+            $stmt = Database::getInstance()->prepare("SELECT id FROM rest_restaurantes WHERE id = ? AND activo = 1 LIMIT 1");
+            $stmt->execute([$restauranteId]);
+            return (int)($stmt->fetchColumn() ?: 0);
+        }
+
+        $branchId = (int)($body['branch_id'] ?? $body['sucursal_id'] ?? 0);
+        if ($branchId <= 0) {
+            return 0;
+        }
+
+        return (int)($this->restauranteIdPorSucursal(Database::getInstance(), $branchId) ?? 0);
+    }
+
+    private function mobilePickupEnabled(int $restauranteId): bool
+    {
+        if (!$this->adminTableExists('rest_configuracion')) {
+            return true;
+        }
+        try {
+            $stmt = Database::getInstance()->prepare(
+                "SELECT tipos_entrega FROM rest_configuracion WHERE restaurante_id = ? LIMIT 1"
+            );
+            $stmt->execute([$restauranteId]);
+            $raw = (string)($stmt->fetchColumn() ?: '');
+            if ($raw === '') {
+                return true;
+            }
+            $tipos = json_decode($raw, true);
+            if (!is_array($tipos) || empty($tipos)) {
+                return true;
+            }
+            return in_array('pickup', array_map('strtolower', array_map('strval', $tipos)), true);
+        } catch (\Throwable $e) {
+            return true;
+        }
+    }
+
+    private function mobileNormalizeDateTime(mixed $value): ?string
+    {
+        $value = trim((string)($value ?? ''));
+        if ($value === '') {
+            return null;
+        }
+        $ts = strtotime(str_replace('T', ' ', $value));
+        return $ts ? date('Y-m-d H:i:s', $ts) : null;
+    }
+
+    private function mobileRestPedidoResource(int $pedidoId, ?int $mobileUsuarioId = null): ?array
+    {
+        $where = ['p.id = ?'];
+        $params = [$pedidoId];
+        if ($mobileUsuarioId && $this->adminColumnExists('rest_pedidos', 'mobile_usuario_id')) {
+            $where[] = 'p.mobile_usuario_id = ?';
+            $params[] = $mobileUsuarioId;
+        }
+
+        $stmt = Database::getInstance()->prepare(
+            "SELECT p.*
+               FROM rest_pedidos p
+              WHERE " . implode(' AND ', $where) . "
+              LIMIT 1"
+        );
+        $stmt->execute($params);
+        $pedido = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$pedido) {
+            return null;
+        }
+
+        $itemsStmt = Database::getInstance()->prepare(
+            "SELECT pi.id, pi.platillo_id, pi.cantidad, pi.precio_unit, pi.subtotal, pi.notas, pi.estado,
+                    pl.nombre AS platillo_nombre
+               FROM rest_pedido_items pi
+               LEFT JOIN rest_platillos pl ON pl.id = pi.platillo_id
+              WHERE pi.pedido_id = ?
+              ORDER BY pi.id ASC"
+        );
+        $itemsStmt->execute([$pedidoId]);
+        $items = array_map(static function (array $item): array {
+            return [
+                'id' => (int)$item['id'],
+                'platillo_id' => (int)$item['platillo_id'],
+                'nombre' => (string)($item['platillo_nombre'] ?? ''),
+                'cantidad' => (int)$item['cantidad'],
+                'precio_unit' => (float)$item['precio_unit'],
+                'subtotal' => (float)$item['subtotal'],
+                'notas' => $item['notas'],
+                'estado' => $item['estado'],
+            ];
+        }, $itemsStmt->fetchAll(PDO::FETCH_ASSOC) ?: []);
+
+        return [
+            'id' => (int)$pedido['id'],
+            'folio' => (string)$pedido['folio'],
+            'estado' => (string)$pedido['estado'],
+            'tipo_origen' => $pedido['tipo_origen'] ?? null,
+            'tipo_pedido' => $pedido['tipo_pedido'] ?? null,
+            'tipo_entrega' => $pedido['tipo_entrega'] ?? null,
+            'pickup_at' => $pedido['pickup_at'] ?? null,
+            'cliente_nombre' => $pedido['cliente_nombre'] ?? null,
+            'comprador_telefono' => $pedido['comprador_telefono'] ?? null,
+            'metodo_pago' => $pedido['metodo_pago'] ?? null,
+            'app_order_id' => $pedido['app_order_id'] ?? null,
+            'subtotal' => (float)$pedido['subtotal'],
+            'total' => (float)$pedido['total'],
+            'created_at' => $pedido['created_at'] ?? null,
+            'items' => $items,
+        ];
     }
 
     private function findMobilePromotionForCalculation(int $mobileUsuarioId, int $promotionId, string $code): ?array
@@ -743,6 +1325,7 @@ class ApiController extends BaseController
 
     private function calculatePromotionDiscount(array $promotion, array $items): array
     {
+        $promotion = $this->normalizePromotionRuleArray($promotion);
         $normalizedItems = $this->normalizePromotionCalculationItems($items);
         $subtotal = 0.0;
         $eligibleSubtotal = 0.0;
@@ -920,6 +1503,7 @@ class ApiController extends BaseController
 
     private function promotionCalculationSummary(array $promotion): array
     {
+        $promotion = $this->normalizePromotionRuleArray($promotion);
         return [
             'id' => (int)($promotion['id'] ?? 0),
             'titulo' => (string)($promotion['titulo'] ?? ''),
@@ -930,7 +1514,74 @@ class ApiController extends BaseController
             'scope_ids' => $this->parsePromotionScopeIds($promotion['scope_ids'] ?? null),
             'buy_qty' => isset($promotion['buy_qty']) ? (int)$promotion['buy_qty'] : null,
             'pay_qty' => isset($promotion['pay_qty']) ? (int)$promotion['pay_qty'] : null,
+            'min_subtotal' => (float)($promotion['min_subtotal'] ?? 0),
+            'max_uses' => isset($promotion['max_uses']) ? (int)$promotion['max_uses'] : null,
+            'combinable' => (int)($promotion['combinable'] ?? 0),
         ];
+    }
+
+    private function normalizePromotionRuleArray(array $promotion): array
+    {
+        $tipo = $this->normalizePromotionDiscountType((string)($promotion['tipo_descuento'] ?? $promotion['discount_type'] ?? $promotion['tipo'] ?? 'porcentaje'));
+        $valor = $promotion['valor_descuento']
+            ?? $promotion['discount_value']
+            ?? $promotion['descuento_valor']
+            ?? $promotion['descuento']
+            ?? $promotion['value']
+            ?? $promotion['discount_percent']
+            ?? $promotion['porcentaje_descuento']
+            ?? 0;
+        $valor = (float)$valor;
+        if ($tipo === 'porcentaje') {
+            $valor = min(100.0, max(0.0, $valor));
+        } elseif ($tipo === 'monto_fijo') {
+            $valor = max(0.0, $valor);
+        }
+
+        $scopeTipo = $this->normalizePromotionScopeType((string)($promotion['scope_tipo'] ?? $promotion['scope_type'] ?? $promotion['scope'] ?? 'all'));
+        $scopeIds = $this->parsePromotionScopeIds($promotion['scope_ids_array'] ?? $promotion['scope_ids'] ?? $promotion['scopeIds'] ?? []);
+        if (!$scopeIds && $scopeTipo === 'products') {
+            $scopeIds = $this->parsePromotionScopeIds($promotion['producto_ids'] ?? $promotion['product_ids'] ?? []);
+        }
+        if (!$scopeIds && $scopeTipo === 'categories') {
+            $scopeIds = $this->parsePromotionScopeIds($promotion['categoria_ids'] ?? $promotion['category_ids'] ?? []);
+        }
+
+        $promotion['tipo_descuento'] = $tipo;
+        $promotion['tipo'] = $tipo;
+        $promotion['discount_type'] = $tipo;
+        $promotion['valor_descuento'] = $valor;
+        $promotion['discount_value'] = $valor;
+        $promotion['discount'] = $valor;
+        $promotion['descuento'] = $valor;
+        $promotion['valor'] = $valor;
+        $promotion['discount_percent'] = $tipo === 'porcentaje' ? $valor : 0;
+        $promotion['porcentaje_descuento'] = $tipo === 'porcentaje' ? $valor : 0;
+        $promotion['scope_tipo'] = $scopeTipo;
+        $promotion['scope_type'] = $scopeTipo;
+        $promotion['scope_ids_array'] = $scopeIds;
+        $promotion['scope_ids'] = $scopeIds ? json_encode($scopeIds) : null;
+        $promotion['min_subtotal'] = (float)($promotion['min_subtotal'] ?? $promotion['minimum_subtotal'] ?? 0);
+        $promotion['minimum_subtotal'] = $promotion['min_subtotal'];
+        $promotion['buy_qty'] = isset($promotion['buy_qty']) ? (int)$promotion['buy_qty'] : null;
+        $promotion['pay_qty'] = isset($promotion['pay_qty']) ? (int)$promotion['pay_qty'] : null;
+        $promotion['max_uses'] = isset($promotion['max_uses']) ? (int)$promotion['max_uses'] : null;
+        $promotion['combinable'] = (int)($promotion['combinable'] ?? 0);
+
+        return $promotion;
+    }
+
+    private function mobilePromotionApiResource(array $promotion): array
+    {
+        $promotion = $this->normalizePromotionRuleArray($promotion);
+        $scopeIds = $promotion['scope_ids_array'] ?? [];
+        $promotion['scope_ids'] = $scopeIds;
+        $promotion['producto_ids'] = $promotion['scope_tipo'] === 'products' ? $scopeIds : [];
+        $promotion['categoria_ids'] = $promotion['scope_tipo'] === 'categories' ? $scopeIds : [];
+        $promotion['requires_server_calculation'] = true;
+        $promotion['calculation_endpoint'] = '/api/v1/promociones/aplicar';
+        $promotion['applies_to_all_menu'] = $promotion['scope_tipo'] === 'all';
+        return $promotion;
     }
 
     private function requireApiToken(array $scopesRequired): array
@@ -1852,11 +2503,18 @@ class ApiController extends BaseController
 
     private function restauranteIdPorSucursal(\PDO $db, int $branchId): ?int
     {
-        $columns = $db->query(
-            "SELECT column_name FROM information_schema.columns
-             WHERE table_schema=DATABASE() AND table_name='rest_restaurantes'
-               AND column_name IN ('sucursal_id','sucursal_carnihub_id')"
-        )->fetchAll(\PDO::FETCH_COLUMN);
+        $columns = [];
+        try {
+            foreach (['sucursal_id', 'sucursal_carnihub_id'] as $candidate) {
+                $stmt = $db->prepare("SHOW COLUMNS FROM `rest_restaurantes` LIKE ?");
+                $stmt->execute([$candidate]);
+                if ($stmt->fetch()) {
+                    $columns[] = $candidate;
+                }
+            }
+        } catch (\Throwable $e) {
+            $columns = [];
+        }
         foreach (['sucursal_id', 'sucursal_carnihub_id'] as $column) {
             if (!in_array($column, $columns, true)) continue;
             $stmt = $db->prepare("SELECT id FROM rest_restaurantes WHERE `{$column}`=? AND activo=1 LIMIT 1");
@@ -2152,14 +2810,35 @@ class ApiController extends BaseController
     {
         $empresaId = (int)$jwtUser['empresa_id'];
         $branchId  = $this->getAmareBranchId($empresaId);
+        $search      = trim($this->get('search', ''));
+        $page        = max(1, (int)$this->get('page', 1));
+        $perPageRaw  = trim((string)$this->get('per_page', 50));
+        $fetchAll    = in_array(strtolower($perPageRaw), ['all', 'todos', '0', '-1', '*'], true);
+        $perPage     = $fetchAll ? 500 : min(100, max(1, (int)$perPageRaw));
+
+        if (!$branchId) {
+            $users = $this->adminLocalListUsers($empresaId, $search, $fetchAll ? null : $perPage);
+            $this->adminApiOk('Usuarios locales obtenidos correctamente', [
+                'users' => $users,
+                'pagination' => [
+                    'page' => 1,
+                    'per_page' => count($users),
+                    'total' => count($users),
+                    'all' => $fetchAll,
+                ],
+                'source' => 'local',
+            ]);
+        }
 
         if (!$branchId) {
             $this->adminApiError('No se encontró la sucursal vinculada para tu empresa en la API Amare.', 404);
         }
 
-        $search  = trim($this->get('search', ''));
-        $page    = max(1, (int)$this->get('page', 1));
-        $perPage = min(100, max(1, (int)$this->get('per_page', 50)));
+        $search      = trim($this->get('search', ''));
+        $page        = max(1, (int)$this->get('page', 1));
+        $perPageRaw  = trim((string)$this->get('per_page', 50));
+        $fetchAll    = in_array(strtolower($perPageRaw), ['all', 'todos', '0', '-1', '*'], true);
+        $perPage     = $fetchAll ? 500 : min(100, max(1, (int)$perPageRaw));
 
         // Proxy: llamar a la API Amare para obtener usuarios móviles de esa sucursal
         $endpoint = "branches/{$branchId}/users?" . http_build_query([
@@ -2168,11 +2847,15 @@ class ApiController extends BaseController
             'per_page' => $perPage,
         ]);
 
-        $result = $this->callAmareApi('GET', $endpoint);
+        $result = $fetchAll
+            ? $this->adminFetchAllRemoteUsers("branches/{$branchId}/users", $search, $perPage)
+            : $this->callAmareApi('GET', $endpoint);
         if (!$result['success']) {
             error_log('[adminListUsers] Fallo API Amare, usando usuarios locales: ' . ($result['error'] ?? 'Desconocido'));
             $this->adminApiOk('Usuarios locales obtenidos correctamente', [
-                'users' => $this->adminRemoteGlobalUsersOrLocal($empresaId, $search, $page, $perPage),
+                'users' => $fetchAll
+                    ? $this->adminRemoteGlobalUsersOrLocal($empresaId, $search, 1, $perPage, true)
+                    : $this->adminRemoteGlobalUsersOrLocal($empresaId, $search, $page, $perPage),
                 'pagination' => [],
                 'source' => 'local',
             ]);
@@ -2193,8 +2876,11 @@ class ApiController extends BaseController
                 'page' => $page,
                 'per_page' => $perPage,
             ]);
-            foreach (["users?{$globalQuery}", "usuarios?{$globalQuery}"] as $globalEndpoint) {
-                $globalResult = $this->callAmareApi('GET', $globalEndpoint);
+            foreach (["users", "usuarios"] as $globalEndpointBase) {
+                $globalEndpoint = "{$globalEndpointBase}?{$globalQuery}";
+                $globalResult = $fetchAll
+                    ? $this->adminFetchAllRemoteUsers($globalEndpointBase, $search, $perPage)
+                    : $this->callAmareApi('GET', $globalEndpoint);
                 if (!$globalResult['success']) {
                     continue;
                 }
@@ -2207,8 +2893,13 @@ class ApiController extends BaseController
             }
         }
         if (empty($users)) {
-            $users = $this->adminLocalListUsers($empresaId, $search, $perPage);
-            $pagination = [];
+            $users = $this->adminLocalListUsers($empresaId, $search, $fetchAll ? null : $perPage);
+            $pagination = [
+                'page' => 1,
+                'per_page' => count($users),
+                'total' => count($users),
+                'all' => $fetchAll,
+            ];
         }
 
         $this->adminApiOk('Usuarios obtenidos correctamente', [
@@ -2437,6 +3128,7 @@ class ApiController extends BaseController
         $data = $result['data'];
         // La API Amare responde { ok: true, data: { promotions: [...], pagination: {...} } }
         $promotions = $data['data']['promotions'] ?? $data['promotions'] ?? $data['data']['promociones'] ?? $data['promociones'] ?? [];
+        $promotions = $this->adminNormalizePromotionList($empresaId, is_array($promotions) ? $promotions : []);
         $pagination = $data['data']['pagination'] ?? $data['pagination'] ?? [];
 
         $this->adminApiOk('Promociones obtenidas correctamente', [
@@ -2476,6 +3168,9 @@ class ApiController extends BaseController
 
         $data = $result['data'];
         $promotion = $data['data']['promotion'] ?? $data['promotion'] ?? $data;
+        if (is_array($promotion)) {
+            $promotion = $this->adminNormalizePromotionList($empresaId, [$promotion])[0] ?? $promotion;
+        }
 
         $this->adminApiOk('Promoción obtenida correctamente', $promotion);
     }
@@ -2517,7 +3212,7 @@ class ApiController extends BaseController
             ]);
         }
 
-        $remoteBody = $body;
+        $remoteBody = $this->promotionPayloadForRemote($body);
         unset($remoteBody['usuario_ids']);
 
         $endpoint = "branches/{$branchId}/promotions";
@@ -2543,6 +3238,10 @@ class ApiController extends BaseController
 
         $data = $result['data'];
         $promotion = $data['data']['promotion'] ?? $data['promotion'] ?? $data;
+        $localPromotion = $this->adminLocalSyncPromotion($empresaId, $body, is_array($promotion) ? $promotion : []);
+        if ($localPromotion && is_array($promotion)) {
+            $promotion['local_promotion'] = $localPromotion;
+        }
 
         $this->adminApiOk('Promoción creada correctamente', $promotion);
     }
@@ -2560,10 +3259,11 @@ class ApiController extends BaseController
         $errors = $this->validatePromotionData($body, $id);
         if (!empty($errors)) { $this->adminApiError('Error de validación', 422, $errors); }
 
+        $remoteBody = $this->promotionPayloadForRemote($body);
         $endpoint = "branches/{$branchId}/promotions/{$id}";
-        $result = $this->callAmareApi('PUT', $endpoint, $body);
+        $result = $this->callAmareApi('PUT', $endpoint, $remoteBody);
         if (!$result['success'] && $this->esEndpointNoEncontrado($result)) {
-            $result = $this->callAmareApi('PUT', "branches/{$branchId}/promociones/{$id}", $body);
+            $result = $this->callAmareApi('PUT', "branches/{$branchId}/promociones/{$id}", $remoteBody);
         }
         if (!$result['success'] && $this->esEndpointNoEncontrado($result)) {
             $promotion = $this->adminLocalUpdatePromotion($id, $empresaId, $body);
@@ -2589,6 +3289,10 @@ class ApiController extends BaseController
 
         $data = $result['data'];
         $promotion = $data['data']['promotion'] ?? $data['promotion'] ?? $data;
+        $localPromotion = $this->adminLocalSyncPromotion($empresaId, ['id' => $id] + $body, is_array($promotion) ? $promotion : []);
+        if ($localPromotion && is_array($promotion)) {
+            $promotion['local_promotion'] = $localPromotion;
+        }
 
         $this->adminApiOk('Promoción actualizada correctamente', $promotion);
     }
@@ -2649,13 +3353,18 @@ class ApiController extends BaseController
                 null,
                 'no_push_token'
             );
-            $this->adminApiError('El usuario no tiene token push activo.', 422);
+            $this->adminApiOk('El usuario no tiene token push activo.', [
+                'promotion' => $promotion,
+                'notification' => $this->adminLatestPromotionNotificationLog($id),
+                'notification_summary' => $this->adminPromotionNotificationSummary($id, 'skipped', 'no_push_token'),
+            ]);
         }
 
-        $this->adminSendPromotionNotification($promotion, $promotion);
+        $notification = $this->adminSendPromotionNotification($promotion, $promotion);
         $this->adminApiOk('Notificación enviada o registrada para revisión.', [
             'promotion' => $this->adminLocalGetPromotion($id, $empresaId),
-            'notification' => $this->adminLatestPromotionNotificationLog($id),
+            'notification' => $notification['log'] ?? $this->adminLatestPromotionNotificationLog($id),
+            'notification_summary' => $notification,
         ]);
     }
 
@@ -2765,6 +3474,37 @@ class ApiController extends BaseController
         return $body;
     }
 
+    private function promotionPayloadForRemote(array $body): array
+    {
+        $normalized = $this->normalizePromotionRuleArray($body);
+        $scopeIds = $normalized['scope_ids_array'] ?? [];
+        $payload = $body;
+
+        $payload['tipo_descuento'] = $normalized['tipo_descuento'];
+        $payload['tipo'] = $normalized['tipo_descuento'];
+        $payload['discount_type'] = $normalized['tipo_descuento'];
+        $payload['valor_descuento'] = $normalized['valor_descuento'];
+        $payload['discount_value'] = $normalized['valor_descuento'];
+        $payload['discount'] = $normalized['valor_descuento'];
+        $payload['descuento'] = $normalized['valor_descuento'];
+        $payload['valor'] = $normalized['valor_descuento'];
+        $payload['discount_percent'] = $normalized['tipo_descuento'] === 'porcentaje' ? $normalized['valor_descuento'] : 0;
+        $payload['porcentaje_descuento'] = $normalized['tipo_descuento'] === 'porcentaje' ? $normalized['valor_descuento'] : 0;
+        $payload['scope_tipo'] = $normalized['scope_tipo'];
+        $payload['scope_type'] = $normalized['scope_tipo'];
+        $payload['scope_ids'] = $scopeIds;
+        $payload['producto_ids'] = $normalized['scope_tipo'] === 'products' ? $scopeIds : [];
+        $payload['categoria_ids'] = $normalized['scope_tipo'] === 'categories' ? $scopeIds : [];
+        $payload['min_subtotal'] = $normalized['min_subtotal'];
+        $payload['minimum_subtotal'] = $normalized['min_subtotal'];
+        $payload['buy_qty'] = $normalized['buy_qty'];
+        $payload['pay_qty'] = $normalized['pay_qty'];
+        $payload['max_uses'] = $normalized['max_uses'];
+        $payload['combinable'] = $normalized['combinable'];
+
+        return $payload;
+    }
+
     private function normalizePromotionDiscountType(string $type): string
     {
         $type = strtolower(trim($type));
@@ -2773,6 +3513,9 @@ class ApiController extends BaseController
             'percent' => 'porcentaje',
             'fixed' => 'monto_fijo',
             'amount' => 'monto_fijo',
+            'fixed_amount' => 'monto_fijo',
+            'monto' => 'monto_fijo',
+            'paquete' => 'bxgy',
             '2x1' => 'bxgy',
             '3x2' => 'bxgy',
             'buy_x_pay_y' => 'bxgy',
@@ -2935,25 +3678,28 @@ class ApiController extends BaseController
             || str_contains($message, 'not found');
     }
 
-    private function adminLocalListUsers(int $empresaId, string $search = '', int $limit = 50): array
+    private function adminLocalListUsers(int $empresaId, string $search = '', ?int $limit = 50): array
     {
         $db = Database::getInstance();
-        $limit = min(100, max(1, $limit));
+        $limit = $limit === null ? null : min(5000, max(1, $limit));
+
+        foreach (['mobile_usuarios', 'app_clientes', 'app_usuarios'] as $table) {
+            $users = $this->adminLocalListUsersFromTable($table, $search, $limit);
+            if (!empty($users)) {
+                return $users;
+            }
+        }
 
         if ($this->adminTableExists('mobile_usuarios')) {
             $nameCol = $this->adminFirstExistingColumn('mobile_usuarios', ['nombre', 'nombre_completo', 'name', 'full_name']);
             $emailCol = $this->adminFirstExistingColumn('mobile_usuarios', ['email', 'correo']);
             $phoneCol = $this->adminFirstExistingColumn('mobile_usuarios', ['telefono', 'celular', 'phone', 'mobile', 'whatsapp']);
             $activeCol = $this->adminFirstExistingColumn('mobile_usuarios', ['activo', 'active', 'is_active']);
-            $roleCol = $this->adminFirstExistingColumn('mobile_usuarios', ['rol', 'role']);
 
             $where = [];
             $params = [];
             if ($activeCol) {
                 $where[] = "COALESCE(mu.`{$activeCol}`, 1) = 1";
-            }
-            if ($roleCol) {
-                $where[] = "(mu.`{$roleCol}` IS NULL OR mu.`{$roleCol}` NOT IN ('admin', 'staff', 'mesero', 'chef', 'owner'))";
             }
             if ($search !== '') {
                 $parts = [];
@@ -2973,6 +3719,7 @@ class ApiController extends BaseController
             $emailExpr = $emailCol ? "mu.`{$emailCol}`" : "''";
             $phoneExpr = $phoneCol ? "mu.`{$phoneCol}`" : "''";
 
+            $limitSql = $limit === null ? '' : " LIMIT {$limit}";
             $stmt = $db->prepare(
                 "SELECT mu.id,
                         {$nombreExpr} AS nombre,
@@ -2983,7 +3730,7 @@ class ApiController extends BaseController
                    FROM mobile_usuarios mu
                    {$whereSql}
                   ORDER BY mu.id DESC
-                  LIMIT {$limit}"
+                  {$limitSql}"
             );
             $stmt->execute($params);
             $users = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
@@ -2995,7 +3742,95 @@ class ApiController extends BaseController
         return $this->adminLocalUsersFromPushTokens($search, $limit);
     }
 
-    private function adminLocalUsersFromPushTokens(string $search = '', int $limit = 50): array
+    private function adminLocalListUsersFromTable(string $table, string $search = '', ?int $limit = 50): array
+    {
+        if (!preg_match('/^[a-zA-Z0-9_]+$/', $table)) {
+            return [];
+        }
+
+        try {
+            $db = Database::getInstance();
+            $db->query("SELECT 1 FROM `{$table}` LIMIT 0");
+
+            $knownColumns = [
+                'mobile_usuarios' => [
+                    'name' => 'nombre',
+                    'email' => 'email',
+                    'phone' => 'telefono',
+                    'active' => 'activo',
+                ],
+            ];
+            $known = $knownColumns[$table] ?? null;
+
+            $nameCol = $known['name'] ?? $this->adminFirstExistingColumn($table, ['nombre', 'nombre_completo', 'name', 'full_name']);
+            $emailCol = $known['email'] ?? $this->adminFirstExistingColumn($table, ['email', 'correo']);
+            $phoneCol = $known['phone'] ?? $this->adminFirstExistingColumn($table, ['telefono', 'celular', 'phone', 'mobile', 'whatsapp']);
+            $activeCol = $known['active'] ?? null;
+
+            if (!$nameCol && !$emailCol && !$phoneCol) {
+                error_log("[adminLocalListUsersFromTable] Tabla {$table} existe, pero no tiene columnas reconocidas de usuario.");
+                return [];
+            }
+
+            $where = [];
+            $params = [];
+            if ($activeCol) {
+                $where[] = "COALESCE(u.`{$activeCol}`, 1) = 1";
+            }
+            if ($search !== '') {
+                $parts = [];
+                foreach ([$nameCol, $emailCol, $phoneCol] as $column) {
+                    if ($column) {
+                        $parts[] = "u.`{$column}` LIKE ?";
+                        $params[] = '%' . $search . '%';
+                    }
+                }
+                if ($parts) {
+                    $where[] = '(' . implode(' OR ', $parts) . ')';
+                }
+            }
+
+            $whereSql = $where ? 'WHERE ' . implode(' AND ', $where) : '';
+            $nombreExpr = $nameCol ? "u.`{$nameCol}`" : "CONCAT('Usuario ', u.id)";
+            $emailExpr = $emailCol ? "u.`{$emailCol}`" : "''";
+            $phoneExpr = $phoneCol ? "u.`{$phoneCol}`" : "''";
+            $limitSql = $limit === null ? '' : " LIMIT " . min(5000, max(1, $limit));
+
+            $stmt = $db->prepare(
+                "SELECT u.id,
+                        {$nombreExpr} AS nombre,
+                        {$nombreExpr} AS name,
+                        {$emailExpr} AS email,
+                        {$phoneExpr} AS telefono,
+                        {$phoneExpr} AS phone
+                   FROM `{$table}` u
+                   {$whereSql}
+                  ORDER BY u.id DESC
+                  {$limitSql}"
+            );
+            $stmt->execute($params);
+            $users = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            error_log("[adminLocalListUsersFromTable] Tabla {$table} devolvio " . count($users) . " usuarios.");
+
+            return array_map(static function (array $user): array {
+                $id = (int)($user['id'] ?? 0);
+                $nombre = trim((string)($user['nombre'] ?? $user['name'] ?? ''));
+                return [
+                    'id' => $id,
+                    'nombre' => $nombre !== '' ? $nombre : "Usuario {$id}",
+                    'name' => $nombre !== '' ? $nombre : "Usuario {$id}",
+                    'email' => trim((string)($user['email'] ?? '')),
+                    'telefono' => trim((string)($user['telefono'] ?? $user['phone'] ?? '')),
+                    'phone' => trim((string)($user['phone'] ?? $user['telefono'] ?? '')),
+                ];
+            }, $users);
+        } catch (\Throwable $e) {
+            error_log("[adminLocalListUsersFromTable] No se pudo leer {$table}: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    private function adminLocalUsersFromPushTokens(string $search = '', ?int $limit = 50): array
     {
         $table = $this->adminFindTableByColumns(
             ['usuario_id', 'fcm_token'],
@@ -3019,13 +3854,14 @@ class ApiController extends BaseController
         $whereSql = $where ? 'WHERE ' . implode(' AND ', $where) : '';
         $orderSql = $lastSeenCol ? "MAX(pt.`{$lastSeenCol}`) DESC, " : '';
 
+        $limitSql = $limit === null ? '' : " LIMIT " . min(5000, max(1, $limit));
         $stmt = $db->prepare(
             "SELECT pt.usuario_id AS id
                FROM `{$table}` pt
                {$whereSql}
               GROUP BY pt.usuario_id
               ORDER BY {$orderSql} pt.usuario_id DESC
-              LIMIT {$limit}"
+              {$limitSql}"
         );
         $stmt->execute();
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
@@ -3185,7 +4021,7 @@ class ApiController extends BaseController
         }
 
         error_log('[adminLocalUsersFromPushTokens] Tabla ' . $table . ' devolvio ' . count($users) . ' usuarios.');
-        return array_slice($users, 0, $limit);
+        return $limit === null ? $users : array_slice($users, 0, $limit);
     }
 
     private function adminFindTableByColumns(array $requiredColumns, array $preferredTables = []): ?string
@@ -3218,28 +4054,94 @@ class ApiController extends BaseController
 
         try {
             $db = Database::getInstance();
-            $placeholders = implode(', ', array_fill(0, count($requiredColumns), '?'));
-            $stmt = $db->prepare(
-                "SELECT table_name
-                   FROM information_schema.columns
-                  WHERE table_schema = DATABASE()
-                    AND column_name IN ({$placeholders})
-                  GROUP BY table_name
-                 HAVING COUNT(DISTINCT column_name) = ?
-                  ORDER BY table_name ASC
-                  LIMIT 1"
-            );
-            $params = $requiredColumns;
-            $params[] = count($requiredColumns);
-            $stmt->execute($params);
-            $table = $stmt->fetchColumn();
-            return $table ? (string)$table : null;
+            $tables = $db->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN) ?: [];
+            foreach ($tables as $table) {
+                $table = (string)$table;
+                if (!preg_match('/^[a-zA-Z0-9_]+$/', $table)) {
+                    continue;
+                }
+                $allPresent = true;
+                foreach ($requiredColumns as $column) {
+                    if (!$this->adminColumnExists($table, $column)) {
+                        $allPresent = false;
+                        break;
+                    }
+                }
+                if ($allPresent) {
+                    return $table;
+                }
+            }
+            return null;
         } catch (\Throwable $e) {
             return null;
         }
     }
 
-    private function adminRemoteGlobalUsersOrLocal(int $empresaId, string $search, int $page, int $perPage): array
+    private function adminFetchAllRemoteUsers(string $endpointBase, string $search, int $perPage = 500): array
+    {
+        $perPage = min(5000, max(1, $perPage));
+        $usersByKey = [];
+        $pagination = [];
+        $maxPages = 200;
+
+        for ($page = 1; $page <= $maxPages; $page++) {
+            $query = http_build_query([
+                'search' => $search,
+                'page' => $page,
+                'per_page' => $perPage,
+            ]);
+            $result = $this->callAmareApi('GET', "{$endpointBase}?{$query}");
+            if (!$result['success']) {
+                return $page === 1
+                    ? $result
+                    : ['success' => true, 'data' => ['users' => array_values($usersByKey), 'pagination' => $pagination]];
+            }
+
+            $data = $result['data'];
+            $users = $data['data']['users'] ?? $data['users'] ?? $data['data']['usuarios'] ?? $data['usuarios'] ?? [];
+            $pagination = $data['data']['pagination'] ?? $data['pagination'] ?? $pagination;
+            if (empty($users)) {
+                break;
+            }
+
+            $before = count($usersByKey);
+            foreach ($users as $user) {
+                if (!is_array($user)) {
+                    continue;
+                }
+                $key = (string)($user['id'] ?? $user['usuario_id'] ?? $user['email'] ?? $user['correo'] ?? $user['telefono'] ?? $user['phone'] ?? '');
+                if ($key === '') {
+                    $key = 'row_' . $page . '_' . count($usersByKey);
+                }
+                $usersByKey[$key] = $user;
+            }
+
+            $totalPages = (int)($pagination['total_pages'] ?? $pagination['last_page'] ?? $pagination['pages'] ?? 0);
+            if ($totalPages <= 0) {
+                $total = (int)($pagination['total'] ?? 0);
+                $pageSize = (int)($pagination['per_page'] ?? $pagination['limit'] ?? count($users));
+                $totalPages = $total > 0 && $pageSize > 0 ? (int)ceil($total / $pageSize) : 0;
+            }
+            if (count($usersByKey) === $before || ($totalPages > 0 ? $page >= $totalPages : count($users) < $perPage)) {
+                break;
+            }
+        }
+
+        return [
+            'success' => true,
+            'data' => [
+                'users' => array_values($usersByKey),
+                'pagination' => array_merge($pagination, [
+                    'page' => 1,
+                    'per_page' => count($usersByKey),
+                    'total' => count($usersByKey),
+                    'all' => true,
+                ]),
+            ],
+        ];
+    }
+
+    private function adminRemoteGlobalUsersOrLocal(int $empresaId, string $search, int $page, int $perPage, bool $fetchAll = false): array
     {
         $query = http_build_query([
             'search' => $search,
@@ -3247,8 +4149,11 @@ class ApiController extends BaseController
             'per_page' => $perPage,
         ]);
 
-        foreach (["users?{$query}", "usuarios?{$query}"] as $endpoint) {
-            $result = $this->callAmareApi('GET', $endpoint);
+        foreach (["users", "usuarios"] as $endpointBase) {
+            $endpoint = "{$endpointBase}?{$query}";
+            $result = $fetchAll
+                ? $this->adminFetchAllRemoteUsers($endpointBase, $search, $perPage)
+                : $this->callAmareApi('GET', $endpoint);
             if (!$result['success']) {
                 continue;
             }
@@ -3259,7 +4164,7 @@ class ApiController extends BaseController
             }
         }
 
-        return $this->adminLocalListUsers($empresaId, $search, $perPage);
+        return $this->adminLocalListUsers($empresaId, $search, $fetchAll ? null : $perPage);
     }
 
     private function adminPromotionCatalog(array $jwtUser): void
@@ -3316,6 +4221,44 @@ class ApiController extends BaseController
         ]);
     }
 
+    private function adminNormalizePromotionList(int $empresaId, array $promotions): array
+    {
+        $localById = [];
+        $localByCode = [];
+        if ($this->adminTableExists('mobile_promociones')) {
+            foreach ($this->adminLocalListPromotions($empresaId) as $local) {
+                $localById[(int)($local['id'] ?? 0)] = $local;
+                $code = trim((string)($local['code'] ?? ''));
+                if ($code !== '') {
+                    $localByCode[strtoupper($code)] = $local;
+                }
+            }
+        }
+
+        $normalized = [];
+        foreach ($promotions as $promotion) {
+            if (!is_array($promotion)) {
+                continue;
+            }
+            $id = (int)($promotion['id'] ?? 0);
+            $code = strtoupper(trim((string)($promotion['code'] ?? '')));
+            $local = $localById[$id] ?? ($code !== '' ? ($localByCode[$code] ?? []) : []);
+            $row = $this->normalizePromotionRuleArray(array_merge($local, $promotion));
+            if (!empty($row['usuario_id']) && !empty($row['code'])) {
+                $synced = $this->adminLocalSyncPromotion($empresaId, $row, $promotion);
+                if ($synced) {
+                    $row = $this->normalizePromotionRuleArray(array_merge($row, $synced));
+                }
+            }
+            $row['scope_ids'] = $row['scope_ids_array'] ?? [];
+            $row['producto_ids'] = $row['scope_tipo'] === 'products' ? $row['scope_ids'] : [];
+            $row['categoria_ids'] = $row['scope_tipo'] === 'categories' ? $row['scope_ids'] : [];
+            $normalized[] = $row;
+        }
+
+        return $normalized;
+    }
+
     private function adminLocalListPromotions(int $empresaId): array
     {
         $db = Database::getInstance();
@@ -3337,7 +4280,7 @@ class ApiController extends BaseController
                 $usuarioEmail = $emailCol ? "mu.`{$emailCol}` AS usuario_email" : $usuarioEmail;
                 $join = ' LEFT JOIN mobile_usuarios mu ON mu.id = mp.usuario_id';
             }
-            if ($this->adminTableExists('mobile_notification_logs')) {
+            if ($this->adminEnsureMobileNotificationLogsTable()) {
                 $notificationJoin = " LEFT JOIN (
                         SELECT n1.*
                           FROM mobile_notification_logs n1
@@ -3390,30 +4333,72 @@ class ApiController extends BaseController
             return $rows;
         }
 
-        if (!$restauranteId || !$this->adminTableExists('rest_promociones')) {
+        if (!$restauranteId || !$this->adminRestPromocionesDisponible()) {
             return [];
+        }
+
+        $notificationJoin = '';
+        $notificationStatus = "NULL AS notification_status";
+        $notificationError = "NULL AS notification_error";
+        $notificationSentAt = "NULL AS notification_sent_at";
+        if ($this->adminEnsureMobileNotificationLogsTable()) {
+            $notificationJoin = " LEFT JOIN (
+                    SELECT n1.*
+                      FROM mobile_notification_logs n1
+                      JOIN (
+                            SELECT promotion_id, MAX(id) AS id
+                              FROM mobile_notification_logs
+                             WHERE promotion_id IS NOT NULL
+                             GROUP BY promotion_id
+                           ) nx ON nx.id = n1.id
+                ) nl ON nl.promotion_id = p.id";
+            $notificationStatus = "nl.status AS notification_status";
+            $notificationError = "nl.error AS notification_error";
+            $notificationSentAt = "nl.sent_at AS notification_sent_at";
         }
 
         $stmt = $db->prepare(
             "SELECT p.id,
-                    NULL AS usuario_id,
-                    '' AS usuario_nombre,
-                    '' AS usuario_email,
+                    p.usuario_id,
+                    COALESCE(mu.nombre, '') AS usuario_nombre,
+                    COALESCE(mu.email, '') AS usuario_email,
                     p.titulo,
                     p.descripcion,
-                    '' AS imagen,
-                    '' AS deep_link,
-                    '' AS code,
+                    p.imagen,
+                    p.deep_link,
+                    p.code,
+                    p.tipo AS tipo_descuento,
+                    p.valor_descuento,
+                    'all' AS scope_tipo,
+                    NULL AS scope_ids,
+                    NULL AS buy_qty,
+                    NULL AS pay_qty,
+                    0 AS min_subtotal,
+                    NULL AS max_uses,
+                    0 AS combinable,
                     p.activo,
-                    CONCAT(p.fecha_fin, ' 23:59:59') AS expires_at,
-                    p.created_at
+                    COALESCE(p.expires_at, CONCAT(p.fecha_fin, ' 23:59:59')) AS expires_at,
+                    p.created_at,
+                    {$notificationStatus},
+                    {$notificationError},
+                    {$notificationSentAt}
                FROM rest_promociones p
+               LEFT JOIN mobile_usuarios mu ON mu.id = p.usuario_id
+               {$notificationJoin}
               WHERE p.restaurante_id = ?
               ORDER BY p.id DESC
               LIMIT 100"
         );
         $stmt->execute([$restauranteId]);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        foreach ($rows as &$row) {
+            $tokens = $this->adminPromotionPushTokens((int)($row['usuario_id'] ?? 0));
+            $row['push_token_count'] = count($tokens);
+            $row['has_push_token'] = !empty($tokens) ? 1 : 0;
+        }
+        unset($row);
+
+        return $rows;
     }
 
     private function adminLocalGetPromotion(int $id, int $empresaId): ?array
@@ -3437,6 +4422,40 @@ class ApiController extends BaseController
         $expiresAt = $body['expires_at'] ?? null;
         if (!$expiresAt) {
             $expiresAt = date('Y-m-d H:i:s', strtotime('+30 days'));
+        }
+
+        if ($restauranteId && $this->adminRestPromocionesDisponible()) {
+            $tipo = $this->normalizePromotionDiscountType((string)($body['tipo_descuento'] ?? $body['tipo'] ?? 'porcentaje'));
+            if (!in_array($tipo, ['porcentaje', 'monto_fijo'], true)) {
+                $tipo = 'porcentaje';
+            }
+            $stmt = $db->prepare(
+                "INSERT INTO rest_promociones
+                    (restaurante_id, usuario_id, titulo, descripcion, code, tipo, valor_descuento, fecha_inicio, fecha_fin, activo, expires_at, imagen, deep_link)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            );
+            $stmt->execute([
+                $restauranteId,
+                (int)($body['usuario_id'] ?? 0) ?: null,
+                (string)($body['titulo'] ?? ''),
+                (string)($body['descripcion'] ?? ''),
+                $code,
+                $tipo,
+                (float)($body['valor_descuento'] ?? 0),
+                date('Y-m-d'),
+                substr((string)$expiresAt, 0, 10),
+                isset($body['activo']) ? (int)$body['activo'] : 1,
+                $expiresAt,
+                (string)($body['imagen'] ?? ''),
+                $this->adminPromotionDeepLink($code),
+            ]);
+            $promotionId = (int)$db->lastInsertId();
+            $promotion = $this->adminLocalGetPromotion($promotionId, $empresaId) ?? ['id' => $promotionId];
+            $notification = $this->adminSendPromotionNotification($promotion, $body);
+            $promotion = $this->adminLocalGetPromotion($promotionId, $empresaId) ?? $promotion;
+            $promotion['notification_summary'] = $notification;
+            $promotion['notification'] = $notification['log'] ?? null;
+            return $promotion;
         }
 
         $this->adminEnsureMobilePromocionesTable();
@@ -3465,11 +4484,14 @@ class ApiController extends BaseController
             $this->adminInsertExistingColumns('mobile_promociones', $values);
             $promotionId = (int)$db->lastInsertId();
             $promotion = $this->adminLocalGetPromotion($promotionId, $empresaId) ?? ['id' => $promotionId] + $values;
-            $this->adminSendPromotionNotification($promotion, $body);
-            return $this->adminLocalGetPromotion($promotionId, $empresaId) ?? $promotion;
+            $notification = $this->adminSendPromotionNotification($promotion, $body);
+            $promotion = $this->adminLocalGetPromotion($promotionId, $empresaId) ?? $promotion;
+            $promotion['notification_summary'] = $notification;
+            $promotion['notification'] = $notification['log'] ?? null;
+            return $promotion;
         }
 
-        if (!$restauranteId || !$this->adminTableExists('rest_promociones')) {
+        if (!$restauranteId || !$this->adminRestPromocionesDisponible()) {
             $this->adminApiError('No existe tabla local para guardar promociones.', 500);
         }
 
@@ -3487,8 +4509,85 @@ class ApiController extends BaseController
         ]);
         $promotionId = (int)$db->lastInsertId();
         $promotion = $this->adminLocalGetPromotion($promotionId, $empresaId) ?? ['id' => $promotionId];
-        $this->adminSendPromotionNotification($promotion, $body);
+        $notification = $this->adminSendPromotionNotification($promotion, $body);
+        $promotion['notification_summary'] = $notification;
+        $promotion['notification'] = $notification['log'] ?? null;
         return $promotion;
+    }
+
+    private function adminLocalSyncPromotion(int $empresaId, array $body, array $remotePromotion = []): ?array
+    {
+        if (!$this->adminEnsureMobilePromocionesTable() || !$this->adminTableExists('mobile_promociones')) {
+            return null;
+        }
+
+        $db = Database::getInstance();
+        $merged = array_merge($remotePromotion, $body);
+        $merged = $this->normalizePromotionRuleArray($merged);
+        $scopeIds = $merged['scope_ids_array'] ?? [];
+        $usuarioId = (int)($merged['usuario_id'] ?? $merged['mobile_usuario_id'] ?? $body['usuario_id'] ?? 0);
+        if ($usuarioId <= 0) {
+            return null;
+        }
+
+        $code = trim((string)($merged['code'] ?? $body['code'] ?? ''));
+        if ($code === '') {
+            return null;
+        }
+
+        $productoId = (int)($merged['producto_id'] ?? $merged['platillo_id'] ?? 0);
+        if ($productoId <= 0 && $merged['scope_tipo'] === 'products' && $scopeIds) {
+            $productoId = (int)$scopeIds[0];
+        }
+
+        $preferredId = (int)($body['id'] ?? $remotePromotion['id'] ?? $merged['id'] ?? 0);
+        $existingId = 0;
+        if ($preferredId > 0) {
+            $stmt = $db->prepare("SELECT id FROM mobile_promociones WHERE id = ? LIMIT 1");
+            $stmt->execute([$preferredId]);
+            $existingId = (int)($stmt->fetchColumn() ?: 0);
+        }
+        if ($existingId <= 0) {
+            $stmt = $db->prepare("SELECT id FROM mobile_promociones WHERE usuario_id = ? AND code = ? ORDER BY id DESC LIMIT 1");
+            $stmt->execute([$usuarioId, $code]);
+            $existingId = (int)($stmt->fetchColumn() ?: 0);
+        }
+
+        $values = [
+            'usuario_id' => $usuarioId,
+            'producto_id' => $productoId > 0 ? $productoId : null,
+            'platillo_id' => $productoId > 0 ? $productoId : null,
+            'titulo' => (string)($merged['titulo'] ?? $merged['title'] ?? ''),
+            'descripcion' => (string)($merged['descripcion'] ?? $merged['description'] ?? ''),
+            'imagen' => (string)($merged['imagen'] ?? $merged['image'] ?? ''),
+            'deep_link' => $this->adminPromotionDeepLink($code),
+            'code' => $code,
+            'tipo_descuento' => $merged['tipo_descuento'],
+            'valor_descuento' => (float)$merged['valor_descuento'],
+            'scope_tipo' => $merged['scope_tipo'],
+            'scope_ids' => $scopeIds ? json_encode($scopeIds) : null,
+            'buy_qty' => $merged['buy_qty'],
+            'pay_qty' => $merged['pay_qty'],
+            'min_subtotal' => (float)$merged['min_subtotal'],
+            'max_uses' => $merged['max_uses'],
+            'combinable' => (int)$merged['combinable'],
+            'activo' => isset($merged['activo']) ? (int)$merged['activo'] : 1,
+            'expires_at' => $merged['expires_at'] ?? null,
+            'updated_at' => date('Y-m-d H:i:s'),
+        ];
+
+        if ($existingId > 0) {
+            $this->adminUpdateExistingColumns('mobile_promociones', $existingId, $values);
+            return $this->adminLocalGetPromotion($existingId, $empresaId);
+        }
+
+        if ($preferredId > 0) {
+            $values = ['id' => $preferredId] + $values;
+        }
+        $values['created_at'] = date('Y-m-d H:i:s');
+        $this->adminInsertExistingColumns('mobile_promociones', $values);
+        $newId = $preferredId > 0 ? $preferredId : (int)$db->lastInsertId();
+        return $this->adminLocalGetPromotion($newId, $empresaId);
     }
 
     private function adminPromotionDeepLink(string $code): string
@@ -3584,6 +4683,13 @@ class ApiController extends BaseController
 
     private function adminEnsureMobileNotificationLogsTable(): bool
     {
+        try {
+            Database::getInstance()->query("SELECT 1 FROM `mobile_notification_logs` LIMIT 0");
+            return true;
+        } catch (\Throwable $e) {
+            // Si no se puede leer, intentamos crearla por compatibilidad con instalaciones viejas.
+        }
+
         if ($this->adminTableExists('mobile_notification_logs')) {
             return true;
         }
@@ -3619,7 +4725,7 @@ class ApiController extends BaseController
         }
     }
 
-    private function adminSendPromotionNotification(array $promotion, array $body): void
+    private function adminSendPromotionNotification(array $promotion, array $body): array
     {
         $promotionId = (int)($promotion['id'] ?? 0);
         $usuarioId = (int)($promotion['usuario_id'] ?? $body['usuario_id'] ?? 0);
@@ -3638,18 +4744,24 @@ class ApiController extends BaseController
 
         if ($usuarioId <= 0) {
             $this->adminLogPromotionNotification($promotionId, 0, null, null, 'skipped', $title, $message, null, 'missing_usuario_id');
-            return;
+            return $this->adminPromotionNotificationSummary($promotionId, 'skipped', 'missing_usuario_id');
         }
         if ($activo !== 1) {
             $this->adminLogPromotionNotification($promotionId, $usuarioId, null, null, 'skipped', $title, $message, null, 'inactive_promotion');
-            return;
+            return $this->adminPromotionNotificationSummary($promotionId, 'skipped', 'inactive_promotion');
         }
 
         $tokens = $this->adminPromotionPushTokens($usuarioId);
         if (empty($tokens)) {
             $this->adminLogPromotionNotification($promotionId, $usuarioId, null, null, 'skipped', $title, $message, null, 'no_push_token');
-            return;
+            return $this->adminPromotionNotificationSummary($promotionId, 'skipped', 'no_push_token');
         }
+
+        $sent = 0;
+        $failed = 0;
+        $skipped = 0;
+        $invalidated = 0;
+        $lastError = null;
 
         if (!$this->adminCanSendFcm()) {
             foreach ($tokens as $tokenRow) {
@@ -3664,14 +4776,16 @@ class ApiController extends BaseController
                     null,
                     'missing_fcm_config'
                 );
+                $skipped++;
             }
             error_log('[adminSendPromotionNotification] Falta configurar Firebase HTTP v1 o FCM legacy.');
-            return;
+            return $this->adminPromotionNotificationSummary($promotionId, 'skipped', 'missing_fcm_config', $sent, $failed, $skipped, $invalidated);
         }
 
         foreach ($tokens as $tokenRow) {
             $token = trim((string)($tokenRow['token'] ?? ''));
             if ($token === '') {
+                $skipped++;
                 continue;
             }
 
@@ -3728,18 +4842,11 @@ class ApiController extends BaseController
                         . ' response=' . substr((string)($result['body'] ?? ''), 0, 900));
                 }
 
-                $this->adminLogPromotionNotification(
-                    $promotionId,
-                    $usuarioId,
-                    (int)($tokenRow['id'] ?? 0) ?: null,
-                    $token,
-                    $status,
-                    $title,
-                    $message,
-                    $result['body'] ?? '',
-                    $error
-                );
+                $logStatus = $status;
                 if ($status === 'failed' && $this->adminFcmTokenIsInvalid($error)) {
+                    $logStatus = 'skipped';
+                    $error = 'invalid_push_token';
+                    $invalidated++;
                     $this->adminDisablePromotionPushToken(
                         (string)($tokenRow['_table'] ?? ''),
                         (int)($tokenRow['id'] ?? 0),
@@ -3747,6 +4854,26 @@ class ApiController extends BaseController
                         $token
                     );
                 }
+
+                $this->adminLogPromotionNotification(
+                    $promotionId,
+                    $usuarioId,
+                    (int)($tokenRow['id'] ?? 0) ?: null,
+                    $token,
+                    $logStatus,
+                    $title,
+                    $message,
+                    $result['body'] ?? '',
+                    $error
+                );
+                if ($logStatus === 'sent') {
+                    $sent++;
+                } elseif ($logStatus === 'skipped') {
+                    $skipped++;
+                } else {
+                    $failed++;
+                }
+                $lastError = $error;
             } catch (\Throwable $e) {
                 $this->adminLogPromotionNotification(
                     $promotionId,
@@ -3759,9 +4886,42 @@ class ApiController extends BaseController
                     null,
                     $e->getMessage()
                 );
+                $failed++;
+                $lastError = $e->getMessage();
                 error_log('[adminSendPromotionNotification] Error FCM: ' . $e->getMessage());
             }
         }
+
+        if ($sent > 0) {
+            return $this->adminPromotionNotificationSummary($promotionId, 'sent', null, $sent, $failed, $skipped, $invalidated);
+        }
+        if ($invalidated > 0 && $failed === 0) {
+            return $this->adminPromotionNotificationSummary($promotionId, 'skipped', 'invalid_push_token', $sent, $failed, $skipped, $invalidated);
+        }
+        if ($failed > 0) {
+            return $this->adminPromotionNotificationSummary($promotionId, 'failed', $lastError, $sent, $failed, $skipped, $invalidated);
+        }
+        return $this->adminPromotionNotificationSummary($promotionId, 'skipped', 'no_deliverable_push_token', $sent, $failed, $skipped, $invalidated);
+    }
+
+    private function adminPromotionNotificationSummary(
+        int $promotionId,
+        string $status,
+        ?string $error = null,
+        int $sent = 0,
+        int $failed = 0,
+        int $skipped = 0,
+        int $invalidated = 0
+    ): array {
+        return [
+            'status' => $status,
+            'error' => $error,
+            'sent' => $sent,
+            'failed' => $failed,
+            'skipped' => $skipped,
+            'invalidated_tokens' => $invalidated,
+            'log' => $this->adminLatestPromotionNotificationLog($promotionId),
+        ];
     }
 
     private function adminPromotionPushTokens(int $usuarioId): array
@@ -3799,6 +4959,25 @@ class ApiController extends BaseController
         );
         $stmt->execute([$usuarioId]);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        if (empty($rows)) {
+            try {
+                $totalStmt = $db->prepare(
+                    "SELECT COUNT(*)
+                       FROM `{$table}`
+                      WHERE usuario_id = ?
+                        AND fcm_token <> ''"
+                );
+                $totalStmt->execute([$usuarioId]);
+                $totalTokens = (int)$totalStmt->fetchColumn();
+                if ($totalTokens > 0 && $enabledCol) {
+                    error_log('[adminPromotionPushTokens] Usuario ' . $usuarioId . ' tiene tokens push, pero ninguno activo.');
+                } else {
+                    error_log('[adminPromotionPushTokens] Usuario ' . $usuarioId . ' no tiene tokens push registrados.');
+                }
+            } catch (\Throwable $e) {
+                error_log('[adminPromotionPushTokens] No se pudo diagnosticar tokens usuario=' . $usuarioId . ': ' . $e->getMessage());
+            }
+        }
         foreach ($rows as &$row) {
             $row['_table'] = $table;
         }
@@ -4218,33 +5397,78 @@ class ApiController extends BaseController
         ?string $error
     ): void {
         if (!$this->adminEnsureMobileNotificationLogsTable()) {
-            error_log('[adminLogPromotionNotification] No se pudo registrar notificacion: ' . ($error ?? $status));
-            return;
+            try {
+                $this->adminInsertPromotionNotificationLog($promotionId, $usuarioId, $tokenId, $token, $status, $title, $body, $response, $error);
+                return;
+            } catch (\Throwable $e) {
+                error_log('[adminLogPromotionNotification] No se pudo registrar notificacion: ' . ($error ?? $status) . ' detalle=' . $e->getMessage());
+                return;
+            }
         }
 
         try {
-            $this->adminInsertExistingColumns('mobile_notification_logs', [
-                'promotion_id' => $promotionId > 0 ? $promotionId : null,
-                'usuario_id' => $usuarioId,
-                'fcm_token_id' => $tokenId,
-                'fcm_token' => $token,
-                'provider' => 'fcm',
-                'status' => $status,
-                'title' => $title,
-                'body' => $body,
-                'response' => $response,
-                'error' => $error,
-                'sent_at' => $status === 'sent' ? date('Y-m-d H:i:s') : null,
-                'created_at' => date('Y-m-d H:i:s'),
-            ]);
+            $this->adminInsertPromotionNotificationLog($promotionId, $usuarioId, $tokenId, $token, $status, $title, $body, $response, $error);
         } catch (\Throwable $e) {
             error_log('[adminLogPromotionNotification] No se pudo guardar log de notificacion: ' . $e->getMessage());
         }
     }
 
+    private function adminInsertPromotionNotificationLog(
+        int $promotionId,
+        int $usuarioId,
+        ?int $tokenId,
+        ?string $token,
+        string $status,
+        string $title,
+        string $body,
+        ?string $response,
+        ?string $error
+    ): void {
+        $sentAt = $status === 'sent' ? date('Y-m-d H:i:s') : null;
+        $createdAt = date('Y-m-d H:i:s');
+        $values = [
+            'promotion_id' => $promotionId > 0 ? $promotionId : null,
+            'usuario_id' => $usuarioId,
+            'fcm_token_id' => $tokenId,
+            'fcm_token' => $token,
+            'provider' => 'fcm',
+            'status' => $status,
+            'title' => $title,
+            'body' => $body,
+            'response' => $response,
+            'error' => $error,
+            'sent_at' => $sentAt,
+            'created_at' => $createdAt,
+        ];
+
+        try {
+            $this->adminInsertExistingColumns('mobile_notification_logs', $values);
+            return;
+        } catch (\Throwable $flexibleError) {
+            $stmt = Database::getInstance()->prepare(
+                "INSERT INTO mobile_notification_logs
+                    (promotion_id, usuario_id, fcm_token_id, fcm_token, provider, status, title, body, response, error, sent_at, created_at)
+                 VALUES (?, ?, ?, ?, 'fcm', ?, ?, ?, ?, ?, ?, ?)"
+            );
+            $stmt->execute([
+                $values['promotion_id'],
+                $usuarioId,
+                $tokenId,
+                $token,
+                $status,
+                $title,
+                $body,
+                $response,
+                $error,
+                $sentAt,
+                $createdAt,
+            ]);
+        }
+    }
+
     private function adminLatestPromotionNotificationLog(int $promotionId): ?array
     {
-        if ($promotionId <= 0 || !$this->adminTableExists('mobile_notification_logs')) {
+        if ($promotionId <= 0 || !$this->adminEnsureMobileNotificationLogsTable()) {
             return null;
         }
 
@@ -4288,25 +5512,45 @@ class ApiController extends BaseController
         }
 
         $restauranteId = $this->adminRestauranteIdByEmpresa($empresaId);
-        if (!$restauranteId || !$this->adminTableExists('rest_promociones')) {
+        if (!$restauranteId || !$this->adminRestPromocionesDisponible()) {
             return null;
         }
         $existing = $this->adminLocalGetPromotion($id, $empresaId);
         if (!$existing) {
             return null;
         }
+        $tipo = null;
+        if (array_key_exists('tipo_descuento', $body) || array_key_exists('tipo', $body)) {
+            $tipo = $this->normalizePromotionDiscountType((string)($body['tipo_descuento'] ?? $body['tipo'] ?? 'porcentaje'));
+            if (!in_array($tipo, ['porcentaje', 'monto_fijo'], true)) {
+                $tipo = 'porcentaje';
+            }
+        }
         $stmt = $db->prepare(
             "UPDATE rest_promociones
                 SET titulo = COALESCE(?, titulo),
                     descripcion = COALESCE(?, descripcion),
+                    code = COALESCE(?, code),
+                    tipo = COALESCE(?, tipo),
+                    valor_descuento = COALESCE(?, valor_descuento),
+                    expires_at = COALESCE(?, expires_at),
                     fecha_fin = COALESCE(?, fecha_fin),
+                    imagen = COALESCE(?, imagen),
+                    deep_link = COALESCE(?, deep_link),
                     activo = COALESCE(?, activo)
               WHERE id = ? AND restaurante_id = ?"
         );
+        $code = array_key_exists('code', $body) ? (string)$body['code'] : null;
         $stmt->execute([
             $body['titulo'] ?? null,
             $body['descripcion'] ?? null,
+            $code,
+            $tipo,
+            array_key_exists('valor_descuento', $body) ? (float)$body['valor_descuento'] : null,
+            $body['expires_at'] ?? null,
             !empty($body['expires_at']) ? substr((string)$body['expires_at'], 0, 10) : null,
+            array_key_exists('imagen', $body) ? (string)$body['imagen'] : null,
+            $code !== null ? $this->adminPromotionDeepLink($code) : null,
             array_key_exists('activo', $body) ? (int)$body['activo'] : null,
             $id,
             $restauranteId,
@@ -4323,7 +5567,7 @@ class ApiController extends BaseController
             return $stmt->rowCount() > 0;
         }
         $restauranteId = $this->adminRestauranteIdByEmpresa($empresaId);
-        if (!$restauranteId || !$this->adminTableExists('rest_promociones')) {
+        if (!$restauranteId || !$this->adminRestPromocionesDisponible()) {
             return false;
         }
         $stmt = $db->prepare("DELETE FROM rest_promociones WHERE id = ? AND restaurante_id = ?");
@@ -4340,7 +5584,7 @@ class ApiController extends BaseController
             return $stmt->rowCount() > 0;
         }
         $restauranteId = $this->adminRestauranteIdByEmpresa($empresaId);
-        if (!$restauranteId || !$this->adminTableExists('rest_promociones')) {
+        if (!$restauranteId || !$this->adminRestPromocionesDisponible()) {
             return false;
         }
         $stmt = $db->prepare("UPDATE rest_promociones SET activo = 0 WHERE id = ? AND restaurante_id = ?");
@@ -4354,7 +5598,24 @@ class ApiController extends BaseController
         $stmt = $db->prepare("SELECT id FROM rest_restaurantes WHERE empresa_id = ? AND activo = 1 ORDER BY id ASC LIMIT 1");
         $stmt->execute([$empresaId]);
         $id = $stmt->fetchColumn();
-        return $id ? (int)$id : null;
+        if ($id) {
+            return (int)$id;
+        }
+
+        $sessionRestauranteId = (int)($_SESSION['restaurante_activo_id'] ?? 0);
+        return $sessionRestauranteId > 0 ? $sessionRestauranteId : null;
+    }
+
+    private function adminRestPromocionesDisponible(): bool
+    {
+        try {
+            $db = Database::getInstance();
+            $db->query("SELECT 1 FROM rest_promociones LIMIT 0");
+            return true;
+        } catch (\Throwable $e) {
+            error_log('[adminRestPromocionesDisponible] No se pudo leer rest_promociones: ' . $e->getMessage());
+            return false;
+        }
     }
 
     private function adminTableExists(string $table): bool
@@ -4364,13 +5625,7 @@ class ApiController extends BaseController
         }
         try {
             $db = Database::getInstance();
-            $stmt = $db->prepare(
-                "SELECT 1
-                   FROM information_schema.tables
-                  WHERE table_schema = DATABASE()
-                    AND table_name = ?
-                  LIMIT 1"
-            );
+            $stmt = $db->prepare("SHOW TABLES LIKE ?");
             $stmt->execute([$table]);
             if ($stmt->fetchColumn()) {
                 return true;
@@ -4390,16 +5645,9 @@ class ApiController extends BaseController
         }
         try {
             $db = Database::getInstance();
-            $stmt = $db->prepare(
-                "SELECT 1
-                   FROM information_schema.columns
-                  WHERE table_schema = DATABASE()
-                    AND table_name = ?
-                    AND column_name = ?
-                  LIMIT 1"
-            );
-            $stmt->execute([$table, $column]);
-            return (bool)$stmt->fetchColumn();
+            $stmt = $db->prepare("SHOW COLUMNS FROM `{$table}` LIKE ?");
+            $stmt->execute([$column]);
+            return (bool)$stmt->fetch(PDO::FETCH_ASSOC);
         } catch (\Throwable $e) {
             return false;
         }

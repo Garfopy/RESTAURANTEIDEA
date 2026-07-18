@@ -142,6 +142,7 @@ class RestReservaController extends BaseController
             'notas'          => $this->post('notas') ?: null,
             'origen'         => 'restaurante',
         ];
+        $data = $this->model->aplicarCanalReserva($data, 'web');
 
         if ($id) {
             // En edición: solo actualizar mesero_id si aún está vacío

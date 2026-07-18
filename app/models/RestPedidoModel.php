@@ -11,16 +11,17 @@ class RestPedidoModel extends BaseModel
             return self::$columnCache[$key];
         }
 
-        $stmt = $this->db->prepare(
-            "SELECT COUNT(*)
-               FROM information_schema.columns
-              WHERE table_schema = DATABASE()
-                AND table_name = ?
-                AND column_name = ?"
-        );
-        $stmt->execute([$table, $column]);
-        self::$columnCache[$key] = (int)$stmt->fetchColumn() > 0;
-        return self::$columnCache[$key];
+        if (!preg_match('/^[a-zA-Z0-9_]+$/', $table) || !preg_match('/^[a-zA-Z0-9_]+$/', $column)) {
+            return self::$columnCache[$key] = false;
+        }
+
+        try {
+            $stmt = $this->db->prepare("SHOW COLUMNS FROM `{$table}` LIKE ?");
+            $stmt->execute([$column]);
+            return self::$columnCache[$key] = (bool)$stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (\Throwable $e) {
+            return self::$columnCache[$key] = false;
+        }
     }
 
     private function hasColumn(string $column): bool
@@ -145,19 +146,41 @@ class RestPedidoModel extends BaseModel
             $folio = $this->generarFolio($data['restaurante_id']);
             $subtotal = array_sum(array_column($items, 'subtotal'));
 
+            $pedidoData = [
+                'restaurante_id' => $data['restaurante_id'],
+                'mesa_id' => $data['mesa_id'] ?? null,
+                'visita_id' => $data['visita_id'] ?? null,
+                'mesero_id' => $data['mesero_id'] ?? null,
+                'folio' => $folio,
+                'notas' => $data['notas'] ?? null,
+                'subtotal' => $subtotal,
+                'total' => $data['total'] ?? $subtotal,
+            ];
+
+            foreach ([
+                'tipo_origen',
+                'tipo_pedido',
+                'tipo_entrega',
+                'direccion_entrega',
+                'mobile_usuario_id',
+                'cliente_nombre',
+                'comprador_nombre',
+                'comprador_telefono',
+                'comprador_direccion',
+                'metodo_pago',
+                'pickup_at',
+                'app_order_id',
+                'pagado_at',
+            ] as $column) {
+                if (array_key_exists($column, $data) && $this->hasColumn($column)) {
+                    $pedidoData[$column] = $data[$column];
+                }
+            }
+
+            $columns = array_keys($pedidoData);
             $this->execute(
-                "INSERT INTO rest_pedidos (restaurante_id, mesa_id, visita_id, mesero_id, folio, notas, subtotal, total)
-                 VALUES (?,?,?,?,?,?,?,?)",
-                [
-                    $data['restaurante_id'],
-                    $data['mesa_id'] ?? null,
-                    $data['visita_id'] ?? null,
-                    $data['mesero_id'] ?? null,
-                    $folio,
-                    $data['notas'] ?? null,
-                    $subtotal,
-                    $subtotal,
-                ]
+                "INSERT INTO rest_pedidos (`" . implode('`, `', $columns) . "`) VALUES (" . implode(',', array_fill(0, count($columns), '?')) . ")",
+                array_values($pedidoData)
             );
             $pedidoId = (int) $this->db->lastInsertId();
 

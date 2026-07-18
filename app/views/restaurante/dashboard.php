@@ -66,6 +66,12 @@ $ingresosGenerales = $ingresosTickets + $ingresosPedidosApp;
 $perdidasGenerales = (float)($kpis['gastos'] ?? 0) + (float)($kpis['retiros'] ?? 0);
 $saldoAmareUsado = (float)($amareKpis['walletUsado'] ?? 0);
 $perdidasAmare = (float)($amareKpis['perdidaAmare'] ?? 0);
+$reservasWeb = (int)($reservasCanal['web'] ?? 0);
+$reservasMovil = (int)($reservasCanal['movil'] ?? 0);
+$reservasTotal = (int)($reservasCanal['total'] ?? ($reservasWeb + $reservasMovil));
+$reservasMovilPct = (float)($reservasCanal['chart_pct'] ?? 0);
+$reservasWebPctLabel = (float)($reservasCanal['web_pct'] ?? 0);
+$reservasMovilPctLabel = (float)($reservasCanal['movil_pct'] ?? 0);
 $maxGeneral = max($ingresosGenerales, $perdidasGenerales, 1);
 $maxAmare = max($ingresosRecargasAmare, $saldoAmareUsado, $perdidasAmare, 1);
 $ingGeneralPct = min(100, round(($ingresosGenerales / $maxGeneral) * 100));
@@ -267,7 +273,7 @@ $infoBtn = static function (string $text, string $theme = 'light'): string {
   </div>
 </div>
 
-<div style="display:grid;grid-template-columns:1fr;gap:20px;margin-bottom:20px">
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;margin-bottom:20px">
   <!-- Próximas reservas -->
   <div style="background:#fff;border-radius:12px;padding:20px;border:1px solid #E5E7EB">
     <div style="font-weight:700;color:#111827;margin-bottom:14px">Próximas reservaciones</div>
@@ -281,6 +287,33 @@ $infoBtn = static function (string $text, string $theme = 'light'): string {
     </div>
     <?php endforeach; ?>
     <?php endif; ?>
+  </div>
+  <div style="background:#fff;border-radius:12px;padding:20px;border:1px solid #E5E7EB;display:flex;flex-direction:column;gap:16px">
+    <div>
+      <div style="font-weight:700;color:#111827">Reservas por canal</div>
+      <div style="font-size:.76rem;color:#9CA3AF;margin-top:3px">Origen historico de reservaciones</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap">
+      <div style="width:128px;height:128px;border-radius:50%;background:conic-gradient(#2563EB 0 <?= $reservasMovilPct ?>%, #10B981 <?= $reservasMovilPct ?>% 100%);display:flex;align-items:center;justify-content:center;flex:0 0 auto">
+        <div style="width:78px;height:78px;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid #EEF2F7">
+          <strong style="font-size:1.35rem;color:#111827;line-height:1"><?= $reservasTotal ?></strong>
+          <span style="font-size:.68rem;color:#9CA3AF">total</span>
+        </div>
+      </div>
+      <div style="display:grid;gap:10px;min-width:180px;flex:1">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+          <span style="display:flex;align-items:center;gap:8px;color:#374151;font-size:.86rem"><i style="width:10px;height:10px;border-radius:50%;background:#10B981;display:inline-block"></i>Web</span>
+          <strong style="color:#111827"><?= $reservasWeb ?> <span style="color:#9CA3AF;font-size:.72rem;font-weight:600"><?= number_format($reservasWebPctLabel, 1) ?>%</span></strong>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+          <span style="display:flex;align-items:center;gap:8px;color:#374151;font-size:.86rem"><i style="width:10px;height:10px;border-radius:50%;background:#2563EB;display:inline-block"></i>Movil</span>
+          <strong style="color:#111827"><?= $reservasMovil ?> <span style="color:#9CA3AF;font-size:.72rem;font-weight:600"><?= number_format($reservasMovilPctLabel, 1) ?>%</span></strong>
+        </div>
+        <?php if ($reservasTotal === 0): ?>
+        <div style="font-size:.75rem;color:#9CA3AF">Aun no hay datos para graficar.</div>
+        <?php endif; ?>
+      </div>
+    </div>
   </div>
 </div>
 

@@ -62,7 +62,23 @@ if ($_earlyCtrl === 'auth' && $_earlyAction === 'logoutstaff') {
 
 // Sesión sin expiración automática por inactividad
 ini_set('session.gc_maxlifetime', 31536000); // 1 año en segundos
-session_set_cookie_params(['lifetime' => 0, 'path' => '/', 'samesite' => 'Lax']);
+session_set_cookie_params([
+    'lifetime' => SESSION_LIFETIME_SECONDS,
+    'path'     => '/',
+    'secure'   => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'),
+    'httponly' => true,
+    'samesite' => 'Lax',
+]);
+if (defined('SESSION_SAVE_PATH')) {
+    if (!is_dir(SESSION_SAVE_PATH)) {
+        @mkdir(SESSION_SAVE_PATH, 0775, true);
+    }
+    if (is_dir(SESSION_SAVE_PATH) && is_writable(SESSION_SAVE_PATH)) {
+        ini_set('session.save_path', SESSION_SAVE_PATH);
+    }
+}
+ini_set('session.gc_maxlifetime', (string)SESSION_LIFETIME_SECONDS);
+ini_set('session.gc_probability', '0');
 session_name(SESSION_NAME . $_cookieSuffix);
 session_start();
 
@@ -193,6 +209,8 @@ $publicPaths = [
     'api/v1',
     'api/v1/ping',
     'api/v1/pedidos',
+    'api/v1/rest-pedidos',
+    'api/v1/reservaciones',
     'api/v1/productos',
     'api/v1/promociones',
     // Admin API (JWT Bearer — el guard de sesión no aplica, el controller maneja auth)

@@ -304,12 +304,18 @@ $promoId     = (int)($promoId ?? $promo['id'] ?? 0);
         <label style="display:block;font-weight:600;font-size:.9rem;color:#374151;margin-bottom:8px">
           Usuarios Receptores <span style="color:#EF4444">*</span>
         </label>
+        <input type="search" id="inpUsuarioBuscar" class="promo-input"
+               placeholder="Buscar por nombre, telefono o correo"
+               autocomplete="off"
+               style="width:100%;padding:10px 14px;border:1.5px solid #D1D5DB;border-radius:8px;
+                      font-size:.9rem;margin-bottom:8px;background:#fff">
         <select id="inpUsuario" name="usuario_ids[]" class="promo-input" required <?= $isEdit ? '' : 'multiple size="10"' ?>
                 style="width:100%;padding:12px 14px;border:1.5px solid #D1D5DB;border-radius:8px;
                        font-size:.95rem;cursor:pointer;background-color:#fff;transition:border-color 0.2s;line-height:1.6"
                 onchange="validarCampo(this)">
           <option value="">Cargando usuarios...</option>
         </select>
+        <div id="usuariosFiltroInfo" style="font-size:.72rem;color:#6B7280;margin-top:5px"></div>
         <div style="font-size:.75rem;color:#9CA3AF;margin-top:4px"><?= $isEdit ? 'Selecciona el usuario registrado en la app m&oacute;vil.' : 'Selecciona uno o varios usuarios registrados en la app m&oacute;vil.' ?></div>
         <div class="promo-error" style="display:none;font-size:.8rem;color:#EF4444;margin-top:4px"></div>
       </div>
@@ -360,6 +366,7 @@ $promoId     = (int)($promoId ?? $promo['id'] ?? 0);
   var pendingUsuarioId = '';
   var pendingScopeIds = [];
   var promoCatalog = { products: [], categories: [] };
+  var usuariosAppTotal = 0;
 
   // ──────────────────────────────────────────────────────────────
   // Carga inicial
@@ -368,16 +375,22 @@ $promoId     = (int)($promoId ?? $promo['id'] ?? 0);
   async function cargarUsuarios() {
     var select = document.getElementById('inpUsuario');
     try {
-      var resp = await ApiClient.get('/admin/users?per_page=100');
+      var resp = await ApiClient.get('/admin/users?per_page=all');
       if (!resp.success) {
         select.innerHTML = '<option value="">Error cargando usuarios</option>';
         return;
       }
 
-      var users = resp.data.users || [];
+      var payload = resp.data || {};
+      var users = payload.users || (payload.data && payload.data.users) || resp.users || [];
+      if (!Array.isArray(users)) {
+        users = [];
+      }
+      usuariosAppTotal = users.length;
       select.innerHTML = <?= $isEdit ? '\'<option value="">Selecciona un usuario de la app</option>\'' : "''" ?>;
       if (users.length === 0) {
         select.innerHTML = '<option value="">No hay usuarios registrados en la app movil</option>';
+        actualizarInfoUsuarios(0, 0);
         return;
       }
 
@@ -389,13 +402,59 @@ $promoId     = (int)($promoId ?? $promo['id'] ?? 0);
         var correo = user.email || user.correo || '';
         var contacto = telefono || correo || '';
         option.textContent = contacto ? (nombre + '  |  ' + contacto) : nombre;
+        option.dataset.search = normalizarBusqueda([nombre, telefono, correo].join(' '));
         select.appendChild(option);
       });
 
       seleccionarUsuarioPendiente();
+      filtrarUsuarios();
     } catch (e) {
       select.innerHTML = '<option value="">Error cargando usuarios</option>';
+      actualizarInfoUsuarios(0, usuariosAppTotal);
     }
+  }
+
+  function normalizarBusqueda(value) {
+    return String(value || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function actualizarInfoUsuarios(visibles, total) {
+    var info = document.getElementById('usuariosFiltroInfo');
+    if (!info) return;
+    if (total <= 0) {
+      info.textContent = '';
+      return;
+    }
+    info.textContent = visibles === total
+      ? total + ' usuario' + (total === 1 ? '' : 's') + ' disponible' + (total === 1 ? '' : 's')
+      : visibles + ' de ' + total + ' usuario' + (total === 1 ? '' : 's') + ' coinciden con la busqueda';
+  }
+
+  function filtrarUsuarios() {
+    var input = document.getElementById('inpUsuarioBuscar');
+    var select = document.getElementById('inpUsuario');
+    if (!input || !select) return;
+
+    var q = normalizarBusqueda(input.value);
+    var visibles = 0;
+    var total = 0;
+    for (var i = 0; i < select.options.length; i++) {
+      var option = select.options[i];
+      if (!option.value) {
+        option.hidden = q.length > 0;
+        continue;
+      }
+      total++;
+      var match = q === '' || (option.dataset.search || '').indexOf(q) !== -1;
+      option.hidden = !match;
+      if (match) visibles++;
+    }
+    actualizarInfoUsuarios(visibles, total);
   }
 
   async function cargarCatalogoPromos() {
@@ -783,6 +842,27 @@ $promoId     = (int)($promoId ?? $promo['id'] ?? 0);
     container.innerHTML = html;
   }
 
+  function mensajeGuardadoPromocion(resp) {
+    var data = resp && resp.data ? resp.data : {};
+    var summary = data.notification_summary
+      || (data.local_promotion && data.local_promotion.notification_summary)
+      || null;
+    if (!summary) {
+      return resp.message || 'Promocion guardada correctamente.';
+    }
+    var error = (summary.error || '').toString();
+    if (error === 'invalid_push_token') {
+      return 'Promocion guardada correctamente. El push no se envio porque el token del usuario vencio; cuando abra la app se registrara uno nuevo.';
+    }
+    if (error === 'no_push_token') {
+      return 'Promocion guardada correctamente. El usuario aun no tiene token push activo; la vera al abrir la app.';
+    }
+    if (summary.status === 'failed') {
+      return 'Promocion guardada correctamente. El push no se pudo enviar ahora, pero la promocion quedo disponible en la app.';
+    }
+    return resp.message || 'Promocion guardada correctamente.';
+  }
+
   window.mostrarError = mostrarError;
   window.mostrarExito = mostrarExito;
 
@@ -880,6 +960,7 @@ $promoId     = (int)($promoId ?? $promo['id'] ?? 0);
     }
 
     if (resp.success) {
+      resp.message = mensajeGuardadoPromocion(resp);
       mostrarExito(resp.message || 'Promoción guardada correctamente.');
       setTimeout(function() {
         window.location.href = '<?= BASE_URL ?>rest-promocion/index';
@@ -972,6 +1053,11 @@ $promoId     = (int)($promoId ?? $promo['id'] ?? 0);
   async function iniciar() {
     if (!ApiClient.isLoggedIn()) {
       await ApiClient.getTokenFromSession();
+    }
+
+    var usuarioBuscar = document.getElementById('inpUsuarioBuscar');
+    if (usuarioBuscar) {
+      usuarioBuscar.addEventListener('input', filtrarUsuarios);
     }
 
     await cargarUsuarios();

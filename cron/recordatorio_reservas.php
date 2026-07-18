@@ -50,15 +50,12 @@ $log = function (string $m): void {
 $dryRun = in_array('--dry-run', $argv ?? [], true);
 
 $columnExists = function (PDO $db, string $table, string $column): bool {
-    $stmt = $db->prepare(
-        "SELECT COUNT(*)
-           FROM INFORMATION_SCHEMA.COLUMNS
-          WHERE TABLE_SCHEMA = DATABASE()
-            AND TABLE_NAME = ?
-            AND COLUMN_NAME = ?"
-    );
-    $stmt->execute([$table, $column]);
-    return (int)$stmt->fetchColumn() > 0;
+    if (!preg_match('/^[a-zA-Z0-9_]+$/', $table) || !preg_match('/^[a-zA-Z0-9_]+$/', $column)) {
+        return false;
+    }
+    $stmt = $db->prepare("SHOW COLUMNS FROM `{$table}` LIKE ?");
+    $stmt->execute([$column]);
+    return (bool)$stmt->fetch(PDO::FETCH_ASSOC);
 };
 
 try {
@@ -89,12 +86,63 @@ try {
         $log('SMTP no configurado; se intentara fallback con mail() si el servidor lo permite.');
     }
 
+    $confirmaciones = $reservaModel->getConfirmacionesPendientes();
     $pendientes = $reservaModel->getParaRecordatorio();
 } catch (Throwable $e) {
     $log('ERROR preflight: ' . $e->getMessage());
     exit(1);
 }
 
+$log('Confirmaciones pendientes: ' . count($confirmaciones));
+
+$confEnviadas = 0;
+$confFallos   = 0;
+
+foreach ($confirmaciones as $r) {
+    $restaurante = [
+        'nombre'         => $r['rest_nombre']    ?? '',
+        'slug'           => $r['rest_slug']      ?? '',
+        'telefono'       => $r['rest_telefono']  ?? '',
+        'direccion'      => $r['rest_direccion'] ?? '',
+        'color_primario' => $r['color_primario'] ?? '#C8102E',
+    ];
+
+    $cancelUrl = BASE_URL . 'menu/' . $restaurante['slug'] . '/cancelarReserva/' . (int)$r['id'];
+
+    if ($dryRun) {
+        $log("DRY confirmacion -> reserva #{$r['id']} {$r['email']} {$restaurante['nombre']} {$r['fecha']} {$r['hora']} $cancelUrl");
+        continue;
+    }
+
+    try {
+        $ok = $email->enviarConfirmacionReserva(
+            $r['email'],
+            $restaurante,
+            [
+                'nombre'      => $r['nombre'],
+                'fecha'       => $r['fecha'] ?? '',
+                'hora'        => $r['hora'],
+                'personas'    => $r['personas'],
+                'mesa_nombre' => $r['mesa_nombre'] ?? 'Por asignar',
+            ],
+            $cancelUrl
+        );
+    } catch (Throwable $e) {
+        $ok = false;
+        $log("ERROR confirmacion -> reserva #{$r['id']} {$r['email']}: " . $e->getMessage());
+    }
+
+    if ($ok) {
+        $reservaModel->marcarConfirmacionEnviada((int)$r['id']);
+        $confEnviadas++;
+        $log("OK confirmacion -> reserva #{$r['id']} {$r['email']}");
+    } else {
+        $confFallos++;
+        $log("FAIL confirmacion -> reserva #{$r['id']} {$r['email']}");
+    }
+}
+
+$log("Confirmaciones terminadas. Enviadas: $confEnviadas - Fallos: $confFallos");
 $log('Recordatorios pendientes: ' . count($pendientes));
 
 $enviados = 0;

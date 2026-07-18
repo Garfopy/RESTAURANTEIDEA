@@ -299,18 +299,22 @@
       if (hasToken) {
         return { label: 'Token listo', detail: 'Push pendiente', color: '#2563EB', title: 'El usuario tiene token push activo' };
       }
-      return { label: '', detail: '', color: '#6B7280', title: '' };
+      return { label: 'Sin token', detail: 'Push pendiente', color: '#D97706', title: 'No hay token push activo para este usuario' };
     }
     if (status === 'sent') {
       return { label: 'Push enviada', detail: '', color: '#059669', title: p.notification_sent_at ? ('Enviada: ' + p.notification_sent_at) : 'Notificacion enviada' };
     }
     if (status === 'failed') {
+      if (isInvalidPushTokenError(error)) {
+        return { label: 'Push fallida', detail: 'Token invalido', color: '#EF4444', title: 'La promocion esta guardada, pero el token push del usuario ya no es valido' };
+      }
       return { label: 'Push fallida', detail: getPushErrorHint(error), color: '#EF4444', title: error ? ('Error: ' + error) : 'Firebase rechazo el envio' };
     }
     if (status === 'skipped') {
       var label = 'Push no enviada';
       if (error === 'missing_fcm_config') label = 'Falta FCM';
       if (error === 'no_push_token') label = 'Sin token';
+      if (error === 'invalid_push_token') label = 'Push fallida';
       if (error === 'no_push_token' && hasToken) {
         return { label: 'Token listo', detail: 'Reintenta el envio', color: '#2563EB', title: 'Antes no habia token, pero ahora el usuario tiene token push activo' };
       }
@@ -319,10 +323,21 @@
     return { label: 'Push pendiente', detail: '', color: '#6B7280', title: error || 'Pendiente' };
   }
 
+  function isInvalidPushTokenError(error) {
+    var lower = (error || '').toString().toLowerCase();
+    return lower.indexOf('invalid_push_token') >= 0
+      || lower.indexOf('unregistered') >= 0
+      || lower.indexOf('registration token') >= 0
+      || lower.indexOf('requested entity was not found') >= 0;
+  }
+
   function getPushErrorHint(error) {
     error = (error || '').toString();
     var lower = error.toLowerCase();
     if (!error) return '';
+    if (isInvalidPushTokenError(error)) {
+      return 'Token invalido';
+    }
     if (lower.indexOf('third_party_auth_error') >= 0 || lower.indexOf('apns') >= 0) {
       return 'Revisar APNs iOS';
     }
@@ -412,6 +427,11 @@
 
     if (resp.success) {
       var notification = resp.data && resp.data.notification ? resp.data.notification : null;
+      if (notification && isInvalidPushTokenError(notification.error)) {
+        ApiClient.flash('error', 'Token vencido: la promocion esta guardada, pero el usuario debe abrir la app para reactivar push.');
+        cargarPromociones();
+        return;
+      }
       if (notification && notification.status === 'failed') {
         ApiClient.flash('error', 'Push fallida: ' + (notification.error || 'Firebase rechazó el envío'));
       } else if (notification && notification.status === 'skipped') {

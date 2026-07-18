@@ -37,6 +37,8 @@ define('BRAND_COLOR',   '#C8102E');
 
 // Session name
 define('SESSION_NAME',  'capirest_session');
+define('SESSION_LIFETIME_SECONDS', 315360000); // 10 years; no automatic logout by inactivity.
+define('SESSION_SAVE_PATH', BASE_PATH . '/storage/sessions');
 
 // Despliegue standalone (solo restaurante, sin SaaS multi-empresa)
 if (!defined('RESTAURANTE_STANDALONE')) define('RESTAURANTE_STANDALONE', true);
