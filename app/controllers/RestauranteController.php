@@ -152,6 +152,8 @@ class RestauranteController extends BaseController
         $topVendidos   = $menuModel->getTopVendidos($restauranteId, 5);
         $menosVendidos = $menuModel->getMenosVendidos($restauranteId, 5);
 
+        $moderacionSocial = (new RestSocialModeracionModel())->resumenDashboard($restauranteId, 5);
+
         $linkStaff  = BASE_URL . 'auth/login';
         $linkMenu   = BASE_URL . 'menu/'   . $restaurante['slug'];
         $flash      = $this->getFlash();
@@ -159,7 +161,7 @@ class RestauranteController extends BaseController
         $activeMenu = 'rest_dashboard';
         $this->render('restaurante/dashboard', compact(
             'restaurante','kpis','amareKpis','comparativaFinanzas','activos','alertas','proximas',
-            'reservasCanal','topVendidos','menosVendidos',
+            'reservasCanal','topVendidos','menosVendidos','moderacionSocial',
             'linkStaff','linkMenu','flash','pageTitle','activeMenu'
         ));
     }

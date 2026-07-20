@@ -273,6 +273,153 @@ $infoBtn = static function (string $text, string $theme = 'light'): string {
   </div>
 </div>
 
+<?php
+$moderacionSocial = $moderacionSocial ?? [
+  'available' => false,
+  'kpis' => [],
+  'reportes' => [],
+  'bloqueos' => [],
+  'usuarios_observados' => [],
+];
+$modKpis = $moderacionSocial['kpis'] ?? [];
+$reportesApp = $moderacionSocial['reportes'] ?? [];
+$bloqueosApp = $moderacionSocial['bloqueos'] ?? [];
+$usuariosObservados = $moderacionSocial['usuarios_observados'] ?? [];
+$fmtModDate = static function (?string $date): string {
+  if (!$date) return '';
+  $ts = strtotime($date);
+  return $ts ? date('d/m H:i', $ts) : $date;
+};
+$reasonLabel = static function (?string $value): string {
+  $value = trim((string)$value);
+  if ($value === '') return 'Sin motivo';
+  $labels = [
+    'user_report' => 'Reporte de usuario',
+    'user_request' => 'Solicitud del usuario',
+    'harassment' => 'Acoso',
+    'spam' => 'Spam',
+    'inappropriate' => 'Contenido inapropiado',
+  ];
+  return $labels[$value] ?? ucfirst(str_replace('_', ' ', $value));
+};
+$shortText = static function (?string $value, int $max = 130): string {
+  $value = trim((string)$value);
+  if ($value === '') return '';
+  return strlen($value) > $max ? substr($value, 0, $max - 3) . '...' : $value;
+};
+?>
+<div style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:20px;margin-bottom:24px">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:16px;flex-wrap:wrap">
+    <div>
+      <div style="font-weight:800;color:#111827">Moderacion app</div>
+      <div style="font-size:.78rem;color:#6B7280;margin-top:3px">Reportes, bloqueos y usuarios que requieren revision</div>
+    </div>
+    <span style="font-size:.72rem;color:#374151;background:#F3F4F6;border-radius:99px;padding:5px 10px;font-weight:700">App social</span>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px">
+    <div style="border:1px solid #FEE2E2;background:#FEF2F2;border-radius:10px;padding:14px">
+      <div style="font-size:.72rem;color:#991B1B;font-weight:700">Reportes abiertos</div>
+      <div style="font-size:1.45rem;font-weight:800;color:#7F1D1D;margin-top:6px"><?= (int)($modKpis['reportes_abiertos'] ?? 0) ?></div>
+    </div>
+    <div style="border:1px solid #E5E7EB;background:#F9FAFB;border-radius:10px;padding:14px">
+      <div style="font-size:.72rem;color:#374151;font-weight:700">Reportes del mes</div>
+      <div style="font-size:1.45rem;font-weight:800;color:#111827;margin-top:6px"><?= (int)($modKpis['reportes_mes'] ?? 0) ?></div>
+    </div>
+    <div style="border:1px solid #FEF3C7;background:#FFFBEB;border-radius:10px;padding:14px">
+      <div style="font-size:.72rem;color:#92400E;font-weight:700">Bloqueos del mes</div>
+      <div style="font-size:1.45rem;font-weight:800;color:#78350F;margin-top:6px"><?= (int)($modKpis['bloqueos_mes'] ?? 0) ?></div>
+    </div>
+    <div style="border:1px solid #DBEAFE;background:#EFF6FF;border-radius:10px;padding:14px">
+      <div style="font-size:.72rem;color:#1E40AF;font-weight:700">Usuarios bloqueados</div>
+      <div style="font-size:1.45rem;font-weight:800;color:#1E3A8A;margin-top:6px"><?= (int)($modKpis['usuarios_bloqueados'] ?? 0) ?></div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px">
+    <div style="border:1px solid #EEF2F7;border-radius:10px;padding:14px;min-height:210px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div style="font-weight:800;color:#111827;font-size:.92rem">Reportes recientes</div>
+        <span style="font-size:.68rem;color:#991B1B;background:#FEF2F2;border-radius:99px;padding:3px 8px;font-weight:700">prioridad</span>
+      </div>
+      <?php if (empty($reportesApp)): ?>
+      <p style="color:#9CA3AF;font-size:.84rem;margin:0">Sin reportes recientes desde la app.</p>
+      <?php else: ?>
+      <?php foreach ($reportesApp as $r): ?>
+      <div style="padding:10px 0;border-bottom:1px solid #F3F4F6">
+        <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
+          <div style="min-width:0">
+            <div style="font-weight:700;color:#111827;font-size:.86rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+              <?= htmlspecialchars($r['reported_nombre'] ?? 'Usuario reportado') ?>
+            </div>
+            <div style="font-size:.74rem;color:#6B7280;margin-top:2px">
+              Reporta: <?= htmlspecialchars($r['reporter_nombre'] ?? 'Usuario') ?>
+              <?php if (!empty($r['reporter_meta'])): ?> - <?= htmlspecialchars($r['reporter_meta']) ?><?php endif; ?>
+            </div>
+          </div>
+          <span style="font-size:.68rem;color:#374151;background:#F3F4F6;border-radius:99px;padding:2px 7px;white-space:nowrap">
+            <?= htmlspecialchars($r['status'] ?? 'open') ?>
+          </span>
+        </div>
+        <div style="font-size:.75rem;color:#374151;margin-top:6px">
+          <?= htmlspecialchars($reasonLabel($r['reason'] ?? null)) ?>
+          <?php if (!empty($r['created_at'])): ?> - <?= htmlspecialchars($fmtModDate($r['created_at'])) ?><?php endif; ?>
+        </div>
+        <?php if (!empty($r['details'])): ?>
+        <div style="font-size:.74rem;color:#6B7280;margin-top:4px;line-height:1.35">
+          <?= htmlspecialchars($shortText($r['details'])) ?>
+        </div>
+        <?php endif; ?>
+      </div>
+      <?php endforeach; ?>
+      <?php endif; ?>
+    </div>
+
+    <div style="border:1px solid #EEF2F7;border-radius:10px;padding:14px;min-height:210px">
+      <div style="font-weight:800;color:#111827;font-size:.92rem;margin-bottom:10px">Bloqueos recientes</div>
+      <?php if (empty($bloqueosApp)): ?>
+      <p style="color:#9CA3AF;font-size:.84rem;margin:0">Sin bloqueos recientes desde la app.</p>
+      <?php else: ?>
+      <?php foreach ($bloqueosApp as $b): ?>
+      <div style="padding:10px 0;border-bottom:1px solid #F3F4F6">
+        <div style="font-weight:700;color:#111827;font-size:.86rem">
+          <?= htmlspecialchars($b['blocker_nombre'] ?? 'Usuario') ?> bloqueo a <?= htmlspecialchars($b['blocked_nombre'] ?? 'Usuario') ?>
+        </div>
+        <div style="font-size:.74rem;color:#6B7280;margin-top:2px">
+          <?php if (!empty($b['blocker_meta'])): ?><?= htmlspecialchars($b['blocker_meta']) ?> - <?php endif; ?>
+          <?= htmlspecialchars($reasonLabel($b['reason'] ?? null)) ?>
+          <?php if (!empty($b['created_at'])): ?> - <?= htmlspecialchars($fmtModDate($b['created_at'])) ?><?php endif; ?>
+        </div>
+      </div>
+      <?php endforeach; ?>
+      <?php endif; ?>
+    </div>
+
+    <div style="border:1px solid #EEF2F7;border-radius:10px;padding:14px;min-height:210px">
+      <div style="font-weight:800;color:#111827;font-size:.92rem;margin-bottom:10px">Usuarios observados</div>
+      <?php if (empty($usuariosObservados)): ?>
+      <p style="color:#9CA3AF;font-size:.84rem;margin:0">Sin usuarios con acumulacion de bloqueos.</p>
+      <?php else: ?>
+      <?php foreach ($usuariosObservados as $u): ?>
+      <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid #F3F4F6">
+        <div style="min-width:0">
+          <div style="font-weight:700;color:#111827;font-size:.86rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+            <?= htmlspecialchars($u['nombre'] ?? 'Usuario') ?>
+          </div>
+          <div style="font-size:.74rem;color:#6B7280;margin-top:2px">
+            <?= htmlspecialchars($u['meta'] ?? 'Sin mesa activa') ?>
+          </div>
+        </div>
+        <span style="font-size:.72rem;color:#92400E;background:#FEF3C7;border:1px solid #FCD34D;border-radius:99px;padding:3px 8px;font-weight:800;white-space:nowrap">
+          <?= (int)($u['total_bloqueos'] ?? 0) ?> bloq.
+        </span>
+      </div>
+      <?php endforeach; ?>
+      <?php endif; ?>
+    </div>
+  </div>
+</div>
+
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;margin-bottom:20px">
   <!-- Próximas reservas -->
   <div style="background:#fff;border-radius:12px;padding:20px;border:1px solid #E5E7EB">
