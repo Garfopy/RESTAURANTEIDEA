@@ -126,6 +126,10 @@ if ($ctrlSlug === 'api' && $action !== 'index') {
     $action = array_shift($rest);
     $param  = $rest ? implode('/', $rest) : null;
 }
+if ($ctrlSlug === 'admin' && $action === 'social') {
+    $rest = array_slice($segments, 2);
+    $param = $rest ? implode('/', $rest) : null;
+}
 // ── Ruta raíz → landing AMARE ────────────────────────────────────────────────
 if ($path === '') {
     $ctrlSlug = 'landing';
@@ -168,6 +172,7 @@ $routes = [
     'carnihub'      => 'CarnihubController',
     // API v1 REST — autenticación por Bearer token (CapiRest, etc.)
     'api'           => 'ApiController',
+    'admin'         => 'ApiController',
 ];
 
 // ── Auth guard ────────────────────────────────────────────────────────────────
@@ -219,6 +224,7 @@ $publicPaths = [
     'api/auth/login',
     'api/auth/token',
     'api/admin',
+    'admin/social',
     'api/legal',
     'api/legal/terminos',
     'api/admin/users',

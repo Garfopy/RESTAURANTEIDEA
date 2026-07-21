@@ -271,6 +271,11 @@ class RestSocialModeracionModel extends BaseModel
             }
         }
 
+        foreach ($usuarios as &$usuario) {
+            $usuario['suspension_foto'] = $this->latestRejectedPhotoForUser((int)($usuario['id'] ?? 0));
+        }
+        unset($usuario);
+
         return [
             'available' => true,
             'kpis' => [
@@ -340,12 +345,13 @@ class RestSocialModeracionModel extends BaseModel
 
         $this->execute("UPDATE mobile_usuarios SET " . implode(', ', $sets) . " WHERE id = ?", [$userId]);
         $this->marcarReportesUsuario($userId, $restauranteId, $auto ? 'auto_banned' : 'banned', $adminId);
+        $this->registrarAccionModeracion($auto ? 'user_auto_suspended' : 'user_suspended', $userId, null, null, null, $adminId, $auto ? 'Cuenta suspendida automaticamente por reportes.' : 'Cuenta suspendida por moderacion de reportes.');
         return true;
     }
 
-    public function reactivarUsuario(int $userId, int $restauranteId): bool
+    public function reactivarUsuario(int $userId, int $restauranteId, ?int $adminId = null): bool
     {
-        if (!$this->canManage() || !$this->usuarioEnRestaurante($userId, $restauranteId)) {
+        if (!$this->tableExists('mobile_usuarios') || !$this->usuarioEnRestaurante($userId, $restauranteId)) {
             return false;
         }
 
@@ -356,13 +362,183 @@ class RestSocialModeracionModel extends BaseModel
             $sets[] = "`{$activeCol}` = 1";
         }
         if ($socialActiveCol && $socialActiveCol !== $activeCol) {
-            $sets[] = "`{$socialActiveCol}` = 1";
+            $sets[] = "`{$socialActiveCol}` = 0";
         }
         if (!$sets) {
             return false;
         }
 
-        return $this->execute("UPDATE mobile_usuarios SET " . implode(', ', $sets) . " WHERE id = ?", [$userId]);
+        $ok = $this->execute("UPDATE mobile_usuarios SET " . implode(', ', $sets) . " WHERE id = ?", [$userId]);
+        if ($ok) {
+            $this->registrarAccionModeracion('user_reactivated', $userId, null, null, null, $adminId, 'Cuenta reactivada sin restaurar Social ni fotografias rechazadas.');
+        }
+        return $ok;
+    }
+
+    public function gestionFotos(
+        int $restauranteId,
+        string $status = 'pending',
+        int $page = 1,
+        int $perPage = 25,
+        string $search = '',
+        bool $central = false
+    ): array {
+        if (!$this->canManagePhotos()) {
+            return [
+                'available' => false,
+                'photos' => [],
+                'pagination' => ['total' => 0, 'page' => 1, 'pages' => 0],
+                'pending_count' => 0,
+            ];
+        }
+
+        $status = in_array($status, ['pending', 'approved', 'rejected'], true) ? $status : 'pending';
+        $page = max(1, $page);
+        $perPage = min(100, max(1, $perPage));
+        $offset = ($page - 1) * $perPage;
+        $where = ['spm.status = ?'];
+        $params = [$status];
+
+        $restaurantCol = $this->firstExistingColumn('mobile_usuarios', [
+            'current_restaurante_id',
+            'restaurante_id',
+            'restaurant_id',
+            'rest_id',
+        ]);
+        if (!$central && $restaurantCol) {
+            $where[] = "u.{$restaurantCol} = ?";
+            $params[] = $restauranteId;
+        }
+
+        $search = trim($search);
+        if ($search !== '') {
+            $where[] = "({$this->userNameExpr('u')} LIKE ? OR {$this->userEmailExpr('u')} LIKE ? OR spm.photo_url LIKE ?)";
+            $needle = '%' . $search . '%';
+            $params[] = $needle;
+            $params[] = $needle;
+            $params[] = $needle;
+        }
+
+        $whereSql = implode(' AND ', $where);
+        $reportesExpr = $this->tableExists('social_reports')
+            ? "(SELECT COUNT(*) FROM social_reports sr WHERE sr.reported_user_id = u.id)"
+            : '0';
+
+        $totalRow = $this->queryOne(
+            "SELECT COUNT(*) AS total
+             FROM social_photo_moderation spm
+             JOIN mobile_usuarios u ON u.id = spm.user_id
+             WHERE {$whereSql}",
+            $params
+        );
+        $total = (int)($totalRow['total'] ?? 0);
+
+        $photos = $this->query(
+            "SELECT spm.id,
+                    spm.user_id,
+                    spm.photo_url,
+                    spm.status,
+                    spm.review_notes,
+                    spm.reviewed_by,
+                    spm.created_at,
+                    spm.reviewed_at,
+                    {$this->userNameExpr('u')} AS usuario_nombre,
+                    {$this->userEmailExpr('u')} AS usuario_email,
+                    {$this->userMetaExpr('u')} AS usuario_meta,
+                    {$this->userIsActiveExpr('u')} AS activo,
+                    {$this->userSocialActiveExpr('u')} AS social_activo,
+                    " . ($this->columnExists('mobile_usuarios', 'foto_url') ? 'u.foto_url' : 'NULL') . " AS foto_url,
+                    " . ($this->columnExists('mobile_usuarios', 'social_photos_json') ? 'u.social_photos_json' : 'NULL') . " AS social_photos_json,
+                    {$reportesExpr} AS reportes_existentes
+             FROM social_photo_moderation spm
+             JOIN mobile_usuarios u ON u.id = spm.user_id
+             WHERE {$whereSql}
+             ORDER BY spm.created_at DESC, spm.id DESC
+             LIMIT {$perPage} OFFSET {$offset}",
+            $params
+        );
+
+        foreach ($photos as &$photo) {
+            $allPhotos = $this->profilePhotosFromRow($photo);
+            $currentUrl = (string)($photo['photo_url'] ?? '');
+            $photo['profile_photos'] = array_values(array_filter($allPhotos, static fn($url) => $url !== $currentUrl));
+        }
+        unset($photo);
+
+        return [
+            'available' => true,
+            'photos' => $photos,
+            'pagination' => [
+                'total' => $total,
+                'page' => $page,
+                'pages' => (int)ceil($total / $perPage),
+            ],
+            'pending_count' => $this->countFotosPendientes($restauranteId, $central),
+        ];
+    }
+
+    public function aprobarFoto(int $photoId, int $restauranteId, ?int $adminId = null, bool $central = false): array
+    {
+        if (!$this->canManagePhotos() || !$this->fotoEnRestaurante($photoId, $restauranteId, $central)) {
+            return ['ok' => false, 'status' => 'not_found'];
+        }
+
+        $stmt = $this->db->prepare(
+            "UPDATE social_photo_moderation
+             SET status = 'approved', reviewed_by = ?, reviewed_at = NOW(), review_notes = NULL
+             WHERE id = ? AND status = 'pending'"
+        );
+        $stmt->execute([$adminId, $photoId]);
+        if ($stmt->rowCount() === 0) {
+            return ['ok' => false, 'status' => 'conflict'];
+        }
+
+        $photo = $this->fotoModeracion($photoId);
+        $this->registrarAccionModeracion('photo_approved', (int)($photo['user_id'] ?? 0), $photoId, $photo['photo_url'] ?? null, 'approved', $adminId, null);
+        return ['ok' => true, 'status' => 'approved'];
+    }
+
+    public function rechazarFoto(int $photoId, int $restauranteId, string $notes, ?int $adminId = null, bool $central = false): array
+    {
+        $notes = trim($notes);
+        if (mb_strlen($notes) < 10) {
+            return ['ok' => false, 'status' => 'validation', 'message' => 'El motivo de rechazo debe tener al menos 10 caracteres.'];
+        }
+        if (!$this->canManagePhotos() || !$this->fotoEnRestaurante($photoId, $restauranteId, $central)) {
+            return ['ok' => false, 'status' => 'not_found'];
+        }
+
+        $photo = $this->fotoModeracion($photoId);
+        if (!$photo) {
+            return ['ok' => false, 'status' => 'not_found'];
+        }
+
+        try {
+            $this->db->beginTransaction();
+            $stmt = $this->db->prepare(
+                "UPDATE social_photo_moderation
+                 SET status = 'rejected', review_notes = ?, reviewed_by = ?, reviewed_at = NOW()
+                 WHERE id = ? AND status = 'pending'"
+            );
+            $stmt->execute([$notes, $adminId, $photoId]);
+            if ($stmt->rowCount() === 0) {
+                $this->db->rollBack();
+                return ['ok' => false, 'status' => 'conflict'];
+            }
+
+            $this->retirarFotoDePerfil((int)$photo['user_id'], (string)$photo['photo_url']);
+            $this->desactivarCuentaPorFoto((int)$photo['user_id']);
+            $this->registrarAccionModeracion('photo_rejected_suspended', (int)$photo['user_id'], $photoId, $photo['photo_url'] ?? null, 'rejected', $adminId, $notes);
+            $this->db->commit();
+        } catch (\Throwable $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            error_log('[RestSocialModeracionModel::rechazarFoto] ' . $e->getMessage());
+            return ['ok' => false, 'status' => 'error'];
+        }
+
+        return ['ok' => true, 'status' => 'rejected'];
     }
 
     public function cambiarEstadoReporte(int $reportId, int $restauranteId, string $status, ?int $adminId = null): bool
@@ -454,6 +630,236 @@ class RestSocialModeracionModel extends BaseModel
             [$reportId, $restauranteId, $restauranteId]
         );
         return $row !== null;
+    }
+
+    private function canManagePhotos(): bool
+    {
+        return $this->tableExists('social_photo_moderation')
+            && $this->tableExists('mobile_usuarios')
+            && $this->columnExists('social_photo_moderation', 'user_id')
+            && $this->columnExists('social_photo_moderation', 'photo_url')
+            && $this->columnExists('social_photo_moderation', 'status');
+    }
+
+    private function countFotosPendientes(int $restauranteId, bool $central = false): int
+    {
+        if (!$this->canManagePhotos()) {
+            return 0;
+        }
+
+        $where = ["spm.status = 'pending'"];
+        $params = [];
+        $restaurantCol = $this->firstExistingColumn('mobile_usuarios', [
+            'current_restaurante_id',
+            'restaurante_id',
+            'restaurant_id',
+            'rest_id',
+        ]);
+        if (!$central && $restaurantCol) {
+            $where[] = "u.{$restaurantCol} = ?";
+            $params[] = $restauranteId;
+        }
+
+        $row = $this->queryOne(
+            "SELECT COUNT(*) AS c
+             FROM social_photo_moderation spm
+             JOIN mobile_usuarios u ON u.id = spm.user_id
+             WHERE " . implode(' AND ', $where),
+            $params
+        );
+        return (int)($row['c'] ?? 0);
+    }
+
+    private function fotoEnRestaurante(int $photoId, int $restauranteId, bool $central = false): bool
+    {
+        if ($central) {
+            $row = $this->queryOne("SELECT id FROM social_photo_moderation WHERE id = ? LIMIT 1", [$photoId]);
+            return $row !== null;
+        }
+
+        $restaurantCol = $this->firstExistingColumn('mobile_usuarios', [
+            'current_restaurante_id',
+            'restaurante_id',
+            'restaurant_id',
+            'rest_id',
+        ]);
+        if (!$restaurantCol) {
+            return true;
+        }
+
+        $row = $this->queryOne(
+            "SELECT spm.id
+             FROM social_photo_moderation spm
+             JOIN mobile_usuarios u ON u.id = spm.user_id
+             WHERE spm.id = ? AND u.{$restaurantCol} = ?
+             LIMIT 1",
+            [$photoId, $restauranteId]
+        );
+        return $row !== null;
+    }
+
+    private function fotoModeracion(int $photoId): ?array
+    {
+        return $this->queryOne(
+            "SELECT id, user_id, photo_url, status, review_notes, reviewed_by, created_at, reviewed_at
+             FROM social_photo_moderation
+             WHERE id = ?
+             LIMIT 1",
+            [$photoId]
+        );
+    }
+
+    private function profilePhotosFromRow(array $row): array
+    {
+        $photos = [];
+        if (!empty($row['foto_url'])) {
+            $photos[] = (string)$row['foto_url'];
+        }
+
+        $json = (string)($row['social_photos_json'] ?? '');
+        if ($json !== '') {
+            $decoded = json_decode($json, true);
+            if (is_array($decoded)) {
+                foreach ($decoded as $url) {
+                    if (is_string($url) && trim($url) !== '') {
+                        $photos[] = trim($url);
+                    }
+                }
+            }
+        }
+
+        return array_values(array_unique($photos));
+    }
+
+    private function retirarFotoDePerfil(int $userId, string $photoUrl): void
+    {
+        $row = $this->queryOne(
+            "SELECT id,
+                    " . ($this->columnExists('mobile_usuarios', 'foto_url') ? 'foto_url' : 'NULL') . " AS foto_url,
+                    " . ($this->columnExists('mobile_usuarios', 'social_photos_json') ? 'social_photos_json' : 'NULL') . " AS social_photos_json
+             FROM mobile_usuarios
+             WHERE id = ?
+             LIMIT 1",
+            [$userId]
+        );
+        if (!$row) {
+            return;
+        }
+
+        $sets = [];
+        $params = [];
+        if ($this->columnExists('mobile_usuarios', 'foto_url') && (string)($row['foto_url'] ?? '') === $photoUrl) {
+            $sets[] = 'foto_url = NULL';
+        }
+        if ($this->columnExists('mobile_usuarios', 'social_photos_json')) {
+            $photos = $this->profilePhotosFromRow(['foto_url' => null, 'social_photos_json' => $row['social_photos_json'] ?? null]);
+            $remaining = array_values(array_filter($photos, static fn($url) => $url !== $photoUrl));
+            $sets[] = 'social_photos_json = ?';
+            $params[] = $remaining ? json_encode($remaining, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : null;
+        }
+        if (!$sets) {
+            return;
+        }
+
+        $params[] = $userId;
+        $stmt = $this->db->prepare("UPDATE mobile_usuarios SET " . implode(', ', $sets) . " WHERE id = ?");
+        $stmt->execute($params);
+    }
+
+    private function desactivarCuentaPorFoto(int $userId): void
+    {
+        $sets = [];
+        $activeCol = $this->firstExistingColumn('mobile_usuarios', ['activo', 'active', 'is_active']);
+        $socialActiveCol = $this->firstExistingColumn('mobile_usuarios', ['is_social_active', 'social_active']);
+        if ($activeCol) {
+            $sets[] = "`{$activeCol}` = 0";
+        }
+        if ($socialActiveCol && $socialActiveCol !== $activeCol) {
+            $sets[] = "`{$socialActiveCol}` = 0";
+        }
+        if (!$sets) {
+            return;
+        }
+
+        $stmt = $this->db->prepare("UPDATE mobile_usuarios SET " . implode(', ', $sets) . " WHERE id = ?");
+        $stmt->execute([$userId]);
+    }
+
+    private function latestRejectedPhotoForUser(int $userId): ?array
+    {
+        if ($userId <= 0 || !$this->tableExists('social_photo_moderation')) {
+            return null;
+        }
+
+        $moderatorName = 'NULL';
+        if ($this->tableExists('usuarios')) {
+            $nameCol = $this->firstExistingColumn('usuarios', ['nombre', 'name', 'nombre_completo']);
+            $emailCol = $this->firstExistingColumn('usuarios', ['email', 'correo']);
+            if ($nameCol && $emailCol) {
+                $moderatorName = "(SELECT COALESCE(NULLIF(a.{$nameCol}, ''), NULLIF(a.{$emailCol}, ''), CONCAT('Admin #', a.id)) FROM usuarios a WHERE a.id = spm.reviewed_by LIMIT 1)";
+            } elseif ($nameCol) {
+                $moderatorName = "(SELECT COALESCE(NULLIF(a.{$nameCol}, ''), CONCAT('Admin #', a.id)) FROM usuarios a WHERE a.id = spm.reviewed_by LIMIT 1)";
+            } elseif ($emailCol) {
+                $moderatorName = "(SELECT COALESCE(NULLIF(a.{$emailCol}, ''), CONCAT('Admin #', a.id)) FROM usuarios a WHERE a.id = spm.reviewed_by LIMIT 1)";
+            }
+        }
+
+        return $this->queryOne(
+            "SELECT spm.id,
+                    spm.photo_url,
+                    spm.review_notes,
+                    spm.reviewed_by,
+                    spm.reviewed_at,
+                    {$moderatorName} AS moderador_nombre
+             FROM social_photo_moderation spm
+             WHERE spm.user_id = ? AND spm.status = 'rejected'
+             ORDER BY spm.reviewed_at DESC, spm.id DESC
+             LIMIT 1",
+            [$userId]
+        );
+    }
+
+    private function registrarAccionModeracion(
+        string $action,
+        ?int $userId,
+        ?int $photoId,
+        ?string $photoUrl,
+        ?string $decision,
+        ?int $adminId,
+        ?string $notes
+    ): void {
+        if (!$this->tableExists('moderation_actions')) {
+            return;
+        }
+
+        $values = [
+            'action' => $action,
+            'target_type' => $photoId ? 'social_photo' : 'mobile_user',
+            'target_id' => $photoId ?: $userId,
+            'user_id' => $userId,
+            'photo_id' => $photoId,
+            'photo_url' => $photoUrl,
+            'decision' => $decision,
+            'notes' => $notes,
+            'moderator_id' => $adminId,
+            'created_at' => date('Y-m-d H:i:s'),
+        ];
+
+        $columns = [];
+        $params = [];
+        foreach ($values as $column => $value) {
+            if ($this->columnExists('moderation_actions', $column)) {
+                $columns[] = "`{$column}`";
+                $params[] = $value;
+            }
+        }
+        if (!$columns) {
+            return;
+        }
+
+        $placeholders = implode(', ', array_fill(0, count($columns), '?'));
+        $stmt = $this->db->prepare("INSERT INTO moderation_actions (" . implode(', ', $columns) . ") VALUES ({$placeholders})");
+        $stmt->execute($params);
     }
 
     private function countReports(int $restauranteId, bool $onlyOpen): int
