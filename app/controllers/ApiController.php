@@ -4293,6 +4293,64 @@ class ApiController extends BaseController
             }
         }
 
+        if ($this->adminTableExists('rest_platillos')) {
+            try {
+                $productActiveWhere = $this->adminColumnExists('rest_platillos', 'activo')
+                    ? ' AND COALESCE(p.activo, 1) = 1'
+                    : '';
+                $productAvailableWhere = $this->adminColumnExists('rest_platillos', 'disponible')
+                    ? ' AND COALESCE(p.disponible, 1) = 1'
+                    : '';
+                $restaurantJoin = '';
+                $restaurantWhere = '';
+                $params = [];
+                if ($this->adminTableExists('rest_restaurantes') && $this->adminColumnExists('rest_restaurantes', 'empresa_id')) {
+                    $restaurantJoin = ' JOIN rest_restaurantes r ON r.id = p.restaurante_id';
+                    $restaurantWhere = ' AND r.empresa_id = ?';
+                    $params[] = $empresaId;
+                    if ($this->adminColumnExists('rest_restaurantes', 'activo')) {
+                        $restaurantWhere .= ' AND COALESCE(r.activo, 1) = 1';
+                    }
+                }
+                $stmt = $db->prepare(
+                    "SELECT p.restaurante_id
+                       FROM rest_platillos p
+                       {$restaurantJoin}
+                      WHERE p.restaurante_id IS NOT NULL
+                            {$productActiveWhere}
+                            {$productAvailableWhere}
+                            {$restaurantWhere}
+                      GROUP BY p.restaurante_id
+                      ORDER BY COUNT(*) DESC, p.restaurante_id ASC"
+                );
+                $stmt->execute($params);
+                foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) ?: [] as $id) {
+                    $id = (int)$id;
+                    if ($id > 0 && !in_array($id, $candidateIds, true)) {
+                        $candidateIds[] = $id;
+                    }
+                }
+
+                $stmt = $db->query(
+                    "SELECT p.restaurante_id
+                       FROM rest_platillos p
+                      WHERE p.restaurante_id IS NOT NULL
+                            {$productActiveWhere}
+                            {$productAvailableWhere}
+                      GROUP BY p.restaurante_id
+                      ORDER BY COUNT(*) DESC, p.restaurante_id ASC"
+                );
+                foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) ?: [] as $id) {
+                    $id = (int)$id;
+                    if ($id > 0 && !in_array($id, $candidateIds, true)) {
+                        $candidateIds[] = $id;
+                    }
+                }
+            } catch (\Throwable $e) {
+                error_log('[adminPromotionCatalog] No se pudieron agregar restaurantes con platillos: ' . $e->getMessage());
+            }
+        }
+
         if (!$candidateIds) {
             $this->adminApiError('No se encontro restaurante vinculado para tu empresa.', 404);
         }
@@ -4416,6 +4474,8 @@ class ApiController extends BaseController
             $row['categoria_ids'] = $row['scope_tipo'] === 'categories' ? $row['scope_ids'] : [];
             $normalized[] = $row;
         }
+
+        $this->adminAttachPromotionPushState($normalized);
 
         return $normalized;
     }
@@ -5080,14 +5140,75 @@ class ApiController extends BaseController
     {
         $cache = [];
         foreach ($rows as &$row) {
-            $usuarioId = (int)($row['usuario_id'] ?? 0);
-            if (!array_key_exists($usuarioId, $cache)) {
-                $cache[$usuarioId] = $this->adminPromotionPushTokens($usuarioId);
+            $tokenRows = [];
+            $userIds = $this->adminPromotionUserTokenIds($row);
+            $cacheKey = implode(',', $userIds);
+            if ($cacheKey === '') {
+                $cacheKey = 'none';
             }
-            $row['push_token_count'] = count($cache[$usuarioId]);
-            $row['has_push_token'] = !empty($cache[$usuarioId]) ? 1 : 0;
+            if (!array_key_exists($cacheKey, $cache)) {
+                foreach ($userIds as $usuarioId) {
+                    $tokenRows = $this->adminPromotionPushTokens($usuarioId);
+                    if ($tokenRows) {
+                        $row['push_usuario_id'] = $usuarioId;
+                        break;
+                    }
+                }
+                $cache[$cacheKey] = $tokenRows;
+            }
+            $row['push_token_count'] = count($cache[$cacheKey]);
+            $row['has_push_token'] = !empty($cache[$cacheKey]) ? 1 : 0;
         }
         unset($row);
+    }
+
+    private function adminPromotionUserTokenIds(array $row): array
+    {
+        $ids = [];
+        foreach (['usuario_id', 'mobile_usuario_id', 'mobile_user_id', 'user_id', 'cliente_id', 'comensal_id'] as $key) {
+            $id = (int)($row[$key] ?? 0);
+            if ($id > 0 && !in_array($id, $ids, true)) {
+                $ids[] = $id;
+            }
+        }
+
+        if (!$this->adminTableExists('mobile_usuarios')) {
+            return $ids;
+        }
+
+        $email = strtolower(trim((string)($row['usuario_email'] ?? $row['email'] ?? $row['correo'] ?? '')));
+        $name = trim((string)($row['usuario_nombre'] ?? $row['nombre'] ?? $row['name'] ?? ''));
+        $db = Database::getInstance();
+
+        try {
+            $emailCol = $this->adminFirstExistingColumn('mobile_usuarios', ['email', 'correo']);
+            if ($email !== '' && $emailCol) {
+                $stmt = $db->prepare("SELECT id FROM mobile_usuarios WHERE LOWER(TRIM(`{$emailCol}`)) = ? LIMIT 5");
+                $stmt->execute([$email]);
+                foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) ?: [] as $id) {
+                    $id = (int)$id;
+                    if ($id > 0 && !in_array($id, $ids, true)) {
+                        $ids[] = $id;
+                    }
+                }
+            }
+
+            $nameCol = $this->adminFirstExistingColumn('mobile_usuarios', ['nombre', 'nombre_completo', 'name', 'full_name']);
+            if ($name !== '' && $nameCol) {
+                $stmt = $db->prepare("SELECT id FROM mobile_usuarios WHERE LOWER(TRIM(`{$nameCol}`)) = LOWER(TRIM(?)) LIMIT 5");
+                $stmt->execute([$name]);
+                foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) ?: [] as $id) {
+                    $id = (int)$id;
+                    if ($id > 0 && !in_array($id, $ids, true)) {
+                        $ids[] = $id;
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            error_log('[adminPromotionUserTokenIds] No se pudieron resolver usuarios alternos para push: ' . $e->getMessage());
+        }
+
+        return $ids;
     }
 
     private function adminPromotionPushTokenSource(): ?array

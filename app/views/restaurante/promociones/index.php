@@ -293,7 +293,12 @@
   function getPushInfo(p) {
     var status = (p.notification_status || '').toString().toLowerCase();
     var error = p.notification_error || '';
+    var errorLower = error.toString().toLowerCase();
     var hasToken = parseInt(p.has_push_token || 0, 10) === 1;
+
+    if (hasToken && (!status || (status === 'skipped' && errorLower.indexOf('no_push_token') >= 0))) {
+      return { label: 'Token listo', detail: status ? 'Reintenta el envio' : 'Push pendiente', color: '#2563EB', title: 'El usuario tiene token push activo' };
+    }
 
     if (!status) {
       if (hasToken) {
@@ -312,10 +317,10 @@
     }
     if (status === 'skipped') {
       var label = 'Push no enviada';
-      if (error === 'missing_fcm_config') label = 'Falta FCM';
-      if (error === 'no_push_token') label = 'Sin token';
-      if (error === 'invalid_push_token') label = 'Push fallida';
-      if (error === 'no_push_token' && hasToken) {
+      if (errorLower === 'missing_fcm_config') label = 'Falta FCM';
+      if (errorLower === 'no_push_token') label = 'Sin token';
+      if (errorLower === 'invalid_push_token') label = 'Push fallida';
+      if (errorLower.indexOf('no_push_token') >= 0 && hasToken) {
         return { label: 'Token listo', detail: 'Reintenta el envio', color: '#2563EB', title: 'Antes no habia token, pero ahora el usuario tiene token push activo' };
       }
       return { label: label, detail: getPushErrorHint(error), color: '#D97706', title: error || 'Envio omitido' };
