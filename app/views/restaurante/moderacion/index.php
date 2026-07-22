@@ -61,6 +61,82 @@ $statusOptions = [
     'approved' => 'Aprobadas',
     'rejected' => 'Rechazadas',
 ];
+
+$fotosPorPerfil = [];
+$addProfilePhoto = static function (array &$perfil, string $url, ?array $moderacion = null): void {
+    $url = trim($url);
+    if ($url === '') {
+        return;
+    }
+    $key = md5($url);
+    if (!isset($perfil['photos'][$key])) {
+        $perfil['photos'][$key] = [
+            'url' => $url,
+            'moderation' => null,
+        ];
+    }
+    if ($moderacion !== null) {
+        $perfil['photos'][$key]['moderation'] = $moderacion;
+    }
+};
+
+foreach ($fotos as $foto) {
+    $userId = (int)($foto['user_id'] ?? 0);
+    $fallbackKey = strtolower((string)($foto['usuario_email'] ?? $foto['usuario_meta'] ?? ''));
+    $profileKey = $userId > 0 ? 'user_' . $userId : 'meta_' . md5($fallbackKey . ($foto['usuario_nombre'] ?? ''));
+
+    if (!isset($fotosPorPerfil[$profileKey])) {
+        $fotosPorPerfil[$profileKey] = [
+            'user_id' => $userId,
+            'usuario_nombre' => $foto['usuario_nombre'] ?? 'Usuario',
+            'usuario_email' => $foto['usuario_email'] ?? $foto['usuario_meta'] ?? '',
+            'activo' => $foto['activo'] ?? 0,
+            'social_activo' => $foto['social_activo'] ?? 0,
+            'reportes_existentes' => $foto['reportes_existentes'] ?? 0,
+            'latest_created_at' => $foto['created_at'] ?? null,
+            'pending_count' => 0,
+            'moderation_count' => 0,
+            'photos' => [],
+        ];
+    }
+
+    if (!empty($foto['created_at'])) {
+        $currentTs = strtotime((string)($fotosPorPerfil[$profileKey]['latest_created_at'] ?? '')) ?: 0;
+        $nextTs = strtotime((string)$foto['created_at']) ?: 0;
+        if ($nextTs > $currentTs) {
+            $fotosPorPerfil[$profileKey]['latest_created_at'] = $foto['created_at'];
+        }
+    }
+
+    $fotosPorPerfil[$profileKey]['moderation_count']++;
+    if (($foto['status'] ?? '') === 'pending') {
+        $fotosPorPerfil[$profileKey]['pending_count']++;
+    }
+
+    $addProfilePhoto($fotosPorPerfil[$profileKey], (string)($foto['photo_url'] ?? ''), $foto);
+    foreach (($foto['profile_photos'] ?? []) as $profilePhoto) {
+        $addProfilePhoto($fotosPorPerfil[$profileKey], (string)$profilePhoto);
+    }
+}
+
+foreach ($fotosPorPerfil as &$perfil) {
+    uasort($perfil['photos'], static function (array $a, array $b): int {
+        $aModeration = !empty($a['moderation']);
+        $bModeration = !empty($b['moderation']);
+        if ($aModeration !== $bModeration) {
+            return $aModeration ? -1 : 1;
+        }
+        $aStatus = (string)($a['moderation']['status'] ?? '');
+        $bStatus = (string)($b['moderation']['status'] ?? '');
+        if ($aStatus !== $bStatus) {
+            $order = ['pending' => 0, 'rejected' => 1, 'approved' => 2];
+            return ($order[$aStatus] ?? 9) <=> ($order[$bStatus] ?? 9);
+        }
+        return strcmp((string)$a['url'], (string)$b['url']);
+    });
+    $perfil['photos'] = array_values($perfil['photos']);
+}
+unset($perfil);
 ?>
 
 <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:18px;flex-wrap:wrap">
@@ -247,73 +323,87 @@ $statusOptions = [
 </div>
 <?php else: ?>
 <div style="display:grid;gap:16px">
-  <?php foreach ($fotos as $foto): ?>
+  <?php foreach ($fotosPorPerfil as $perfil): ?>
   <?php
-    [$photoStatusText, $photoStatusBg, $photoStatusColor] = $photoStatusLabel($foto['status'] ?? 'pending');
-    $accountActive = (int)($foto['activo'] ?? 0) === 1;
-    $socialActive = (int)($foto['social_activo'] ?? 0) === 1;
+    $accountActive = (int)($perfil['activo'] ?? 0) === 1;
+    $socialActive = (int)($perfil['social_activo'] ?? 0) === 1;
+    $pendingPhotos = (int)($perfil['pending_count'] ?? 0);
+    $moderationPhotos = (int)($perfil['moderation_count'] ?? 0);
   ?>
   <div style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;overflow:hidden">
-    <div style="display:grid;grid-template-columns:minmax(260px,360px) minmax(0,1fr);gap:0">
-      <div style="background:#F9FAFB;border-right:1px solid #EEF2F7;padding:14px">
-        <img src="<?= htmlspecialchars($foto['photo_url'] ?? '') ?>" alt="" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:8px;border:1px solid #E5E7EB;background:#fff">
+    <div style="padding:16px 18px;border-bottom:1px solid #EEF2F7;display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;align-items:flex-start">
+      <div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <h2 style="font-size:1.05rem;margin:0;color:#111827"><?= htmlspecialchars($perfil['usuario_nombre'] ?? 'Usuario') ?></h2>
+          <?php if ($pendingPhotos > 0): ?>
+          <span style="font-size:.7rem;font-weight:800;border-radius:99px;padding:3px 8px;background:#FFFBEB;color:#92400E"><?= $pendingPhotos ?> pendientes</span>
+          <?php endif; ?>
+          <span style="font-size:.7rem;font-weight:800;border-radius:99px;padding:3px 8px;background:#F9FAFB;color:#374151;border:1px solid #E5E7EB"><?= $moderationPhotos ?> en este filtro</span>
+        </div>
+        <div style="font-size:.8rem;color:#6B7280;margin-top:4px"><?= htmlspecialchars($perfil['usuario_email'] ?? '') ?></div>
+        <div style="font-size:.78rem;color:#6B7280;margin-top:3px">Ultima publicacion: <?= htmlspecialchars($fmtDate($perfil['latest_created_at'] ?? null)) ?></div>
       </div>
-      <div style="padding:16px 18px;display:grid;gap:14px">
-        <div style="display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap">
-          <div>
-            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-              <h2 style="font-size:1rem;margin:0;color:#111827"><?= htmlspecialchars($foto['usuario_nombre'] ?? 'Usuario') ?></h2>
-              <span style="font-size:.7rem;font-weight:800;border-radius:99px;padding:3px 8px;background:<?= $photoStatusBg ?>;color:<?= $photoStatusColor ?>"><?= htmlspecialchars($photoStatusText) ?></span>
-            </div>
-            <div style="font-size:.8rem;color:#6B7280;margin-top:4px"><?= htmlspecialchars($foto['usuario_email'] ?? $foto['usuario_meta'] ?? '') ?></div>
-            <div style="font-size:.78rem;color:#6B7280;margin-top:3px">Publicada: <?= htmlspecialchars($fmtDate($foto['created_at'] ?? null)) ?></div>
+      <a href="<?= BASE_URL ?>rest-cliente/detalle/app-<?= (int)($perfil['user_id'] ?? 0) ?>" style="height:fit-content;text-decoration:none;border:1px solid #E5E7EB;background:#fff;color:#374151;border-radius:8px;padding:8px 10px;font-weight:800;font-size:.8rem">Ver perfil completo</a>
+    </div>
+
+    <div style="padding:14px 18px;border-bottom:1px solid #F3F4F6;display:flex;gap:8px;flex-wrap:wrap">
+      <span style="display:inline-flex;border-radius:999px;padding:4px 9px;font-size:.74rem;font-weight:800;background:<?= $accountActive ? '#ECFDF5' : '#FEF2F2' ?>;color:<?= $accountActive ? '#047857' : '#991B1B' ?>">Cuenta <?= $accountActive ? 'activa' : 'suspendida' ?></span>
+      <span style="display:inline-flex;border-radius:999px;padding:4px 9px;font-size:.74rem;font-weight:800;background:<?= $socialActive ? '#EFF6FF' : '#F3F4F6' ?>;color:<?= $socialActive ? '#1D4ED8' : '#4B5563' ?>">Social <?= $socialActive ? 'activo' : 'inactivo' ?></span>
+      <span style="display:inline-flex;border-radius:999px;padding:4px 9px;font-size:.74rem;font-weight:800;background:#F9FAFB;color:#374151;border:1px solid #E5E7EB"><?= (int)($perfil['reportes_existentes'] ?? 0) ?> reportes</span>
+    </div>
+
+    <div style="padding:16px 18px">
+      <div style="font-size:.78rem;color:#6B7280;font-weight:800;margin-bottom:10px">Fotografias del perfil</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px">
+        <?php foreach (($perfil['photos'] ?? []) as $profilePhoto): ?>
+        <?php
+          $moderacionFoto = $profilePhoto['moderation'] ?? null;
+          [$photoStatusText, $photoStatusBg, $photoStatusColor] = $moderacionFoto
+              ? $photoStatusLabel($moderacionFoto['status'] ?? 'pending')
+              : ['Perfil', '#F3F4F6', '#4B5563'];
+        ?>
+        <div style="border:1px solid #E5E7EB;border-radius:8px;background:#fff;overflow:hidden;display:grid;grid-template-rows:auto 1fr">
+          <div style="position:relative;background:#F9FAFB">
+            <img src="<?= htmlspecialchars($profilePhoto['url'] ?? '') ?>" alt="" style="display:block;width:100%;aspect-ratio:4/3;object-fit:cover;background:#F9FAFB">
+            <span style="position:absolute;top:8px;left:8px;font-size:.68rem;font-weight:800;border-radius:99px;padding:3px 7px;background:<?= $photoStatusBg ?>;color:<?= $photoStatusColor ?>;box-shadow:0 4px 12px rgba(17,24,39,.12)"><?= htmlspecialchars($photoStatusText) ?></span>
           </div>
-          <a href="<?= BASE_URL ?>rest-cliente/detalle/app-<?= (int)($foto['user_id'] ?? 0) ?>" style="height:fit-content;text-decoration:none;border:1px solid #E5E7EB;background:#fff;color:#374151;border-radius:8px;padding:8px 10px;font-weight:800;font-size:.8rem">Ver perfil completo</a>
-        </div>
-
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <span style="display:inline-flex;border-radius:999px;padding:4px 9px;font-size:.74rem;font-weight:800;background:<?= $accountActive ? '#ECFDF5' : '#FEF2F2' ?>;color:<?= $accountActive ? '#047857' : '#991B1B' ?>">Cuenta <?= $accountActive ? 'activa' : 'suspendida' ?></span>
-          <span style="display:inline-flex;border-radius:999px;padding:4px 9px;font-size:.74rem;font-weight:800;background:<?= $socialActive ? '#EFF6FF' : '#F3F4F6' ?>;color:<?= $socialActive ? '#1D4ED8' : '#4B5563' ?>">Social <?= $socialActive ? 'activo' : 'inactivo' ?></span>
-          <span style="display:inline-flex;border-radius:999px;padding:4px 9px;font-size:.74rem;font-weight:800;background:#F9FAFB;color:#374151;border:1px solid #E5E7EB"><?= (int)($foto['reportes_existentes'] ?? 0) ?> reportes</span>
-        </div>
-
-        <div>
-          <div style="font-size:.76rem;color:#6B7280;font-weight:800;margin-bottom:8px">Resto de fotografias del perfil</div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <?php foreach (($foto['profile_photos'] ?? []) as $profilePhoto): ?>
-            <img src="<?= htmlspecialchars($profilePhoto) ?>" alt="" style="width:72px;height:72px;border-radius:8px;object-fit:cover;border:1px solid #E5E7EB;background:#F9FAFB">
-            <?php endforeach; ?>
-            <?php if (empty($foto['profile_photos'])): ?>
-            <span style="color:#9CA3AF;font-size:.8rem">Sin fotografias adicionales.</span>
+          <div style="padding:10px;display:grid;gap:8px;align-content:start">
+            <?php if ($moderacionFoto): ?>
+            <div style="font-size:.72rem;color:#6B7280">Publicada: <?= htmlspecialchars($fmtDate($moderacionFoto['created_at'] ?? null)) ?></div>
+            <?php if (($moderacionFoto['status'] ?? '') === 'pending'): ?>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <form method="post" action="<?= BASE_URL ?>rest-moderacion/foto/<?= (int)$moderacionFoto['id'] ?>" class="moderation-action-form" style="flex:1;min-width:82px">
+                <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrfToken) ?>">
+                <input type="hidden" name="decision" value="approved">
+                <button type="submit" style="width:100%;border:1px solid #A7F3D0;background:#ECFDF5;color:#047857;border-radius:8px;padding:8px 9px;font-weight:800;cursor:pointer">Aprobar</button>
+              </form>
+              <button type="button"
+                      data-reject-photo-id="<?= (int)$moderacionFoto['id'] ?>"
+                      data-reject-photo-url="<?= htmlspecialchars($moderacionFoto['photo_url'] ?? $profilePhoto['url'] ?? '') ?>"
+                      data-reject-user="<?= htmlspecialchars($perfil['usuario_nombre'] ?? 'Usuario') ?>"
+                      style="flex:1;min-width:112px;border:0;background:#DC2626;color:#fff;border-radius:8px;padding:8px 9px;font-weight:800;cursor:pointer">
+                Rechazar
+              </button>
+            </div>
+            <?php elseif (($moderacionFoto['status'] ?? '') === 'rejected'): ?>
+            <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:8px;color:#7F1D1D;font-size:.76rem;line-height:1.35">
+              <strong>Motivo:</strong> <?= nl2br(htmlspecialchars($moderacionFoto['review_notes'] ?? 'Sin motivo registrado')) ?>
+            </div>
+            <?php endif; ?>
+            <?php else: ?>
+            <div style="font-size:.72rem;color:#9CA3AF">Foto actual del perfil.</div>
             <?php endif; ?>
           </div>
         </div>
-
-        <?php if (($foto['status'] ?? '') === 'pending'): ?>
-        <div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap">
-          <form method="post" action="<?= BASE_URL ?>rest-moderacion/foto/<?= (int)$foto['id'] ?>" class="moderation-action-form">
-            <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrfToken) ?>">
-            <input type="hidden" name="decision" value="approved">
-            <button type="submit" style="border:1px solid #A7F3D0;background:#ECFDF5;color:#047857;border-radius:8px;padding:9px 12px;font-weight:800;cursor:pointer">Aprobar</button>
-          </form>
-          <button type="button"
-                  data-reject-photo-id="<?= (int)$foto['id'] ?>"
-                  data-reject-photo-url="<?= htmlspecialchars($foto['photo_url'] ?? '') ?>"
-                  data-reject-user="<?= htmlspecialchars($foto['usuario_nombre'] ?? 'Usuario') ?>"
-                  style="border:0;background:#DC2626;color:#fff;border-radius:8px;padding:9px 12px;font-weight:800;cursor:pointer">
-            Rechazar y suspender
-          </button>
-        </div>
-        <?php elseif (($foto['status'] ?? '') === 'rejected'): ?>
-        <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:10px;color:#7F1D1D;font-size:.84rem">
-          <strong>Motivo:</strong> <?= nl2br(htmlspecialchars($foto['review_notes'] ?? 'Sin motivo registrado')) ?>
-        </div>
+        <?php endforeach; ?>
+        <?php if (empty($perfil['photos'])): ?>
+        <div style="color:#9CA3AF;font-size:.8rem">Sin fotografias registradas.</div>
         <?php endif; ?>
       </div>
     </div>
   </div>
   <?php endforeach; ?>
-  <?php if (empty($fotos)): ?>
+  <?php if (empty($fotosPorPerfil)): ?>
   <div style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;text-align:center;color:#9CA3AF;padding:28px">No hay fotografias para este filtro.</div>
   <?php endif; ?>
 </div>

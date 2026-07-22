@@ -3,6 +3,7 @@
 $menuPrincipalId = (int)($menuPrincipal['id'] ?? 0);
 $esMenuPrincipal = $menuPrincipalId > 0 && $menuPrincipalId === (int)($restaurante['id'] ?? 0);
 $hayCadenaMenu = !empty($sucursales) && count($sucursales) > 1;
+$mapsApiKey = trim((string)($mapsApiKey ?? ''));
 ?>
 <div>
   <div class="rst-card">
@@ -128,7 +129,7 @@ $hayCadenaMenu = !empty($sucursales) && count($sucursales) > 1;
       </div>
 
       <!-- Dirección + Mapa lado a lado -->
-      <div style="display:grid;grid-template-columns:280px 1fr;gap:16px;margin-bottom:20px;align-items:start">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:18px;margin-bottom:20px;align-items:start">
         <div>
           <label class="form-label">Dirección</label>
           <div style="position:relative">
@@ -141,23 +142,27 @@ $hayCadenaMenu = !empty($sucursales) && count($sucursales) > 1;
                  z-index:300;background:#fff;border:1.5px solid #E5E7EB;border-radius:10px;
                  box-shadow:0 6px 24px rgba(0,0,0,.1);max-height:220px;overflow-y:auto"></div>
           </div>
-          <div style="margin-top:10px"></div>
-          <div id="coordsBox" style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:10px 12px;<?= empty($restaurante['direccion']) ? 'display:none' : '' ?>">
-            <div style="font-size:.75rem;font-weight:700;color:#065F46;margin-bottom:6px">📍 Coordenadas</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+            <button type="button" id="btnUseLocation" class="btn btn-outline btn-sm" style="padding:7px 10px">Usar mi ubicacion</button>
+            <button type="button" id="btnCenterMap" class="btn btn-outline btn-sm" style="padding:7px 10px">Centrar mapa</button>
+          </div>
+          <div id="coordsBox" style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:10px 12px;margin-top:10px;<?= empty($restaurante['lat']) || empty($restaurante['lng']) ? 'display:none' : '' ?>">
+            <div style="font-size:.75rem;font-weight:700;color:#065F46;margin-bottom:6px">Coordenadas</div>
             <div style="font-size:.78rem;color:#374151">Lat: <span id="coordLat"><?= $restaurante['lat'] ?? '—' ?></span></div>
             <div style="font-size:.78rem;color:#374151">Lng: <span id="coordLng"><?= $restaurante['lng'] ?? '—' ?></span></div>
             <input type="hidden" name="lat" id="inpLat" value="<?= htmlspecialchars($restaurante['lat'] ?? '') ?>">
             <input type="hidden" name="lng" id="inpLng" value="<?= htmlspecialchars($restaurante['lng'] ?? '') ?>">
           </div>
           <div id="mapNote" style="font-size:.72rem;color:#9CA3AF;margin-top:6px">
-            El mapa se actualiza mientras escribes o al elegir una sugerencia.
+            <?= $mapsApiKey !== '' ? 'Google Places activo para buscar y fijar la ubicacion.' : 'Configura google_maps_key para activar Google Maps; mientras tanto se usa busqueda libre.' ?>
           </div>
         </div>
         <div>
           <label class="form-label">Ubicación en mapa</label>
           <div id="rstMap"
                data-direccion="<?= htmlspecialchars($restaurante['direccion'] ?? '', ENT_QUOTES) ?>"
-               style="border-radius:10px;overflow:hidden;border:1px solid #E5E7EB;height:200px;background:#F3F4F6;display:flex;align-items:center;justify-content:center">
+               data-google-ready="<?= $mapsApiKey !== '' ? '1' : '0' ?>"
+               style="border-radius:8px;overflow:hidden;border:1px solid #D1D5DB;height:280px;background:#F3F4F6;display:flex;align-items:center;justify-content:center">
             <?php if (empty($restaurante['direccion'])): ?>
             <div style="text-align:center;color:#9CA3AF;font-size:.82rem">
               <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="margin:0 auto 6px;display:block"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
@@ -1009,14 +1014,74 @@ $hayCadenaMenu = !empty($sucursales) && count($sucursales) > 1;
 
 <script>
 const BASE = '<?= BASE_URL ?>';
+const GOOGLE_MAPS_API_KEY = '<?= htmlspecialchars($mapsApiKey, ENT_QUOTES) ?>';
+const GOOGLE_MAPS_ENABLED = GOOGLE_MAPS_API_KEY.length > 0;
+const DEFAULT_REST_CENTER = { lat: 20.6736, lng: -103.344 };
+let rstGoogleMap = null;
+let rstGoogleMarker = null;
+let rstGoogleGeocoder = null;
+let rstGoogleAutocomplete = null;
+let rstGoogleLoading = false;
+let rstGoogleUnavailable = false;
+let rstGoogleInputBound = false;
+const rstGoogleCallbacks = [];
 let rstLeafletMap = null;
 let rstLeafletMarker = null;
 let rstLeafletLoading = false;
+let rstFreeInputBound = false;
 const rstLeafletCallbacks = [];
+
+function escapeHtml(value) {
+  return String(value || '').replace(/[&<>"']/g, function(chr) {
+    return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[chr];
+  });
+}
+
+function escapeAttr(value) {
+  return escapeHtml(value).replace(/`/g, '&#096;');
+}
+
+function setMapNote(message, color) {
+  const note = document.getElementById('mapNote');
+  if (!note) return;
+  note.textContent = message;
+  note.style.color = color || '#9CA3AF';
+}
+
+function ensureRstGoogleMaps(callback) {
+  if (!GOOGLE_MAPS_ENABLED || rstGoogleUnavailable) return false;
+  if (window.google && google.maps && google.maps.places) {
+    callback(true);
+    return true;
+  }
+  rstGoogleCallbacks.push(callback);
+  if (rstGoogleLoading) return true;
+  rstGoogleLoading = true;
+
+  window.__rstGoogleMapsReady = function() {
+    rstGoogleLoading = false;
+    while (rstGoogleCallbacks.length) rstGoogleCallbacks.shift()(true);
+  };
+
+  const script = document.createElement('script');
+  script.src = 'https://maps.googleapis.com/maps/api/js?key='
+    + encodeURIComponent(GOOGLE_MAPS_API_KEY)
+    + '&libraries=places&language=es&region=MX&callback=__rstGoogleMapsReady';
+  script.async = true;
+  script.defer = true;
+  script.onerror = function() {
+    rstGoogleLoading = false;
+    rstGoogleUnavailable = true;
+    setMapNote('No se pudo cargar Google Maps; usando busqueda libre.', '#B45309');
+    while (rstGoogleCallbacks.length) rstGoogleCallbacks.shift()(false);
+  };
+  document.head.appendChild(script);
+  return true;
+}
 
 function ensureRstLeaflet(callback) {
   if (window.L) {
-    callback();
+    callback(true);
     return;
   }
   rstLeafletCallbacks.push(callback);
@@ -1031,16 +1096,19 @@ function ensureRstLeaflet(callback) {
   const script = document.createElement('script');
   script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
   script.onload = function() {
-    while (rstLeafletCallbacks.length) rstLeafletCallbacks.shift()();
+    while (rstLeafletCallbacks.length) rstLeafletCallbacks.shift()(true);
+  };
+  script.onerror = function() {
+    while (rstLeafletCallbacks.length) rstLeafletCallbacks.shift()(false);
   };
   document.head.appendChild(script);
 }
 
 function setMapPlaceholder(message) {
   const el = document.getElementById('rstMap');
-  if (!el || rstLeafletMap) return;
+  if (!el || rstGoogleMap || rstLeafletMap) return;
   el.style.display = 'flex';
-  el.innerHTML = '<div style="text-align:center;color:#9CA3AF;font-size:.82rem;padding:20px">' + message + '</div>';
+  el.innerHTML = '<div style="text-align:center;color:#9CA3AF;font-size:.82rem;padding:20px">' + escapeHtml(message) + '</div>';
 }
 
 function renderAddressMap(lat, lng, label) {
@@ -1049,7 +1117,64 @@ function renderAddressMap(lat, lng, label) {
   lng = parseFloat(lng);
   if (!el || !isFinite(lat) || !isFinite(lng)) return;
 
-  ensureRstLeaflet(function() {
+  if (GOOGLE_MAPS_ENABLED) {
+    renderGoogleAddressMap(lat, lng, label);
+    return;
+  }
+  renderLeafletAddressMap(lat, lng, label);
+}
+
+function renderGoogleAddressMap(lat, lng, label) {
+  const el = document.getElementById('rstMap');
+  if (!el) return;
+  ensureRstGoogleMaps(function(ok) {
+    if (!ok || !window.google || !google.maps) {
+      renderLeafletAddressMap(lat, lng, label);
+      return;
+    }
+    const position = { lat: lat, lng: lng };
+    el.style.display = 'block';
+    if (!rstGoogleMap) {
+      el.innerHTML = '';
+      rstGoogleMap = new google.maps.Map(el, {
+        center: position,
+        zoom: 16,
+        mapTypeControl: false,
+        streetViewControl: true,
+        fullscreenControl: true,
+        gestureHandling: 'greedy',
+        clickableIcons: false
+      });
+      rstGoogleMarker = new google.maps.Marker({
+        map: rstGoogleMap,
+        position: position,
+        draggable: true,
+        title: label || 'Ubicacion del restaurante'
+      });
+      rstGoogleMarker.addListener('dragend', function(event) {
+        const markerLat = event.latLng.lat();
+        const markerLng = event.latLng.lng();
+        setAddressCoords(markerLat, markerLng, label || '', false);
+        reverseGeocodePosition(markerLat, markerLng);
+      });
+    } else {
+      rstGoogleMap.setCenter(position);
+      rstGoogleMap.setZoom(16);
+      rstGoogleMarker.setPosition(position);
+      rstGoogleMarker.setTitle(label || 'Ubicacion del restaurante');
+    }
+    setMapNote('Ubicacion fijada. Puedes arrastrar el marcador para ajustar el punto.', '#065F46');
+  });
+}
+
+function renderLeafletAddressMap(lat, lng, label) {
+  const el = document.getElementById('rstMap');
+  if (!el) return;
+  ensureRstLeaflet(function(ok) {
+    if (!ok) {
+      setMapPlaceholder('No se pudo cargar el mapa.');
+      return;
+    }
     el.style.display = 'block';
     if (!rstLeafletMap) {
       const markerIcon = L.divIcon({
@@ -1242,58 +1367,7 @@ bindColorPair('appBgPicker', 'txtAppBgColor');
 bindColorPair('appBtnPicker', 'txtAppBtnColor');
 bindColorPair('appBtnTextPicker', 'txtAppBtnTextColor');
 
-// ── Address autocomplete con Nominatim ──────────────────────────────────────
-(function() {
-  const inp  = document.getElementById('inpDireccion');
-  const sugg = document.getElementById('addrSugg');
-  if (!inp || !sugg) return;
-  let timer;
-  inp.addEventListener('input', function() {
-    clearTimeout(timer);
-    clearAddressCoords();
-    const q = this.value.trim();
-    if (q.length < 4) { sugg.style.display = 'none'; return; }
-    timer = setTimeout(function() {
-      fetch('https://nominatim.openstreetmap.org/search?format=json&limit=6&addressdetails=0&q=' + encodeURIComponent(q))
-        .then(function(r){ return r.json(); })
-        .then(function(data) {
-          if (!data || !data.length) {
-            sugg.style.display = 'none';
-            setMapPlaceholder('No se encontro la direccion en el mapa.');
-            return;
-          }
-          var firstLat = parseFloat(data[0].lat);
-          var firstLng = parseFloat(data[0].lon);
-          if (isFinite(firstLat) && isFinite(firstLng)) {
-            setAddressCoords(firstLat.toFixed(6), firstLng.toFixed(6), data[0].display_name);
-          }
-          sugg.innerHTML = data.map(function(item) {
-            var name = item.display_name.replace(/</g,'&lt;').replace(/>/g,'&gt;');
-            var lat = parseFloat(item.lat);
-            var lng = parseFloat(item.lon);
-            return '<div class="addr-opt" onmousedown="addrSelect(event,this)" data-val="' + name.replace(/"/g,'&quot;') + '"'
-              + ' data-lat="' + (isFinite(lat) ? lat.toFixed(6) : '') + '"'
-              + ' data-lng="' + (isFinite(lng) ? lng.toFixed(6) : '') + '"'
-              + ' style="padding:9px 13px;cursor:pointer;font-size:.82rem;color:#374151;border-bottom:1px solid #F3F4F6;display:flex;align-items:flex-start;gap:8px">'
-              + '<span style="flex-shrink:0;color:var(--cp)">📍</span>'
-              + '<span>' + name + '</span></div>';
-          }).join('');
-          sugg.style.display = 'block';
-        })
-        .catch(function(){
-          sugg.style.display = 'none';
-          setMapPlaceholder('No se pudo cargar el mapa.');
-        });
-    }, 420);
-  });
-  inp.addEventListener('blur', function() {
-    setTimeout(function(){ sugg.style.display = 'none'; }, 200);
-  });
-  inp.addEventListener('focus', function() {
-    if (sugg.innerHTML && this.value.length >= 4) sugg.style.display = 'block';
-  });
-})();
-function setAddressCoords(lat, lng, label) {
+function setAddressCoords(lat, lng, label, shouldRender) {
   const coordLat = document.getElementById('coordLat');
   const coordLng = document.getElementById('coordLng');
   const inpLat = document.getElementById('inpLat');
@@ -1309,7 +1383,9 @@ function setAddressCoords(lat, lng, label) {
   if (inpLat) inpLat.value = latFixed;
   if (inpLng) inpLng.value = lngFixed;
   if (box) box.style.display = 'block';
-  renderAddressMap(latFixed, lngFixed, label || document.getElementById('inpDireccion')?.value || '');
+  if (shouldRender !== false) {
+    renderAddressMap(latFixed, lngFixed, label || document.getElementById('inpDireccion')?.value || '');
+  }
 }
 function clearAddressCoords() {
   const coordLat = document.getElementById('coordLat');
@@ -1324,6 +1400,156 @@ function clearAddressCoords() {
   if (box) box.style.display = 'none';
   setMapPlaceholder('Escribe la direccion para cargar la ubicacion en el mapa.');
 }
+
+function geocodeAddressGoogle(query, onResult, onEmpty) {
+  if (!GOOGLE_MAPS_ENABLED || !query) return false;
+  ensureRstGoogleMaps(function(ok) {
+    if (!ok || !window.google || !google.maps) {
+      if (onEmpty) onEmpty();
+      return;
+    }
+    rstGoogleGeocoder = rstGoogleGeocoder || new google.maps.Geocoder();
+    rstGoogleGeocoder.geocode({
+      address: query,
+      componentRestrictions: { country: 'MX' }
+    }, function(results, status) {
+      if (status === 'OK' && results && results[0] && results[0].geometry) {
+        const loc = results[0].geometry.location;
+        onResult({
+          address: results[0].formatted_address || query,
+          lat: loc.lat(),
+          lng: loc.lng()
+        });
+      } else if (onEmpty) {
+        onEmpty();
+      }
+    });
+  });
+  return true;
+}
+
+function reverseGeocodePosition(lat, lng) {
+  if (!GOOGLE_MAPS_ENABLED) return;
+  ensureRstGoogleMaps(function(ok) {
+    if (!ok || !window.google || !google.maps) return;
+    rstGoogleGeocoder = rstGoogleGeocoder || new google.maps.Geocoder();
+    rstGoogleGeocoder.geocode({ location: { lat: lat, lng: lng } }, function(results, status) {
+      if (status === 'OK' && results && results[0]) {
+        const inp = document.getElementById('inpDireccion');
+        if (inp) inp.value = results[0].formatted_address;
+        setMapNote('Punto ajustado desde el marcador.', '#065F46');
+      }
+    });
+  });
+}
+
+function initGoogleAddressSearch() {
+  const inp = document.getElementById('inpDireccion');
+  const sugg = document.getElementById('addrSugg');
+  if (!inp) return false;
+  if (sugg) sugg.style.display = 'none';
+
+  ensureRstGoogleMaps(function(ok) {
+    if (!ok || !window.google || !google.maps || !google.maps.places) {
+      initFreeAddressSearch();
+      return;
+    }
+    rstGoogleGeocoder = rstGoogleGeocoder || new google.maps.Geocoder();
+    if (!rstGoogleAutocomplete) {
+      rstGoogleAutocomplete = new google.maps.places.Autocomplete(inp, {
+        fields: ['formatted_address', 'geometry', 'name'],
+        componentRestrictions: { country: 'mx' }
+      });
+      rstGoogleAutocomplete.addListener('place_changed', function() {
+        const place = rstGoogleAutocomplete.getPlace();
+        if (!place || !place.geometry || !place.geometry.location) {
+          setMapNote('Elige una sugerencia de Google para fijar coordenadas.', '#B45309');
+          return;
+        }
+        const label = place.formatted_address || place.name || inp.value;
+        inp.value = label;
+        setAddressCoords(place.geometry.location.lat(), place.geometry.location.lng(), label);
+      });
+    }
+    if (!rstGoogleInputBound) {
+      rstGoogleInputBound = true;
+      let timer;
+      inp.addEventListener('input', function() {
+        clearTimeout(timer);
+        clearAddressCoords();
+        const q = this.value.trim();
+        if (q.length < 6) return;
+        timer = setTimeout(function() {
+          geocodeAddressGoogle(q, function(result) {
+            setAddressCoords(result.lat, result.lng, result.address);
+          }, function() {
+            setMapNote('No se encontro esa direccion en Google Maps.', '#B45309');
+          });
+        }, 700);
+      });
+    }
+  });
+  return true;
+}
+
+function searchAddressFree(query, limit, onResult, onError) {
+  fetch('https://nominatim.openstreetmap.org/search?format=json&limit=' + limit + '&addressdetails=0&q=' + encodeURIComponent(query))
+    .then(function(r){ return r.json(); })
+    .then(function(data){ onResult(data || []); })
+    .catch(function(){ if (onError) onError(); });
+}
+
+function initFreeAddressSearch() {
+  const inp  = document.getElementById('inpDireccion');
+  const sugg = document.getElementById('addrSugg');
+  if (!inp || !sugg) return;
+  if (rstFreeInputBound) return;
+  rstFreeInputBound = true;
+  let timer;
+  inp.addEventListener('input', function() {
+    clearTimeout(timer);
+    clearAddressCoords();
+    const q = this.value.trim();
+    if (q.length < 4) { sugg.style.display = 'none'; return; }
+    timer = setTimeout(function() {
+      searchAddressFree(q, 6, function(data) {
+        if (!data.length) {
+          sugg.style.display = 'none';
+          setMapPlaceholder('No se encontro la direccion en el mapa.');
+          return;
+        }
+        var firstLat = parseFloat(data[0].lat);
+        var firstLng = parseFloat(data[0].lon);
+        if (isFinite(firstLat) && isFinite(firstLng)) {
+          setAddressCoords(firstLat.toFixed(6), firstLng.toFixed(6), data[0].display_name);
+        }
+        sugg.innerHTML = data.map(function(item) {
+          var rawName = item.display_name || '';
+          var name = escapeHtml(rawName);
+          var lat = parseFloat(item.lat);
+          var lng = parseFloat(item.lon);
+          return '<div class="addr-opt" onmousedown="addrSelect(event,this)" data-val="' + escapeAttr(rawName) + '"'
+            + ' data-lat="' + (isFinite(lat) ? lat.toFixed(6) : '') + '"'
+            + ' data-lng="' + (isFinite(lng) ? lng.toFixed(6) : '') + '"'
+            + ' style="padding:9px 13px;cursor:pointer;font-size:.82rem;color:#374151;border-bottom:1px solid #F3F4F6;display:flex;align-items:flex-start;gap:8px">'
+            + '<span style="flex-shrink:0;color:var(--cp)">Pin</span>'
+            + '<span>' + name + '</span></div>';
+        }).join('');
+        sugg.style.display = 'block';
+      }, function() {
+        sugg.style.display = 'none';
+        setMapPlaceholder('No se pudo cargar el mapa.');
+      });
+    }, 420);
+  });
+  inp.addEventListener('blur', function() {
+    setTimeout(function(){ sugg.style.display = 'none'; }, 200);
+  });
+  inp.addEventListener('focus', function() {
+    if (sugg.innerHTML && this.value.length >= 4) sugg.style.display = 'block';
+  });
+}
+
 function addrSelect(e, el) {
   e.preventDefault();
   document.getElementById('inpDireccion').value = el.dataset.val;
@@ -1354,21 +1580,87 @@ document.addEventListener('mouseout', function(e) {
   const inp = document.getElementById('inpDireccion');
   const lat = document.getElementById('inpLat')?.value;
   const lng = document.getElementById('inpLng')?.value;
+  const useLocationBtn = document.getElementById('btnUseLocation');
+  const centerMapBtn = document.getElementById('btnCenterMap');
+
+  if (GOOGLE_MAPS_ENABLED) {
+    initGoogleAddressSearch();
+  } else {
+    initFreeAddressSearch();
+  }
+
+  if (useLocationBtn) {
+    useLocationBtn.addEventListener('click', function() {
+      if (!navigator.geolocation) {
+        setMapNote('Tu navegador no permite obtener ubicacion.', '#B45309');
+        return;
+      }
+      useLocationBtn.disabled = true;
+      navigator.geolocation.getCurrentPosition(function(pos) {
+        useLocationBtn.disabled = false;
+        const nextLat = pos.coords.latitude;
+        const nextLng = pos.coords.longitude;
+        setAddressCoords(nextLat, nextLng, inp?.value || 'Ubicacion actual');
+        reverseGeocodePosition(nextLat, nextLng);
+      }, function() {
+        useLocationBtn.disabled = false;
+        setMapNote('No se pudo obtener tu ubicacion.', '#B45309');
+      }, { enableHighAccuracy: true, timeout: 9000 });
+    });
+  }
+
+  if (centerMapBtn) {
+    centerMapBtn.addEventListener('click', function() {
+      const savedLat = document.getElementById('inpLat')?.value;
+      const savedLng = document.getElementById('inpLng')?.value;
+      if (savedLat && savedLng) {
+        renderAddressMap(savedLat, savedLng, inp?.value || '');
+        return;
+      }
+      const q = inp?.value.trim() || '';
+      if (q.length < 4) {
+        renderAddressMap(DEFAULT_REST_CENTER.lat, DEFAULT_REST_CENTER.lng, 'Centro de referencia');
+        setMapNote('Escribe una direccion o usa tu ubicacion para fijar el punto exacto.', '#B45309');
+        return;
+      }
+      if (GOOGLE_MAPS_ENABLED) {
+        geocodeAddressGoogle(q, function(result) {
+          setAddressCoords(result.lat, result.lng, result.address);
+        }, function() {
+          setMapNote('No se encontro esa direccion en Google Maps.', '#B45309');
+        });
+      } else {
+        searchAddressFree(q, 1, function(data) {
+          if (data && data[0]) {
+            setAddressCoords(data[0].lat, data[0].lon, data[0].display_name);
+          } else {
+            setMapPlaceholder('No se encontro la direccion en el mapa.');
+          }
+        }, function(){ setMapPlaceholder('No se pudo cargar el mapa.'); });
+      }
+    });
+  }
+
   if (lat && lng) {
     setAddressCoords(lat, lng, inp?.value || '');
     return;
   }
   if (inp && inp.value.trim().length >= 4) {
-    fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&addressdetails=0&q=' + encodeURIComponent(inp.value.trim()))
-      .then(function(r){ return r.json(); })
-      .then(function(data) {
+    if (GOOGLE_MAPS_ENABLED) {
+      geocodeAddressGoogle(inp.value.trim(), function(result) {
+        setAddressCoords(result.lat, result.lng, result.address);
+      }, function() {
+        setMapPlaceholder('No se encontro la direccion en Google Maps.');
+      });
+    } else {
+      searchAddressFree(inp.value.trim(), 1, function(data) {
         if (data && data[0]) {
           setAddressCoords(data[0].lat, data[0].lon, data[0].display_name);
         } else {
           setMapPlaceholder('No se encontro la direccion en el mapa.');
         }
-      })
-      .catch(function(){ setMapPlaceholder('No se pudo cargar el mapa.'); });
+      }, function(){ setMapPlaceholder('No se pudo cargar el mapa.'); });
+    }
   } else {
     setMapPlaceholder('Escribe la direccion para cargar la ubicacion en el mapa.');
   }

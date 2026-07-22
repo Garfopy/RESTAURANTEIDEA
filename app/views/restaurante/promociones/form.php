@@ -488,6 +488,13 @@ $promoId     = (int)($promoId ?? $promo['id'] ?? 0);
       option.textContent = (product.nombre || ('Producto ' + product.id)) + categoria + precio;
       productsSelect.appendChild(option);
     });
+    if (promoCatalog.products.length === 0) {
+      var emptyProduct = document.createElement('option');
+      emptyProduct.value = '';
+      emptyProduct.disabled = true;
+      emptyProduct.textContent = 'No hay productos activos para este restaurante';
+      productsSelect.appendChild(emptyProduct);
+    }
 
     promoCatalog.categories.forEach(function(category) {
       var option = document.createElement('option');
@@ -495,6 +502,13 @@ $promoId     = (int)($promoId ?? $promo['id'] ?? 0);
       option.textContent = category.nombre || ('Categoria ' + category.id);
       categoriesSelect.appendChild(option);
     });
+    if (promoCatalog.categories.length === 0) {
+      var emptyCategory = document.createElement('option');
+      emptyCategory.value = '';
+      emptyCategory.disabled = true;
+      emptyCategory.textContent = 'No hay categorias activas para este restaurante';
+      categoriesSelect.appendChild(emptyCategory);
+    }
 
     aplicarScopePendiente();
     actualizarResumenPromo();

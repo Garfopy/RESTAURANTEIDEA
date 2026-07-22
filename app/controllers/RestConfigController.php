@@ -449,8 +449,8 @@ class RestConfigController extends BaseController
         $restaurante   = $this->model->find($restauranteId);
         $flash         = $this->getFlash();
 
-        // Google Maps API key from global_settings (superadmin-configured)
-        $mapsApiKey = '';
+        // Google Maps API key from env/config, overridable by global_settings.
+        $mapsApiKey = defined('GOOGLE_MAPS_KEY') ? (string) GOOGLE_MAPS_KEY : '';
         // Payment / Stripe config from global_settings
         $cfgPagos = [];
         $cfgCarniHub = [];
@@ -459,7 +459,7 @@ class RestConfigController extends BaseController
             $stmt = $db->prepare("SELECT valor FROM global_settings WHERE clave = 'google_maps_key' LIMIT 1");
             $stmt->execute();
             $row = $stmt->fetch(\PDO::FETCH_ASSOC);
-            $mapsApiKey = $row['valor'] ?? '';
+            $mapsApiKey = trim((string)($row['valor'] ?? '')) !== '' ? (string) $row['valor'] : $mapsApiKey;
 
             // Pagos (comensales + app móvil)
             $clavesPagos = ['stripe_public_key','stripe_secret_key','metodos_pago_habilitados',

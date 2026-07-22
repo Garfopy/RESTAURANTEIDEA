@@ -4243,53 +4243,142 @@ class ApiController extends BaseController
     {
         $empresaId = (int)$jwtUser['empresa_id'];
         $restauranteId = $this->adminRestauranteIdByEmpresa($empresaId);
-        if (!$restauranteId) {
-            $this->adminApiError('No se encontro restaurante vinculado para tu empresa.', 404);
+        $candidateIds = [];
+        $sessionRestauranteId = (int)($_SESSION['restaurante_activo_id'] ?? 0);
+        foreach ([$sessionRestauranteId, $restauranteId] as $candidateId) {
+            $candidateId = (int)$candidateId;
+            if ($candidateId > 0 && !in_array($candidateId, $candidateIds, true)) {
+                $candidateIds[] = $candidateId;
+            }
         }
 
         $db = Database::getInstance();
-        $categories = [];
-        $products = [];
+        if ($this->adminTableExists('rest_restaurantes')) {
+            try {
+                $restaurantOrder = $this->adminColumnExists('rest_restaurantes', 'menu_principal')
+                    ? 'menu_principal DESC, id ASC'
+                    : 'id ASC';
+                $restaurantActiveWhere = $this->adminColumnExists('rest_restaurantes', 'activo')
+                    ? 'AND COALESCE(activo, 1) = 1'
+                    : '';
+                $stmt = $db->prepare(
+                    "SELECT id
+                       FROM rest_restaurantes
+                      WHERE empresa_id = ?
+                        {$restaurantActiveWhere}
+                      ORDER BY {$restaurantOrder}"
+                );
+                $stmt->execute([$empresaId]);
+                foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) ?: [] as $id) {
+                    $id = (int)$id;
+                    if ($id > 0 && !in_array($id, $candidateIds, true)) {
+                        $candidateIds[] = $id;
+                    }
+                }
 
-        if ($this->adminTableExists('rest_categorias_menu')) {
-            $stmt = $db->prepare(
-                "SELECT id, nombre, descripcion, activo
-                   FROM rest_categorias_menu
-                  WHERE restaurante_id = ?
-                    AND COALESCE(activo, 1) = 1
-                  ORDER BY orden ASC, nombre ASC"
-            );
-            $stmt->execute([$restauranteId]);
-            $categories = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+                if (!$candidateIds) {
+                    $singleActive = $db->query(
+                        "SELECT id
+                           FROM rest_restaurantes
+                          " . ($restaurantActiveWhere !== '' ? "WHERE COALESCE(activo, 1) = 1" : "") . "
+                          ORDER BY id ASC
+                          LIMIT 2"
+                    )->fetchAll(PDO::FETCH_COLUMN) ?: [];
+                    if (count($singleActive) === 1) {
+                        $candidateIds[] = (int)$singleActive[0];
+                    }
+                }
+            } catch (\Throwable $e) {
+                error_log('[adminPromotionCatalog] No se pudieron resolver restaurantes candidatos: ' . $e->getMessage());
+            }
         }
 
-        if ($this->adminTableExists('rest_platillos')) {
-            $categoryJoin = $this->adminTableExists('rest_categorias_menu')
-                ? " LEFT JOIN rest_categorias_menu c ON c.id = p.categoria_id"
-                : "";
-            $categoryName = $this->adminTableExists('rest_categorias_menu') ? "c.nombre" : "''";
-            $stmt = $db->prepare(
-                "SELECT p.id,
-                        p.nombre,
-                        p.descripcion,
-                        p.precio,
-                        p.categoria_id,
-                        {$categoryName} AS categoria_nombre
-                   FROM rest_platillos p
-                   {$categoryJoin}
-                  WHERE p.restaurante_id = ?
-                    AND COALESCE(p.activo, 1) = 1
-                    AND COALESCE(p.disponible, 1) = 1
-                  ORDER BY categoria_nombre ASC, p.nombre ASC"
-            );
-            $stmt->execute([$restauranteId]);
-            $products = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        if (!$candidateIds) {
+            $this->adminApiError('No se encontro restaurante vinculado para tu empresa.', 404);
+        }
+
+        $categories = [];
+        $products = [];
+        $usedRestauranteId = (int)$candidateIds[0];
+
+        foreach ($candidateIds as $candidateId) {
+            $candidateId = (int)$candidateId;
+            $candidateCategories = [];
+            $candidateProducts = [];
+
+            if ($this->adminTableExists('rest_categorias_menu')) {
+                $categoryActiveWhere = $this->adminColumnExists('rest_categorias_menu', 'activo')
+                    ? ' AND COALESCE(activo, 1) = 1'
+                    : '';
+                $categoryOrder = $this->adminColumnExists('rest_categorias_menu', 'orden')
+                    ? 'orden ASC, nombre ASC'
+                    : 'nombre ASC';
+                $stmt = $db->prepare(
+                    "SELECT id,
+                            nombre,
+                            " . ($this->adminColumnExists('rest_categorias_menu', 'descripcion') ? 'descripcion' : "'' AS descripcion") . ",
+                            " . ($this->adminColumnExists('rest_categorias_menu', 'activo') ? 'activo' : '1 AS activo') . "
+                       FROM rest_categorias_menu
+                      WHERE restaurante_id = ?
+                            {$categoryActiveWhere}
+                      ORDER BY {$categoryOrder}"
+                );
+                $stmt->execute([$candidateId]);
+                $candidateCategories = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            }
+
+            if ($this->adminTableExists('rest_platillos')) {
+                $hasCategories = $this->adminTableExists('rest_categorias_menu');
+                $categoryJoin = $hasCategories
+                    ? " LEFT JOIN rest_categorias_menu c ON c.id = p.categoria_id"
+                        . ($this->adminColumnExists('rest_categorias_menu', 'restaurante_id') ? " AND c.restaurante_id = p.restaurante_id" : "")
+                    : "";
+                $categoryName = $hasCategories ? "COALESCE(c.nombre, '')" : "''";
+                $productActiveWhere = $this->adminColumnExists('rest_platillos', 'activo')
+                    ? ' AND COALESCE(p.activo, 1) = 1'
+                    : '';
+                $productAvailableWhere = $this->adminColumnExists('rest_platillos', 'disponible')
+                    ? ' AND COALESCE(p.disponible, 1) = 1'
+                    : '';
+                $priceExpr = $this->adminColumnExists('rest_platillos', 'precio')
+                    ? 'p.precio'
+                    : ($this->adminColumnExists('rest_platillos', 'precio_base') ? 'p.precio_base' : '0');
+                $descriptionExpr = $this->adminColumnExists('rest_platillos', 'descripcion')
+                    ? 'p.descripcion'
+                    : "''";
+                $stmt = $db->prepare(
+                    "SELECT p.id,
+                            p.nombre,
+                            {$descriptionExpr} AS descripcion,
+                            {$priceExpr} AS precio,
+                            " . ($this->adminColumnExists('rest_platillos', 'categoria_id') ? 'p.categoria_id' : 'NULL AS categoria_id') . ",
+                            {$categoryName} AS categoria_nombre
+                       FROM rest_platillos p
+                       {$categoryJoin}
+                      WHERE p.restaurante_id = ?
+                            {$productActiveWhere}
+                            {$productAvailableWhere}
+                      ORDER BY categoria_nombre ASC, p.nombre ASC"
+                );
+                $stmt->execute([$candidateId]);
+                $candidateProducts = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            }
+
+            if ($candidateProducts || $candidateCategories || (!$categories && !$products)) {
+                $usedRestauranteId = $candidateId;
+                $categories = $candidateCategories;
+                $products = $candidateProducts;
+            }
+            if ($candidateProducts) {
+                break;
+            }
         }
 
         $this->adminApiOk('Catalogo de promociones obtenido correctamente', [
             'categories' => $categories,
             'products' => $products,
-            'restaurante_id' => $restauranteId,
+            'restaurante_id' => $usedRestauranteId,
+            'candidate_restaurante_ids' => $candidateIds,
         ]);
     }
 
@@ -4396,12 +4485,7 @@ class ApiController extends BaseController
                      ORDER BY mp.id DESC
                      LIMIT 100";
             $rows = $db->query($sql)->fetchAll(PDO::FETCH_ASSOC) ?: [];
-            foreach ($rows as &$row) {
-                $tokens = $this->adminPromotionPushTokens((int)($row['usuario_id'] ?? 0));
-                $row['push_token_count'] = count($tokens);
-                $row['has_push_token'] = !empty($tokens) ? 1 : 0;
-            }
-            unset($row);
+            $this->adminAttachPromotionPushState($rows);
             return $rows;
         }
 
@@ -4463,12 +4547,7 @@ class ApiController extends BaseController
         );
         $stmt->execute([$restauranteId]);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-        foreach ($rows as &$row) {
-            $tokens = $this->adminPromotionPushTokens((int)($row['usuario_id'] ?? 0));
-            $row['push_token_count'] = count($tokens);
-            $row['has_push_token'] = !empty($tokens) ? 1 : 0;
-        }
-        unset($row);
+        $this->adminAttachPromotionPushState($rows);
 
         return $rows;
     }
@@ -4921,6 +5000,7 @@ class ApiController extends BaseController
                     $invalidated++;
                     $this->adminDisablePromotionPushToken(
                         (string)($tokenRow['_table'] ?? ''),
+                        (string)($tokenRow['_token_column'] ?? 'fcm_token'),
                         (int)($tokenRow['id'] ?? 0),
                         $usuarioId,
                         $token
@@ -4996,25 +5076,99 @@ class ApiController extends BaseController
         ];
     }
 
+    private function adminAttachPromotionPushState(array &$rows): void
+    {
+        $cache = [];
+        foreach ($rows as &$row) {
+            $usuarioId = (int)($row['usuario_id'] ?? 0);
+            if (!array_key_exists($usuarioId, $cache)) {
+                $cache[$usuarioId] = $this->adminPromotionPushTokens($usuarioId);
+            }
+            $row['push_token_count'] = count($cache[$usuarioId]);
+            $row['has_push_token'] = !empty($cache[$usuarioId]) ? 1 : 0;
+        }
+        unset($row);
+    }
+
+    private function adminPromotionPushTokenSource(): ?array
+    {
+        static $resolved = false;
+        static $cached = null;
+        if ($resolved) {
+            return $cached;
+        }
+
+        $preferredTables = ['mobile_push_tokens', 'push_tokens', 'mobile_tokens', 'mobile_fcm_tokens', 'notification_tokens'];
+        $userColumns = ['usuario_id', 'mobile_usuario_id', 'mobile_user_id', 'user_id', 'cliente_id', 'comensal_id'];
+        $tokenColumns = ['fcm_token', 'token', 'device_token', 'push_token', 'notification_token', 'expo_push_token'];
+
+        $checkTable = function (string $table) use ($userColumns, $tokenColumns): ?array {
+            if (!preg_match('/^[a-zA-Z0-9_]+$/', $table) || !$this->adminTableExists($table)) {
+                return null;
+            }
+            $userCol = $this->adminFirstExistingColumn($table, $userColumns);
+            $tokenCol = $this->adminFirstExistingColumn($table, $tokenColumns);
+            if (!$userCol || !$tokenCol) {
+                return null;
+            }
+            return [
+                'table' => $table,
+                'user_column' => $userCol,
+                'token_column' => $tokenCol,
+            ];
+        };
+
+        foreach ($preferredTables as $table) {
+            $source = $checkTable($table);
+            if ($source) {
+                $resolved = true;
+                $cached = $source;
+                return $cached;
+            }
+        }
+
+        try {
+            $db = Database::getInstance();
+            $tables = $db->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN) ?: [];
+            foreach ($tables as $table) {
+                $table = (string)$table;
+                if (!preg_match('/(?:push|fcm|notification).*token|token.*(?:push|fcm|notification)/i', $table)) {
+                    continue;
+                }
+                $source = $checkTable($table);
+                if ($source) {
+                    $resolved = true;
+                    $cached = $source;
+                    return $cached;
+                }
+            }
+        } catch (\Throwable $e) {
+            error_log('[adminPromotionPushTokenSource] No se pudo buscar tabla de tokens: ' . $e->getMessage());
+        }
+
+        $resolved = true;
+        $cached = null;
+        return $cached;
+    }
+
     private function adminPromotionPushTokens(int $usuarioId): array
     {
         if ($usuarioId <= 0) {
             return [];
         }
 
-        $table = $this->adminFindTableByColumns(
-            ['usuario_id', 'fcm_token'],
-            ['mobile_push_tokens', 'push_tokens', 'mobile_tokens', 'mobile_fcm_tokens']
-        );
-
-        if (!$table) {
+        $source = $this->adminPromotionPushTokenSource();
+        if (!$source) {
             return [];
         }
 
+        $table = (string)$source['table'];
+        $userCol = (string)$source['user_column'];
+        $tokenCol = (string)$source['token_column'];
         $enabledCol = $this->adminFirstExistingColumn($table, ['enabled', 'activo', 'active', 'is_active']);
         $idCol = $this->adminColumnExists($table, 'id') ? 'id' : null;
         $platformCol = $this->adminFirstExistingColumn($table, ['platform', 'plataforma', 'os']);
-        $where = ['usuario_id = ?'];
+        $where = ["`{$userCol}` = ?"];
         if ($enabledCol) {
             $where[] = "COALESCE(`{$enabledCol}`, 1) = 1";
         }
@@ -5023,11 +5177,11 @@ class ApiController extends BaseController
         $stmt = $db->prepare(
             "SELECT " . ($idCol ? "`{$idCol}` AS id," : "NULL AS id,")
                 . ($platformCol ? " `{$platformCol}` AS platform," : " NULL AS platform,")
-                . " fcm_token AS token
+                . " `{$tokenCol}` AS token
                FROM `{$table}`
               WHERE " . implode(' AND ', $where) . "
-                AND fcm_token <> ''
-              ORDER BY " . ($idCol ? "`{$idCol}`" : "usuario_id") . " DESC"
+                AND TRIM(COALESCE(`{$tokenCol}`, '')) <> ''
+              ORDER BY " . ($idCol ? "`{$idCol}`" : "`{$userCol}`") . " DESC"
         );
         $stmt->execute([$usuarioId]);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
@@ -5036,15 +5190,15 @@ class ApiController extends BaseController
                 $totalStmt = $db->prepare(
                     "SELECT COUNT(*)
                        FROM `{$table}`
-                      WHERE usuario_id = ?
-                        AND fcm_token <> ''"
+                      WHERE `{$userCol}` = ?
+                        AND TRIM(COALESCE(`{$tokenCol}`, '')) <> ''"
                 );
                 $totalStmt->execute([$usuarioId]);
                 $totalTokens = (int)$totalStmt->fetchColumn();
                 if ($totalTokens > 0 && $enabledCol) {
-                    error_log('[adminPromotionPushTokens] Usuario ' . $usuarioId . ' tiene tokens push, pero ninguno activo.');
+                    error_log('[adminPromotionPushTokens] Usuario ' . $usuarioId . ' tiene tokens push, pero ninguno activo en ' . $table . '.');
                 } else {
-                    error_log('[adminPromotionPushTokens] Usuario ' . $usuarioId . ' no tiene tokens push registrados.');
+                    error_log('[adminPromotionPushTokens] Usuario ' . $usuarioId . ' no tiene tokens push registrados en ' . $table . '.');
                 }
             } catch (\Throwable $e) {
                 error_log('[adminPromotionPushTokens] No se pudo diagnosticar tokens usuario=' . $usuarioId . ': ' . $e->getMessage());
@@ -5052,6 +5206,7 @@ class ApiController extends BaseController
         }
         foreach ($rows as &$row) {
             $row['_table'] = $table;
+            $row['_token_column'] = $tokenCol;
         }
         unset($row);
         return $rows;
@@ -5065,9 +5220,12 @@ class ApiController extends BaseController
             || str_contains($error, 'REQUESTED ENTITY WAS NOT FOUND');
     }
 
-    private function adminDisablePromotionPushToken(string $table, int $tokenId, int $usuarioId, string $token): void
+    private function adminDisablePromotionPushToken(string $table, string $tokenColumn, int $tokenId, int $usuarioId, string $token): void
     {
         if ($table === '' || !preg_match('/^[a-zA-Z0-9_]+$/', $table) || !$this->adminTableExists($table)) {
+            return;
+        }
+        if (!preg_match('/^[a-zA-Z0-9_]+$/', $tokenColumn) || !$this->adminColumnExists($table, $tokenColumn)) {
             return;
         }
 
@@ -5082,7 +5240,11 @@ class ApiController extends BaseController
                 $stmt = $db->prepare("UPDATE `{$table}` SET `{$enabledCol}` = 0 WHERE id = ?");
                 $stmt->execute([$tokenId]);
             } else {
-                $stmt = $db->prepare("UPDATE `{$table}` SET `{$enabledCol}` = 0 WHERE usuario_id = ? AND fcm_token = ?");
+                $userCol = $this->adminFirstExistingColumn($table, ['usuario_id', 'mobile_usuario_id', 'mobile_user_id', 'user_id', 'cliente_id', 'comensal_id']);
+                if (!$userCol) {
+                    return;
+                }
+                $stmt = $db->prepare("UPDATE `{$table}` SET `{$enabledCol}` = 0 WHERE `{$userCol}` = ? AND `{$tokenColumn}` = ?");
                 $stmt->execute([$usuarioId, $token]);
             }
             error_log('[adminDisablePromotionPushToken] Token FCM invalido desactivado usuario=' . $usuarioId . ' token_id=' . ($tokenId ?: 'null'));
