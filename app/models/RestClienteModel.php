@@ -1141,47 +1141,114 @@ class RestClienteModel extends BaseModel
 
     public function getPromocionesMobileActivas(int $mobileUsuarioId): array
     {
-        if ($mobileUsuarioId <= 0 || !$this->tableExists('mobile_promociones')) {
+        if ($mobileUsuarioId <= 0) {
             return [];
         }
 
-        $productoSelect = $this->columnExists('mobile_promociones', 'producto_id')
-            ? 'producto_id, producto_id AS platillo_id,'
-            : 'NULL AS producto_id, NULL AS platillo_id,';
-        $ruleSelects = [
-            $this->columnExists('mobile_promociones', 'tipo_descuento') ? 'tipo_descuento' : "'porcentaje' AS tipo_descuento",
-            $this->columnExists('mobile_promociones', 'valor_descuento') ? 'valor_descuento' : '0 AS valor_descuento',
-            $this->columnExists('mobile_promociones', 'scope_tipo') ? 'scope_tipo' : "'all' AS scope_tipo",
-            $this->columnExists('mobile_promociones', 'scope_ids') ? 'scope_ids' : 'NULL AS scope_ids',
-            $this->columnExists('mobile_promociones', 'buy_qty') ? 'buy_qty' : 'NULL AS buy_qty',
-            $this->columnExists('mobile_promociones', 'pay_qty') ? 'pay_qty' : 'NULL AS pay_qty',
-            $this->columnExists('mobile_promociones', 'min_subtotal') ? 'min_subtotal' : '0 AS min_subtotal',
-            $this->columnExists('mobile_promociones', 'max_uses') ? 'max_uses' : 'NULL AS max_uses',
-            $this->columnExists('mobile_promociones', 'combinable') ? 'combinable' : '0 AS combinable',
-        ];
-        $ruleSelect = implode(",\n                    ", $ruleSelects) . ',';
+        $promociones = [];
 
-        return $this->query(
-            "SELECT id,
-                    usuario_id,
-                    {$productoSelect}
-                    {$ruleSelect}
-                    titulo,
-                    descripcion,
-                    imagen,
-                    deep_link,
-                    code,
-                    code AS texto_copiar,
-                    activo,
-                    expires_at,
-                    created_at
-             FROM mobile_promociones
-             WHERE usuario_id = ?
-               AND activo = 1
-               AND (expires_at IS NULL OR expires_at >= NOW())
-             ORDER BY created_at DESC, id DESC",
-            [$mobileUsuarioId]
-        );
+        if ($this->tableExists('mobile_promociones')) {
+            $productoSelect = $this->columnExists('mobile_promociones', 'producto_id')
+                ? 'producto_id, producto_id AS platillo_id,'
+                : 'NULL AS producto_id, NULL AS platillo_id,';
+            $ruleSelects = [
+                $this->columnExists('mobile_promociones', 'tipo_descuento') ? 'tipo_descuento' : "'porcentaje' AS tipo_descuento",
+                $this->columnExists('mobile_promociones', 'valor_descuento') ? 'valor_descuento' : '0 AS valor_descuento',
+                $this->columnExists('mobile_promociones', 'scope_tipo') ? 'scope_tipo' : "'all' AS scope_tipo",
+                $this->columnExists('mobile_promociones', 'scope_ids') ? 'scope_ids' : 'NULL AS scope_ids',
+                $this->columnExists('mobile_promociones', 'buy_qty') ? 'buy_qty' : 'NULL AS buy_qty',
+                $this->columnExists('mobile_promociones', 'pay_qty') ? 'pay_qty' : 'NULL AS pay_qty',
+                $this->columnExists('mobile_promociones', 'min_subtotal') ? 'min_subtotal' : '0 AS min_subtotal',
+                $this->columnExists('mobile_promociones', 'max_uses') ? 'max_uses' : 'NULL AS max_uses',
+                $this->columnExists('mobile_promociones', 'combinable') ? 'combinable' : '0 AS combinable',
+            ];
+            $ruleSelect = implode(",\n                    ", $ruleSelects) . ',';
+
+            $promociones = array_merge($promociones, $this->query(
+                "SELECT id,
+                        'mobile' AS source,
+                        usuario_id,
+                        {$productoSelect}
+                        {$ruleSelect}
+                        titulo,
+                        descripcion,
+                        imagen,
+                        deep_link,
+                        code,
+                        code AS texto_copiar,
+                        activo,
+                        expires_at,
+                        created_at
+                 FROM mobile_promociones
+                 WHERE usuario_id = ?
+                   AND activo = 1
+                   AND (expires_at IS NULL OR expires_at >= NOW())",
+                [$mobileUsuarioId]
+            ));
+        }
+
+        if ($this->tableExists('rest_promociones')) {
+            $tipoExpr = $this->columnExists('rest_promociones', 'tipo') ? 'tipo AS tipo_descuento' : "'porcentaje' AS tipo_descuento";
+            $valorExpr = $this->columnExists('rest_promociones', 'valor_descuento') ? 'valor_descuento' : '0 AS valor_descuento';
+            $imagenExpr = $this->columnExists('rest_promociones', 'imagen') ? 'imagen' : "'' AS imagen";
+            $deepLinkExpr = $this->columnExists('rest_promociones', 'deep_link') ? 'deep_link' : "'' AS deep_link";
+            $expiresExpr = $this->columnExists('rest_promociones', 'expires_at')
+                ? 'expires_at'
+                : ($this->columnExists('rest_promociones', 'fecha_fin') ? "CONCAT(fecha_fin, ' 23:59:59') AS expires_at" : 'NULL AS expires_at');
+            $createdExpr = $this->columnExists('rest_promociones', 'created_at') ? 'created_at' : 'NULL AS created_at';
+
+            $promociones = array_merge($promociones, $this->query(
+                "SELECT id,
+                        'rest' AS source,
+                        usuario_id,
+                        NULL AS producto_id,
+                        NULL AS platillo_id,
+                        {$tipoExpr},
+                        {$valorExpr},
+                        'all' AS scope_tipo,
+                        NULL AS scope_ids,
+                        NULL AS buy_qty,
+                        NULL AS pay_qty,
+                        0 AS min_subtotal,
+                        NULL AS max_uses,
+                        0 AS combinable,
+                        titulo,
+                        descripcion,
+                        {$imagenExpr},
+                        {$deepLinkExpr},
+                        code,
+                        code AS texto_copiar,
+                        activo,
+                        {$expiresExpr},
+                        {$createdExpr}
+                 FROM rest_promociones
+                 WHERE usuario_id = ?
+                   AND activo = 1
+                   AND (" . ($this->columnExists('rest_promociones', 'expires_at') ? 'expires_at IS NULL OR expires_at >= NOW()' : 'fecha_fin >= CURDATE()') . ")",
+                [$mobileUsuarioId]
+            ));
+        }
+
+        $seen = [];
+        $unique = [];
+        foreach ($promociones as $promo) {
+            $key = trim((string)($promo['code'] ?? ''));
+            if ($key === '') {
+                $key = (string)($promo['source'] ?? '') . ':' . (string)($promo['id'] ?? '');
+            }
+            $key = strtoupper($key);
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $unique[] = $promo;
+        }
+
+        usort($unique, function (array $a, array $b): int {
+            return strcmp((string)($b['created_at'] ?? ''), (string)($a['created_at'] ?? ''));
+        });
+
+        return $unique;
     }
 
     public function ensurePromocionEnviosTable(): void

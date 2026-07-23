@@ -1282,42 +1282,87 @@ class ApiController extends BaseController
 
     private function findMobilePromotionForCalculation(int $mobileUsuarioId, int $promotionId, string $code): ?array
     {
-        if (!$this->adminTableExists('mobile_promociones')) {
+        $db = Database::getInstance();
+
+        if ($this->adminTableExists('mobile_promociones')) {
+            $this->adminEnsureMobilePromocionesTable();
+
+            $where = ["usuario_id = ?", "activo = 1", "(expires_at IS NULL OR expires_at >= NOW())"];
+            $params = [$mobileUsuarioId];
+            if ($promotionId > 0 && $code === '') {
+                $where[] = "id = ?";
+                $params[] = $promotionId;
+            } else {
+                $where[] = "code = ?";
+                $params[] = $code;
+            }
+
+            $sql = "SELECT id,
+                           " . $this->adminColumnExpr('mobile_promociones', 'mp', 'usuario_id', 'usuario_id', 'NULL') . ",
+                           " . $this->adminColumnExpr('mobile_promociones', 'mp', 'producto_id', 'producto_id', 'NULL') . ",
+                           " . $this->adminColumnExpr('mobile_promociones', 'mp', 'titulo', 'titulo', "''") . ",
+                           " . $this->adminColumnExpr('mobile_promociones', 'mp', 'descripcion', 'descripcion', "''") . ",
+                           " . $this->adminColumnExpr('mobile_promociones', 'mp', 'code', 'code', "''") . ",
+                           " . $this->adminColumnExpr('mobile_promociones', 'mp', 'tipo_descuento', 'tipo_descuento', "'porcentaje'") . ",
+                           " . $this->adminColumnExpr('mobile_promociones', 'mp', 'valor_descuento', 'valor_descuento', '0') . ",
+                           " . $this->adminColumnExpr('mobile_promociones', 'mp', 'scope_tipo', 'scope_tipo', "'all'") . ",
+                           " . $this->adminColumnExpr('mobile_promociones', 'mp', 'scope_ids', 'scope_ids', 'NULL') . ",
+                           " . $this->adminColumnExpr('mobile_promociones', 'mp', 'buy_qty', 'buy_qty', 'NULL') . ",
+                           " . $this->adminColumnExpr('mobile_promociones', 'mp', 'pay_qty', 'pay_qty', 'NULL') . ",
+                           " . $this->adminColumnExpr('mobile_promociones', 'mp', 'min_subtotal', 'min_subtotal', '0') . ",
+                           " . $this->adminColumnExpr('mobile_promociones', 'mp', 'max_uses', 'max_uses', 'NULL') . ",
+                           " . $this->adminColumnExpr('mobile_promociones', 'mp', 'combinable', 'combinable', '0') . "
+                      FROM mobile_promociones mp
+                     WHERE " . implode(' AND ', $where) . "
+                     LIMIT 1";
+
+            $stmt = $db->prepare($sql);
+            $stmt->execute($params);
+            $promotion = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($promotion) {
+                return $promotion;
+            }
+        }
+
+        if (!$this->adminTableExists('rest_promociones')) {
             return null;
         }
 
-        $this->adminEnsureMobilePromocionesTable();
-
-        $where = ["usuario_id = ?", "activo = 1", "(expires_at IS NULL OR expires_at >= NOW())"];
+        $where = ["p.usuario_id = ?", "p.activo = 1"];
         $params = [$mobileUsuarioId];
-        if ($promotionId > 0) {
-            $where[] = "id = ?";
+        if ($this->adminColumnExists('rest_promociones', 'expires_at')) {
+            $where[] = "(p.expires_at IS NULL OR p.expires_at >= NOW())";
+        } elseif ($this->adminColumnExists('rest_promociones', 'fecha_fin')) {
+            $where[] = "p.fecha_fin >= CURDATE()";
+        }
+        if ($promotionId > 0 && $code === '') {
+            $where[] = "p.id = ?";
             $params[] = $promotionId;
         } else {
-            $where[] = "code = ?";
+            $where[] = "p.code = ?";
             $params[] = $code;
         }
 
-        $sql = "SELECT id,
-                       " . $this->adminColumnExpr('mobile_promociones', 'mp', 'usuario_id', 'usuario_id', 'NULL') . ",
-                       " . $this->adminColumnExpr('mobile_promociones', 'mp', 'producto_id', 'producto_id', 'NULL') . ",
-                       " . $this->adminColumnExpr('mobile_promociones', 'mp', 'titulo', 'titulo', "''") . ",
-                       " . $this->adminColumnExpr('mobile_promociones', 'mp', 'descripcion', 'descripcion', "''") . ",
-                       " . $this->adminColumnExpr('mobile_promociones', 'mp', 'code', 'code', "''") . ",
-                       " . $this->adminColumnExpr('mobile_promociones', 'mp', 'tipo_descuento', 'tipo_descuento', "'porcentaje'") . ",
-                       " . $this->adminColumnExpr('mobile_promociones', 'mp', 'valor_descuento', 'valor_descuento', '0') . ",
-                       " . $this->adminColumnExpr('mobile_promociones', 'mp', 'scope_tipo', 'scope_tipo', "'all'") . ",
-                       " . $this->adminColumnExpr('mobile_promociones', 'mp', 'scope_ids', 'scope_ids', 'NULL') . ",
-                       " . $this->adminColumnExpr('mobile_promociones', 'mp', 'buy_qty', 'buy_qty', 'NULL') . ",
-                       " . $this->adminColumnExpr('mobile_promociones', 'mp', 'pay_qty', 'pay_qty', 'NULL') . ",
-                       " . $this->adminColumnExpr('mobile_promociones', 'mp', 'min_subtotal', 'min_subtotal', '0') . ",
-                       " . $this->adminColumnExpr('mobile_promociones', 'mp', 'max_uses', 'max_uses', 'NULL') . ",
-                       " . $this->adminColumnExpr('mobile_promociones', 'mp', 'combinable', 'combinable', '0') . "
-                  FROM mobile_promociones mp
-                 WHERE " . implode(' AND ', $where) . "
-                 LIMIT 1";
-
-        $stmt = Database::getInstance()->prepare($sql);
+        $stmt = $db->prepare(
+            "SELECT p.id,
+                    p.usuario_id,
+                    NULL AS producto_id,
+                    p.titulo,
+                    p.descripcion,
+                    p.code,
+                    " . ($this->adminColumnExists('rest_promociones', 'tipo') ? 'p.tipo' : "'porcentaje'") . " AS tipo_descuento,
+                    " . ($this->adminColumnExists('rest_promociones', 'valor_descuento') ? 'p.valor_descuento' : '0') . " AS valor_descuento,
+                    'all' AS scope_tipo,
+                    NULL AS scope_ids,
+                    NULL AS buy_qty,
+                    NULL AS pay_qty,
+                    0 AS min_subtotal,
+                    NULL AS max_uses,
+                    0 AS combinable
+               FROM rest_promociones p
+              WHERE " . implode(' AND ', $where) . "
+              LIMIT 1"
+        );
         $stmt->execute($params);
         $promotion = $stmt->fetch(PDO::FETCH_ASSOC);
         return $promotion ?: null;
@@ -3242,6 +3287,15 @@ class ApiController extends BaseController
         $promotion = $data['data']['promotion'] ?? $data['promotion'] ?? $data;
         if (is_array($promotion)) {
             $promotion = $this->adminNormalizePromotionList($empresaId, [$promotion])[0] ?? $promotion;
+            error_log(
+                '[adminGetPromotion] id=' . $id
+                . ' usuario_id=' . (int)($promotion['usuario_id'] ?? 0)
+                . ' email=' . (string)($promotion['usuario_email'] ?? '')
+                . ' has_push_token=' . (int)($promotion['has_push_token'] ?? 0)
+                . ' push_token_count=' . (int)($promotion['push_token_count'] ?? 0)
+                . ' notification_status=' . (string)($promotion['notification_status'] ?? '')
+                . ' notification_error=' . (string)($promotion['notification_error'] ?? '')
+            );
         }
 
         $this->adminApiOk('Promoción obtenida correctamente', $promotion);
@@ -3269,6 +3323,11 @@ class ApiController extends BaseController
         if (!empty($errors)) { $this->adminApiError('Error de validación', 422, $errors); }
 
         if (count($usuarioIds) > 1) {
+            if (trim((string)($body['code'] ?? '')) !== '') {
+                $this->adminApiError('Para crear promociones a varios usuarios deja el codigo vacio; se generara uno unico para cada usuario.', 422, [
+                    'code' => ['El codigo manual solo puede usarse con un usuario.'],
+                ]);
+            }
             $created = [];
             foreach ($usuarioIds as $usuarioId) {
                 $userBody = $body;
@@ -4335,6 +4394,20 @@ class ApiController extends BaseController
                     "SELECT p.restaurante_id
                        FROM rest_platillos p
                       WHERE p.restaurante_id IS NOT NULL
+                      GROUP BY p.restaurante_id
+                      ORDER BY COUNT(*) DESC, p.restaurante_id ASC"
+                );
+                foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) ?: [] as $id) {
+                    $id = (int)$id;
+                    if ($id > 0 && !in_array($id, $candidateIds, true)) {
+                        $candidateIds[] = $id;
+                    }
+                }
+
+                $stmt = $db->query(
+                    "SELECT p.restaurante_id
+                       FROM rest_platillos p
+                      WHERE p.restaurante_id IS NOT NULL
                             {$productActiveWhere}
                             {$productAvailableWhere}
                       GROUP BY p.restaurante_id
@@ -4383,6 +4456,37 @@ class ApiController extends BaseController
                 );
                 $stmt->execute([$candidateId]);
                 $candidateCategories = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+                if (!$candidateCategories && $categoryActiveWhere !== '') {
+                    $stmt = $db->prepare(
+                        "SELECT id,
+                                nombre,
+                                " . ($this->adminColumnExists('rest_categorias_menu', 'descripcion') ? 'descripcion' : "'' AS descripcion") . ",
+                                " . ($this->adminColumnExists('rest_categorias_menu', 'activo') ? 'activo' : '1 AS activo') . "
+                           FROM rest_categorias_menu
+                          WHERE restaurante_id = ?
+                          ORDER BY {$categoryOrder}"
+                    );
+                    $stmt->execute([$candidateId]);
+                    $candidateCategories = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+                }
+            }
+
+            if (!$candidateCategories) {
+                try {
+                    $stmt = $db->prepare(
+                        "SELECT id,
+                                nombre,
+                                descripcion,
+                                1 AS activo
+                           FROM rest_categorias_menu
+                          WHERE restaurante_id = ?
+                          ORDER BY nombre ASC"
+                    );
+                    $stmt->execute([$candidateId]);
+                    $candidateCategories = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+                } catch (\Throwable $e) {
+                    error_log('[adminPromotionCatalog] Lectura directa rest_categorias_menu fallo: ' . $e->getMessage());
+                }
             }
 
             if ($this->adminTableExists('rest_platillos')) {
@@ -4420,6 +4524,49 @@ class ApiController extends BaseController
                 );
                 $stmt->execute([$candidateId]);
                 $candidateProducts = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+                if (!$candidateProducts && ($productActiveWhere !== '' || $productAvailableWhere !== '')) {
+                    $stmt = $db->prepare(
+                        "SELECT p.id,
+                                p.nombre,
+                                {$descriptionExpr} AS descripcion,
+                                {$priceExpr} AS precio,
+                                " . ($this->adminColumnExists('rest_platillos', 'categoria_id') ? 'p.categoria_id' : 'NULL AS categoria_id') . ",
+                                {$categoryName} AS categoria_nombre
+                           FROM rest_platillos p
+                           {$categoryJoin}
+                          WHERE p.restaurante_id = ?
+                          ORDER BY categoria_nombre ASC, p.nombre ASC"
+                    );
+                    $stmt->execute([$candidateId]);
+                    $candidateProducts = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+                    if ($candidateProducts) {
+                        error_log('[adminPromotionCatalog] Catalogo usando platillos sin filtro activo/disponible para restaurante=' . $candidateId . ' count=' . count($candidateProducts));
+                    }
+                }
+            }
+
+            if (!$candidateProducts) {
+                try {
+                    $stmt = $db->prepare(
+                        "SELECT p.id,
+                                p.nombre,
+                                p.descripcion AS descripcion,
+                                p.precio AS precio,
+                                p.categoria_id,
+                                COALESCE(c.nombre, '') AS categoria_nombre
+                           FROM rest_platillos p
+                           LEFT JOIN rest_categorias_menu c ON c.id = p.categoria_id
+                          WHERE p.restaurante_id = ?
+                          ORDER BY categoria_nombre ASC, p.nombre ASC"
+                    );
+                    $stmt->execute([$candidateId]);
+                    $candidateProducts = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+                    if ($candidateProducts) {
+                        error_log('[adminPromotionCatalog] Catalogo usando lectura directa de rest_platillos restaurante=' . $candidateId . ' count=' . count($candidateProducts));
+                    }
+                } catch (\Throwable $e) {
+                    error_log('[adminPromotionCatalog] Lectura directa rest_platillos fallo: ' . $e->getMessage());
+                }
             }
 
             if ($candidateProducts || $candidateCategories || (!$categories && !$products)) {
@@ -4431,6 +4578,78 @@ class ApiController extends BaseController
                 break;
             }
         }
+
+        $catalogDiagnostics = [];
+        try {
+            $catalogDiagnostics[] = 'db=' . (defined('DB_NAME') ? (string)DB_NAME : 'unknown');
+            try {
+                $catalogDiagnostics[] = 'pdo_database=' . (string)$db->query('SELECT DATABASE()')->fetchColumn();
+            } catch (\Throwable $e) {
+                $catalogDiagnostics[] = 'pdo_database_error=' . $e->getMessage();
+            }
+            try {
+                $catalogDiagnostics[] = 'pdo_user=' . (string)$db->query('SELECT USER()')->fetchColumn();
+            } catch (\Throwable $e) {
+                $catalogDiagnostics[] = 'pdo_user_error=' . $e->getMessage();
+            }
+            $catalogDiagnostics[] = 'rest_platillos_exists=' . ($this->adminTableExists('rest_platillos') ? 'yes' : 'no');
+            try {
+                $catalogDiagnostics[] = 'direct_platillos_total=' . (int)$db->query('SELECT COUNT(*) FROM rest_platillos')->fetchColumn();
+            } catch (\Throwable $e) {
+                $catalogDiagnostics[] = 'direct_platillos_error=' . $e->getMessage();
+            }
+            if ($this->adminTableExists('rest_platillos')) {
+                $catalogDiagnostics[] = 'platillos_total=' . (int)$db->query('SELECT COUNT(*) FROM rest_platillos')->fetchColumn();
+                $stmt = $db->prepare('SELECT COUNT(*) FROM rest_platillos WHERE restaurante_id = ?');
+                $stmt->execute([$usedRestauranteId]);
+                $catalogDiagnostics[] = 'platillos_used_restaurante=' . (int)$stmt->fetchColumn();
+                $stmt = $db->query('SELECT restaurante_id, COUNT(*) AS total FROM rest_platillos GROUP BY restaurante_id ORDER BY total DESC, restaurante_id ASC LIMIT 5');
+                $byRestaurant = [];
+                foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+                    $byRestaurant[] = (int)($row['restaurante_id'] ?? 0) . ':' . (int)($row['total'] ?? 0);
+                }
+                $catalogDiagnostics[] = 'platillos_por_restaurante=' . ($byRestaurant ? implode('|', $byRestaurant) : 'none');
+            }
+            $catalogDiagnostics[] = 'categorias_exists=' . ($this->adminTableExists('rest_categorias_menu') ? 'yes' : 'no');
+            try {
+                $catalogDiagnostics[] = 'direct_categorias_total=' . (int)$db->query('SELECT COUNT(*) FROM rest_categorias_menu')->fetchColumn();
+            } catch (\Throwable $e) {
+                $catalogDiagnostics[] = 'direct_categorias_error=' . $e->getMessage();
+            }
+            if ($this->adminTableExists('rest_categorias_menu')) {
+                $catalogDiagnostics[] = 'categorias_total=' . (int)$db->query('SELECT COUNT(*) FROM rest_categorias_menu')->fetchColumn();
+                $stmt = $db->prepare('SELECT COUNT(*) FROM rest_categorias_menu WHERE restaurante_id = ?');
+                $stmt->execute([$usedRestauranteId]);
+                $catalogDiagnostics[] = 'categorias_used_restaurante=' . (int)$stmt->fetchColumn();
+            }
+            $likeTables = [];
+            $allTables = $db->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN) ?: [];
+            foreach ($allTables as $table) {
+                $table = (string)$table;
+                if ($table === '') {
+                    continue;
+                }
+                if (!preg_match('/platillo|categoria|menu|producto/i', $table)) {
+                    continue;
+                }
+                if (!in_array($table, $likeTables, true)) {
+                    $likeTables[] = $table;
+                }
+            }
+            $catalogDiagnostics[] = 'tablas_similares=' . ($likeTables ? implode(',', $likeTables) : 'none');
+        } catch (\Throwable $e) {
+            $catalogDiagnostics[] = 'diagnostics_error=' . $e->getMessage();
+        }
+
+        error_log(
+            '[adminPromotionCatalog] empresa=' . $empresaId
+            . ' session_restaurante=' . $sessionRestauranteId
+            . ' used_restaurante=' . $usedRestauranteId
+            . ' candidates=' . implode(',', $candidateIds)
+            . ' products=' . count($products)
+            . ' categories=' . count($categories)
+            . ' | ' . implode(' ', $catalogDiagnostics)
+        );
 
         $this->adminApiOk('Catalogo de promociones obtenido correctamente', [
             'categories' => $categories,
@@ -4622,17 +4841,106 @@ class ApiController extends BaseController
         return null;
     }
 
+    private function adminLocalPromotionCodeExists(string $code, ?int $excludeId = null, array $tables = ['rest_promociones', 'mobile_promociones']): bool
+    {
+        $code = trim($code);
+        if ($code === '') {
+            return false;
+        }
+
+        $db = Database::getInstance();
+        foreach ($tables as $table) {
+            if (!$this->adminTableExists($table) || !$this->adminColumnExists($table, 'code')) {
+                continue;
+            }
+            $where = 'TRIM(code) = ?';
+            $params = [$code];
+            if ($excludeId !== null && $this->adminColumnExists($table, 'id')) {
+                $where .= ' AND id <> ?';
+                $params[] = $excludeId;
+            }
+            try {
+                $stmt = $db->prepare("SELECT id FROM `{$table}` WHERE {$where} LIMIT 1");
+                $stmt->execute($params);
+                if ($stmt->fetchColumn()) {
+                    return true;
+                }
+            } catch (\Throwable $e) {
+                error_log('[adminLocalPromotionCodeExists] No se pudo validar codigo en ' . $table . ': ' . $e->getMessage());
+            }
+        }
+
+        return false;
+    }
+
+    private function adminIsDuplicateKeyError(\PDOException $e): bool
+    {
+        $info = $e->errorInfo ?? [];
+        return (string)($info[0] ?? '') === '23000'
+            || (int)($info[1] ?? 0) === 1062
+            || str_contains($e->getMessage(), 'Duplicate entry');
+    }
+
     private function adminLocalCreatePromotion(int $empresaId, array $body): array
     {
         $db = Database::getInstance();
         $restauranteId = $this->adminRestauranteIdByEmpresa($empresaId);
         $code = trim((string)($body['code'] ?? ''));
         if ($code === '') {
-            $code = 'PROMO' . strtoupper(bin2hex(random_bytes(3)));
+            do {
+                $code = 'PROMO' . strtoupper(bin2hex(random_bytes(3)));
+            } while ($this->adminLocalPromotionCodeExists($code, null, ['mobile_promociones']));
+        } elseif ($this->adminLocalPromotionCodeExists($code, null, ['mobile_promociones'])) {
+            $this->adminApiError('Ese codigo de promocion ya existe. Usa otro codigo.', 409, [
+                'code' => ['El codigo "' . $code . '" ya esta registrado.'],
+            ]);
         }
         $expiresAt = $body['expires_at'] ?? null;
         if (!$expiresAt) {
             $expiresAt = date('Y-m-d H:i:s', strtotime('+30 days'));
+        }
+
+        $this->adminEnsureMobilePromocionesTable();
+        if ($this->adminTableExists('mobile_promociones')) {
+            $values = [
+                'usuario_id' => (int)($body['usuario_id'] ?? 0),
+                'producto_id' => $body['producto_id'] ?? $body['platillo_id'] ?? null,
+                'platillo_id' => $body['producto_id'] ?? $body['platillo_id'] ?? null,
+                'titulo' => (string)($body['titulo'] ?? ''),
+                'descripcion' => (string)($body['descripcion'] ?? ''),
+                'imagen' => (string)($body['imagen'] ?? ''),
+                'deep_link' => $this->adminPromotionDeepLink($code),
+                'code' => $code,
+                'tipo_descuento' => $body['tipo_descuento'] ?? 'porcentaje',
+                'valor_descuento' => (float)($body['valor_descuento'] ?? 0),
+                'scope_tipo' => $body['scope_tipo'] ?? 'all',
+                'scope_ids' => $body['scope_ids'] ?? null,
+                'buy_qty' => $body['buy_qty'] ?? null,
+                'pay_qty' => $body['pay_qty'] ?? null,
+                'min_subtotal' => (float)($body['min_subtotal'] ?? 0),
+                'max_uses' => $body['max_uses'] ?? null,
+                'combinable' => (int)($body['combinable'] ?? 0),
+                'activo' => isset($body['activo']) ? (int)$body['activo'] : 1,
+                'expires_at' => $expiresAt,
+                'created_at' => date('Y-m-d H:i:s'),
+            ];
+            try {
+                $this->adminInsertExistingColumns('mobile_promociones', $values);
+            } catch (\PDOException $e) {
+                if ($this->adminIsDuplicateKeyError($e)) {
+                    $this->adminApiError('Ese codigo de promocion ya existe. Usa otro codigo.', 409, [
+                        'code' => ['El codigo "' . $code . '" ya esta registrado.'],
+                    ]);
+                }
+                throw $e;
+            }
+            $promotionId = (int)$db->lastInsertId();
+            $promotion = $this->adminLocalGetPromotion($promotionId, $empresaId) ?? ['id' => $promotionId] + $values;
+            $notification = $this->adminSendPromotionNotification($promotion, $body);
+            $promotion = $this->adminLocalGetPromotion($promotionId, $empresaId) ?? $promotion;
+            $promotion['notification_summary'] = $notification;
+            $promotion['notification'] = $notification['log'] ?? null;
+            return $promotion;
         }
 
         if ($restauranteId && $this->adminRestPromocionesDisponible()) {
@@ -4645,21 +4953,30 @@ class ApiController extends BaseController
                     (restaurante_id, usuario_id, titulo, descripcion, code, tipo, valor_descuento, fecha_inicio, fecha_fin, activo, expires_at, imagen, deep_link)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
             );
-            $stmt->execute([
-                $restauranteId,
-                (int)($body['usuario_id'] ?? 0) ?: null,
-                (string)($body['titulo'] ?? ''),
-                (string)($body['descripcion'] ?? ''),
-                $code,
-                $tipo,
-                (float)($body['valor_descuento'] ?? 0),
-                date('Y-m-d'),
-                substr((string)$expiresAt, 0, 10),
-                isset($body['activo']) ? (int)$body['activo'] : 1,
-                $expiresAt,
-                (string)($body['imagen'] ?? ''),
-                $this->adminPromotionDeepLink($code),
-            ]);
+            try {
+                $stmt->execute([
+                    $restauranteId,
+                    (int)($body['usuario_id'] ?? 0) ?: null,
+                    (string)($body['titulo'] ?? ''),
+                    (string)($body['descripcion'] ?? ''),
+                    $code,
+                    $tipo,
+                    (float)($body['valor_descuento'] ?? 0),
+                    date('Y-m-d'),
+                    substr((string)$expiresAt, 0, 10),
+                    isset($body['activo']) ? (int)$body['activo'] : 1,
+                    $expiresAt,
+                    (string)($body['imagen'] ?? ''),
+                    $this->adminPromotionDeepLink($code),
+                ]);
+            } catch (\PDOException $e) {
+                if ($this->adminIsDuplicateKeyError($e)) {
+                    $this->adminApiError('Ese codigo de promocion ya existe. Usa otro codigo.', 409, [
+                        'code' => ['El codigo "' . $code . '" ya esta registrado.'],
+                    ]);
+                }
+                throw $e;
+            }
             $promotionId = (int)$db->lastInsertId();
             $promotion = $this->adminLocalGetPromotion($promotionId, $empresaId) ?? ['id' => $promotionId];
             $notification = $this->adminSendPromotionNotification($promotion, $body);
@@ -5847,6 +6164,14 @@ class ApiController extends BaseController
     private function adminLocalUpdatePromotion(int $id, int $empresaId, array $body): ?array
     {
         $db = Database::getInstance();
+        if (array_key_exists('code', $body)) {
+            $newCode = trim((string)$body['code']);
+            if ($newCode !== '' && $this->adminLocalPromotionCodeExists($newCode, $id)) {
+                $this->adminApiError('Ese codigo de promocion ya existe. Usa otro codigo.', 409, [
+                    'code' => ['El codigo "' . $newCode . '" ya esta registrado.'],
+                ]);
+            }
+        }
         if ($this->adminTableExists('mobile_promociones') && $this->adminLocalGetPromotion($id, $empresaId)) {
             $values = [];
             $this->adminEnsureMobilePromocionesRuleColumns();
@@ -5862,7 +6187,16 @@ class ApiController extends BaseController
             if (isset($values['code']) && $this->adminColumnExists('mobile_promociones', 'deep_link')) {
                 $values['deep_link'] = $this->adminPromotionDeepLink((string)$values['code']);
             }
-            $this->adminUpdateExistingColumns('mobile_promociones', $id, $values);
+            try {
+                $this->adminUpdateExistingColumns('mobile_promociones', $id, $values);
+            } catch (\PDOException $e) {
+                if ($this->adminIsDuplicateKeyError($e)) {
+                    $this->adminApiError('Ese codigo de promocion ya existe. Usa otro codigo.', 409, [
+                        'code' => ['El codigo "' . trim((string)($values['code'] ?? '')) . '" ya esta registrado.'],
+                    ]);
+                }
+                throw $e;
+            }
             return $this->adminLocalGetPromotion($id, $empresaId);
         }
 
@@ -5896,20 +6230,29 @@ class ApiController extends BaseController
               WHERE id = ? AND restaurante_id = ?"
         );
         $code = array_key_exists('code', $body) ? (string)$body['code'] : null;
-        $stmt->execute([
-            $body['titulo'] ?? null,
-            $body['descripcion'] ?? null,
-            $code,
-            $tipo,
-            array_key_exists('valor_descuento', $body) ? (float)$body['valor_descuento'] : null,
-            $body['expires_at'] ?? null,
-            !empty($body['expires_at']) ? substr((string)$body['expires_at'], 0, 10) : null,
-            array_key_exists('imagen', $body) ? (string)$body['imagen'] : null,
-            $code !== null ? $this->adminPromotionDeepLink($code) : null,
-            array_key_exists('activo', $body) ? (int)$body['activo'] : null,
-            $id,
-            $restauranteId,
-        ]);
+        try {
+            $stmt->execute([
+                $body['titulo'] ?? null,
+                $body['descripcion'] ?? null,
+                $code,
+                $tipo,
+                array_key_exists('valor_descuento', $body) ? (float)$body['valor_descuento'] : null,
+                $body['expires_at'] ?? null,
+                !empty($body['expires_at']) ? substr((string)$body['expires_at'], 0, 10) : null,
+                array_key_exists('imagen', $body) ? (string)$body['imagen'] : null,
+                $code !== null ? $this->adminPromotionDeepLink($code) : null,
+                array_key_exists('activo', $body) ? (int)$body['activo'] : null,
+                $id,
+                $restauranteId,
+            ]);
+        } catch (\PDOException $e) {
+            if ($this->adminIsDuplicateKeyError($e)) {
+                $this->adminApiError('Ese codigo de promocion ya existe. Usa otro codigo.', 409, [
+                    'code' => ['El codigo "' . trim((string)$code) . '" ya esta registrado.'],
+                ]);
+            }
+            throw $e;
+        }
         return $this->adminLocalGetPromotion($id, $empresaId);
     }
 
@@ -5978,18 +6321,24 @@ class ApiController extends BaseController
         if (!preg_match('/^[a-zA-Z0-9_]+$/', $table)) {
             return false;
         }
+        $quoted = "`{$table}`";
         try {
             $db = Database::getInstance();
-            $stmt = $db->prepare("SHOW TABLES LIKE ?");
-            $stmt->execute([$table]);
-            if ($stmt->fetchColumn()) {
-                return true;
-            }
-
-            $db->query("SELECT 1 FROM `{$table}` LIMIT 0");
+            $db->query("SELECT 1 FROM {$quoted} LIMIT 0");
             return true;
         } catch (\Throwable $e) {
-            return false;
+            try {
+                $stmt = Database::getInstance()->prepare(
+                    "SELECT COUNT(*)
+                       FROM information_schema.tables
+                      WHERE table_schema = DATABASE()
+                        AND table_name = ?"
+                );
+                $stmt->execute([$table]);
+                return (int)$stmt->fetchColumn() > 0;
+            } catch (\Throwable $inner) {
+                return false;
+            }
         }
     }
 
@@ -6000,9 +6349,20 @@ class ApiController extends BaseController
         }
         try {
             $db = Database::getInstance();
-            $stmt = $db->prepare("SHOW COLUMNS FROM `{$table}` LIKE ?");
-            $stmt->execute([$column]);
-            return (bool)$stmt->fetch(PDO::FETCH_ASSOC);
+            $stmt = $db->prepare(
+                "SELECT COUNT(*)
+                   FROM information_schema.columns
+                  WHERE table_schema = DATABASE()
+                    AND table_name = ?
+                    AND column_name = ?"
+            );
+            $stmt->execute([$table, $column]);
+            if ((int)$stmt->fetchColumn() > 0) {
+                return true;
+            }
+
+            $db->query("SELECT `{$column}` FROM `{$table}` LIMIT 0");
+            return true;
         } catch (\Throwable $e) {
             return false;
         }

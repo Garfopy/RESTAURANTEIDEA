@@ -1,5 +1,8 @@
 # ── Credenciales y configuración sensible ──────────────────────────────────────
 config/database.php
+firebase/*.json
+firebase/*.key
+firebase/*.pem
 
 # ── Uploads de usuarios (imágenes, firmas, fotos) ──────────────────────────────
 public/uploads/**/*

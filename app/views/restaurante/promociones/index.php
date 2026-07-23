@@ -253,7 +253,7 @@
 
   /**
    * Determina el estado visual de una promoción
-   * Estados: Activa, Expirada, Inactiva, Programada
+   * Estados: Activa, Expirada, Inactiva
    */
   function getEstadoInfo(p) {
     var activo = parseInt(p.activo) === 1;
@@ -274,13 +274,6 @@
           return { color: '#9CA3AF', bg: '#F3F4F6', label: 'Expirada' };
         }
 
-        // Programada: si se creó en el futuro
-        if (p.created_at) {
-          var creada = new Date(p.created_at.replace(' ', 'T'));
-          if (creada > ahora) {
-            return { color: '#D97706', bg: '#FFFBEB', label: 'Programada' };
-          }
-        }
       } catch (e) {
         // Si hay error al parsear fechas, asumir activa
       }
