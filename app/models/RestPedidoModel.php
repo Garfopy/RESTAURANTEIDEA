@@ -34,6 +34,18 @@ class RestPedidoModel extends BaseModel
         return $this->hasColumn('tipo_origen');
     }
 
+    private function sqlFechaFinanciera(string $alias = 'p'): string
+    {
+        $columns = [];
+        foreach (['pagado_at', 'cerrado_at', 'actualizado_at', 'updated_at', 'created_at'] as $column) {
+            if ($this->hasColumn($column)) {
+                $columns[] = "{$alias}.{$column}";
+            }
+        }
+        if (!$columns) return 'NULL';
+        return count($columns) === 1 ? $columns[0] : 'COALESCE(' . implode(', ', $columns) . ')';
+    }
+
     private function sqlNoStore(string $alias = 'p'): string
     {
         if (!$this->soportaTipoOrigen()) {
@@ -207,12 +219,16 @@ class RestPedidoModel extends BaseModel
         }
     }
 
-    public function getConItems(int $pedidoId, ?int $restauranteId = null): ?array
+    public function getConItems(int $pedidoId, ?int $restauranteId = null, ?string $visibleDesde = null): ?array
     {
         $whereRestaurante = $restauranteId !== null ? ' AND p.restaurante_id = ?' : '';
+        $whereVisible = $visibleDesde !== null ? ' AND DATE(' . $this->sqlFechaFinanciera('p') . ') >= ?' : '';
         $params = [$pedidoId];
         if ($restauranteId !== null) {
             $params[] = $restauranteId;
+        }
+        if ($visibleDesde !== null) {
+            $params[] = $visibleDesde;
         }
 
         $pedido = $this->queryOne(
@@ -220,7 +236,7 @@ class RestPedidoModel extends BaseModel
              FROM rest_pedidos p
              LEFT JOIN rest_mesas m ON m.id = p.mesa_id
              LEFT JOIN usuarios u ON u.id = p.mesero_id
-             WHERE p.id = ?{$whereRestaurante}",
+             WHERE p.id = ?{$whereRestaurante}{$whereVisible}",
             $params
         );
         if (!$pedido) return null;
@@ -422,7 +438,7 @@ class RestPedidoModel extends BaseModel
         );
     }
 
-    public function listar(int $restauranteId, int $page = 1, string $estado = ''): array
+    public function listar(int $restauranteId, int $page = 1, string $estado = '', ?string $visibleDesde = null): array
     {
         $noStore = $this->sqlNoStore('p');
         $params = [$restauranteId];
@@ -430,6 +446,10 @@ class RestPedidoModel extends BaseModel
         if ($estado !== '') {
             $where = 'AND p.estado = ?';
             $params[] = $estado;
+        }
+        if ($visibleDesde !== null) {
+            $where .= ' AND DATE(' . $this->sqlFechaFinanciera('p') . ') >= ?';
+            $params[] = $visibleDesde;
         }
         $sql = "SELECT p.*, m.nombre AS mesa_nombre, u.nombre AS mesero_nombre
                 FROM rest_pedidos p
@@ -441,7 +461,7 @@ class RestPedidoModel extends BaseModel
         return $this->paginate($sql, $params, $page);
     }
 
-    public function listarStore(int $restauranteId, int $page = 1, string $estado = ''): array
+    public function listarStore(int $restauranteId, int $page = 1, string $estado = '', ?string $visibleDesde = null): array
     {
         $soloStore = $this->sqlSoloStore('p');
         $params = [$restauranteId];
@@ -449,6 +469,10 @@ class RestPedidoModel extends BaseModel
         if ($estado !== '') {
             $where = 'AND p.estado = ?';
             $params[] = $estado;
+        }
+        if ($visibleDesde !== null) {
+            $where .= ' AND DATE(' . $this->sqlFechaFinanciera('p') . ') >= ?';
+            $params[] = $visibleDesde;
         }
 
         $sql = "SELECT p.*, m.nombre AS mesa_nombre, u.nombre AS mesero_nombre
@@ -475,5 +499,14 @@ class RestPedidoModel extends BaseModel
                 AND LOWER(COALESCE(tipo_origen, '')) = 'store'",
             [$estado, $pedidoId, $restauranteId]
         );
+    }
+
+    public function getPedidoIdPorItem(int $itemId): ?int
+    {
+        $row = $this->queryOne(
+            "SELECT pedido_id FROM rest_pedido_items WHERE id = ?",
+            [$itemId]
+        );
+        return $row ? (int)$row['pedido_id'] : null;
     }
 }

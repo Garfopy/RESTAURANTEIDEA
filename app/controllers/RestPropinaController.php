@@ -15,6 +15,9 @@ class RestPropinaController extends BaseController
         $restauranteId = $this->restauranteId();
         $desde = $this->get('desde', date('Y-m-d'));
         $hasta = $this->get('hasta', date('Y-m-d'));
+        $rango = $this->ajustarRangoFinancieroVisible((string)$desde, (string)$hasta);
+        $desde = $rango['desde'];
+        $hasta = $rango['hasta'];
 
         $db = Database::getInstance();
 
@@ -71,10 +74,14 @@ class RestPropinaController extends BaseController
         $db = Database::getInstance();
 
         // Verificar que el ticket pertenece a este restaurante
+        $visibleDesde = $this->fechaFinancieraVisibleDesde();
+        $filtroVisible = $visibleDesde ? ' AND DATE(COALESCE(pagado_at, created_at)) >= ?' : '';
+        $params = [(int)$ticketId, $restauranteId];
+        if ($visibleDesde) $params[] = $visibleDesde;
         $stmt = $db->prepare(
-            "SELECT id FROM rest_tickets WHERE id = ? AND restaurante_id = ? AND estado = 'pagado'"
+            "SELECT id FROM rest_tickets WHERE id = ? AND restaurante_id = ? AND estado = 'pagado'{$filtroVisible}"
         );
-        $stmt->execute([(int)$ticketId, $restauranteId]);
+        $stmt->execute($params);
         if (!$stmt->fetch()) {
             $this->json(['ok' => false, 'msg' => 'Ticket no encontrado']);
             return;
@@ -93,6 +100,9 @@ class RestPropinaController extends BaseController
         $restauranteId = $this->restauranteId();
         $desde = $this->post('desde', date('Y-m-d'));
         $hasta = $this->post('hasta', date('Y-m-d'));
+        $rango = $this->ajustarRangoFinancieroVisible((string)$desde, (string)$hasta);
+        $desde = $rango['desde'];
+        $hasta = $rango['hasta'];
 
         $db = Database::getInstance();
         $db->prepare(

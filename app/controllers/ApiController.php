@@ -2268,7 +2268,7 @@ class ApiController extends BaseController
             
             // Usuarios del portal restaurante que pueden consumir la Admin API.
             $rolActual = $usuario['rol_slug'] ?? $usuario['rol'] ?? '';
-            $rolValido = in_array($rolActual, ['admin', 'admin_restaurante', 'comprador', 'admin_local', 'superadmin'], true);
+            $rolValido = in_array($rolActual, ['admin', 'admin_restaurante', 'comprador', 'admin_local', 'programador', 'superadmin'], true);
             if (!$rolValido) {
                 $this->adminApiError('Acceso denegado. Se requiere rol de administrador.', 403);
             }
@@ -2305,7 +2305,10 @@ class ApiController extends BaseController
         if (!$usuario || !password_verify($password, $usuario['password'] ?? '')) {
             $this->adminApiError('Credenciales incorrectas', 401);
         }
-        $rolValido = ($usuario['rol'] === 'admin' || ($usuario['rol_slug'] ?? '') === 'admin_restaurante');
+        $rolValido = (
+            $usuario['rol'] === 'admin'
+            || in_array(($usuario['rol_slug'] ?? ''), ['admin_restaurante', 'programador'], true)
+        );
         if (!$rolValido) {
             $this->adminApiError('Acceso denegado. Se requiere rol de administrador.', 403);
         }
@@ -2805,7 +2808,7 @@ class ApiController extends BaseController
         if (!empty($_SESSION['usuario'])) {
             $user = $_SESSION['usuario'];
             $rol = $user['rol'] ?? $user['rol_slug'] ?? '';
-            if ($requireAdmin && !in_array($rol, ['admin', 'admin_restaurante', 'comprador', 'admin_local', 'superadmin'], true)) {
+            if ($requireAdmin && !in_array($rol, ['admin', 'admin_restaurante', 'comprador', 'admin_local', 'programador', 'superadmin'], true)) {
                 $this->adminApiError('Acceso denegado. Se requiere rol de administrador.', 403);
             }
             return [
@@ -2824,7 +2827,7 @@ class ApiController extends BaseController
         }
         $payload = $this->validateJWT($m[1]);
         if (!$payload) { $this->adminApiError('Token inválido o expirado', 401); }
-        if ($requireAdmin && !in_array($payload['rol'] ?? '', ['admin', 'admin_restaurante', 'comprador', 'admin_local', 'superadmin'], true)) {
+        if ($requireAdmin && !in_array($payload['rol'] ?? '', ['admin', 'admin_restaurante', 'comprador', 'admin_local', 'programador', 'superadmin'], true)) {
             $this->adminApiError('Acceso denegado. Se requiere rol de administrador.', 403);
         }
         return $payload;
@@ -3054,6 +3057,15 @@ class ApiController extends BaseController
         $db = Database::getInstance();
         $where = ['r.empresa_id = ?'];
         $params = [$empresaId];
+        if (($jwtUser['rol'] ?? '') !== 'programador') {
+            $where[] = "NOT EXISTS (
+                SELECT 1 FROM rest_visibilidad_financiera vf
+                 WHERE vf.restaurante_id = fs.restaurante_id
+                   AND vf.activo = 1
+                   AND vf.ocultar_hasta IS NOT NULL
+                   AND DATE(fs.created_at) <= vf.ocultar_hasta
+            )";
+        }
 
         if ($restauranteId > 0) {
             $where[] = 'fs.restaurante_id = ?';
@@ -3110,14 +3122,14 @@ class ApiController extends BaseController
 
     private function adminGetInvoiceRequest(int $id, array $jwtUser): void
     {
-        $row = $this->adminInvoiceRequestRow($id, (int)$jwtUser['empresa_id']);
+        $row = $this->adminInvoiceRequestRow($id, (int)$jwtUser['empresa_id'], (string)($jwtUser['rol'] ?? ''));
         if (!$row) $this->adminApiError('Solicitud de factura no encontrada', 404);
         $this->adminApiOk('Solicitud de factura obtenida correctamente', (new RestFacturaSolicitudModel())->normalizar($row));
     }
 
     private function adminUpdateInvoiceRequest(int $id, array $jwtUser): void
     {
-        $row = $this->adminInvoiceRequestRow($id, (int)$jwtUser['empresa_id']);
+        $row = $this->adminInvoiceRequestRow($id, (int)$jwtUser['empresa_id'], (string)($jwtUser['rol'] ?? ''));
         if (!$row) $this->adminApiError('Solicitud de factura no encontrada', 404);
         $body = json_decode(file_get_contents('php://input'), true) ?? [];
 
@@ -3133,19 +3145,26 @@ class ApiController extends BaseController
             $this->adminApiError($e->getMessage(), 422);
         }
 
-        $updated = $this->adminInvoiceRequestRow($id, (int)$jwtUser['empresa_id']);
+        $updated = $this->adminInvoiceRequestRow($id, (int)$jwtUser['empresa_id'], (string)($jwtUser['rol'] ?? ''));
         $this->adminApiOk('Solicitud de factura actualizada correctamente', (new RestFacturaSolicitudModel())->normalizar($updated));
     }
 
     private function adminStampInvoiceRequest(int $id, array $jwtUser): void
     {
+        $row = $this->adminInvoiceRequestRow(
+            $id,
+            (int)$jwtUser['empresa_id'],
+            (string)($jwtUser['rol'] ?? '')
+        );
+        if (!$row) $this->adminApiError('Solicitud de factura no encontrada', 404);
+
         $body = json_decode(file_get_contents('php://input'), true) ?? [];
 
         try {
             (new FacturApiService())->stampInvoiceRequest($id, (int)$jwtUser['empresa_id'], is_array($body) ? $body : []);
         } catch (\Throwable $e) {
             error_log('[FacturAPI admin stamp] ' . $e->getMessage());
-            $row = $this->adminInvoiceRequestRow($id, (int)$jwtUser['empresa_id']);
+            $row = $this->adminInvoiceRequestRow($id, (int)$jwtUser['empresa_id'], (string)($jwtUser['rol'] ?? ''));
             if ($row) {
                 (new RestFacturaSolicitudModel())->actualizarEstado($id, (int)$row['restaurante_id'], [
                     'estado' => 'en_proceso',
@@ -3158,12 +3177,19 @@ class ApiController extends BaseController
             $this->adminApiError($e->getMessage(), 422);
         }
 
-        $updated = $this->adminInvoiceRequestRow($id, (int)$jwtUser['empresa_id']);
+        $updated = $this->adminInvoiceRequestRow($id, (int)$jwtUser['empresa_id'], (string)($jwtUser['rol'] ?? ''));
         $this->adminApiOk('Solicitud timbrada correctamente con FacturAPI', (new RestFacturaSolicitudModel())->normalizar($updated));
     }
 
-    private function adminInvoiceRequestRow(int $id, int $empresaId): ?array
+    private function adminInvoiceRequestRow(int $id, int $empresaId, string $rol = ''): ?array
     {
+        $filtroVisibilidad = $rol === 'programador' ? '' : " AND NOT EXISTS (
+            SELECT 1 FROM rest_visibilidad_financiera vf
+             WHERE vf.restaurante_id = fs.restaurante_id
+               AND vf.activo = 1
+               AND vf.ocultar_hasta IS NOT NULL
+               AND DATE(fs.created_at) <= vf.ocultar_hasta
+        )";
         $stmt = Database::getInstance()->prepare(
             "SELECT fs.*,
                     fs.receptor_nombre AS receptor_nombre_fiscal,
@@ -3172,7 +3198,7 @@ class ApiController extends BaseController
                     r.nombre AS restaurante_nombre
                FROM facturacion_solicitudes fs
                JOIN rest_restaurantes r ON r.id = fs.restaurante_id
-              WHERE fs.id = ? AND r.empresa_id = ?
+              WHERE fs.id = ? AND r.empresa_id = ?{$filtroVisibilidad}
               LIMIT 1"
         );
         $stmt->execute([$id, $empresaId]);

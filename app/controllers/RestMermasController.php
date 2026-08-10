@@ -12,7 +12,7 @@ class RestMermasController extends BaseController
         $this->requireRestaurante();
 
         $rol = $_SESSION['usuario']['rol_slug'] ?? '';
-        if (!in_array($rol, ['admin_restaurante', 'comprador', 'admin_local'], true)) {
+        if (!in_array($rol, ['admin_restaurante', 'comprador', 'admin_local', 'programador'], true)) {
             $this->redirect('restaurante/dashboard');
         }
 

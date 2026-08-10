@@ -21,7 +21,7 @@ class RestMenuController extends BaseController
         $pageTitle  = 'Menú';
         $activeMenu = 'rest_menu';
         $restModel = new RestauranteModel();
-        $sucursales = $this->rolActual() === 'admin_restaurante'
+        $sucursales = in_array($this->rolActual(), ['admin_restaurante', 'programador'], true)
             ? $restModel->getByEmpresa((int)$this->empresaId())
             : $restModel->getByComprador((int)$this->usuarioId());
         $restaurante = $restModel->find((int)$restauranteId) ?: [];
@@ -74,7 +74,7 @@ class RestMenuController extends BaseController
     private function usuarioPuedeAdministrarRestaurante(array $restaurante): bool
     {
         $rol = $this->rolActual();
-        if ($rol === 'admin_restaurante') {
+        if (in_array($rol, ['admin_restaurante', 'programador'], true)) {
             return (int)($restaurante['empresa_id'] ?? 0) === (int)$this->empresaId();
         }
         if ($rol === 'admin_local') {

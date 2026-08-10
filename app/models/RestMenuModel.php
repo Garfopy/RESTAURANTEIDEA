@@ -24,6 +24,18 @@ class RestMenuModel extends BaseModel
         }
     }
 
+    private function pedidoFechaFinancieraSql(string $alias = 'ped'): string
+    {
+        $columns = [];
+        foreach (['pagado_at', 'cerrado_at', 'actualizado_at', 'updated_at', 'created_at'] as $column) {
+            if ($this->tableColumnExists('rest_pedidos', $column)) {
+                $columns[] = "{$alias}.{$column}";
+            }
+        }
+        if (!$columns) return 'NULL';
+        return count($columns) === 1 ? $columns[0] : 'COALESCE(' . implode(', ', $columns) . ')';
+    }
+
     public function soportaSelectorUnificado(): bool
     {
         $stmt = $this->db->prepare(
@@ -818,9 +830,11 @@ class RestMenuModel extends BaseModel
      * Platillos más vendidos del restaurante (último año, ignora ítems cancelados).
      * Devuelve nombre, precio actual, unidades vendidas y revenue.
      */
-    public function getTopVendidos(int $restauranteId, int $limit = 5): array
+    public function getTopVendidos(int $restauranteId, int $limit = 5, ?string $visibleDesde = null): array
     {
         $limit = max(1, min(20, $limit));
+        $filtroVisible = $visibleDesde ? ' AND DATE(' . $this->pedidoFechaFinancieraSql('ped') . ') >= ?' : '';
+        $params = $visibleDesde ? [$restauranteId, $visibleDesde] : [$restauranteId];
         return $this->query(
             "SELECT p.id, p.nombre, p.precio,
                     SUM(pi.cantidad)         AS unidades_vendidas,
@@ -831,10 +845,11 @@ class RestMenuModel extends BaseModel
              WHERE ped.restaurante_id = ?
                AND pi.estado <> 'cancelado'
                AND ped.created_at >= DATE_SUB(NOW(), INTERVAL 365 DAY)
+               {$filtroVisible}
              GROUP BY p.id, p.nombre, p.precio
              ORDER BY unidades_vendidas DESC
              LIMIT $limit",
-            [$restauranteId]
+            $params
         );
     }
 
@@ -842,22 +857,25 @@ class RestMenuModel extends BaseModel
      * Platillos menos vendidos entre los que SÍ están activos en menú,
      * incluye los que no se han vendido nunca (LEFT JOIN).
      */
-    public function getMenosVendidos(int $restauranteId, int $limit = 5): array
+    public function getMenosVendidos(int $restauranteId, int $limit = 5, ?string $visibleDesde = null): array
     {
         $limit = max(1, min(20, $limit));
+        $filtroVisible = $visibleDesde ? ' AND DATE(' . $this->pedidoFechaFinancieraSql('ped') . ') >= ?' : '';
+        $params = $visibleDesde ? [$visibleDesde, $restauranteId] : [$restauranteId];
         return $this->query(
             "SELECT p.id, p.nombre, p.precio,
                     COALESCE(SUM(CASE WHEN pi.estado <> 'cancelado' THEN pi.cantidad ELSE 0 END), 0) AS unidades_vendidas
              FROM rest_platillos p
              LEFT JOIN rest_pedido_items pi ON pi.platillo_id = p.id
              LEFT JOIN rest_pedidos ped ON ped.id = pi.pedido_id
-                  AND ped.created_at >= DATE_SUB(NOW(), INTERVAL 365 DAY)
-                  AND ped.restaurante_id = p.restaurante_id
+                   AND ped.created_at >= DATE_SUB(NOW(), INTERVAL 365 DAY)
+                   AND ped.restaurante_id = p.restaurante_id
+                   {$filtroVisible}
              WHERE p.restaurante_id = ? AND p.activo = 1
              GROUP BY p.id, p.nombre, p.precio
              ORDER BY unidades_vendidas ASC, p.nombre ASC
              LIMIT $limit",
-            [$restauranteId]
+            $params
         );
     }
 }

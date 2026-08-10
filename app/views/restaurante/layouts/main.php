@@ -22,8 +22,9 @@ $activeMenu = $activeMenu ?? '';
 
 // Roles para visibilidad del sidebar
 $_rol      = $usuario['rol_slug'] ?? '';
-$_isAdmin  = in_array($_rol, ['admin_restaurante', 'comprador'], true); // gestión del restaurante
-$_isMesero = in_array($_rol, ['mesero', 'comprador'], true);            // operación de salón
+$_isAdmin  = in_array($_rol, ['admin_restaurante', 'comprador', 'programador'], true); // gestión del restaurante
+$_isMesero = in_array($_rol, ['mesero', 'comprador', 'programador'], true);             // operación de salón
+$_isProgramador = $_rol === 'programador';
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -150,6 +151,12 @@ $_isMesero = in_array($_rol, ['mesero', 'comprador'], true);            // opera
        href="<?= BASE_URL ?>rest-finanzas/cortes" style="padding-left:38px;font-size:.82rem">
       Corte de Caja
     </a>
+    <?php if ($_isProgramador): ?>
+    <a class="rst-nav-link <?= $activeMenu === 'rest_visibilidad_financiera' ? 'active' : '' ?>"
+       href="<?= BASE_URL ?>rest-finanzas/visibilidad" style="padding-left:38px;font-size:.82rem">
+      Visibilidad de datos
+    </a>
+    <?php endif; ?>
     <a class="rst-nav-link <?= $activeMenu === 'rest_facturas' ? 'active' : '' ?>"
        href="<?= BASE_URL ?>rest-factura/index" style="padding-left:38px;font-size:.82rem">
       Facturas

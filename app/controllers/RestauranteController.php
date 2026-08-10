@@ -44,7 +44,7 @@ class RestauranteController extends BaseController
         $this->requireRestaurante();
         $compradorId         = $this->usuarioId();
         $rol                 = $this->rolActual();
-        $sucursales = $rol === 'admin_restaurante'
+        $sucursales = in_array($rol, ['admin_restaurante', 'programador'], true)
             ? $this->model->getByEmpresa((int)$this->empresaId())
             : $this->model->getByComprador($compradorId);
         $restauranteActivoId = $this->restauranteId();
@@ -77,7 +77,11 @@ class RestauranteController extends BaseController
 
         if ($localId) {
             $local = $this->model->find($localId);
-            if ($local && (int)$local['comprador_id'] === $this->usuarioId()) {
+            $puedeVincular = $local && (
+                (int)$local['comprador_id'] === $this->usuarioId()
+                || ($this->esProgramador() && (int)($local['empresa_id'] ?? 0) === (int)$this->empresaId())
+            );
+            if ($puedeVincular) {
                 $db   = \Database::getInstance();
                 $stmt = $db->prepare("UPDATE rest_restaurantes SET sucursal_id = ? WHERE id = ?");
                 $stmt->execute([$sucursalId, $localId]);
@@ -90,7 +94,9 @@ class RestauranteController extends BaseController
     public function seleccionar(?string $p = null): void
     {
         $compradorId   = $this->usuarioId();
-        $restaurantes  = $this->model->getByComprador($compradorId);
+        $restaurantes  = $this->esProgramador()
+            ? $this->model->getByEmpresa((int)$this->empresaId())
+            : $this->model->getByComprador($compradorId);
 
         if (count($restaurantes) === 1) {
             $_SESSION['restaurante_activo_id'] = $restaurantes[0]['id'];
@@ -105,7 +111,11 @@ class RestauranteController extends BaseController
     public function activar(?string $id = null): void
     {
         $restauranteId = (int)($id ?? $this->post('restaurante_id'));
-        if (!$this->model->verificarAcceso($restauranteId, $this->usuarioId())) {
+        $restaurante = $this->model->find($restauranteId);
+        $accesoProgramador = $this->esProgramador()
+            && $restaurante
+            && (int)($restaurante['empresa_id'] ?? 0) === (int)$this->empresaId();
+        if (!$accesoProgramador && !$this->model->verificarAcceso($restauranteId, $this->usuarioId())) {
             $this->flash('error', 'Sin acceso a ese restaurante.');
             $this->redirect('restaurante/seleccionar');
         }
@@ -149,8 +159,9 @@ class RestauranteController extends BaseController
         $reservasCanal = $reservas->getResumenCanal($restauranteId);
 
         $menuModel     = new RestMenuModel();
-        $topVendidos   = $menuModel->getTopVendidos($restauranteId, 5);
-        $menosVendidos = $menuModel->getMenosVendidos($restauranteId, 5);
+        $visibleDesde  = $this->fechaFinancieraVisibleDesde();
+        $topVendidos   = $menuModel->getTopVendidos($restauranteId, 5, $visibleDesde);
+        $menosVendidos = $menuModel->getMenosVendidos($restauranteId, 5, $visibleDesde);
 
         $moderacionSocial = (new RestSocialModeracionModel())->resumenDashboard($restauranteId, 5);
 

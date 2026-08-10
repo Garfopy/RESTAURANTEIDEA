@@ -8,6 +8,14 @@ class RestFacturaSolicitudModel extends BaseModel
 
     private static array $columnCache = [];
 
+    private function fechaVisibleDesde(int $restauranteId): ?string
+    {
+        return (new RestVisibilidadFinancieraModel())->fechaVisibleDesde(
+            $restauranteId,
+            $_SESSION['usuario']['rol_slug'] ?? ''
+        );
+    }
+
     private function hasColumn(string $column): bool
     {
         if (array_key_exists($column, self::$columnCache)) {
@@ -38,6 +46,12 @@ class RestFacturaSolicitudModel extends BaseModel
 
         $where = ['fs.restaurante_id = ?'];
         $params = [$restauranteId];
+
+        $visibleDesde = $this->fechaVisibleDesde($restauranteId);
+        if ($visibleDesde) {
+            $where[] = 'DATE(fs.created_at) >= ?';
+            $params[] = $visibleDesde;
+        }
 
         $estado = (string)($filtros['estado'] ?? '');
         if ($estado !== '' && in_array($estado, self::ESTADOS, true)) {
@@ -77,6 +91,10 @@ class RestFacturaSolicitudModel extends BaseModel
 
     public function buscarParaRestaurante(int $id, int $restauranteId): ?array
     {
+        $visibleDesde = $this->fechaVisibleDesde($restauranteId);
+        $filtroVisible = $visibleDesde ? ' AND DATE(fs.created_at) >= ?' : '';
+        $params = [$id, $restauranteId];
+        if ($visibleDesde) $params[] = $visibleDesde;
         return $this->queryOne(
             "SELECT fs.*,
                     fs.receptor_nombre AS receptor_nombre_fiscal,
@@ -90,9 +108,9 @@ class RestFacturaSolicitudModel extends BaseModel
                JOIN rest_restaurantes r ON r.id = fs.restaurante_id
           LEFT JOIN rest_mesas m ON m.id = fs.mesa_id
           LEFT JOIN rest_pedidos p ON p.id = fs.pedido_id
-              WHERE fs.id = ? AND fs.restaurante_id = ?
+              WHERE fs.id = ? AND fs.restaurante_id = ?{$filtroVisible}
               LIMIT 1",
-            [$id, $restauranteId]
+            $params
         );
     }
 
@@ -137,8 +155,12 @@ class RestFacturaSolicitudModel extends BaseModel
             }
         }
 
+        $visibleDesde = $this->fechaVisibleDesde($restauranteId);
+        $filtroVisible = $visibleDesde ? ' AND DATE(created_at) >= ?' : '';
+        if ($visibleDesde) $params[] = $visibleDesde;
+
         return $this->execute(
-            "UPDATE facturacion_solicitudes SET " . implode(', ', $sets) . " WHERE id = ? AND restaurante_id = ?",
+            "UPDATE facturacion_solicitudes SET " . implode(', ', $sets) . " WHERE id = ? AND restaurante_id = ?{$filtroVisible}",
             $params
         );
     }

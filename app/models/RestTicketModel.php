@@ -64,7 +64,7 @@ class RestTicketModel extends BaseModel
         return $ticketId;
     }
 
-    public function getDetalle(int $ticketId, ?int $restauranteId = null): ?array
+    public function getDetalle(int $ticketId, ?int $restauranteId = null, ?string $visibleDesde = null): ?array
     {
         $params = [$ticketId];
         $whereRestaurante = '';
@@ -72,13 +72,18 @@ class RestTicketModel extends BaseModel
             $whereRestaurante = ' AND t.restaurante_id = ?';
             $params[] = $restauranteId;
         }
+        $whereVisible = '';
+        if ($visibleDesde !== null) {
+            $whereVisible = ' AND DATE(COALESCE(t.pagado_at, t.created_at)) >= ?';
+            $params[] = $visibleDesde;
+        }
 
         return $this->queryOne(
             "SELECT t.*, m.nombre AS mesa_nombre, v.qr_code, v.estado AS visita_estado
              FROM rest_tickets t
              LEFT JOIN rest_mesas m ON m.id = t.mesa_id
              LEFT JOIN rest_visitas v ON v.id = t.visita_id
-             WHERE t.id = ?{$whereRestaurante}",
+             WHERE t.id = ?{$whereRestaurante}{$whereVisible}",
             $params
         );
     }
@@ -129,14 +134,20 @@ class RestTicketModel extends BaseModel
         );
     }
 
-    public function listar(int $restauranteId, int $page = 1): array
+    public function listar(int $restauranteId, int $page = 1, ?string $visibleDesde = null): array
     {
+        $filtroVisible = $visibleDesde !== null
+            ? ' AND DATE(COALESCE(t.pagado_at, t.created_at)) >= ?'
+            : '';
+        $params = $visibleDesde !== null
+            ? [$restauranteId, $visibleDesde]
+            : [$restauranteId];
         $sql = "SELECT t.*, m.nombre AS mesa_nombre, v.qr_code
                 FROM rest_tickets t
                 LEFT JOIN rest_mesas m ON m.id = t.mesa_id
                 LEFT JOIN rest_visitas v ON v.id = t.visita_id
-                WHERE t.restaurante_id = ?
+                WHERE t.restaurante_id = ?{$filtroVisible}
                 ORDER BY t.created_at DESC";
-        return $this->paginate($sql, [$restauranteId], $page);
+        return $this->paginate($sql, $params, $page);
     }
 }

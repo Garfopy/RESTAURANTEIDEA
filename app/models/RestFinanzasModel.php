@@ -4,6 +4,24 @@ class RestFinanzasModel extends BaseModel
     protected string $table = 'rest_tickets';
     private static array $schemaCache = [];
 
+    private function ajustarRangoVisible(int $restauranteId, string $desde, string $hasta): array
+    {
+        $rol = $_SESSION['usuario']['rol_slug'] ?? '';
+        $visibleDesde = (new RestVisibilidadFinancieraModel())->fechaVisibleDesde($restauranteId, $rol);
+        if ($visibleDesde && $desde < $visibleDesde) {
+            $desde = $visibleDesde;
+        }
+        return [$desde, $hasta];
+    }
+
+    private function fechaVisibleDesde(int $restauranteId): ?string
+    {
+        return (new RestVisibilidadFinancieraModel())->fechaVisibleDesde(
+            $restauranteId,
+            $_SESSION['usuario']['rol_slug'] ?? ''
+        );
+    }
+
     private function tableExists(string $table): bool
     {
         $key = 'table:' . $table;
@@ -473,6 +491,7 @@ class RestFinanzasModel extends BaseModel
 
     public function kpisDashboard(int $restauranteId, string $desde, string $hasta): array
     {
+        [$desde, $hasta] = $this->ajustarRangoVisible($restauranteId, $desde, $hasta);
         $params = [$restauranteId, $desde, $hasta];
 
         $ingresosTickets = (float) $this->queryOne(
@@ -542,6 +561,7 @@ class RestFinanzasModel extends BaseModel
 
     public function amareDashboardKpis(int $restauranteId, string $desde, string $hasta): array
     {
+        [$desde, $hasta] = $this->ajustarRangoVisible($restauranteId, $desde, $hasta);
         $saldo = 0.0;
         $recargas = 0.0;
         $walletUsado = 0.0;
@@ -649,6 +669,7 @@ class RestFinanzasModel extends BaseModel
 
     public function ingresosVsEgresosGrafica(int $restauranteId, string $desde, string $hasta): array
     {
+        [$desde, $hasta] = $this->ajustarRangoVisible($restauranteId, $desde, $hasta);
         $ingTickets = $this->query(
             "SELECT DATE(t.pagado_at) AS dia,
                     SUM({$this->ticketIngresoContableExpr('t')}) AS total
@@ -673,6 +694,7 @@ class RestFinanzasModel extends BaseModel
 
     public function gastosPorCategoria(int $restauranteId, string $desde, string $hasta): array
     {
+        [$desde, $hasta] = $this->ajustarRangoVisible($restauranteId, $desde, $hasta);
         return $this->query(
             "SELECT categoria, SUM(monto) AS total
              FROM rest_gastos WHERE restaurante_id=? AND fecha BETWEEN ? AND ?
@@ -683,6 +705,7 @@ class RestFinanzasModel extends BaseModel
 
     public function metodosPago(int $restauranteId, string $desde, string $hasta): array
     {
+        [$desde, $hasta] = $this->ajustarRangoVisible($restauranteId, $desde, $hasta);
         $metodos = $this->query(
             "SELECT t.metodo_pago,
                     COUNT(*) AS cantidad,
@@ -794,6 +817,7 @@ class RestFinanzasModel extends BaseModel
         string $estacionProductos = 'todas'
     ): array
     {
+        [$desde, $hasta] = $this->ajustarRangoVisible($restauranteId, $desde, $hasta);
         if (!$this->ventasDisponibles()) {
             return [
                 'kpis' => ['ventas' => 0, 'unidades' => 0, 'pedidos' => 0, 'productos' => 0, 'ticketPromedio' => 0],
@@ -1062,14 +1086,24 @@ class RestFinanzasModel extends BaseModel
 
     public function actividadReciente(int $restauranteId, int $limit = 15): array
     {
+        $visibleDesde = $this->fechaVisibleDesde($restauranteId);
+        $gastoFiltro = $visibleDesde ? ' AND fecha >= ?' : '';
+        $movFiltro = $visibleDesde ? ' AND DATE(created_at) >= ?' : '';
+        $params = [$restauranteId];
+        if ($visibleDesde) $params[] = $visibleDesde;
+        $params[] = $restauranteId;
+        if ($visibleDesde) $params[] = $visibleDesde;
+        $params[] = $restauranteId;
+        if ($visibleDesde) $params[] = $visibleDesde;
+
         return $this->query(
-            "(SELECT 'gasto' AS tipo, descripcion, monto, created_at FROM rest_gastos WHERE restaurante_id=?)
+            "(SELECT 'gasto' AS tipo, descripcion, monto, created_at FROM rest_gastos WHERE restaurante_id=?{$gastoFiltro})
              UNION ALL
-             (SELECT 'retiro', descripcion, monto, created_at FROM rest_retiros WHERE restaurante_id=?)
+             (SELECT 'retiro', descripcion, monto, created_at FROM rest_retiros WHERE restaurante_id=?{$movFiltro})
              UNION ALL
-             (SELECT 'corte', CONCAT('Corte ', turno), utilidad_neta, created_at FROM rest_cortes WHERE restaurante_id=?)
+             (SELECT 'corte', CONCAT('Corte ', turno), utilidad_neta, created_at FROM rest_cortes WHERE restaurante_id=?{$movFiltro})
              ORDER BY created_at DESC LIMIT $limit",
-            [$restauranteId, $restauranteId, $restauranteId]
+            $params
         );
     }
 
@@ -1077,10 +1111,13 @@ class RestFinanzasModel extends BaseModel
 
     public function getGastos(int $restauranteId, int $page = 1): array
     {
+        $visibleDesde = $this->fechaVisibleDesde($restauranteId);
+        $filtro = $visibleDesde ? ' AND g.fecha >= ?' : '';
+        $params = $visibleDesde ? [$restauranteId, $visibleDesde] : [$restauranteId];
         $sql = "SELECT g.*, u.nombre AS usuario_nombre
                 FROM rest_gastos g JOIN usuarios u ON u.id = g.usuario_id
-                WHERE g.restaurante_id = ? ORDER BY g.fecha DESC, g.created_at DESC";
-        return $this->paginate($sql, [$restauranteId], $page);
+                WHERE g.restaurante_id = ?{$filtro} ORDER BY g.fecha DESC, g.created_at DESC";
+        return $this->paginate($sql, $params, $page);
     }
 
     public function insertGasto(array $data): int
@@ -1098,10 +1135,13 @@ class RestFinanzasModel extends BaseModel
 
     public function getRetiros(int $restauranteId, int $page = 1): array
     {
+        $visibleDesde = $this->fechaVisibleDesde($restauranteId);
+        $filtro = $visibleDesde ? ' AND DATE(r.created_at) >= ?' : '';
+        $params = $visibleDesde ? [$restauranteId, $visibleDesde] : [$restauranteId];
         $sql = "SELECT r.*, u.nombre AS usuario_nombre
                 FROM rest_retiros r JOIN usuarios u ON u.id = r.usuario_id
-                WHERE r.restaurante_id = ? ORDER BY r.created_at DESC";
-        return $this->paginate($sql, [$restauranteId], $page);
+                WHERE r.restaurante_id = ?{$filtro} ORDER BY r.created_at DESC";
+        return $this->paginate($sql, $params, $page);
     }
 
     public function insertRetiro(array $data): int
@@ -1117,10 +1157,13 @@ class RestFinanzasModel extends BaseModel
 
     public function getCortes(int $restauranteId, int $page = 1): array
     {
+        $visibleDesde = $this->fechaVisibleDesde($restauranteId);
+        $filtro = $visibleDesde ? ' AND DATE(c.created_at) >= ?' : '';
+        $params = $visibleDesde ? [$restauranteId, $visibleDesde] : [$restauranteId];
         $sql = "SELECT c.*, u.nombre AS usuario_nombre
                 FROM rest_cortes c JOIN usuarios u ON u.id = c.usuario_id
-                WHERE c.restaurante_id = ? ORDER BY c.created_at DESC";
-        return $this->paginate($sql, [$restauranteId], $page);
+                WHERE c.restaurante_id = ?{$filtro} ORDER BY c.created_at DESC";
+        return $this->paginate($sql, $params, $page);
     }
 
     public function insertCorte(array $data): int

@@ -21,7 +21,7 @@ class RestPedidoController extends BaseController
         $restauranteId = $this->restauranteId();
         $estado        = $this->get('estado', '');
         $page          = (int)$this->get('page', 1);
-        $resultado     = $this->model->listar($restauranteId, $page, $estado);
+        $resultado     = $this->model->listar($restauranteId, $page, $estado, $this->fechaFinancieraVisibleDesde());
         $soportaTipoOrigen = $this->model->soportaTipoOrigen();
         $flash         = $this->getFlash();
         $pageTitle     = 'Pedidos';
@@ -34,7 +34,7 @@ class RestPedidoController extends BaseController
         $restauranteId = $this->restauranteId();
         $estado        = $this->get('estado', '');
         $page          = (int)$this->get('page', 1);
-        $resultado     = $this->model->listarStore($restauranteId, $page, $estado);
+        $resultado     = $this->model->listarStore($restauranteId, $page, $estado, $this->fechaFinancieraVisibleDesde());
         $soportaTipoOrigen = $this->model->soportaTipoOrigen();
         $flash         = $this->getFlash();
         $pageTitle     = 'Ventas Store';
@@ -44,7 +44,7 @@ class RestPedidoController extends BaseController
 
     public function detalle(?string $id = null): void
     {
-        $pedido    = $this->model->getConItems((int)$id, (int)$this->restauranteId());
+        $pedido    = $this->model->getConItems((int)$id, (int)$this->restauranteId(), $this->fechaFinancieraVisibleDesde());
         if (!$pedido) { $this->flash('error', 'Pedido no encontrado.'); $this->redirect('rest-pedido/index'); }
         $flash     = $this->getFlash();
         $pageTitle = 'Pedido ' . $pedido['folio'];
@@ -110,6 +110,10 @@ class RestPedidoController extends BaseController
 
     public function cambiarEstado(?string $id = null): void
     {
+        $pedido = $this->model->getConItems((int)$id, (int)$this->restauranteId(), $this->fechaFinancieraVisibleDesde());
+        if (!$pedido) {
+            $this->json(['ok' => false, 'msg' => 'Pedido no encontrado'], 404);
+        }
         $estado = $this->post('estado') ?? $this->get('estado');
         $this->model->cambiarEstadoPedido((int)$id, $estado);
         $this->json(['ok' => true]);
@@ -127,13 +131,21 @@ class RestPedidoController extends BaseController
             $this->redirect('rest-pedido/ventasStore');
         }
 
-        $ok = $this->model->cambiarEstadoStore((int)$id, (int)$this->restauranteId(), $estado);
+        $pedido = $this->model->getConItems((int)$id, (int)$this->restauranteId(), $this->fechaFinancieraVisibleDesde());
+        $ok = $pedido && $this->model->cambiarEstadoStore((int)$id, (int)$this->restauranteId(), $estado);
         $this->flash($ok ? 'success' : 'error', $ok ? 'Venta actualizada.' : 'No se pudo actualizar la venta.');
         $this->redirect('rest-pedido/ventasStore');
     }
 
     public function cambiarEstadoItem(?string $id = null): void
     {
+        $pedidoId = $this->model->getPedidoIdPorItem((int)$id);
+        $pedido = $pedidoId
+            ? $this->model->getConItems($pedidoId, (int)$this->restauranteId(), $this->fechaFinancieraVisibleDesde())
+            : null;
+        if (!$pedido) {
+            $this->json(['ok' => false, 'msg' => 'Item no encontrado'], 404);
+        }
         $estado = $this->post('estado') ?? $this->get('estado');
         $this->model->cambiarEstadoItem((int)$id, $estado);
         $this->json(['ok' => true]);
@@ -141,7 +153,11 @@ class RestPedidoController extends BaseController
 
     public function cancelar(?string $id = null): void
     {
-        $pedido = $this->model->getConItems((int)$id, (int)$this->restauranteId());
+        $pedido = $this->model->getConItems((int)$id, (int)$this->restauranteId(), $this->fechaFinancieraVisibleDesde());
+        if (!$pedido) {
+            $this->flash('error', 'Pedido no encontrado.');
+            $this->redirect('rest-pedido/index');
+        }
         $this->model->cambiarEstadoPedido((int)$id, 'cancelado');
         $this->flash('success', 'Pedido cancelado.');
         $esStore = strtolower((string)($pedido['tipo_origen'] ?? '')) === 'store';

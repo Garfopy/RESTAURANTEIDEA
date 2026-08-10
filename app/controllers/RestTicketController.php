@@ -16,7 +16,7 @@ class RestTicketController extends BaseController
     {
         $restauranteId = $this->restauranteId();
         $page      = (int)$this->get('page', 1);
-        $resultado = $this->model->listar($restauranteId, $page);
+        $resultado = $this->model->listar($restauranteId, $page, $this->fechaFinancieraVisibleDesde());
         $flash     = $this->getFlash();
         $pageTitle  = 'Tickets';
         $activeMenu = 'rest_tickets';
@@ -39,7 +39,7 @@ class RestTicketController extends BaseController
 
     public function detalle(?string $id = null): void
     {
-        $ticket = $this->model->getDetalle((int)$id, $this->restauranteId());
+        $ticket = $this->model->getDetalle((int)$id, $this->restauranteId(), $this->fechaFinancieraVisibleDesde());
         if (!$ticket) { $this->flash('error', 'Ticket no encontrado.'); $this->redirect('rest-ticket/index'); }
 
         // Cargar ítems de todos los pedidos de esta visita
@@ -65,7 +65,7 @@ class RestTicketController extends BaseController
 
     public function confirmarPago(?string $id = null): void
     {
-        $ticket = $this->model->getDetalle((int)$id, $this->restauranteId());
+        $ticket = $this->model->getDetalle((int)$id, $this->restauranteId(), $this->fechaFinancieraVisibleDesde());
         if (!$ticket) {
             $this->flash('error', 'Ticket no encontrado.');
             $this->redirect('rest-ticket/index');

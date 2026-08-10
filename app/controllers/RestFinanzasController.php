@@ -32,6 +32,74 @@ class RestFinanzasController extends BaseController
         ));
     }
 
+    public function visibilidad(?string $p = null): void
+    {
+        $this->requireProgramador();
+        $restauranteId = (int)$this->restauranteId();
+        $visibilidadModel = new RestVisibilidadFinancieraModel();
+        $configuracion = $visibilidadModel->getConfiguracion($restauranteId);
+        $historial = $visibilidadModel->getHistorial($restauranteId);
+        $flash = $this->getFlash();
+        $pageTitle = 'Visibilidad de datos financieros';
+        $activeMenu = 'rest_visibilidad_financiera';
+
+        $this->render('restaurante/finanzas/visibilidad', compact(
+            'configuracion', 'historial', 'flash', 'pageTitle', 'activeMenu'
+        ));
+    }
+
+    public function guardarVisibilidad(?string $p = null): void
+    {
+        $this->requireProgramador();
+        if (!$this->isPost()) {
+            $this->redirect('rest-finanzas/visibilidad');
+        }
+
+        $fecha = trim((string)$this->post('ocultar_hasta', ''));
+        try {
+            (new RestVisibilidadFinancieraModel())->guardarOcultamiento(
+                (int)$this->restauranteId(),
+                $fecha,
+                (int)$this->usuarioId()
+            );
+            $this->log(
+                'Ocultamiento financiero activado',
+                'finanzas',
+                'Registros con fecha hasta ' . $fecha . ' ocultos para roles no programador.'
+            );
+            $this->flash('success', 'La informacion con fecha hasta ' . $fecha . ' quedo oculta para los demas niveles.');
+        } catch (InvalidArgumentException $e) {
+            $this->flash('error', $e->getMessage());
+        } catch (Throwable $e) {
+            error_log('[RestFinanzasController::guardarVisibilidad] ' . $e->getMessage());
+            $this->flash('error', 'No se pudo actualizar la visibilidad financiera.');
+        }
+
+        $this->redirect('rest-finanzas/visibilidad');
+    }
+
+    public function restaurarVisibilidad(?string $p = null): void
+    {
+        $this->requireProgramador();
+        if (!$this->isPost()) {
+            $this->redirect('rest-finanzas/visibilidad');
+        }
+
+        try {
+            (new RestVisibilidadFinancieraModel())->restaurarVisibilidad(
+                (int)$this->restauranteId(),
+                (int)$this->usuarioId()
+            );
+            $this->log('Ocultamiento financiero revertido', 'finanzas');
+            $this->flash('success', 'La visibilidad historica fue restaurada para todos los niveles.');
+        } catch (Throwable $e) {
+            error_log('[RestFinanzasController::restaurarVisibilidad] ' . $e->getMessage());
+            $this->flash('error', 'No se pudo restaurar la visibilidad financiera.');
+        }
+
+        $this->redirect('rest-finanzas/visibilidad');
+    }
+
     public function gastos(?string $p = null): void
     {
         $this->redirect('rest-finanzas/egresos?tab=gastos');
