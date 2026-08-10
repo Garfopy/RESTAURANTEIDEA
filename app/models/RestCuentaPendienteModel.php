@@ -67,6 +67,12 @@ class RestCuentaPendienteModel extends BaseModel
         return "CONVERT({$alias}.{$column} USING utf8mb4) COLLATE utf8mb4_unicode_ci";
     }
 
+    private function phoneExpr(string $alias, string $column): string
+    {
+        $value = $this->textExpr($alias, $column);
+        return "NULLIF(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE({$value}, ' ', ''), '-', ''), '(', ''), ')', ''), '+', ''), '')";
+    }
+
     private function mobileColumns(): array
     {
         if (!$this->tableExists('mobile_usuarios')) {
@@ -97,19 +103,202 @@ class RestCuentaPendienteModel extends BaseModel
         ];
     }
 
+    public function listarSalidasPendientes(int $restauranteId): array
+    {
+        return $this->query(
+            "SELECT v.id AS visita_id,
+                    v.qr_code,
+                    v.pagada_at,
+                    v.total AS visita_total,
+                    v.created_at,
+                    m.id AS mesa_id,
+                    m.nombre AS mesa_nombre,
+                    c.nombre AS cliente_nombre,
+                    c.email AS cliente_email,
+                    c.telefono AS cliente_telefono,
+                    tp.folio AS ticket_folio,
+                    COALESCE(tp.total, v.total, 0) AS monto,
+                    COALESCE(tp.pagado_at, v.pagada_at) AS pago_confirmado_at
+               FROM rest_visitas v
+          LEFT JOIN rest_mesas m ON m.id = v.mesa_id
+          LEFT JOIN rest_comensales c ON c.id = v.comensal_id
+          LEFT JOIN (
+                    SELECT t1.visita_id, t1.folio, t1.total, t1.pagado_at
+                      FROM rest_tickets t1
+                      JOIN (
+                            SELECT visita_id, MAX(id) AS ticket_id
+                              FROM rest_tickets
+                             WHERE restaurante_id = ? AND estado = 'pagado'
+                          GROUP BY visita_id
+                      ) ultimo ON ultimo.ticket_id = t1.id
+               ) tp ON tp.visita_id = v.id
+              WHERE v.restaurante_id = ?
+                AND v.estado = 'pagada'
+                AND v.salida_at IS NULL
+           ORDER BY COALESCE(v.pagada_at, v.created_at) ASC, v.id ASC",
+            [$restauranteId, $restauranteId]
+        );
+    }
+
+    public function getHistorialSalidas(int $restauranteId, int $limit = 30): array
+    {
+        if (!$this->tableExists('rest_validaciones_salida_programador')) {
+            return [];
+        }
+        $limit = max(1, min(100, $limit));
+        return $this->query(
+            "SELECT vs.*, u.nombre AS programador_nombre
+               FROM rest_validaciones_salida_programador vs
+          LEFT JOIN usuarios u ON u.id = vs.usuario_id
+              WHERE vs.restaurante_id = ?
+           ORDER BY vs.created_at DESC, vs.id DESC
+              LIMIT {$limit}",
+            [$restauranteId]
+        );
+    }
+
+    public function validarSalidaManual(
+        int $restauranteId,
+        int $visitaId,
+        string $motivo,
+        int $usuarioId
+    ): array {
+        if (!$this->tableExists('rest_validaciones_salida_programador')) {
+            throw new RuntimeException('Falta ejecutar la migracion 085_validacion_salida_programador.sql.');
+        }
+        foreach ([
+            'restaurante_id', 'visita_id', 'ticket_folio', 'cliente_referencia',
+            'mesa_referencia', 'pagada_at', 'salida_registrada_at', 'motivo',
+            'usuario_id', 'created_at',
+        ] as $column) {
+            if (!$this->columnExists('rest_validaciones_salida_programador', $column)) {
+                throw new DomainException('La migracion 085 esta incompleta. Falta la columna ' . $column . '.');
+            }
+        }
+        $motivo = trim($motivo);
+        $length = function_exists('mb_strlen') ? mb_strlen($motivo) : strlen($motivo);
+        if ($visitaId <= 0) {
+            throw new InvalidArgumentException('La visita seleccionada no es valida.');
+        }
+        if ($length < 5 || $length > 500) {
+            throw new InvalidArgumentException('El motivo debe tener entre 5 y 500 caracteres.');
+        }
+
+        $this->db->beginTransaction();
+        try {
+            $visita = $this->queryOne(
+                "SELECT v.*, m.nombre AS mesa_nombre, c.nombre AS cliente_nombre,
+                        (SELECT t.folio
+                           FROM rest_tickets t
+                          WHERE t.visita_id = v.id AND t.estado = 'pagado'
+                       ORDER BY t.id DESC LIMIT 1) AS ticket_folio
+                   FROM rest_visitas v
+              LEFT JOIN rest_mesas m ON m.id = v.mesa_id
+              LEFT JOIN rest_comensales c ON c.id = v.comensal_id
+                  WHERE v.id = ? AND v.restaurante_id = ?
+                  FOR UPDATE",
+                [$visitaId, $restauranteId]
+            );
+            if (!$visita) {
+                throw new DomainException('La visita no existe o pertenece a otro restaurante.');
+            }
+            if (($visita['estado'] ?? '') !== 'pagada') {
+                throw new DomainException('La visita ya no aparece como pagada. No se puede validar su salida.');
+            }
+            if (!empty($visita['salida_at'])) {
+                throw new DomainException('La salida de esta visita ya fue registrada.');
+            }
+
+            $salidaAt = date('Y-m-d H:i:s');
+            $this->execute(
+                "UPDATE rest_visitas
+                    SET salida_at = ?
+                  WHERE id = ? AND restaurante_id = ? AND estado = 'pagada' AND salida_at IS NULL",
+                [$salidaAt, $visitaId, $restauranteId]
+            );
+
+            if (!empty($visita['mesa_id'])) {
+                // Solo liberar si ninguna otra visita sin salida ocupa esa mesa.
+                $this->execute(
+                    "UPDATE rest_mesas m
+                        SET estado = 'disponible'
+                      WHERE m.id = ? AND m.restaurante_id = ?
+                        AND NOT EXISTS (
+                            SELECT 1
+                              FROM rest_visitas otra
+                             WHERE otra.mesa_id = m.id
+                               AND otra.restaurante_id = m.restaurante_id
+                               AND otra.id <> ?
+                               AND otra.salida_at IS NULL
+                               AND otra.estado <> 'cancelada'
+                        )",
+                    [(int)$visita['mesa_id'], $restauranteId, $visitaId]
+                );
+
+                if ($this->tableExists('rest_reservaciones')) {
+                    $this->execute(
+                        "UPDATE rest_reservaciones
+                            SET estado = 'completada'
+                          WHERE restaurante_id = ? AND mesa_id = ?
+                            AND fecha = CURDATE() AND estado IN ('pendiente','confirmada')",
+                        [$restauranteId, (int)$visita['mesa_id']]
+                    );
+                }
+            }
+
+            $cliente = trim((string)($visita['cliente_nombre'] ?? ''));
+            $cliente = $cliente !== '' ? $cliente : 'Visita #' . $visitaId;
+            $this->execute(
+                "INSERT INTO rest_validaciones_salida_programador
+                    (restaurante_id, visita_id, ticket_folio, cliente_referencia,
+                     mesa_referencia, pagada_at, salida_registrada_at, motivo, usuario_id)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                [
+                    $restauranteId,
+                    $visitaId,
+                    $visita['ticket_folio'] ?: null,
+                    $cliente,
+                    $visita['mesa_nombre'] ?: null,
+                    $visita['pagada_at'] ?: null,
+                    $salidaAt,
+                    $motivo,
+                    $usuarioId,
+                ]
+            );
+
+            $this->db->commit();
+            return [
+                'visita_id' => $visitaId,
+                'ticket_folio' => (string)($visita['ticket_folio'] ?? ''),
+                'cliente' => $cliente,
+            ];
+        } catch (Throwable $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
+        }
+    }
+
     private function listarTicketsPendientes(int $restauranteId): array
     {
         $pedidoMobile = $this->firstColumn('rest_pedidos', [
             'mobile_usuario_id', 'mobile_user_id', 'app_cliente_id', 'app_usuario_id', 'usuario_mobile_id'
         ]);
         $pedidoCliente = $this->firstColumn('rest_pedidos', ['cliente_nombre', 'comprador_nombre']);
+        $comensalMobile = $this->firstColumn('rest_comensales', [
+            'mobile_usuario_id', 'mobile_user_id', 'app_cliente_id', 'app_usuario_id', 'usuario_mobile_id'
+        ]);
         $pdSelect = ['visita_id'];
         $pdSelect[] = $pedidoMobile ? "MAX({$pedidoMobile}) AS mobile_usuario_id" : 'NULL AS mobile_usuario_id';
         $pdSelect[] = $pedidoCliente ? "MAX(NULLIF({$pedidoCliente}, '')) AS pedido_cliente" : 'NULL AS pedido_cliente';
 
         $mobile = $this->mobileColumns();
-        $mobileJoin = $this->tableExists('mobile_usuarios') && $pedidoMobile
-            ? 'LEFT JOIN mobile_usuarios mu ON mu.id = pd.mobile_usuario_id'
+        $linkedMobileId = $comensalMobile
+            ? "COALESCE(c.{$comensalMobile}, pd.mobile_usuario_id)"
+            : 'pd.mobile_usuario_id';
+        $mobileJoin = $this->tableExists('mobile_usuarios') && ($pedidoMobile || $comensalMobile)
+            ? "LEFT JOIN mobile_usuarios mu ON mu.id = {$linkedMobileId}"
             : '';
         $mobileName = $mobileJoin && $mobile['name'] ? "NULLIF({$this->textExpr('mu', $mobile['name'])}, '')" : 'NULL';
         $mobileEmail = $mobileJoin && $mobile['email'] ? $this->textExpr('mu', $mobile['email']) : 'NULL';
@@ -118,6 +307,17 @@ class RestCuentaPendienteModel extends BaseModel
         $comensalEmail = $this->textExpr('c', 'email');
         $comensalTelefono = $this->textExpr('c', 'telefono');
         $pedidoClienteExpr = 'CONVERT(pd.pedido_cliente USING utf8mb4) COLLATE utf8mb4_unicode_ci';
+        $emailPorTelefono = 'NULL';
+        if ($this->tableExists('mobile_usuarios') && $mobile['email'] && $mobile['phone']) {
+            $emailPorTelefono = "(
+                SELECT {$this->textExpr('mu_phone', $mobile['email'])}
+                  FROM mobile_usuarios mu_phone
+                 WHERE {$this->phoneExpr('mu_phone', $mobile['phone'])} = {$this->phoneExpr('c', 'telefono')}
+                   AND {$this->phoneExpr('c', 'telefono')} IS NOT NULL
+                 ORDER BY mu_phone.id ASC
+                 LIMIT 1
+            )";
+        }
 
         return $this->query(
             "SELECT 'ticket' AS tipo_registro,
@@ -131,9 +331,9 @@ class RestCuentaPendienteModel extends BaseModel
                     v.estado AS visita_estado,
                     m.nombre AS mesa_nombre,
                     c.id AS comensal_id,
-                    pd.mobile_usuario_id,
+                    {$linkedMobileId} AS mobile_usuario_id,
                     COALESCE(NULLIF({$comensalNombre}, ''), NULLIF({$pedidoClienteExpr}, ''), {$mobileName}, CONCAT('Visita #', v.id)) AS cliente_nombre,
-                    COALESCE(NULLIF({$comensalEmail}, ''), {$mobileEmail}) AS cliente_email,
+                    COALESCE(NULLIF({$comensalEmail}, ''), {$mobileEmail}, {$emailPorTelefono}) AS cliente_email,
                     COALESCE(NULLIF({$comensalTelefono}, ''), {$mobilePhone}) AS cliente_telefono
                FROM rest_tickets t
                JOIN rest_visitas v ON v.id = t.visita_id AND v.restaurante_id = t.restaurante_id

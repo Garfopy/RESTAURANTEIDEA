@@ -106,13 +106,16 @@ class RestFinanzasController extends BaseController
         $restauranteId = (int)$this->restauranteId();
         $cuentasModel = new RestCuentaPendienteModel();
         $pendientes = $cuentasModel->listarPendientes($restauranteId);
+        $salidasPendientes = $cuentasModel->listarSalidasPendientes($restauranteId);
         $historial = $cuentasModel->getHistorial($restauranteId);
+        $historialSalidas = $cuentasModel->getHistorialSalidas($restauranteId);
         $flash = $this->getFlash();
         $pageTitle = 'Cuentas pendientes';
         $activeMenu = 'rest_cuentas_pendientes';
 
         $this->render('restaurante/finanzas/cuentas_pendientes', compact(
-            'pendientes', 'historial', 'flash', 'pageTitle', 'activeMenu'
+            'pendientes', 'salidasPendientes', 'historial', 'historialSalidas',
+            'flash', 'pageTitle', 'activeMenu'
         ));
     }
 
@@ -152,6 +155,44 @@ class RestFinanzasController extends BaseController
             $this->flash(
                 'error',
                 'No se pudo regularizar el adeudo. Detalle tecnico: ' . ($detalle ?: get_class($e))
+            );
+        }
+
+        $this->redirect('rest-finanzas/cuentasPendientes');
+    }
+
+    public function validarSalidaManual(?string $p = null): void
+    {
+        $this->requireProgramador();
+        if (!$this->isPost()) {
+            $this->redirect('rest-finanzas/cuentasPendientes');
+        }
+
+        $visitaId = (int)$this->post('visita_id', 0);
+        $motivo = trim((string)$this->post('motivo', ''));
+
+        try {
+            $resultado = (new RestCuentaPendienteModel())->validarSalidaManual(
+                (int)$this->restauranteId(),
+                $visitaId,
+                $motivo,
+                (int)$this->usuarioId()
+            );
+            $referencia = ($resultado['ticket_folio'] ?? '') ?: ('Visita #' . $visitaId);
+            $this->log(
+                'Salida validada por PROGRAMADOR',
+                'finanzas',
+                $referencia . '. Motivo: ' . $motivo
+            );
+            $this->flash('success', 'La salida de ' . $referencia . ' fue validada y la mesa se liberó correctamente.');
+        } catch (InvalidArgumentException | DomainException $e) {
+            $this->flash('error', $e->getMessage());
+        } catch (Throwable $e) {
+            error_log('[RestFinanzasController::validarSalidaManual] ' . $e->getMessage());
+            $detalle = preg_replace('/\s+/', ' ', trim($e->getMessage()));
+            $this->flash(
+                'error',
+                'No se pudo validar la salida. Detalle técnico: ' . ($detalle ?: get_class($e))
             );
         }
 
