@@ -152,6 +152,10 @@ $_isProgramador = $_rol === 'programador';
       Corte de Caja
     </a>
     <?php if ($_isProgramador): ?>
+    <a class="rst-nav-link <?= $activeMenu === 'rest_cuentas_pendientes' ? 'active' : '' ?>"
+       href="<?= BASE_URL ?>rest-finanzas/cuentasPendientes" style="padding-left:38px;font-size:.82rem">
+      Cuentas pendientes
+    </a>
     <a class="rst-nav-link <?= $activeMenu === 'rest_visibilidad_financiera' ? 'active' : '' ?>"
        href="<?= BASE_URL ?>rest-finanzas/visibilidad" style="padding-left:38px;font-size:.82rem">
       Visibilidad de datos

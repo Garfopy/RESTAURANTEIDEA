@@ -86,6 +86,16 @@ class RestVisibilidadFinancieraModel extends BaseModel
                     actualizado_por = VALUES(actualizado_por)",
                 [$restauranteId, $usuarioId]
             );
+            $restaurada = $this->queryOne(
+                "SELECT activo, ocultar_hasta
+                   FROM rest_visibilidad_financiera
+                  WHERE restaurante_id = ?
+                  FOR UPDATE",
+                [$restauranteId]
+            );
+            if (!$restaurada || (int)$restaurada['activo'] !== 0 || $restaurada['ocultar_hasta'] !== null) {
+                throw new RuntimeException('No se pudo desactivar completamente el filtro de visibilidad.');
+            }
             $this->registrarHistorial(
                 $restauranteId,
                 'restaurar',

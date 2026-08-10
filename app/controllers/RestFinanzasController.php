@@ -100,6 +100,60 @@ class RestFinanzasController extends BaseController
         $this->redirect('rest-finanzas/visibilidad');
     }
 
+    public function cuentasPendientes(?string $p = null): void
+    {
+        $this->requireProgramador();
+        $restauranteId = (int)$this->restauranteId();
+        $cuentasModel = new RestCuentaPendienteModel();
+        $pendientes = $cuentasModel->listarPendientes($restauranteId);
+        $historial = $cuentasModel->getHistorial($restauranteId);
+        $flash = $this->getFlash();
+        $pageTitle = 'Cuentas pendientes';
+        $activeMenu = 'rest_cuentas_pendientes';
+
+        $this->render('restaurante/finanzas/cuentas_pendientes', compact(
+            'pendientes', 'historial', 'flash', 'pageTitle', 'activeMenu'
+        ));
+    }
+
+    public function regularizarAdeudo(?string $p = null): void
+    {
+        $this->requireProgramador();
+        if (!$this->isPost()) {
+            $this->redirect('rest-finanzas/cuentasPendientes');
+        }
+
+        $tipo = trim((string)$this->post('tipo_registro', ''));
+        $registroId = (int)$this->post('registro_id', 0);
+        $metodoPago = trim((string)$this->post('metodo_pago', ''));
+        $motivo = trim((string)$this->post('motivo', ''));
+
+        try {
+            $resultado = (new RestCuentaPendienteModel())->regularizar(
+                (int)$this->restauranteId(),
+                $tipo,
+                $registroId,
+                $metodoPago,
+                $motivo,
+                (int)$this->usuarioId()
+            );
+            $folio = (string)($resultado['folio'] ?? ('#' . $registroId));
+            $this->log(
+                'Adeudo regularizado por PROGRAMADOR',
+                'finanzas',
+                $tipo . ' ' . $folio . '. Motivo: ' . $motivo
+            );
+            $this->flash('success', 'El adeudo de ' . $folio . ' fue retirado y sus registros quedaron sincronizados.');
+        } catch (InvalidArgumentException | DomainException $e) {
+            $this->flash('error', $e->getMessage());
+        } catch (Throwable $e) {
+            error_log('[RestFinanzasController::regularizarAdeudo] ' . $e->getMessage());
+            $this->flash('error', 'No se pudo regularizar el adeudo. Verifica que la migracion 084 este instalada.');
+        }
+
+        $this->redirect('rest-finanzas/cuentasPendientes');
+    }
+
     public function gastos(?string $p = null): void
     {
         $this->redirect('rest-finanzas/egresos?tab=gastos');

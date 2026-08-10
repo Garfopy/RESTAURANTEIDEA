@@ -12,6 +12,7 @@ $ocultarHasta = (string)($configuracion['ocultar_hasta'] ?? '');
   <section class="visibility-hero">
     <h1>Modo PROGRAMADOR</h1>
     <p>Controla qué periodo financiero pueden consultar los demás niveles. Las ventas, tickets, gastos, retiros, cortes, facturas, historial y puntos permanecen guardados sin modificación. PROGRAMADOR siempre conserva la vista completa.</p>
+    <p style="margin-top:12px"><a href="<?= BASE_URL ?>rest-finanzas/cuentasPendientes" style="color:#fff;font-weight:700">Revisar usuarios con cuentas pendientes →</a></p>
   </section>
 
   <div class="visibility-grid">
@@ -65,4 +66,3 @@ $ocultarHasta = (string)($configuracion['ocultar_hasta'] ?? '');
 <?php
 $content = ob_get_clean();
 require ROOT_PATH . '/app/views/restaurante/layouts/main.php';
-

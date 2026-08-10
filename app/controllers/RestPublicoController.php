@@ -456,6 +456,7 @@ class RestPublicoController extends BaseController
         }
 
         $this->ticketModel->marcarPagado($ticketId, $metodo, null);
+        $this->pedidoModel->marcarVisitaEntregada((int)$ticket['visita_id']);
         $this->visitaModel->marcarPagada((int)$ticket['visita_id']);
         // La mesa se libera cuando el portero escanea el QR de salida, no aquí.
 
@@ -500,6 +501,7 @@ class RestPublicoController extends BaseController
                 $this->ticketModel->actualizarPropina($ticketId, $propina);
             }
             $this->ticketModel->marcarPagado($ticketId, 'paypal', $orderId);
+            $this->pedidoModel->marcarVisitaEntregada((int)$ticket['visita_id']);
             $this->visitaModel->marcarPagada((int)$ticket['visita_id']);
             // La mesa se libera cuando el portero escanea el QR de salida, no aquí.
         } catch (\Throwable $e) {
@@ -854,6 +856,7 @@ class RestPublicoController extends BaseController
         }
 
         $this->ticketModel->marcarPagado($ticketId, 'tarjeta', $session->payment_intent ?? null);
+        $this->pedidoModel->marcarVisitaEntregada((int)$ticket['visita_id']);
         $this->visitaModel->marcarPagada((int)$ticket['visita_id']);
         $this->redirect('menu/' . $realSlug . '/confirmacion/' . $ticket['visita_id'] . '?pagado=1');
     }

@@ -47,7 +47,9 @@ abstract class BaseController
             $rol === 'chef'                                            => $this->redirect('rest-chef/dashboard'),
             $rol === 'barra'                                           => $this->redirect('rest-bar/dashboard'),
             $rol === 'portero'                                         => $this->redirect('rest-portero/dashboard'),
-            default                                                    => $this->redirect('auth/login'),
+            // Evita un ciclo /auth/login -> /auth/login cuando una sesion
+            // contiene un rol nuevo, eliminado o todavia no desplegado.
+            default                                                    => $this->redirect('auth/logout'),
         };
     }
 
