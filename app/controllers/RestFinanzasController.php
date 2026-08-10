@@ -148,7 +148,11 @@ class RestFinanzasController extends BaseController
             $this->flash('error', $e->getMessage());
         } catch (Throwable $e) {
             error_log('[RestFinanzasController::regularizarAdeudo] ' . $e->getMessage());
-            $this->flash('error', 'No se pudo regularizar el adeudo. Verifica que la migracion 084 este instalada.');
+            $detalle = preg_replace('/\s+/', ' ', trim($e->getMessage()));
+            $this->flash(
+                'error',
+                'No se pudo regularizar el adeudo. Detalle tecnico: ' . ($detalle ?: get_class($e))
+            );
         }
 
         $this->redirect('rest-finanzas/cuentasPendientes');

@@ -16,9 +16,10 @@ class RestCuentaPendienteModel extends BaseModel
         }
 
         try {
-            $stmt = $this->db->prepare('SHOW TABLES LIKE ?');
-            $stmt->execute([$table]);
-            return self::$schemaCache[$key] = (bool)$stmt->fetchColumn();
+            // No usar SHOW TABLES LIKE ? aqui: algunos servidores con prepares
+            // nativos no aceptan el placeholder y hacen parecer que la tabla no existe.
+            $this->db->query("SELECT 1 FROM `{$table}` LIMIT 0");
+            return self::$schemaCache[$key] = true;
         } catch (Throwable $e) {
             return self::$schemaCache[$key] = false;
         }
@@ -35,9 +36,17 @@ class RestCuentaPendienteModel extends BaseModel
         }
 
         try {
-            $stmt = $this->db->prepare("SHOW COLUMNS FROM `{$table}` LIKE ?");
-            $stmt->execute([$column]);
-            return self::$schemaCache[$key] = (bool)$stmt->fetch(PDO::FETCH_ASSOC);
+            // Leer el esquema completo evita la misma incompatibilidad de LIKE ?.
+            $stmt = $this->db->query("SHOW COLUMNS FROM `{$table}`");
+            $found = false;
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $definition) {
+                $field = (string)($definition['Field'] ?? '');
+                self::$schemaCache['column:' . $table . '.' . $field] = true;
+                if (strcasecmp($field, $column) === 0) {
+                    $found = true;
+                }
+            }
+            return self::$schemaCache[$key] = $found;
         } catch (Throwable $e) {
             return self::$schemaCache[$key] = false;
         }
@@ -230,6 +239,7 @@ class RestCuentaPendienteModel extends BaseModel
         if (!$this->tableExists($this->table)) {
             throw new RuntimeException('Falta ejecutar la migracion 084_regularizacion_adeudos_programador.sql.');
         }
+        $this->validarEsquemaAuditoria();
         if (!in_array($tipo, ['ticket', 'pedido_app'], true) || $registroId <= 0) {
             throw new InvalidArgumentException('La cuenta seleccionada no es valida.');
         }
@@ -291,12 +301,18 @@ class RestCuentaPendienteModel extends BaseModel
         // queden en el mismo estado que un pago confirmado desde Tickets.
         (new RestPedidoModel())->marcarVisitaEntregada((int)$ticket['visita_id']);
         (new RestVisitaModel())->marcarPagada((int)$ticket['visita_id']);
-        $this->execute(
-            "UPDATE rest_alertas
-                SET atendida = 1
-              WHERE restaurante_id = ? AND visita_id = ? AND tipo = 'cuenta' AND atendida = 0",
-            [$restauranteId, (int)$ticket['visita_id']]
-        );
+        // Algunas instalaciones antiguas no tienen la tabla de alertas. Es una
+        // limpieza auxiliar y nunca debe impedir que se refleje el pago.
+        if ($this->tableExists('rest_alertas')
+            && $this->columnExists('rest_alertas', 'atendida')
+            && $this->columnExists('rest_alertas', 'visita_id')) {
+            $this->execute(
+                "UPDATE rest_alertas
+                    SET atendida = 1
+                  WHERE restaurante_id = ? AND visita_id = ? AND tipo = 'cuenta' AND atendida = 0",
+                [$restauranteId, (int)$ticket['visita_id']]
+            );
+        }
 
         $cliente = trim((string)($ticket['cliente_nombre'] ?? ''));
         $cliente = $cliente !== '' ? $cliente : 'Visita #' . (int)$ticket['visita_id'];
@@ -382,5 +398,25 @@ class RestCuentaPendienteModel extends BaseModel
             [$restauranteId, $tipo, $registroId, $folio, $cliente, $monto,
              $estadoAnterior, $metodoPago, $motivo, $usuarioId]
         );
+    }
+
+    private function validarEsquemaAuditoria(): void
+    {
+        $required = [
+            'restaurante_id', 'tipo_registro', 'registro_id', 'folio',
+            'cliente_referencia', 'monto', 'estado_anterior', 'metodo_pago',
+            'motivo', 'usuario_id', 'created_at',
+        ];
+        $missing = [];
+        foreach ($required as $column) {
+            if (!$this->columnExists($this->table, $column)) {
+                $missing[] = $column;
+            }
+        }
+        if ($missing) {
+            throw new DomainException(
+                'La migracion 084 esta incompleta. Faltan columnas: ' . implode(', ', $missing) . '.'
+            );
+        }
     }
 }
