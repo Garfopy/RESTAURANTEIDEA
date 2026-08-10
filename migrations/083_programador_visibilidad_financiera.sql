@@ -3,7 +3,7 @@
 -- tickets, puntos, movimientos de monedero o historial de clientes.
 
 INSERT IGNORE INTO `roles` (`id`, `nombre`, `slug`)
-VALUES (12, 'Programador', 'programador');
+VALUES (12, 'Macias', 'programador');
 
 CREATE TABLE IF NOT EXISTS `rest_visibilidad_financiera` (
   `restaurante_id` INT UNSIGNED NOT NULL,

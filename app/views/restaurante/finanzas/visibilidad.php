@@ -10,8 +10,8 @@ $ocultarHasta = (string)($configuracion['ocultar_hasta'] ?? '');
 
 <div class="visibility-wrap">
   <section class="visibility-hero">
-    <h1>Modo PROGRAMADOR</h1>
-    <p>Controla qué periodo financiero pueden consultar los demás niveles. Las ventas, tickets, gastos, retiros, cortes, facturas, historial y puntos permanecen guardados sin modificación. PROGRAMADOR siempre conserva la vista completa.</p>
+    <h1>Modo Macias</h1>
+    <p>Controla qué periodo financiero pueden consultar los demás niveles. Las ventas, tickets, gastos, retiros, cortes, facturas, historial y puntos permanecen guardados sin modificación. Modo Macias siempre conserva la vista completa.</p>
     <p style="margin-top:12px"><a href="<?= BASE_URL ?>rest-finanzas/cuentasPendientes" style="color:#fff;font-weight:700">Revisar usuarios con cuentas pendientes →</a></p>
   </section>
 
@@ -48,7 +48,7 @@ $ocultarHasta = (string)($configuracion['ocultar_hasta'] ?? '');
           <strong><?= $evento['accion'] === 'ocultar' ? 'Ocultamiento aplicado' : 'Visibilidad restaurada' ?></strong>
           <span>
             <?= htmlspecialchars((string)($evento['created_at'] ?? '')) ?>
-            · <?= htmlspecialchars((string)($evento['usuario_nombre'] ?? 'Programador')) ?>
+            · <?= htmlspecialchars((string)($evento['usuario_nombre'] ?? 'Macias')) ?>
             <?php if (!empty($evento['ocultar_hasta'])): ?>
             · límite <?= htmlspecialchars((string)$evento['ocultar_hasta']) ?>
             <?php endif; ?>

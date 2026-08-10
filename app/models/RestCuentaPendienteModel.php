@@ -140,6 +140,214 @@ class RestCuentaPendienteModel extends BaseModel
         );
     }
 
+    public function listarPedidosParaLiberar(
+        int $restauranteId,
+        string $busqueda = '',
+        string $estado = 'todos',
+        int $limit = 200
+    ): array {
+        $limit = max(20, min(500, $limit));
+        $estados = ['pendiente', 'en_preparacion', 'listo', 'reclamado', 'entregado', 'cancelado'];
+        $estado = in_array($estado, $estados, true) ? $estado : 'todos';
+        $busqueda = trim($busqueda);
+
+        $pedidoCliente = $this->firstColumn('rest_pedidos', ['cliente_nombre', 'comprador_nombre']);
+        $pedidoTelefono = $this->firstColumn('rest_pedidos', ['comprador_telefono', 'cliente_telefono', 'telefono']);
+        $pedidoMobile = $this->firstColumn('rest_pedidos', [
+            'mobile_usuario_id', 'mobile_user_id', 'app_cliente_id', 'app_usuario_id', 'usuario_mobile_id'
+        ]);
+        $tipoOrigen = $this->columnExists('rest_pedidos', 'tipo_origen') ? 'p.tipo_origen' : 'NULL';
+        $ticketPagadoAt = "(SELECT MAX(t_pago.pagado_at)
+                              FROM rest_tickets t_pago
+                             WHERE t_pago.visita_id = p.visita_id
+                               AND t_pago.estado = 'pagado')";
+        $pagadoAt = $this->columnExists('rest_pedidos', 'pagado_at')
+            ? "COALESCE(p.pagado_at, {$ticketPagadoAt})"
+            : $ticketPagadoAt;
+        $pedidoClienteExpr = $pedidoCliente ? "NULLIF({$this->textExpr('p', $pedidoCliente)}, '')" : 'NULL';
+        $pedidoTelefonoExpr = $pedidoTelefono ? "NULLIF({$this->textExpr('p', $pedidoTelefono)}, '')" : 'NULL';
+        $mobileIdExpr = $pedidoMobile ? "p.{$pedidoMobile}" : 'NULL';
+
+        $mobile = $this->mobileColumns();
+        $mobileJoin = $this->tableExists('mobile_usuarios') && $pedidoMobile
+            ? "LEFT JOIN mobile_usuarios mu ON mu.id = p.{$pedidoMobile}"
+            : '';
+        $mobileName = $mobileJoin && $mobile['name'] ? "NULLIF({$this->textExpr('mu', $mobile['name'])}, '')" : 'NULL';
+        $mobileEmail = $mobileJoin && $mobile['email'] ? "NULLIF({$this->textExpr('mu', $mobile['email'])}, '')" : 'NULL';
+        $mobilePhone = $mobileJoin && $mobile['phone'] ? "NULLIF({$this->textExpr('mu', $mobile['phone'])}, '')" : 'NULL';
+
+        $where = ['p.restaurante_id = ?'];
+        $params = [$restauranteId];
+        if ($estado !== 'todos') {
+            $where[] = 'p.estado = ?';
+            $params[] = $estado;
+        }
+        if ($busqueda !== '') {
+            $searchParts = [
+                'p.folio LIKE ?',
+                'c.nombre LIKE ?',
+                'c.email LIKE ?',
+                'c.telefono LIKE ?',
+            ];
+            if ($pedidoCliente) $searchParts[] = "p.{$pedidoCliente} LIKE ?";
+            if ($pedidoTelefono) $searchParts[] = "p.{$pedidoTelefono} LIKE ?";
+            if ($mobileJoin && $mobile['name']) $searchParts[] = "mu.{$mobile['name']} LIKE ?";
+            if ($mobileJoin && $mobile['email']) $searchParts[] = "mu.{$mobile['email']} LIKE ?";
+            if ($mobileJoin && $mobile['phone']) $searchParts[] = "mu.{$mobile['phone']} LIKE ?";
+            $where[] = '(' . implode(' OR ', $searchParts) . ')';
+            foreach ($searchParts as $_) {
+                $params[] = '%' . $busqueda . '%';
+            }
+        }
+
+        return $this->query(
+            "SELECT p.id AS pedido_id,
+                    p.folio,
+                    p.estado,
+                    p.total,
+                    p.subtotal,
+                    p.created_at,
+                    p.visita_id,
+                    {$tipoOrigen} AS tipo_origen,
+                    {$pagadoAt} AS pagado_at,
+                    {$mobileIdExpr} AS mobile_usuario_id,
+                    m.nombre AS mesa_nombre,
+                    COALESCE({$pedidoClienteExpr}, NULLIF({$this->textExpr('c', 'nombre')}, ''), {$mobileName}, CONCAT('Pedido #', p.id)) AS cliente_nombre,
+                    COALESCE(NULLIF({$this->textExpr('c', 'email')}, ''), {$mobileEmail}) AS cliente_email,
+                    COALESCE({$pedidoTelefonoExpr}, NULLIF({$this->textExpr('c', 'telefono')}, ''), {$mobilePhone}) AS cliente_telefono,
+                    (SELECT COUNT(*) FROM rest_pedido_items pi WHERE pi.pedido_id = p.id) AS items_total,
+                    (SELECT COUNT(*) FROM rest_pedido_items pi WHERE pi.pedido_id = p.id AND pi.estado = 'entregado') AS items_entregados
+               FROM rest_pedidos p
+          LEFT JOIN rest_visitas v ON v.id = p.visita_id
+          LEFT JOIN rest_comensales c ON c.id = v.comensal_id
+          LEFT JOIN rest_mesas m ON m.id = p.mesa_id
+               {$mobileJoin}
+              WHERE " . implode(' AND ', $where) . "
+           ORDER BY p.created_at DESC, p.id DESC
+              LIMIT {$limit}",
+            $params
+        );
+    }
+
+    public function getHistorialLiberaciones(int $restauranteId, int $limit = 50): array
+    {
+        if (!$this->tableExists('rest_liberaciones_pedido_programador')) {
+            return [];
+        }
+        $limit = max(1, min(100, $limit));
+        return $this->query(
+            "SELECT lp.*, u.nombre AS programador_nombre
+               FROM rest_liberaciones_pedido_programador lp
+          LEFT JOIN usuarios u ON u.id = lp.usuario_id
+              WHERE lp.restaurante_id = ?
+           ORDER BY lp.created_at DESC, lp.id DESC
+              LIMIT {$limit}",
+            [$restauranteId]
+        );
+    }
+
+    public function liberarPedido(
+        int $restauranteId,
+        int $pedidoId,
+        string $motivo,
+        int $usuarioId
+    ): array {
+        $auditTable = 'rest_liberaciones_pedido_programador';
+        if (!$this->tableExists($auditTable)) {
+            throw new RuntimeException('Falta ejecutar la migracion 086_liberacion_pedidos_programador.sql.');
+        }
+        foreach ([
+            'restaurante_id', 'pedido_id', 'folio', 'cliente_referencia',
+            'estado_anterior', 'estado_nuevo', 'estados_items_anteriores',
+            'motivo', 'usuario_id', 'created_at',
+        ] as $column) {
+            if (!$this->columnExists($auditTable, $column)) {
+                throw new DomainException('La migracion 086 esta incompleta. Falta la columna ' . $column . '.');
+            }
+        }
+        $motivo = trim($motivo);
+        $length = function_exists('mb_strlen') ? mb_strlen($motivo) : strlen($motivo);
+        if ($pedidoId <= 0) {
+            throw new InvalidArgumentException('El pedido seleccionado no es valido.');
+        }
+        if ($length < 5 || $length > 500) {
+            throw new InvalidArgumentException('El motivo debe tener entre 5 y 500 caracteres.');
+        }
+
+        $this->db->beginTransaction();
+        try {
+            $clienteColumn = $this->firstColumn('rest_pedidos', ['cliente_nombre', 'comprador_nombre']);
+            $clienteSelect = $clienteColumn ? ", p.{$clienteColumn} AS pedido_cliente" : ', NULL AS pedido_cliente';
+            $pedido = $this->queryOne(
+                "SELECT p.id, p.folio, p.estado, p.restaurante_id, p.visita_id,
+                        c.nombre AS comensal_nombre{$clienteSelect}
+                   FROM rest_pedidos p
+              LEFT JOIN rest_visitas v ON v.id = p.visita_id
+              LEFT JOIN rest_comensales c ON c.id = v.comensal_id
+                  WHERE p.id = ? AND p.restaurante_id = ?
+                  FOR UPDATE",
+                [$pedidoId, $restauranteId]
+            );
+            if (!$pedido) {
+                throw new DomainException('El pedido no existe o pertenece a otro restaurante.');
+            }
+
+            $items = $this->query(
+                "SELECT estado, COUNT(*) AS cantidad
+                   FROM rest_pedido_items
+                  WHERE pedido_id = ?
+               GROUP BY estado",
+                [$pedidoId]
+            );
+            $todosEntregados = true;
+            foreach ($items as $item) {
+                if (($item['estado'] ?? '') !== 'entregado') {
+                    $todosEntregados = false;
+                    break;
+                }
+            }
+            if (($pedido['estado'] ?? '') === 'entregado' && $todosEntregados) {
+                throw new DomainException('Este pedido ya se encuentra completamente liberado como entregado.');
+            }
+
+            // El modelo de pedidos descuenta inventario de forma idempotente al
+            // transitar a entregado; nunca modifica el estado financiero.
+            (new RestPedidoModel())->cambiarEstadoPedido($pedidoId, 'entregado');
+            $this->execute(
+                "UPDATE rest_pedido_items SET estado = 'entregado' WHERE pedido_id = ?",
+                [$pedidoId]
+            );
+
+            $cliente = trim((string)($pedido['pedido_cliente'] ?? ''));
+            if ($cliente === '') $cliente = trim((string)($pedido['comensal_nombre'] ?? ''));
+            if ($cliente === '') $cliente = 'Pedido #' . $pedidoId;
+            $this->execute(
+                "INSERT INTO rest_liberaciones_pedido_programador
+                    (restaurante_id, pedido_id, folio, cliente_referencia,
+                     estado_anterior, estado_nuevo, estados_items_anteriores, motivo, usuario_id)
+                 VALUES (?, ?, ?, ?, ?, 'entregado', ?, ?, ?)",
+                [
+                    $restauranteId,
+                    $pedidoId,
+                    $pedido['folio'] ?: null,
+                    $cliente,
+                    (string)$pedido['estado'],
+                    json_encode($items, JSON_UNESCAPED_UNICODE),
+                    $motivo,
+                    $usuarioId,
+                ]
+            );
+
+            $this->db->commit();
+            return ['pedido_id' => $pedidoId, 'folio' => (string)$pedido['folio'], 'cliente' => $cliente];
+        } catch (Throwable $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
+        }
+    }
+
     public function getHistorialSalidas(int $restauranteId, int $limit = 30): array
     {
         if (!$this->tableExists('rest_validaciones_salida_programador')) {

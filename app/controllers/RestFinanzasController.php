@@ -65,7 +65,7 @@ class RestFinanzasController extends BaseController
             $this->log(
                 'Ocultamiento financiero activado',
                 'finanzas',
-                'Registros con fecha hasta ' . $fecha . ' ocultos para roles no programador.'
+                'Registros con fecha hasta ' . $fecha . ' ocultos para los demás niveles.'
             );
             $this->flash('success', 'La informacion con fecha hasta ' . $fecha . ' quedo oculta para los demas niveles.');
         } catch (InvalidArgumentException $e) {
@@ -142,7 +142,7 @@ class RestFinanzasController extends BaseController
             );
             $folio = (string)($resultado['folio'] ?? ('#' . $registroId));
             $this->log(
-                'Adeudo regularizado por PROGRAMADOR',
+                'Adeudo regularizado desde Modo Macias',
                 'finanzas',
                 $tipo . ' ' . $folio . '. Motivo: ' . $motivo
             );
@@ -180,7 +180,7 @@ class RestFinanzasController extends BaseController
             );
             $referencia = ($resultado['ticket_folio'] ?? '') ?: ('Visita #' . $visitaId);
             $this->log(
-                'Salida validada por PROGRAMADOR',
+                'Salida validada desde Modo Macias',
                 'finanzas',
                 $referencia . '. Motivo: ' . $motivo
             );
@@ -197,6 +197,63 @@ class RestFinanzasController extends BaseController
         }
 
         $this->redirect('rest-finanzas/cuentasPendientes');
+    }
+
+    public function liberarPedidos(?string $p = null): void
+    {
+        $this->requireProgramador();
+        $restauranteId = (int)$this->restauranteId();
+        $busqueda = trim((string)$this->get('q', ''));
+        $estado = trim((string)$this->get('estado', 'todos'));
+        $cuentasModel = new RestCuentaPendienteModel();
+        $pedidos = $cuentasModel->listarPedidosParaLiberar($restauranteId, $busqueda, $estado);
+        $historialLiberaciones = $cuentasModel->getHistorialLiberaciones($restauranteId);
+        $flash = $this->getFlash();
+        $pageTitle = 'Liberar pedidos';
+        $activeMenu = 'rest_liberar_pedidos';
+
+        $this->render('restaurante/finanzas/liberar_pedidos', compact(
+            'pedidos', 'historialLiberaciones', 'busqueda', 'estado',
+            'flash', 'pageTitle', 'activeMenu'
+        ));
+    }
+
+    public function liberarPedidoManual(?string $p = null): void
+    {
+        $this->requireProgramador();
+        if (!$this->isPost()) {
+            $this->redirect('rest-finanzas/liberarPedidos');
+        }
+
+        $pedidoId = (int)$this->post('pedido_id', 0);
+        $motivo = trim((string)$this->post('motivo', ''));
+
+        try {
+            $resultado = (new RestCuentaPendienteModel())->liberarPedido(
+                (int)$this->restauranteId(),
+                $pedidoId,
+                $motivo,
+                (int)$this->usuarioId()
+            );
+            $folio = ($resultado['folio'] ?? '') ?: ('Pedido #' . $pedidoId);
+            $this->log(
+                'Pedido liberado desde Modo Macias',
+                'pedidos',
+                $folio . '. Motivo: ' . $motivo
+            );
+            $this->flash('success', $folio . ' fue liberado y quedó marcado como entregado.');
+        } catch (InvalidArgumentException | DomainException $e) {
+            $this->flash('error', $e->getMessage());
+        } catch (Throwable $e) {
+            error_log('[RestFinanzasController::liberarPedidoManual] ' . $e->getMessage());
+            $detalle = preg_replace('/\s+/', ' ', trim($e->getMessage()));
+            $this->flash(
+                'error',
+                'No se pudo liberar el pedido. Detalle técnico: ' . ($detalle ?: get_class($e))
+            );
+        }
+
+        $this->redirect('rest-finanzas/liberarPedidos');
     }
 
     public function gastos(?string $p = null): void

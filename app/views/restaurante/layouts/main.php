@@ -156,6 +156,10 @@ $_isProgramador = $_rol === 'programador';
        href="<?= BASE_URL ?>rest-finanzas/cuentasPendientes" style="padding-left:38px;font-size:.82rem">
       Cuentas pendientes
     </a>
+    <a class="rst-nav-link <?= $activeMenu === 'rest_liberar_pedidos' ? 'active' : '' ?>"
+       href="<?= BASE_URL ?>rest-finanzas/liberarPedidos" style="padding-left:38px;font-size:.82rem">
+      Liberar pedidos
+    </a>
     <a class="rst-nav-link <?= $activeMenu === 'rest_visibilidad_financiera' ? 'active' : '' ?>"
        href="<?= BASE_URL ?>rest-finanzas/visibilidad" style="padding-left:38px;font-size:.82rem">
       Visibilidad de datos
