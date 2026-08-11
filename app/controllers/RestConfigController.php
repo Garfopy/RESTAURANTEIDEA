@@ -21,6 +21,44 @@ class RestConfigController extends BaseController
         }
     }
 
+    /**
+     * Garantiza que el interruptor pueda persistirse incluso si el codigo se
+     * desplego antes de importar la migracion 089. Las filas existentes nacen
+     * activas y, despues de crear la columna, los restaurantes nuevos quedan
+     * apagados por defecto.
+     */
+    private function ensureAppMovilColumn(): bool
+    {
+        if ($this->hasColumn('rest_restaurantes', 'app_movil_habilitada')) {
+            return true;
+        }
+
+        try {
+            \Database::getInstance()->exec(
+                "ALTER TABLE `rest_restaurantes`
+                 ADD COLUMN `app_movil_habilitada` TINYINT(1) NOT NULL DEFAULT 1"
+            );
+        } catch (\Throwable $e) {
+            if (!$this->hasColumn('rest_restaurantes', 'app_movil_habilitada')) {
+                error_log('[RestConfig app movil] No se pudo crear la columna: ' . $e->getMessage());
+                return false;
+            }
+        }
+
+        try {
+            \Database::getInstance()->exec(
+                "ALTER TABLE `rest_restaurantes`
+                 MODIFY `app_movil_habilitada` TINYINT(1) NOT NULL DEFAULT 0"
+            );
+        } catch (\Throwable $e) {
+            // El restaurante actual puede guardar su estado aunque un usuario
+            // SQL restringido no permita cambiar el valor predeterminado.
+            error_log('[RestConfig app movil] No se pudo fijar DEFAULT 0: ' . $e->getMessage());
+        }
+
+        return $this->hasColumn('rest_restaurantes', 'app_movil_habilitada');
+    }
+
     private function getSucursalColumn(): ?string
     {
         if ($this->hasColumn('rest_restaurantes', 'sucursal_id')) {
@@ -446,6 +484,7 @@ class RestConfigController extends BaseController
     public function index(?string $p = null): void
     {
         $restauranteId = $this->restauranteId();
+        $this->ensureAppMovilColumn();
         $restaurante   = $this->model->find($restauranteId);
         $flash         = $this->getFlash();
 
@@ -523,6 +562,10 @@ class RestConfigController extends BaseController
     {
         if (!$this->isPost()) $this->redirect('rest-config/index');
         $restauranteId = $this->restauranteId();
+        if (!$this->ensureAppMovilColumn()) {
+            $this->flash('error', 'No se pudo preparar el control de App movil. Importa la migracion 089_app_movil_habilitada.sql.');
+            $this->redirect('rest-config/index');
+        }
         $restauranteActual = $this->model->find((int)$restauranteId) ?: [];
         $appMovilHabilitada = $this->post('app_movil_habilitada') ? 1 : 0;
 
@@ -604,14 +647,19 @@ class RestConfigController extends BaseController
                      SET app_movil_habilitada=?, exclusiones_app_habilitadas=?, extras_app_habilitados=?
                      WHERE id=?"
                 )->execute([$appMovilHabilitada, $exclusionesApp, $extrasApp, $restauranteId]);
+
+                $stmtEstado = $dbModos->prepare(
+                    "SELECT app_movil_habilitada FROM rest_restaurantes WHERE id=? LIMIT 1"
+                );
+                $stmtEstado->execute([$restauranteId]);
+                if ((int)$stmtEstado->fetchColumn() !== $appMovilHabilitada) {
+                    throw new \RuntimeException('La base de datos no conservo el estado seleccionado.');
+                }
             } else {
-                $dbModos->prepare(
-                    "UPDATE rest_restaurantes SET exclusiones_app_habilitadas=?, extras_app_habilitados=? WHERE id=?"
-                )->execute([$exclusionesApp, $extrasApp, $restauranteId]);
-                $appMovilHabilitada = 1;
+                throw new \RuntimeException('Falta la columna app_movil_habilitada.');
             }
         } catch (\Throwable $e) {
-            $modifierSaveError = 'No se guardaron los modificadores. Ejecuta la migracion 069: ' . $e->getMessage();
+            $modifierSaveError = 'No se pudo guardar el estado de la app movil. Ejecuta la migracion 089: ' . $e->getMessage();
             error_log('[RestConfig modificadores] ' . $e->getMessage());
         }
         if ($modifierSaveError === null && ($exclusionesApp || $extrasApp)) {
@@ -1160,6 +1208,7 @@ class RestConfigController extends BaseController
     public function qr(?string $p = null): void
     {
         $restauranteId = $this->restauranteId();
+        $this->ensureAppMovilColumn();
         $restaurante   = $this->model->find($restauranteId);
         $pageTitle     = 'QR del local';
         $activeMenu    = 'rest_qr';

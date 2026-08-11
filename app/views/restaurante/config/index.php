@@ -42,7 +42,8 @@ $appMovilHabilitada = !array_key_exists('app_movil_habilitada', (array)$restaura
             Al apagarla no se elimina ningún dato.
           </p>
         </div>
-        <label class="app-master-toggle__control" aria-label="Activar app móvil">
+        <label class="app-master-toggle__control" aria-label="Activar app m&oacute;vil">
+          <input type="hidden" name="app_movil_habilitada" value="0">
           <input type="checkbox" id="appMovilHabilitada" name="app_movil_habilitada" value="1"
                  aria-controls="appMobileSettings" aria-expanded="<?= $appMovilHabilitada ? 'true' : 'false' ?>"
                  <?= $appMovilHabilitada ? 'checked' : '' ?>>
