@@ -953,8 +953,8 @@ class RestClienteModel extends BaseModel
     {
         $imagen = trim($imagen);
         $fallback = defined('BASE_URL')
-            ? rtrim(BASE_URL, '/') . '/public/img/amare4.jpeg'
-            : 'public/img/amare4.jpeg';
+            ? rtrim(BASE_URL, '/') . '/base/redesign-assets/hero-jungle-pizza-960.webp'
+            : 'base/redesign-assets/hero-jungle-pizza-960.webp';
 
         if ($imagen === '') {
             return $fallback;

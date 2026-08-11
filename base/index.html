@@ -62,6 +62,7 @@
     a { color: inherit; }
     button, a { -webkit-tap-highlight-color: transparent; }
     button { font: inherit; }
+    [hidden] { display: none !important; }
     :focus-visible { outline: 3px solid var(--mint); outline-offset: 4px; }
 
     .skip-link {
@@ -368,6 +369,50 @@
     .drink-points strong { display: block; font-family: "Chewy", "Trebuchet MS", sans-serif; font-size: 1.2rem; text-transform: uppercase; }
     .drink-points span { font-size: 0.78rem; color: rgba(23,21,19,.64); }
 
+    .reservations { padding: 120px 0; color: white; background: var(--ink); }
+    .reservation-grid { display: grid; grid-template-columns: .78fr 1.22fr; gap: clamp(48px, 7vw, 100px); align-items: start; }
+    .reservation-copy { position: sticky; top: 118px; }
+    .reservation-copy .eyebrow { color: var(--mint); }
+    .reservation-copy .section-title { max-width: 560px; font-size: 4rem; }
+    .reservation-copy .lede { max-width: 520px; color: rgba(255,255,255,.72); }
+    .reservation-benefits { display: grid; gap: 14px; margin: 36px 0 0; padding: 0; list-style: none; }
+    .reservation-benefits li { display: grid; grid-template-columns: 34px 1fr; gap: 14px; align-items: start; color: rgba(255,255,255,.78); line-height: 1.6; }
+    .reservation-benefits b { display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid rgba(185,212,204,.48); border-radius: 50%; color: var(--mint); font-size: .72rem; }
+    .reservation-form-shell { padding: clamp(24px, 4vw, 48px); border-top: 7px solid var(--red); border-radius: var(--radius); color: var(--ink); background: var(--paper); box-shadow: 0 28px 80px rgba(0,0,0,.3); }
+    .reservation-form-head { margin-bottom: 30px; }
+    .reservation-form-head strong { display: block; font-family: 'Chewy', 'Trebuchet MS', sans-serif; font-size: 1.65rem; text-transform: uppercase; }
+    .reservation-form-head span { display: block; margin-top: 8px; color: var(--muted); line-height: 1.6; }
+    .reservation-form fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
+    .reservation-form fieldset:disabled { opacity: .55; }
+    .reservation-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+    .reservation-field { display: grid; gap: 8px; }
+    .reservation-field--full { grid-column: 1 / -1; }
+    .reservation-field span, .reservation-table-label { font-size: .75rem; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+    .reservation-field input, .reservation-field select, .reservation-field textarea { width: 100%; min-height: 50px; padding: 12px 14px; border: 1px solid rgba(19,33,43,.25); border-radius: 4px; color: var(--ink); background: white; font: inherit; }
+    .reservation-field textarea { min-height: 108px; resize: vertical; }
+    .reservation-field input:focus, .reservation-field select:focus, .reservation-field textarea:focus { border-color: var(--green); outline: 3px solid rgba(0,108,104,.16); outline-offset: 0; }
+    .reservation-field small { color: var(--muted); font-size: .73rem; line-height: 1.5; }
+    .reservation-table-picker { grid-column: 1 / -1; padding-top: 4px; }
+    .reservation-table-state { margin-top: 10px; padding: 16px; border: 1px dashed rgba(19,33,43,.25); border-radius: 4px; color: var(--muted); background: var(--cream); line-height: 1.55; }
+    .reservation-table-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
+    .reservation-table-option { min-height: 58px; padding: 10px 13px; border: 1px solid rgba(19,33,43,.22); border-radius: 4px; color: var(--ink); background: white; text-align: left; cursor: pointer; transition: border-color 180ms ease, background 180ms ease, color 180ms ease; }
+    .reservation-table-option:hover { border-color: var(--green); }
+    .reservation-table-option[aria-pressed='true'] { border-color: var(--green); color: white; background: var(--green); }
+    .reservation-table-option strong, .reservation-table-option span { display: block; }
+    .reservation-table-option span { margin-top: 3px; font-size: .74rem; opacity: .76; }
+    .reservation-submit { width: 100%; min-height: 54px; margin-top: 24px; border: 0; border-radius: 4px; color: white; background: var(--red); font-weight: 900; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; transition: background 180ms ease, opacity 180ms ease; }
+    .reservation-submit:hover:not(:disabled) { background: var(--red-deep); }
+    .reservation-submit:disabled { cursor: not-allowed; opacity: .48; }
+    .reservation-alert { margin-bottom: 20px; padding: 14px 16px; border-left: 4px solid var(--red); color: #7d1027; background: #fff0f3; line-height: 1.55; }
+    .reservation-alert--warning { border-color: #b67600; color: #6a4700; background: #fff6dc; }
+    .reservation-status { min-height: 24px; margin-top: 14px; color: #8e1730; font-size: .84rem; font-weight: 800; line-height: 1.5; }
+    .reservation-privacy { margin: 10px 0 0; color: var(--muted); font-size: .72rem; line-height: 1.55; text-align: center; }
+    .reservation-success { padding: 20px 0 6px; text-align: center; }
+    .reservation-success-mark { display: grid; place-items: center; width: 58px; height: 58px; margin: 0 auto 18px; border-radius: 50%; color: white; background: var(--green); font-size: 1.8rem; font-weight: 900; }
+    .reservation-success h3 { margin: 0; font-family: 'Chewy', 'Trebuchet MS', sans-serif; font-size: 2rem; text-transform: uppercase; }
+    .reservation-success p { max-width: 500px; margin: 12px auto 24px; color: var(--muted); line-height: 1.65; }
+    .reservation-success-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+
     .reviews { padding: 120px 0; background: var(--cream); }
     .reviews-head { display: grid; grid-template-columns: 0.7fr 1.3fr; gap: 60px; align-items: end; }
     .rating-lockup { display: flex; align-items: baseline; gap: 12px; }
@@ -436,7 +481,7 @@
 
     .reveal { opacity: 0; transform: translateY(28px); transition: opacity 650ms ease, transform 650ms cubic-bezier(.16,1,.3,1); }
     .reveal.is-visible { opacity: 1; transform: translateY(0); }
-    .drink-feature, .reviews, .social, .visit, .site-footer { content-visibility: auto; contain-intrinsic-size: auto 800px; }
+    .drink-feature, .reservations, .reviews, .social, .visit, .site-footer { content-visibility: auto; contain-intrinsic-size: auto 800px; }
 
     @media (max-width: 1020px) {
       .desktop-nav { display: none; }
@@ -446,7 +491,8 @@
       .fact { padding: 17px 0; border-right: 0; border-bottom: 1px solid rgba(255,255,255,.25); }
       .fact:first-child { padding-left: 0; }
       .fact:last-child { border-bottom: 0; }
-      .story-grid, .reviews-head, .visit-grid { grid-template-columns: 1fr; }
+      .story-grid, .reservation-grid, .reviews-head, .visit-grid { grid-template-columns: 1fr; }
+      .reservation-copy { position: static; }
       .story-media { order: 2; }
       .story-media, .story-media img { min-height: 480px; height: 480px; }
       .social-head { align-items: start; flex-direction: column; }
@@ -473,8 +519,9 @@
       .hero-copy { font-size: 1rem; line-height: 1.65; }
       .hero-actions .button { width: 100%; }
       .hero-note { align-items: start; line-height: 1.5; }
-      .section-title, .story-copy .section-title, .menu-heading .section-title, .drink-copy .section-title, .social .section-title, .visit-info .section-title { font-size: 2.5rem; }
-      .story, .menu-section, .reviews, .social { padding: 86px 0; }
+      .section-title, .story-copy .section-title, .menu-heading .section-title, .drink-copy .section-title, .reservation-copy .section-title, .social .section-title, .visit-info .section-title { font-size: 2.5rem; }
+      .story, .menu-section, .reservations, .reviews, .social { padding: 86px 0; }
+      .reservation-form-grid, .reservation-table-options { grid-template-columns: 1fr; }
       .story-grid { gap: 52px; }
       .story-media, .story-media img { min-height: 390px; height: 390px; }
       .story-stamp { right: 12px; bottom: 18px; width: 124px; min-height: 124px; }
@@ -570,6 +617,7 @@
           <a class="social-icon facebook" href="https://www.facebook.com/JunglePizzaZihuatanejo/" target="_blank" rel="noopener" aria-label="Facebook" title="Facebook"><img src="redesign-assets/icons/facebook.svg" width="19" height="19" alt=""></a>
           <a class="social-icon whatsapp" href="https://wa.me/527551002309?text=Hola%20Jungle%20Pizza%2C%20quiero%20hacer%20una%20consulta" target="_blank" rel="noopener" aria-label="WhatsApp" title="WhatsApp"><img src="redesign-assets/icons/whatsapp.svg" width="19" height="19" alt=""></a>
         </span>
+        <a href='#reservaciones'>Reservaciones</a>
       </nav>
       <button class="menu-toggle" id="menuToggle" type="button" aria-label="Abrir menú" aria-expanded="false" aria-controls="mobileNav"><span></span></button>
     </div>
@@ -584,6 +632,7 @@
         <a class="social-icon facebook" href="https://www.facebook.com/JunglePizzaZihuatanejo/" target="_blank" rel="noopener" aria-label="Facebook"><img src="redesign-assets/icons/facebook.svg" width="19" height="19" alt=""></a>
         <a class="social-icon whatsapp" href="https://wa.me/527551002309?text=Hola%20Jungle%20Pizza" target="_blank" rel="noopener" aria-label="WhatsApp"><img src="redesign-assets/icons/whatsapp.svg" width="19" height="19" alt=""></a>
       </span>
+      <a href='#reservaciones'>Reservaciones</a>
     </nav>
   </header>
 
@@ -596,7 +645,7 @@
           <h1 class="hero-brand-lockup" id="hero-title"><img src="redesign-assets/jungle-pizza-logo-420.webp" width="420" height="338" alt="Jungle Pizza" fetchpriority="high"></h1>
           <p class="hero-copy">Masa delgada, horno de leña, margaritas de fruta fresca y una noche que se toma su tiempo.</p>
           <div class="hero-actions">
-            <a class="button button-primary" href="https://wa.me/527551002309?text=Hola%20Jungle%20Pizza%2C%20quiero%20reservar%20una%20mesa" target="_blank" rel="noopener"><img class="button-logo" src="redesign-assets/icons/whatsapp.svg" width="18" height="18" alt=""> Reservar mesa</a>
+            <a class="button button-primary" href="#reservaciones">Reservar mesa</a>
             <a class="button button-outline" href="#menu">Explorar el menú</a>
           </div>
           <p class="hero-note">Viernes a domingo · 4:00 p. m. a 10:00 p. m.</p>
@@ -810,6 +859,89 @@
       </div>
     </section>
 
+    <section class="reservations" id="reservaciones" aria-labelledby="reservation-title">
+      <div class="container reservation-grid">
+        <div class="reservation-copy reveal">
+          <p class="eyebrow">Reserva directa</p>
+          <h2 class="display section-title" id="reservation-title">Tu mesa, lista cuando llegues.</h2>
+          <p class="lede">Consulta la disponibilidad real y confirma tu visita sin llamadas ni mensajes de espera.</p>
+          <ul class="reservation-benefits">
+            <li><b>01</b><span>Elige fecha, horario y número de personas.</span></li>
+            <li><b>02</b><span>Selecciona una mesa disponible en tiempo real.</span></li>
+            <li><b>03</b><span>Recibe la confirmación y el enlace de cancelación por correo.</span></li>
+          </ul>
+        </div>
+
+        <div class="reservation-form-shell reveal">
+          <div class="reservation-form-head">
+            <strong>Reserva en {{RESTAURANT_NAME}}</strong>
+            <span>Los campos marcados con * son obligatorios.</span>
+          </div>
+          <div class="reservation-alert reservation-alert--warning" {{RESERVATION_NOTICE_HIDDEN}}>
+            Las reservaciones en línea no están disponibles por el momento. Puedes escribirnos por WhatsApp.
+          </div>
+          <div class="reservation-alert" id="reservationAlert" role="alert" hidden></div>
+
+          <form class="reservation-form" id="reservationForm" action="{{RESERVATION_ACTION}}" method="post" data-enabled="{{RESERVATION_ENABLED}}" data-availability-url="{{RESERVATION_AVAILABILITY_URL}}">
+            <input type="hidden" name="response" value="json">
+            <fieldset id="reservationFields" {{RESERVATION_DISABLED}}>
+              <div class="reservation-form-grid">
+                <label class="reservation-field reservation-field--full">
+                  <span>Nombre completo *</span>
+                  <input type="text" name="nombre" autocomplete="name" required maxlength="120">
+                </label>
+                <label class="reservation-field">
+                  <span>Teléfono *</span>
+                  <input type="tel" name="telefono" autocomplete="tel" inputmode="numeric" pattern="[0-9]{10}" minlength="10" maxlength="10" placeholder="10 dígitos" required>
+                </label>
+                <label class="reservation-field">
+                  <span>Correo electrónico *</span>
+                  <input type="email" name="email" autocomplete="email" required>
+                  <small>Aquí recibirás tu confirmación.</small>
+                </label>
+                <label class="reservation-field">
+                  <span>Fecha *</span>
+                  <input type="date" name="fecha" id="reservationDate" required>
+                </label>
+                <label class="reservation-field">
+                  <span>Hora *</span>
+                  <input type="time" name="hora" id="reservationTime" step="1800" required>
+                </label>
+                <label class="reservation-field reservation-field--full">
+                  <span>Número de personas *</span>
+                  <input type="number" name="personas" id="reservationPeople" min="1" max="20" value="2" inputmode="numeric" required>
+                </label>
+
+                <div class="reservation-table-picker">
+                  <div class="reservation-table-label">Mesa disponible *</div>
+                  <div class="reservation-table-state" id="reservationTableState" aria-live="polite">Elige fecha, hora y número de personas para consultar mesas.</div>
+                  <div class="reservation-table-options" id="reservationTableOptions" role="group" aria-label="Mesas disponibles"></div>
+                  <input type="hidden" name="mesa_id" id="reservationTableId" value="">
+                </div>
+
+                <label class="reservation-field reservation-field--full">
+                  <span>Notas <small>(opcional)</small></span>
+                  <textarea name="notas" maxlength="600" placeholder="Alergias, celebración, silla infantil o alguna preferencia"></textarea>
+                </label>
+              </div>
+              <button class="reservation-submit" id="reservationSubmit" type="submit" disabled>Selecciona una mesa</button>
+              <div class="reservation-status" id="reservationStatus" aria-live="polite"></div>
+              <p class="reservation-privacy">Usaremos tus datos únicamente para gestionar esta reservación.</p>
+            </fieldset>
+          </form>
+
+          <div class="reservation-success" id="reservationSuccess" tabindex="-1" hidden>
+            <div class="reservation-success-mark" aria-hidden="true">✓</div>
+            <h3>¡Mesa confirmada!</h3>
+            <p>Registramos tu reservación y enviamos los detalles a tu correo. También aparecerá de inmediato en la administración del restaurante.</p>
+            <div class="reservation-success-actions">
+              <button class="button button-primary" id="reservationAgain" type="button">Hacer otra reserva</button>
+              <a class="button button-outline" id="reservationCancel" href="#">Cancelar reservación</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
     <section class="reviews" id="opiniones" aria-labelledby="reviews-title">
       <div class="container">
         <div class="reviews-head reveal">
@@ -892,6 +1024,7 @@
           <a href="https://wa.me/527551002309" target="_blank" rel="noopener">WhatsApp</a>
           <a href="tel:+527551002309">+52 755 100 2309</a>
           <a href="https://www.google.com/maps/dir/?api=1&destination=Jungle+Pizza+Zihuatanejo" target="_blank" rel="noopener">Google Maps</a>
+          <a href="{{ADMIN_URL}}">Acceso a administración</a>
         </div>
         <div class="footer-column">
           <h3>Síguenos</h3>
@@ -1072,6 +1205,154 @@
         if (targetTab) activateTab(targetTab);
       });
     });
+
+    const reservationForm = document.getElementById('reservationForm');
+    if (reservationForm && reservationForm.dataset.enabled === 'true') {
+      const reservationDate = document.getElementById('reservationDate');
+      const reservationTime = document.getElementById('reservationTime');
+      const reservationPeople = document.getElementById('reservationPeople');
+      const reservationTableId = document.getElementById('reservationTableId');
+      const reservationTableState = document.getElementById('reservationTableState');
+      const reservationTableOptions = document.getElementById('reservationTableOptions');
+      const reservationSubmit = document.getElementById('reservationSubmit');
+      const reservationStatus = document.getElementById('reservationStatus');
+      const reservationAlert = document.getElementById('reservationAlert');
+      const reservationSuccess = document.getElementById('reservationSuccess');
+      const reservationCancel = document.getElementById('reservationCancel');
+      const reservationAgain = document.getElementById('reservationAgain');
+      const availabilityUrl = reservationForm.dataset.availabilityUrl;
+      let availabilityTimer;
+      let availabilityRequest;
+
+      const localToday = new Date();
+      localToday.setMinutes(localToday.getMinutes() - localToday.getTimezoneOffset());
+      reservationDate.min = localToday.toISOString().slice(0, 10);
+
+      function clearTableSelection(message) {
+        reservationTableId.value = '';
+        reservationTableOptions.replaceChildren();
+        reservationTableState.hidden = false;
+        reservationTableState.textContent = message;
+        reservationSubmit.disabled = true;
+        reservationSubmit.textContent = 'Selecciona una mesa';
+      }
+
+      function chooseTable(button, tableId) {
+        reservationTableOptions.querySelectorAll('button').forEach(item => {
+          item.setAttribute('aria-pressed', String(item === button));
+        });
+        reservationTableId.value = String(tableId);
+        reservationSubmit.disabled = false;
+        reservationSubmit.textContent = 'Confirmar reservación';
+        reservationStatus.textContent = '';
+      }
+
+      async function loadAvailableTables() {
+        const fecha = reservationDate.value;
+        const hora = reservationTime.value;
+        const personas = Number.parseInt(reservationPeople.value, 10);
+
+        if (!fecha || !hora || !Number.isInteger(personas) || personas < 1 || personas > 20) {
+          clearTableSelection('Elige fecha, hora y número de personas para consultar mesas.');
+          return;
+        }
+
+        availabilityRequest?.abort();
+        availabilityRequest = new AbortController();
+        clearTableSelection('Consultando disponibilidad…');
+
+        try {
+          const query = new URLSearchParams({ fecha, hora, personas: String(personas) });
+          const response = await fetch(`${availabilityUrl}?${query}`, {
+            headers: { Accept: 'application/json' },
+            signal: availabilityRequest.signal
+          });
+          const payload = await response.json();
+          if (!response.ok || !payload.ok) throw new Error('No pudimos consultar las mesas. Intenta de nuevo.');
+
+          reservationTableOptions.replaceChildren();
+          const tables = Array.isArray(payload.mesas) ? payload.mesas : [];
+          if (!tables.length) {
+            clearTableSelection('No hay mesas para ese horario. Prueba otra hora o ajusta el número de personas.');
+            return;
+          }
+
+          reservationTableState.hidden = true;
+          tables.forEach(table => {
+            const button = document.createElement('button');
+            const title = document.createElement('strong');
+            const detail = document.createElement('span');
+            button.type = 'button';
+            button.className = 'reservation-table-option';
+            button.setAttribute('aria-pressed', 'false');
+            title.textContent = table.nombre || `Mesa ${table.id}`;
+            detail.textContent = `${table.zona_nombre || 'Área general'} · hasta ${table.capacidad} personas`;
+            button.append(title, detail);
+            button.addEventListener('click', () => chooseTable(button, table.id));
+            reservationTableOptions.append(button);
+          });
+        } catch (error) {
+          if (error.name === 'AbortError') return;
+          clearTableSelection(error.message || 'No pudimos consultar la disponibilidad.');
+        }
+      }
+
+      [reservationDate, reservationTime, reservationPeople].forEach(field => {
+        field.addEventListener('input', () => {
+          window.clearTimeout(availabilityTimer);
+          availabilityRequest?.abort();
+          clearTableSelection('Actualizando disponibilidad…');
+          availabilityTimer = window.setTimeout(loadAvailableTables, 280);
+        });
+      });
+
+      reservationForm.addEventListener('submit', async event => {
+        event.preventDefault();
+        reservationAlert.hidden = true;
+        reservationStatus.textContent = '';
+        if (!reservationForm.reportValidity()) return;
+        if (!reservationTableId.value) {
+          reservationStatus.textContent = 'Selecciona una mesa disponible antes de continuar.';
+          return;
+        }
+
+        const previousLabel = reservationSubmit.textContent;
+        reservationSubmit.disabled = true;
+        reservationSubmit.textContent = 'Confirmando…';
+        reservationStatus.textContent = 'Estamos registrando tu reservación.';
+
+        try {
+          const response = await fetch(reservationForm.action, {
+            method: 'POST',
+            body: new FormData(reservationForm),
+            headers: { Accept: 'application/json' }
+          });
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok || !payload.ok) throw new Error(payload.message || 'No pudimos confirmar la reservación.');
+
+          reservationForm.hidden = true;
+          reservationSuccess.hidden = false;
+          reservationCancel.href = payload.cancel_url || '#reservaciones';
+          reservationSuccess.focus();
+        } catch (error) {
+          reservationAlert.textContent = error.message || 'Ocurrió un error. Revisa tus datos e intenta nuevamente.';
+          reservationAlert.hidden = false;
+          reservationSubmit.disabled = false;
+          reservationSubmit.textContent = previousLabel;
+          reservationStatus.textContent = '';
+          reservationAlert.scrollIntoView({ block: 'center', behavior: reducedMotion.matches ? 'auto' : 'smooth' });
+        }
+      });
+
+      reservationAgain.addEventListener('click', () => {
+        reservationForm.reset();
+        reservationAlert.hidden = true;
+        reservationForm.hidden = false;
+        reservationSuccess.hidden = true;
+        clearTableSelection('Elige fecha, hora y número de personas para consultar mesas.');
+        reservationForm.querySelector('input[name="nombre"]').focus();
+      });
+    }
 
     const revealObserver = new IntersectionObserver(entries => {
       entries.forEach(entry => {

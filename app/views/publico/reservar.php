@@ -12,8 +12,8 @@ $color = htmlspecialchars($restaurante['color_primario'] ?? '#B68A48');
 $nombre = htmlspecialchars($restaurante['nombre'] ?? 'el restaurante');
 $logo = !empty($restaurante['logo'])
   ? BASE_URL . ltrim((string) $restaurante['logo'], '/')
-  : BASE_URL . 'public/img/logo-amare.png';
-$heroImage = BASE_URL . 'public/img/amare4.jpeg';
+  : BASE_URL . 'base/redesign-assets/jungle-pizza-logo-420.webp';
+$heroImage = BASE_URL . 'base/redesign-assets/hero-jungle-pizza-960.webp';
 $slug = htmlspecialchars($restaurante['slug'] ?? '');
 $habilitadas = !empty($restaurante['reservas_habilitadas']);
 $showSuccessScreen = $habilitadas && $ok;

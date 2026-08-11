@@ -768,7 +768,7 @@ class EmailService
     ): bool {
         if (!$destEmail) return false;
 
-        $restNombre = htmlspecialchars($restaurante['nombre'] ?? 'AMARE');
+        $restNombre = htmlspecialchars($restaurante['nombre'] ?? 'Jungle Pizza');
         $nombre     = htmlspecialchars($reserva['nombre'] ?? '');
         $fecha      = $reserva['fecha'] ?? '';
         $hora       = substr($reserva['hora'] ?? '', 0, 5);
@@ -851,7 +851,7 @@ class EmailService
         <tr><td style="height:4px;background:linear-gradient(90deg,#7b5427,#d8b77a,#9f6d32);font-size:0;line-height:0;">&nbsp;</td></tr>
         <tr>
           <td style="padding:40px 38px 34px;background:#070605;border-bottom:1px solid rgba(216,183,122,.16);">
-            <div style="color:#d8b77a;font-family:Arial,sans-serif;font-size:11px;font-weight:900;letter-spacing:.38em;text-transform:uppercase;">AMARE</div>
+            <div style="color:#d8b77a;font-family:Arial,sans-serif;font-size:11px;font-weight:900;letter-spacing:.38em;text-transform:uppercase;">JUNGLE PIZZA</div>
             <div style="margin-top:18px;display:inline-block;padding:8px 14px;border:1px solid rgba(216,183,122,.38);border-radius:999px;color:#d8b77a;font-family:Arial,sans-serif;font-size:10px;font-weight:900;letter-spacing:.22em;text-transform:uppercase;">' . htmlspecialchars($eyebrow) . '</div>
             <h1 style="margin:22px 0 0;color:#f6f0e7;font-family:Georgia,serif;font-size:40px;line-height:1.05;font-weight:500;">' . htmlspecialchars($titulo) . '</h1>
             <p style="margin:18px 0 0;color:#d8cab7;font-family:Arial,sans-serif;font-size:16px;line-height:1.8;">' . $introHtml . '</p>

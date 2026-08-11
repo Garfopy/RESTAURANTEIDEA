@@ -81,7 +81,7 @@ $saldoAmarePct = min(100, round(($saldoAmareUsado / $maxAmare) * 100));
 $perdidasAmarePct = min(100, round(($perdidasAmare / $maxAmare) * 100));
 $amareCards = [
   [
-    'label'=>'Saldo Amare',
+    'label'=>'Saldo Jungle',
     'val'=>'$'.number_format((float)($amareKpis['saldo'] ?? 0), 2),
     'color'=>'#111827',
     'sub'=>'Disponible en wallets',
@@ -92,14 +92,14 @@ $amareCards = [
     'val'=>'$'.number_format((float)($amareKpis['recargas'] ?? 0), 2),
     'color'=>'#111827',
     'sub'=>'Dinero recargado',
-    'info'=>'Dinero real que entro al restaurante cuando los clientes cargaron Saldo Amare durante este mes.',
+    'info'=>'Dinero real que entro al restaurante cuando los clientes cargaron Saldo Jungle durante este mes.',
   ],
   [
     'label'=>'Saldo usado',
     'val'=>'$'.number_format((float)($amareKpis['walletUsado'] ?? 0), 2),
     'color'=>'#111827',
     'sub'=>'Pagado con wallet',
-    'info'=>'Saldo Amare que los clientes gastaron en pedidos. No se suma otra vez como ingreso porque ya conto al recargarse.',
+    'info'=>'Saldo Jungle que los clientes gastaron en pedidos. No se suma otra vez como ingreso porque ya conto al recargarse.',
   ],
   [
     'label'=>'Puntos dados',
@@ -143,7 +143,7 @@ $infoBtn = static function (string $text, string $theme = 'light'): string {
   <div style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:18px">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:14px">
       <div>
-        <div style="font-weight:800;color:#111827">Metricas Amare</div>
+        <div style="font-weight:800;color:#111827">Métricas Jungle</div>
       </div>
       <span style="font-size:.72rem;color:#6B7280;background:#F3F4F6;border-radius:99px;padding:4px 10px;font-weight:700"><?= date('M Y') ?></span>
     </div>
@@ -214,7 +214,7 @@ $infoBtn = static function (string $text, string $theme = 'light'): string {
 
       <div style="border:1px solid #253044;background:#151F2E;border-radius:12px;padding:14px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-          <span style="font-weight:800;color:#F9FAFB">Amare</span>
+          <span style="font-weight:800;color:#F9FAFB">Jungle</span>
           <span style="font-size:.72rem;color:#CBD5E1">Wallet, puntos y descuentos</span>
         </div>
 

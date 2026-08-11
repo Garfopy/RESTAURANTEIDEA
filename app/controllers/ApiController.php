@@ -2237,8 +2237,6 @@ class ApiController extends BaseController
     // Respuesta estándar: { success: true|false, message: "...", data: {...} }
     // ══════════════════════════════════════════════════════════════════
 
-    private string $jwtSecret = 'amare_api_secret_key_2024_change_this_in_production_use_a_longer_random_string';
-
     /** POST /api/auth/login | GET /api/auth/token */
     public function auth(?string $subAction = null): void
     {
@@ -2247,7 +2245,23 @@ class ApiController extends BaseController
         // CORS: Permitir credenciales con origen específico
         $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
         if ($origin) {
-            header('Access-Control-Allow-Origin: ' . $origin);
+            $baseParts = parse_url(BASE_URL);
+            $baseOrigin = ($baseParts['scheme'] ?? 'https') . '://' . ($baseParts['host'] ?? 'localhost');
+            if (!empty($baseParts['port'])) {
+                $baseOrigin .= ':' . (int)$baseParts['port'];
+            }
+            $extraOrigins = array_values(array_filter(array_map(
+                static fn(string $value): string => rtrim(trim($value), '/'),
+                explode(',', (string)(getenv('CORS_ALLOWED_ORIGINS') ?: ''))
+            )));
+            $allowedOrigins = array_unique(array_merge([$baseOrigin], $extraOrigins));
+            if (!in_array(rtrim($origin, '/'), $allowedOrigins, true)) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'Origen no permitido']);
+                exit;
+            }
+            header('Vary: Origin');
+            header('Access-Control-Allow-Origin: ' . rtrim($origin, '/'));
             header('Access-Control-Allow-Credentials: true');
         }
         
@@ -2327,7 +2341,23 @@ class ApiController extends BaseController
         // CORS: Permitir credenciales desde el origen actual
         $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
         if ($origin) {
-            header('Access-Control-Allow-Origin: ' . $origin);
+            $baseParts = parse_url(BASE_URL);
+            $baseOrigin = ($baseParts['scheme'] ?? 'https') . '://' . ($baseParts['host'] ?? 'localhost');
+            if (!empty($baseParts['port'])) {
+                $baseOrigin .= ':' . (int)$baseParts['port'];
+            }
+            $extraOrigins = array_values(array_filter(array_map(
+                static fn(string $value): string => rtrim(trim($value), '/'),
+                explode(',', (string)(getenv('CORS_ALLOWED_ORIGINS') ?: ''))
+            )));
+            $allowedOrigins = array_unique(array_merge([$baseOrigin], $extraOrigins));
+            if (!in_array(rtrim($origin, '/'), $allowedOrigins, true)) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'Origen no permitido']);
+                exit;
+            }
+            header('Vary: Origin');
+            header('Access-Control-Allow-Origin: ' . rtrim($origin, '/'));
             header('Access-Control-Allow-Credentials: true');
         }
         
@@ -2835,7 +2865,7 @@ class ApiController extends BaseController
 
     public function generateJWT(array $user): string
     {
-        error_log('WEB JWT SECRET=' . $this->jwtSecret);
+        $jwtSecret = $this->jwtSecret();
         $header  = self::b64e(json_encode(['alg' => 'HS256', 'typ' => 'JWT']));
         $now     = time();
         $payload = self::b64e(json_encode([
@@ -2843,7 +2873,7 @@ class ApiController extends BaseController
             'rol' => $user['rol_slug'] ?? $user['rol'] ?? 'unknown', 'empresa_id' => (int)($user['empresa_id'] ?? 0),
             'iat' => $now, 'exp' => $now + 86400,
         ]));
-        $sig = self::b64e(hash_hmac('sha256', "$header.$payload", $this->jwtSecret, true));
+        $sig = self::b64e(hash_hmac('sha256', "$header.$payload", $jwtSecret, true));
         return "$header.$payload.$sig";
     }
 
@@ -2852,11 +2882,21 @@ class ApiController extends BaseController
         $parts = explode('.', $token);
         if (count($parts) !== 3) return null;
         [$header, $payload, $signature] = $parts;
-        $expected = self::b64e(hash_hmac('sha256', "$header.$payload", $this->jwtSecret, true));
+        $expected = self::b64e(hash_hmac('sha256', "$header.$payload", $this->jwtSecret(), true));
         if (!hash_equals($expected, $signature)) return null;
         $data = json_decode(self::b64d($payload), true);
         if (!$data || ($data['exp'] ?? 0) < time()) return null;
         return $data;
+    }
+
+    private function jwtSecret(): string
+    {
+        $secret = trim((string)(getenv('JWT_SECRET') ?: (defined('JWT_SECRET') ? JWT_SECRET : '')));
+        if (strlen($secret) < 32) {
+            error_log('[Jungle API] JWT_SECRET no está configurado o tiene menos de 32 caracteres.');
+            $this->adminApiError('La autenticación API no está configurada.', 500);
+        }
+        return $secret;
     }
 
     private static function b64e(string $d): string { return rtrim(strtr(base64_encode($d), '+/', '-_'), '='); }

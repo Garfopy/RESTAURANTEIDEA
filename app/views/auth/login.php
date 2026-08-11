@@ -351,7 +351,7 @@ if ($_isRest) { $_appName = 'Restaurante'; }
 
       <div class="login-accent-bar"></div>
 
-      <img src="<?= BASE_URL ?>public/img/fondo-amare.png" alt="AMARE" style="height:200px;margin-bottom:20px;object-fit:contain">
+      <img src="<?= BASE_URL ?>base/redesign-assets/jungle-pizza-logo-420.webp" alt="Jungle Pizza" style="height:200px;margin-bottom:20px;object-fit:contain">
 
       <h2 class="shimmer-heading" style="font-size:1.5rem;font-weight:800;margin-bottom:12px;text-align:center;line-height:1.25">
         <?php if ($_isRest): ?>

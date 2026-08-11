@@ -910,16 +910,37 @@ class RestPublicoController extends BaseController
     public function guardarReserva(?string $param = null): void
     {
         $slug        = explode('/', $param ?? '')[0];
+        $wantsJson   = $this->post('response', '') === 'json';
         $restaurante = $this->restModel->getBySlug($slug);
-        if (!$restaurante) { http_response_code(404); die('<h1>Restaurante no encontrado</h1>'); }
+        if (!$restaurante) {
+            if ($wantsJson) {
+                $this->json(['ok' => false, 'message' => 'Restaurante no encontrado.'], 404);
+                return;
+            }
+            http_response_code(404);
+            die('<h1>Restaurante no encontrado</h1>');
+        }
+
+        $reject = function (string $message, int $status = 422) use ($wantsJson, $slug): void {
+            if ($wantsJson) {
+                $this->json(['ok' => false, 'message' => $message], $status);
+                return;
+            }
+            $this->flash('error', $message);
+            $this->redirect('menu/' . $slug . '/reservar');
+        };
 
         if (!$this->isPost()) {
+            if ($wantsJson) {
+                $this->json(['ok' => false, 'message' => 'Método no permitido.'], 405);
+                return;
+            }
             $this->redirect('menu/' . $slug . '/reservar');
             return;
         }
 
         if (empty($restaurante['reservas_habilitadas'])) {
-            $this->redirect('menu/' . $slug . '/reservar');
+            $reject('Las reservaciones no están disponibles en este momento.', 409);
             return;
         }
 
@@ -928,29 +949,37 @@ class RestPublicoController extends BaseController
         $email    = trim($this->post('email', '')) ?: null;
         $fecha    = $this->post('fecha');
         $hora     = $this->post('hora');
-        $personas = max(1, (int)$this->post('personas', 2));
+        $personas = min(20, max(1, (int)$this->post('personas', 2)));
         $notas    = $this->post('notas') ?: null;
         $mesaId   = (int)$this->post('mesa_id', 0);
 
         if (!$nombre || !$telefono || !$fecha || !$hora || !$mesaId) {
-            $this->flash('error', 'Por favor completa todos los campos y selecciona una mesa.');
-            $this->redirect('menu/' . $slug . '/reservar');
+            $reject('Por favor completa todos los campos y selecciona una mesa.');
+            return;
+        }
+
+        $fechaObj = DateTimeImmutable::createFromFormat('!Y-m-d', (string)$fecha);
+        $fechaValida = $fechaObj && $fechaObj->format('Y-m-d') === $fecha;
+        if (!$fechaValida || $fecha < date('Y-m-d')) {
+            $reject('Selecciona una fecha válida a partir de hoy.');
+            return;
+        }
+        if (!preg_match('/^(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d)?$/', (string)$hora)) {
+            $reject('Selecciona un horario válido.');
             return;
         }
 
         // Validar teléfono: exactamente 10 dígitos
         $telefonoDigitos = preg_replace('/\D/', '', $telefono);
         if (strlen($telefonoDigitos) !== 10) {
-            $this->flash('error', 'El teléfono debe contener exactamente 10 dígitos.');
-            $this->redirect('menu/' . $slug . '/reservar');
+            $reject('El teléfono debe contener exactamente 10 dígitos.');
             return;
         }
         $telefono = $telefonoDigitos;
 
         // Validar email obligatorio y bien formado
         if (!$email || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            $this->flash('error', 'Ingresa un correo electrónico válido.');
-            $this->redirect('menu/' . $slug . '/reservar');
+            $reject('Ingresa un correo electrónico válido.');
             return;
         }
 
@@ -965,18 +994,15 @@ class RestPublicoController extends BaseController
         $mesa = $stmtMesa->fetch(PDO::FETCH_ASSOC);
 
         if (!$mesa) {
-            $this->flash('error', 'La mesa seleccionada no está disponible. Elige otra.');
-            $this->redirect('menu/' . $slug . '/reservar');
+            $reject('La mesa seleccionada no está disponible. Elige otra.', 409);
             return;
         }
         if ((int)$mesa['capacidad'] < $personas) {
-            $this->flash('error', 'La mesa seleccionada no tiene capacidad para ' . $personas . ' personas.');
-            $this->redirect('menu/' . $slug . '/reservar');
+            $reject('La mesa seleccionada no tiene capacidad para ' . $personas . ' personas.', 409);
             return;
         }
         if ($reservaModel->hayConflicto($mesaId, $fecha, $hora)) {
-            $this->flash('error', 'Esa mesa ya está reservada en ese horario. Elige otra.');
-            $this->redirect('menu/' . $slug . '/reservar');
+            $reject('Esa mesa ya está reservada en ese horario. Elige otra.', 409);
             return;
         }
 
@@ -997,6 +1023,11 @@ class RestPublicoController extends BaseController
             'estado'         => 'confirmada',
             'origen'         => 'comensal',
         ], 'web'));
+
+        if (!$newId) {
+            $reject('No pudimos registrar la reservación. Intenta nuevamente.', 500);
+            return;
+        }
 
         // Notificar al restaurante (silencioso si falla)
         try {
@@ -1034,6 +1065,16 @@ class RestPublicoController extends BaseController
             } catch (\Throwable $e) {
                 error_log("[Reserva #$newId] Excepción enviando confirmación a $email: " . $e->getMessage());
             }
+        }
+
+        if ($wantsJson) {
+            $this->json([
+                'ok' => true,
+                'message' => 'Tu reservación quedó confirmada.',
+                'reserva_id' => (int)$newId,
+                'cancel_url' => BASE_URL . 'menu/' . $slug . '/cancelarReserva/' . $newId,
+            ]);
+            return;
         }
 
         $this->redirect('menu/' . $slug . '/reservar?ok=1&ref=' . $newId);

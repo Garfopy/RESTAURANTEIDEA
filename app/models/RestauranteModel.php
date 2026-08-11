@@ -156,9 +156,28 @@ class RestauranteModel extends BaseModel
         );
     }
 
+    public function getActiveByName(string $name): ?array
+    {
+        return $this->queryOne(
+            "SELECT * FROM rest_restaurantes
+             WHERE activo = 1 AND nombre LIKE ?
+             ORDER BY id ASC
+             LIMIT 1",
+            ['%' . $name . '%']
+        );
+    }
+
     public function getLandingRestaurant(): ?array
     {
-        $preferredSlugs = ['amare', 'amare-restaurant', 'amare-restaurante'];
+        $preferredSlugs = [
+            'jungle-pizza-zihuatanejo',
+            'jungle-pizza',
+            'junglepizza',
+            'jungle',
+            'amare',
+            'amare-restaurant',
+            'amare-restaurante',
+        ];
 
         foreach ($preferredSlugs as $slug) {
             $restaurant = $this->getBySlug($slug);

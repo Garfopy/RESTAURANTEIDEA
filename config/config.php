@@ -6,7 +6,7 @@
 
 // In CLI/cron there is no reliable HTTP_HOST/SCRIPT_NAME. Allow cPanel cron
 // to inject the public URL with APP_URL, BASE_URL or CARNIHUB_BASE_URL.
-$configuredBaseUrl = getenv('APP_URL') ?: getenv('BASE_URL') ?: getenv('CARNIHUB_BASE_URL') ?: '';
+$configuredBaseUrl = getenv('APP_URL') ?: getenv('BASE_URL') ?: getenv('JUNGLE_BASE_URL') ?: '';
 
 if ($configuredBaseUrl !== '') {
     $parsedPath = parse_url($configuredBaseUrl, PHP_URL_PATH);
@@ -14,9 +14,11 @@ if ($configuredBaseUrl !== '') {
     define('BASE_URL', rtrim($configuredBaseUrl, '/') . '/');
     define('BASE_URL_PATH', $basePath);
 } else {
-    // Detect protocol
-    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
-    $host     = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    // Detectar HTTPS también detrás del proxy inverso del hosting.
+    $forwardedProto = strtolower(trim(explode(',', (string)($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? ''))[0]));
+    $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || $forwardedProto === 'https';
+    $protocol = $isHttps ? 'https://' : 'http://';
+    $host = preg_replace('/[^A-Za-z0-9.\-:\[\]]/', '', (string)($_SERVER['HTTP_HOST'] ?? 'localhost')) ?: 'localhost';
 
     // Detect base path from actual script location
     $scriptDir = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/'));
@@ -28,7 +30,7 @@ if ($configuredBaseUrl !== '') {
 define('BASE_PATH',     dirname(__DIR__));   // project root
 
 // Application
-define('APP_NAME',      'CapiRest');
+define('APP_NAME',      'Jungle Pizza');
 define('APP_VERSION',   '1.0.0');
 define('APP_LOCALE',    'es_MX');
 
@@ -36,7 +38,7 @@ define('APP_LOCALE',    'es_MX');
 define('BRAND_COLOR',   '#C8102E');
 
 // Session name
-define('SESSION_NAME',  'capirest_session');
+define('SESSION_NAME',  'jungle_session');
 define('SESSION_LIFETIME_SECONDS', 315360000); // 10 years; no automatic logout by inactivity.
 define('SESSION_SAVE_PATH', BASE_PATH . '/storage/sessions');
 

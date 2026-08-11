@@ -13,9 +13,9 @@ $ingresosRecargasAmare = (float)($kpis['ingresosRecargasAmare'] ?? 0);
 $metodoPagoLabel = static function (?string $metodo): string {
   $key = strtolower(trim((string)$metodo));
   $labels = [
-    'amare_wallet' => 'Saldo Amare',
-    'saldo_amare' => 'Saldo Amare',
-    'wallet' => 'Saldo Amare',
+    'jungle_wallet' => 'Saldo Jungle',
+    'saldo_jungle' => 'Saldo Jungle',
+    'wallet' => 'Saldo Jungle',
     'app movil' => 'App movil',
     'app_movil' => 'App movil',
     'social_cover' => 'Social Cover',
@@ -32,7 +32,7 @@ $metodosVista = array_map(static function (array $m) use ($metodoPagoLabel): arr
 $ingresoBreakdown = [
   ['label' => 'Tickets de mesa', 'value' => $ingresosTickets],
   ['label' => 'Pedidos app', 'value' => $ingresosPedidosApp],
-  ['label' => 'Recargas Saldo Amare', 'value' => $ingresosRecargasAmare],
+  ['label' => 'Recargas Saldo Jungle', 'value' => $ingresosRecargasAmare],
 ];
 
 ob_start();
@@ -287,7 +287,7 @@ ob_start();
     <div class="finance-hero-top">
       <div>
         <h1 class="finance-title">Dashboard financiero</h1>
-        <p class="finance-subtitle">Vista ejecutiva del periodo: ingresos reales, egresos, utilidad, pagos, ventas app y recargas de Saldo Amare.</p>
+        <p class="finance-subtitle">Vista ejecutiva del periodo: ingresos reales, egresos, utilidad, pagos, ventas app y recargas de Saldo Jungle.</p>
       </div>
       <form class="finance-filter" method="GET" action="<?= BASE_URL ?>rest-finanzas/dashboard">
         <input type="date" name="desde" value="<?= htmlspecialchars($desde) ?>">

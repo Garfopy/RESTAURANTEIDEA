@@ -14,11 +14,13 @@
  * En un deploy normal de CarniHub omite esa línea (o ponla en false).
  */
 
-define('DB_HOST',    'localhost');
-define('DB_NAME',    'nombre_de_tu_base_de_datos');
-define('DB_USER',    'usuario_mysql');
-define('DB_PASS',    'contraseña_mysql');
+define('DB_HOST',    getenv('DB_HOST') ?: 'localhost');
+define('DB_PORT',    getenv('DB_PORT') ?: '3306');
+define('DB_NAME',    getenv('DB_NAME') ?: 'nombre_de_tu_base_de_datos');
+define('DB_USER',    getenv('DB_USER') ?: 'usuario_mysql');
+define('DB_PASS',    getenv('DB_PASS') ?: 'contraseña_mysql');
 define('DB_CHARSET', 'utf8mb4');
+define('JWT_SECRET', getenv('JWT_SECRET') ?: 'CAMBIA_ESTA_CLAVE_POR_UNA_ALEATORIA_DE_64_CARACTERES');
 
 class Database
 {
@@ -29,8 +31,8 @@ class Database
     {
         if (self::$instance === null) {
             $dsn = sprintf(
-                'mysql:host=%s;dbname=%s;charset=%s',
-                DB_HOST, DB_NAME, DB_CHARSET
+                'mysql:host=%s;port=%s;dbname=%s;charset=%s',
+                DB_HOST, DB_PORT, DB_NAME, DB_CHARSET
             );
             $options = [
                 PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
@@ -40,9 +42,9 @@ class Database
             try {
                 self::$instance = new PDO($dsn, DB_USER, DB_PASS, $options);
             } catch (PDOException $e) {
-                error_log('[CarniHub DB] ' . $e->getMessage());
+                error_log('[Jungle DB] ' . $e->getMessage());
                 http_response_code(500);
-                die(json_encode(['error' => 'Database connection failed. Check config/database.php']));
+                die(json_encode(['error' => 'No se pudo conectar con la base de datos.']));
             }
         }
         return self::$instance;

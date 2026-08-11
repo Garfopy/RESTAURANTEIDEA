@@ -9,11 +9,11 @@
  * @var array|null $flash
  */
 $brandColor = htmlspecialchars($restaurante['color_primario'] ?? '#B68A48');
-$nombre = htmlspecialchars($restaurante['nombre'] ?? 'AMARE');
+$nombre = htmlspecialchars($restaurante['nombre'] ?? 'Jungle Pizza');
 $slug = htmlspecialchars($restaurante['slug'] ?? '');
 $logo = !empty($restaurante['logo'])
     ? BASE_URL . ltrim((string)$restaurante['logo'], '/')
-    : BASE_URL . 'public/img/logo-amare.png';
+    : BASE_URL . 'base/redesign-assets/jungle-pizza-logo-420.webp';
 
 $flashMsg = $flash['message'] ?? null;
 $flashType = $flash['type'] ?? 'info';
@@ -380,7 +380,7 @@ $cancelada = $cancelada ?? false;
   <div class="shell">
     <header class="topbar">
       <div class="brand">
-        <img src="<?= htmlspecialchars($logo) ?>" alt="AMARE" onerror="this.onerror=null;this.src='<?= htmlspecialchars(BASE_URL . 'public/img/logo-amare.png') ?>';">
+        <img src="<?= htmlspecialchars($logo) ?>" alt="Jungle Pizza" onerror="this.onerror=null;this.src='<?= htmlspecialchars(BASE_URL . 'base/redesign-assets/jungle-pizza-logo-420.webp') ?>';">
         <div class="brand-copy">
           <small>Reserva directa</small>
           <strong><?= $nombre ?></strong>

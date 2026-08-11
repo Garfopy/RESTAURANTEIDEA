@@ -1,7 +1,8 @@
 {
-  "name": "carnihub/carnihub",
-  "description": "CarniHub - Sistema de gestión para distribuidores de carne",
+  "name": "jungle-pizza/sistema",
+  "description": "Jungle Pizza Zihuatanejo - Sitio, reservaciones y administración del restaurante",
   "type": "project",
+  "license": "proprietary",
   "require": {
     "php": ">=8.0",
     "phpmailer/phpmailer": "^6.9",

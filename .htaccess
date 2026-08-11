@@ -1,4 +1,5 @@
 Options -Indexes
+DirectoryIndex index.php
 RewriteEngine On
 # RewriteBase intencionalmente OMITIDO: el mismo .htaccess funciona en cualquier
 # subdirectorio (/carnihub/, /restaurante/, /, etc.) porque la sustitución
@@ -53,15 +54,23 @@ RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
     frame-src 'self' www.google.com js.stripe.com; \
     object-src 'none'"
   Header always set Permissions-Policy "geolocation=(self)"
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set X-Frame-Options "SAMEORIGIN"
 </IfModule>
 
 # Block direct file access to sensitive directories (but allow virtual routes like config/general)
 RewriteCond %{REQUEST_FILENAME} -f
-RewriteRule ^(config|app)/.*$ - [F,L]
+RewriteRule ^(config|app|cron|docs|firebase|migrations|storage|vendor)/.*$ - [F,L,NC]
+
+# Production must not expose diagnostics, source manifests or SQL dumps.
+RewriteRule ^(?:public/(?:debug-auth|test-email)|api/test)\.php$ - [F,L,NC]
+RewriteRule ^(?:composer\.(?:json|lock)|README\.md|DEBUG_INSTRUCTIONS\.md|plan-restaurantes\.md)$ - [F,L,NC]
+RewriteRule ^.*\.(?:sql|log|ini|env|key|pem)$ - [F,L,NC]
 
 # Block Firebase service account files if they are placed in the web root.
 RewriteRule ^firebase/.*$ - [F,L,NC]
-RewriteRule ^(amare-service-account|.*service-account.*)\.json$ - [F,L,NC]
+RewriteRule ^.*service-account.*\.json$ - [F,L,NC]
 
 # Serve static files/directories directly
 RewriteCond %{REQUEST_FILENAME} -f [OR]

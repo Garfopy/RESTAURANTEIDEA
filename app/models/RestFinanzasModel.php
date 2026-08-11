@@ -116,11 +116,11 @@ class RestFinanzasModel extends BaseModel
         }
 
         return "LOWER(COALESCE({$alias}.{$column}, '')) IN (
-            'saldo_amare',
+            'saldo_jungle',
             'saldo amare',
-            'amare_saldo',
+            'jungle_saldo',
             'amare wallet',
-            'amare_wallet',
+            'jungle_wallet',
             'wallet',
             'monedero',
             'billetera',
@@ -131,9 +131,9 @@ class RestFinanzasModel extends BaseModel
     private function walletColumnExpr(string $table, string $alias): string
     {
         $column = $this->firstExistingColumn($table, [
-            'amare_wallet_used_mxn',
-            'amare_saldo_usado',
-            'saldo_amare_usado',
+            'jungle_wallet_used_mxn',
+            'jungle_saldo_usado',
+            'saldo_jungle_usado',
             'wallet_used_mxn',
             'wallet_usado',
             'saldo_usado',
@@ -145,25 +145,25 @@ class RestFinanzasModel extends BaseModel
 
     private function pedidoWalletTransactionsExpr(string $alias = 'p'): string
     {
-        if (!$this->tableExists('amare_wallet_transactions')) {
+        if (!$this->tableExists('jungle_wallet_transactions')) {
             return '0';
         }
 
-        $amountColumn = $this->firstExistingColumn('amare_wallet_transactions', ['amount_mxn', 'monto', 'amount']);
-        if (!$amountColumn || !$this->columnExists('amare_wallet_transactions', 'reference_id')) {
+        $amountColumn = $this->firstExistingColumn('jungle_wallet_transactions', ['amount_mxn', 'monto', 'amount']);
+        if (!$amountColumn || !$this->columnExists('jungle_wallet_transactions', 'reference_id')) {
             return '0';
         }
 
-        $referenceWhere = $this->columnExists('amare_wallet_transactions', 'reference_type')
+        $referenceWhere = $this->columnExists('jungle_wallet_transactions', 'reference_type')
             ? " AND wt.reference_type IN ('order', 'pedido', 'rest_pedido', 'rest_pedidos')"
             : '';
-        $typeWhere = $this->columnExists('amare_wallet_transactions', 'type')
-            ? " AND wt.type IN ('wallet_payment', 'saldo_payment', 'saldo_amare_payment', 'pago_saldo')"
+        $typeWhere = $this->columnExists('jungle_wallet_transactions', 'type')
+            ? " AND wt.type IN ('wallet_payment', 'saldo_payment', 'saldo_jungle_payment', 'pago_saldo')"
             : '';
 
         return "COALESCE((
             SELECT SUM(ABS(wt.{$amountColumn}))
-            FROM amare_wallet_transactions wt
+            FROM jungle_wallet_transactions wt
             WHERE wt.reference_id = {$alias}.id
               AND wt.{$amountColumn} < 0
               {$referenceWhere}
@@ -241,7 +241,7 @@ class RestFinanzasModel extends BaseModel
 
         foreach (['tipo_origen', 'tipo_pedido', 'origen', 'canal'] as $column) {
             if ($this->columnExists('rest_pedidos', $column)) {
-                $conditions[] = "LOWER(COALESCE({$alias}.{$column}, '')) IN ('app', 'mobile', 'movil', 'amare_app')";
+                $conditions[] = "LOWER(COALESCE({$alias}.{$column}, '')) IN ('app', 'mobile', 'movil', 'jungle_app')";
             }
         }
 
@@ -338,22 +338,22 @@ class RestFinanzasModel extends BaseModel
 
     private function recargasAmarePorDia(string $desde, string $hasta): array
     {
-        if ($this->tableExists('amare_wallet_topups')) {
-            $fechaColumn = $this->firstExistingColumn('amare_wallet_topups', ['confirmed_at', 'pagado_at', 'created_at']);
-            $amountColumn = $this->firstExistingColumn('amare_wallet_topups', ['amount_received', 'requested_amount', 'amount_mxn', 'monto']);
+        if ($this->tableExists('jungle_wallet_topups')) {
+            $fechaColumn = $this->firstExistingColumn('jungle_wallet_topups', ['confirmed_at', 'pagado_at', 'created_at']);
+            $amountColumn = $this->firstExistingColumn('jungle_wallet_topups', ['amount_received', 'requested_amount', 'amount_mxn', 'monto']);
             if ($fechaColumn && $amountColumn) {
-                $amountExpr = $this->columnExists('amare_wallet_topups', 'amount_received')
-                    && $this->columnExists('amare_wallet_topups', 'requested_amount')
+                $amountExpr = $this->columnExists('jungle_wallet_topups', 'amount_received')
+                    && $this->columnExists('jungle_wallet_topups', 'requested_amount')
                     ? 'COALESCE(amount_received, requested_amount)'
                     : $amountColumn;
-                $statusWhere = $this->columnExists('amare_wallet_topups', 'status')
+                $statusWhere = $this->columnExists('jungle_wallet_topups', 'status')
                     ? " AND status IN ('confirmed', 'pagado', 'paid', 'success', 'completed')"
                     : '';
 
                 $rows = $this->query(
                     "SELECT DATE({$fechaColumn}) AS dia,
                             COALESCE(SUM({$amountExpr}), 0) AS total
-                     FROM amare_wallet_topups
+                     FROM jungle_wallet_topups
                      WHERE DATE({$fechaColumn}) BETWEEN ? AND ?
                      {$statusWhere}
                      GROUP BY dia
@@ -367,8 +367,8 @@ class RestFinanzasModel extends BaseModel
             }
         }
 
-        if ($this->tableExists('amare_wallet_transactions')) {
-            $fechaColumn = $this->firstExistingColumn('amare_wallet_transactions', ['created_at', 'fecha', 'paid_at']);
+        if ($this->tableExists('jungle_wallet_transactions')) {
+            $fechaColumn = $this->firstExistingColumn('jungle_wallet_transactions', ['created_at', 'fecha', 'paid_at']);
             $amountExpr = $this->walletTransactionAmountExpr();
             if ($fechaColumn && $amountExpr !== '0') {
                 $topupWhere = $this->walletTopupWhereSql();
@@ -376,7 +376,7 @@ class RestFinanzasModel extends BaseModel
                 return $this->query(
                     "SELECT DATE({$fechaColumn}) AS dia,
                             COALESCE(SUM({$amountExpr}), 0) AS total
-                     FROM amare_wallet_transactions
+                     FROM jungle_wallet_transactions
                      WHERE {$amountExpr} > 0
                        AND DATE({$fechaColumn}) BETWEEN ? AND ?
                        AND {$topupWhere}
@@ -415,7 +415,7 @@ class RestFinanzasModel extends BaseModel
     {
         $amounts = [];
         foreach (['amount_mxn', 'monto', 'amount'] as $column) {
-            if ($this->columnExists('amare_wallet_transactions', $column)) {
+            if ($this->columnExists('jungle_wallet_transactions', $column)) {
                 $amounts[] = "NULLIF({$column}, 0)";
             }
         }
@@ -426,16 +426,16 @@ class RestFinanzasModel extends BaseModel
     private function walletTopupWhereSql(): string
     {
         $conditions = [];
-        if ($this->columnExists('amare_wallet_transactions', 'type')) {
+        if ($this->columnExists('jungle_wallet_transactions', 'type')) {
             $conditions[] = "type IN ('wallet_topup','topup','recarga','demo_credit')";
         }
-        if ($this->columnExists('amare_wallet_transactions', 'tipo')) {
+        if ($this->columnExists('jungle_wallet_transactions', 'tipo')) {
             $conditions[] = "tipo = 'topup'";
         }
-        if ($this->columnExists('amare_wallet_transactions', 'context')) {
+        if ($this->columnExists('jungle_wallet_transactions', 'context')) {
             $conditions[] = "context = 'topup'";
         }
-        if ($this->columnExists('amare_wallet_transactions', 'reference_type')) {
+        if ($this->columnExists('jungle_wallet_transactions', 'reference_type')) {
             $conditions[] = "reference_type = 'wallet_topup'";
         }
 
@@ -444,21 +444,21 @@ class RestFinanzasModel extends BaseModel
 
     private function recargasAmarePeriodo(string $desde, string $hasta): float
     {
-        if ($this->tableExists('amare_wallet_topups')) {
-            $fechaColumn = $this->firstExistingColumn('amare_wallet_topups', ['confirmed_at', 'pagado_at', 'created_at']);
-            $amountColumn = $this->firstExistingColumn('amare_wallet_topups', ['amount_received', 'requested_amount', 'amount_mxn', 'monto']);
+        if ($this->tableExists('jungle_wallet_topups')) {
+            $fechaColumn = $this->firstExistingColumn('jungle_wallet_topups', ['confirmed_at', 'pagado_at', 'created_at']);
+            $amountColumn = $this->firstExistingColumn('jungle_wallet_topups', ['amount_received', 'requested_amount', 'amount_mxn', 'monto']);
             if ($fechaColumn && $amountColumn) {
-                $amountExpr = $this->columnExists('amare_wallet_topups', 'amount_received')
-                    && $this->columnExists('amare_wallet_topups', 'requested_amount')
+                $amountExpr = $this->columnExists('jungle_wallet_topups', 'amount_received')
+                    && $this->columnExists('jungle_wallet_topups', 'requested_amount')
                     ? 'COALESCE(amount_received, requested_amount)'
                     : $amountColumn;
-                $statusWhere = $this->columnExists('amare_wallet_topups', 'status')
+                $statusWhere = $this->columnExists('jungle_wallet_topups', 'status')
                     ? " AND status IN ('confirmed', 'pagado', 'paid', 'success', 'completed')"
                     : '';
 
                 $topupsTotal = (float)($this->queryOne(
                     "SELECT COALESCE(SUM({$amountExpr}),0) AS v
-                     FROM amare_wallet_topups
+                     FROM jungle_wallet_topups
                      WHERE DATE({$fechaColumn}) BETWEEN ? AND ?
                      {$statusWhere}",
                     [$desde, $hasta]
@@ -469,15 +469,15 @@ class RestFinanzasModel extends BaseModel
             }
         }
 
-        if ($this->tableExists('amare_wallet_transactions')) {
-            $fechaColumn = $this->firstExistingColumn('amare_wallet_transactions', ['created_at', 'fecha', 'paid_at']);
+        if ($this->tableExists('jungle_wallet_transactions')) {
+            $fechaColumn = $this->firstExistingColumn('jungle_wallet_transactions', ['created_at', 'fecha', 'paid_at']);
             $amountExpr = $this->walletTransactionAmountExpr();
             if ($fechaColumn && $amountExpr !== '0') {
                 $topupWhere = $this->walletTopupWhereSql();
 
                 return (float)($this->queryOne(
                     "SELECT COALESCE(SUM({$amountExpr}),0) AS v
-                     FROM amare_wallet_transactions
+                     FROM jungle_wallet_transactions
                      WHERE {$amountExpr} > 0
                        AND DATE({$fechaColumn}) BETWEEN ? AND ?
                        AND {$topupWhere}",
@@ -569,22 +569,22 @@ class RestFinanzasModel extends BaseModel
         $puntosDados = 0;
         $puntosRedimidos = 0;
 
-        if ($this->tableExists('amare_wallets')) {
+        if ($this->tableExists('jungle_wallets')) {
             $saldo = (float)($this->queryOne(
-                "SELECT COALESCE(SUM(balance_mxn),0) AS v FROM amare_wallets"
+                "SELECT COALESCE(SUM(balance_mxn),0) AS v FROM jungle_wallets"
             )['v'] ?? 0);
-        } elseif ($this->tableExists('mobile_usuarios') && $this->columnExists('mobile_usuarios', 'amare_saldo')) {
+        } elseif ($this->tableExists('mobile_usuarios') && $this->columnExists('mobile_usuarios', 'jungle_saldo')) {
             $saldo = (float)($this->queryOne(
-                "SELECT COALESCE(SUM(amare_saldo),0) AS v FROM mobile_usuarios WHERE activo = 1"
+                "SELECT COALESCE(SUM(jungle_saldo),0) AS v FROM mobile_usuarios WHERE activo = 1"
             )['v'] ?? 0);
         }
 
         $recargas = $this->recargasAmarePeriodo($desde, $hasta);
 
-        if ($this->tableExists('amare_wallet_transactions') && $this->tableExists('rest_pedidos')) {
+        if ($this->tableExists('jungle_wallet_transactions') && $this->tableExists('rest_pedidos')) {
             $walletUsado = (float)($this->queryOne(
                 "SELECT COALESCE(SUM(ABS(wt.amount_mxn)),0) AS v
-                 FROM amare_wallet_transactions wt
+                 FROM jungle_wallet_transactions wt
                  JOIN rest_pedidos p ON p.id = wt.reference_id
                  WHERE p.restaurante_id = ?
                    AND wt.reference_type = 'order'
@@ -596,7 +596,7 @@ class RestFinanzasModel extends BaseModel
 
             $puntosDados = (int)($this->queryOne(
                 "SELECT COALESCE(SUM(GREATEST(wt.points_delta, 0)),0) AS v
-                 FROM amare_wallet_transactions wt
+                 FROM jungle_wallet_transactions wt
                  JOIN rest_pedidos p ON p.id = wt.reference_id
                  WHERE p.restaurante_id = ?
                    AND wt.reference_type = 'order'
@@ -606,7 +606,7 @@ class RestFinanzasModel extends BaseModel
 
             $puntosRedimidos = (int)($this->queryOne(
                 "SELECT COALESCE(SUM(ABS(LEAST(wt.points_delta, 0))),0) AS v
-                 FROM amare_wallet_transactions wt
+                 FROM jungle_wallet_transactions wt
                  JOIN rest_pedidos p ON p.id = wt.reference_id
                  WHERE p.restaurante_id = ?
                    AND wt.reference_type = 'order'
@@ -618,18 +618,18 @@ class RestFinanzasModel extends BaseModel
         if ($this->tableExists('rest_pedidos')) {
             $pedidoFechaExpr = $this->columnExists('rest_pedidos', 'pagado_at') ? 'COALESCE(pagado_at, created_at)' : 'created_at';
 
-            if ($this->columnExists('rest_pedidos', 'amare_discount_mxn')) {
+            if ($this->columnExists('rest_pedidos', 'jungle_discount_mxn')) {
                 $descuentos += (float)($this->queryOne(
-                    "SELECT COALESCE(SUM(amare_discount_mxn),0) AS v
+                    "SELECT COALESCE(SUM(jungle_discount_mxn),0) AS v
                      FROM rest_pedidos
                      WHERE restaurante_id = ? AND DATE({$pedidoFechaExpr}) BETWEEN ? AND ?",
                     [$restauranteId, $desde, $hasta]
                 )['v'] ?? 0);
             }
 
-            if ($this->columnExists('rest_pedidos', 'amare_wallet_used_mxn')) {
+            if ($this->columnExists('rest_pedidos', 'jungle_wallet_used_mxn')) {
                 $walletUsadoPedidos = (float)($this->queryOne(
-                    "SELECT COALESCE(SUM(amare_wallet_used_mxn),0) AS v
+                    "SELECT COALESCE(SUM(jungle_wallet_used_mxn),0) AS v
                      FROM rest_pedidos
                      WHERE restaurante_id = ? AND DATE({$pedidoFechaExpr}) BETWEEN ? AND ?",
                     [$restauranteId, $desde, $hasta]
@@ -637,18 +637,18 @@ class RestFinanzasModel extends BaseModel
                 $walletUsado = max($walletUsado, $walletUsadoPedidos);
             }
 
-            if ($puntosDados <= 0 && $this->columnExists('rest_pedidos', 'amare_points_earned')) {
+            if ($puntosDados <= 0 && $this->columnExists('rest_pedidos', 'jungle_points_earned')) {
                 $puntosDados = (int)($this->queryOne(
-                    "SELECT COALESCE(SUM(amare_points_earned),0) AS v
+                    "SELECT COALESCE(SUM(jungle_points_earned),0) AS v
                      FROM rest_pedidos
                      WHERE restaurante_id = ? AND DATE({$pedidoFechaExpr}) BETWEEN ? AND ?",
                     [$restauranteId, $desde, $hasta]
                 )['v'] ?? 0);
             }
 
-            if ($puntosRedimidos <= 0 && $this->columnExists('rest_pedidos', 'amare_points_redeemed')) {
+            if ($puntosRedimidos <= 0 && $this->columnExists('rest_pedidos', 'jungle_points_redeemed')) {
                 $puntosRedimidos = (int)($this->queryOne(
-                    "SELECT COALESCE(SUM(amare_points_redeemed),0) AS v
+                    "SELECT COALESCE(SUM(jungle_points_redeemed),0) AS v
                      FROM rest_pedidos
                      WHERE restaurante_id = ? AND DATE({$pedidoFechaExpr}) BETWEEN ? AND ?",
                     [$restauranteId, $desde, $hasta]
