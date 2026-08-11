@@ -26,7 +26,7 @@ class RestVisibilidadFinancieraModel extends BaseModel
 
     public function fechaVisibleDesde(int $restauranteId, string $rol): ?string
     {
-        if ($rol === 'programador') {
+        if ($rol === 'superadmin') {
             return null;
         }
 

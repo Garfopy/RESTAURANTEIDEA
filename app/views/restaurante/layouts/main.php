@@ -22,9 +22,9 @@ $activeMenu = $activeMenu ?? '';
 
 // Roles para visibilidad del sidebar
 $_rol      = $usuario['rol_slug'] ?? '';
-$_isAdmin  = in_array($_rol, ['admin_restaurante', 'comprador', 'programador'], true); // gestión del restaurante
-$_isMesero = in_array($_rol, ['mesero', 'comprador', 'programador'], true);             // operación de salón
-$_isProgramador = $_rol === 'programador';
+$_isAdmin  = in_array($_rol, ['admin_restaurante', 'comprador', 'superadmin'], true); // gestión del restaurante
+$_isMesero = in_array($_rol, ['mesero', 'comprador', 'superadmin'], true);             // operación de salón
+$_isSuperAdmin = $_rol === 'superadmin';
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -151,7 +151,7 @@ $_isProgramador = $_rol === 'programador';
        href="<?= BASE_URL ?>rest-finanzas/cortes" style="padding-left:38px;font-size:.82rem">
       Corte de Caja
     </a>
-    <?php if ($_isProgramador): ?>
+    <?php if ($_isSuperAdmin): ?>
     <a class="rst-nav-link <?= $activeMenu === 'rest_cuentas_pendientes' ? 'active' : '' ?>"
        href="<?= BASE_URL ?>rest-finanzas/cuentasPendientes" style="padding-left:38px;font-size:.82rem">
       Cuentas pendientes

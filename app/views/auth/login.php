@@ -23,12 +23,13 @@ $_waPhone  = preg_replace('/[^0-9]/', '', (string)$_telefono);
     }
     *,*::before,*::after{box-sizing:border-box}
     html{color-scheme:light;background:var(--ink)}
+    html,body{width:100%;height:100%;overflow:hidden}
     body{margin:0;min-width:320px;color:var(--ink);background:var(--ink);font-family:"Nunito",Arial,sans-serif;-webkit-font-smoothing:antialiased}
     button,input{font:inherit} button,a{touch-action:manipulation}
 
     .login-page{
-      position:relative;isolation:isolate;display:grid;min-height:100vh;min-height:100dvh;
-      place-items:center;overflow:hidden;padding:clamp(16px,3vw,48px);
+      position:relative;isolation:isolate;display:grid;width:100%;height:100vh;height:100dvh;min-height:0;
+      place-items:center;overflow:hidden;padding:16px;
       background:
         radial-gradient(circle at 8% 15%,rgba(0,108,104,.34),transparent 32rem),
         radial-gradient(circle at 92% 88%,rgba(212,20,60,.22),transparent 30rem),
@@ -39,10 +40,10 @@ $_waPhone  = preg_replace('/[^0-9]/', '', (string)$_telefono);
       background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);
       background-size:48px 48px;mask-image:linear-gradient(to bottom,#000,transparent 82%);
     }
-    .login-layout{width:min(1180px,100%)}
+    .login-layout{width:min(1180px,100%);height:min(760px,calc(100dvh - 32px))}
     .login-card{
       display:grid;grid-template-columns:minmax(0,1.08fr) minmax(420px,.92fr);
-      min-height:min(720px,calc(100dvh - 64px));overflow:hidden;border:1px solid rgba(255,255,255,.18);
+      width:100%;height:100%;min-height:0;overflow:hidden;border:1px solid rgba(255,255,255,.18);
       border-radius:32px;background:var(--paper);box-shadow:0 32px 90px rgba(5,17,23,.34);
     }
 
@@ -59,7 +60,7 @@ $_waPhone  = preg_replace('/[^0-9]/', '', (string)$_telefono);
     }
     .brand-link:focus-visible{outline:3px solid #fff}
     .brand-logo{display:block;width:154px;height:auto;filter:drop-shadow(0 12px 28px rgba(0,0,0,.32))}
-    .story-content{position:absolute;z-index:2;right:0;bottom:0;left:0;padding:48px}
+    .story-content{position:absolute;z-index:2;right:0;bottom:0;left:0;padding:clamp(30px,4vh,48px)}
     .location-chip{
       display:inline-flex;min-height:36px;align-items:center;margin-bottom:18px;padding:7px 12px;gap:8px;
       border:1px solid rgba(255,255,255,.34);border-radius:999px;background:rgba(6,70,65,.65);
@@ -80,7 +81,7 @@ $_waPhone  = preg_replace('/[^0-9]/', '', (string)$_telefono);
     .story-tag svg{color:#b9d4cc}
 
     .login-panel{
-      position:relative;display:flex;align-items:center;justify-content:center;padding:56px clamp(36px,5vw,68px);
+      position:relative;display:flex;min-height:0;align-items:center;justify-content:center;padding:clamp(24px,4vh,44px) clamp(36px,5vw,68px);
       background:radial-gradient(circle at 100% 0%,rgba(212,20,60,.055),transparent 18rem),var(--paper);
     }
     .login-panel::before{position:absolute;top:0;right:0;left:0;height:5px;content:"";background:linear-gradient(90deg,var(--green) 0 34%,var(--red) 34% 100%)}
@@ -94,18 +95,18 @@ $_waPhone  = preg_replace('/[^0-9]/', '', (string)$_telefono);
       margin:0;color:var(--ink);font-family:"Chewy","Trebuchet MS",sans-serif;
       font-size:clamp(2.35rem,4vw,3.15rem);font-weight:400;line-height:1;
     }
-    .login-intro{margin:14px 0 32px;color:var(--muted);font-size:1rem;line-height:1.65}
+    .login-intro{margin:10px 0 24px;color:var(--muted);font-size:1rem;line-height:1.55}
     .login-intro strong{color:var(--ink);font-weight:900}
 
     .flash-box{
-      display:flex;align-items:flex-start;margin-bottom:24px;padding:14px 15px;gap:11px;
+      display:flex;align-items:flex-start;margin-bottom:16px;padding:12px 14px;gap:11px;
       border:1px solid;border-radius:13px;font-size:.92rem;font-weight:700;line-height:1.45;
     }
     .flash-box svg{width:20px;height:20px;flex:0 0 auto;margin-top:1px}
     .flash-box.is-error{border-color:#f0b7c3;color:#7f1028;background:#fff1f4}
     .flash-box.is-success{border-color:#a8d5c4;color:#0b5c42;background:#edf9f4}
 
-    .field{margin-bottom:20px}
+    .field{margin-bottom:16px}
     .field-label{display:inline-block;margin-bottom:8px;color:var(--ink);font-size:.94rem;font-weight:800}
     .field-control{position:relative}
     .field-icon{
@@ -154,14 +155,14 @@ $_waPhone  = preg_replace('/[^0-9]/', '', (string)$_telefono);
     }
     .login-submit.is-loading .submit-spinner{display:block}
     .support-box{
-      margin-top:28px;padding:17px 18px;border:1px solid #cbded9;border-radius:14px;
+      margin-top:20px;padding:14px 18px;border:1px solid #cbded9;border-radius:14px;
       color:#44565c;background:#f0f7f4;font-size:.88rem;line-height:1.55;text-align:center;
     }
     .support-box strong{display:block;margin-bottom:2px;color:var(--green-deep);font-size:.92rem}
     .support-box a{display:inline-flex;min-height:44px;align-items:center;color:var(--red-deep);font-weight:900;text-decoration:none}
     .support-box a:hover{text-decoration:underline;text-underline-offset:4px}
     .security-note{
-      display:flex;align-items:center;justify-content:center;margin:18px 0 0;gap:8px;
+      display:none;align-items:center;justify-content:center;margin:0;gap:8px;
       color:rgba(255,255,255,.7);font-size:.78rem;font-weight:700;text-align:center;
     }
     .security-note svg{width:15px;height:15px;flex:0 0 auto;color:#b9d4cc}
@@ -171,25 +172,53 @@ $_waPhone  = preg_replace('/[^0-9]/', '', (string)$_telefono);
       .login-card{grid-template-columns:minmax(0,.9fr) minmax(400px,1.1fr)}
       .story-content{padding:36px}.login-panel{padding-right:36px;padding-left:36px}
     }
+    @media(min-width:761px) and (max-height:760px){
+      .login-page{padding:8px}.login-layout{height:calc(100dvh - 16px)}
+      .brand-link{top:16px;left:24px;width:112px;min-height:68px}.brand-logo{width:112px}
+      .story-content{padding:28px}.location-chip{min-height:32px;margin-bottom:10px;padding:5px 10px}
+      .story-title{font-size:clamp(2.1rem,4.8vh,2.8rem)}.story-copy{margin-top:10px;line-height:1.45}
+      .story-tags{margin-top:12px}.login-panel{padding:20px 34px}
+      .kicker{margin-bottom:8px}.login-title{font-size:clamp(2.2rem,6vh,2.7rem)}
+      .login-intro{margin:8px 0 16px;line-height:1.4}.field{margin-bottom:12px}
+      .field-label{margin-bottom:6px}.field-input{min-height:50px;padding-top:11px;padding-bottom:11px}
+      .form-options{min-height:36px;margin-top:-6px;margin-bottom:8px}.forgot-link{min-height:36px}
+      .login-submit{min-height:50px;padding:11px 20px}.support-box{margin-top:12px;padding:9px 14px;line-height:1.35}
+    }
+    @media(min-width:761px) and (max-height:650px){
+      .story-copy,.story-tags,.support-box{display:none}
+    }
     @media(max-width:760px){
-      .login-page{display:block;overflow:visible;padding:12px}.login-layout{max-width:560px;margin:0 auto}
-      .login-card{display:block;min-height:auto;border-radius:24px}.login-story{min-height:238px}
+      .login-page{display:block;height:100dvh;overflow:hidden;padding:8px}.login-layout{height:100%;max-width:560px;margin:0 auto}
+      .login-card{display:grid;grid-template-rows:clamp(140px,26dvh,210px) minmax(0,1fr);height:100%;min-height:0;border-radius:24px}
+      .login-story{min-height:0}
       .story-photo{object-position:center 48%}.brand-link{top:18px;left:20px;width:112px;min-height:72px}
       .brand-logo{width:112px}.story-content{padding:22px}.location-chip{min-height:32px;margin-bottom:10px;padding:5px 10px;font-size:.67rem}
       .story-title{font-size:clamp(1.8rem,8vw,2.35rem)}.story-copy,.story-tags{display:none}
-      .login-panel{padding:38px 28px 30px}.login-title{font-size:clamp(2.3rem,12vw,2.8rem)}
+      .login-panel{overflow:hidden;padding:18px 24px}.kicker{margin-bottom:8px}
+      .login-title{font-size:clamp(2.1rem,10vw,2.6rem)}.login-intro{margin:8px 0 16px;line-height:1.4}
+      .field{margin-bottom:12px}.field-label{margin-bottom:6px}.field-input{min-height:52px;padding-top:11px;padding-bottom:11px}
+      .form-options{min-height:36px;margin-top:-4px;margin-bottom:8px}.forgot-link{min-height:36px}
+      .login-submit{min-height:52px;padding:11px 20px}.support-box,.security-note{display:none}
     }
     @media(max-width:420px){
       .login-page{padding:0;background:var(--paper)}.login-card{border:0;border-radius:0;box-shadow:none}
-      .login-story{min-height:210px}.login-panel{padding:34px 20px 28px}
+      .login-panel{padding:16px 20px}
       .security-note{color:var(--muted)}.security-note svg{color:var(--green)}
     }
     @media(max-width:760px) and (max-height:560px) and (orientation:landscape){
-      .login-page{padding:10px}.login-layout{max-width:980px}
+      .login-page{padding:6px}.login-layout{max-width:980px}
       .login-card{display:grid;grid-template-columns:minmax(280px,.82fr) minmax(400px,1.18fr)}
       .login-story{min-height:0}.brand-link,.brand-logo{width:94px}.story-content{padding:20px}
-      .location-chip,.story-copy,.story-tags{display:none}.story-title{font-size:1.85rem}
-      .login-panel{padding:28px 34px}.login-intro{margin:8px 0 20px}.field{margin-bottom:14px}.support-box{margin-top:18px}
+      .location-chip,.story-copy,.story-tags,.kicker,.support-box{display:none}.story-title{font-size:1.85rem}
+      .login-panel{padding:14px 28px}.login-title{font-size:2rem}.login-intro{margin:4px 0 10px;font-size:.9rem}
+      .field{margin-bottom:8px}.field-input{min-height:46px}.form-options{min-height:30px;margin-bottom:4px}
+      .forgot-link{min-height:30px}.login-submit{min-height:46px}
+    }
+    @media(max-width:760px) and (max-height:650px) and (orientation:portrait){
+      .kicker{display:none}.login-intro{font-size:.9rem}.login-panel{padding-top:12px;padding-bottom:12px}
+    }
+    @media(max-height:420px){
+      .login-story{display:none}.login-card{display:block}.login-panel{height:100%}
     }
     @media(prefers-reduced-motion:reduce){
       *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}

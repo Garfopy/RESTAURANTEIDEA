@@ -29,7 +29,7 @@ $db->beginTransaction();
 
 try {
     $roles = [
-        [1, 'Super Admin', 'superadmin'],
+        [1, 'Superadministrador', 'superadmin'],
         [2, 'Admin Restaurante', 'admin_restaurante'],
         [3, 'Admin Empresa', 'admin_empresa'],
         [4, 'Supervisor', 'supervisor'],
@@ -67,7 +67,7 @@ try {
         $stmt = $db->prepare(
             'INSERT INTO usuarios '
             . '(nombre, apellido_paterno, email, email_verificado, primer_login_completado, password, rol_id, empresa_id, activo) '
-            . 'VALUES (?, ?, ?, 1, 0, ?, 2, ?, 1)'
+            . 'VALUES (?, ?, ?, 1, 0, ?, 1, ?, 1)'
         );
         $stmt->execute([$nombre, 'Jungle', $email, password_hash($password, PASSWORD_BCRYPT), $empresaId]);
         $usuarioId = (int)$db->lastInsertId();
@@ -101,7 +101,10 @@ try {
     }
 
     $stmt = $db->prepare(
-        'UPDATE usuarios SET empresa_id = ?, restaurante_id = ?, restaurante_activo = 1 WHERE id = ?'
+        'UPDATE usuarios
+            SET rol_id = 1, empresa_id = ?, restaurante_id = ?, restaurante_activo = 1,
+                email_verificado = 1, activo = 1
+          WHERE id = ?'
     );
     $stmt->execute([$empresaId, $restauranteId, $usuarioId]);
 
@@ -113,7 +116,7 @@ try {
 
     $db->commit();
     fwrite(STDOUT, "Configuración inicial completada.\n");
-    fwrite(STDOUT, "Administrador: {$email}\n");
+    fwrite(STDOUT, "Superadministrador (rol 1): {$email}\n");
     fwrite(STDOUT, "Restaurante: Jungle Pizza (jungle-pizza-zihuatanejo)\n");
 } catch (Throwable $e) {
     if ($db->inTransaction()) {

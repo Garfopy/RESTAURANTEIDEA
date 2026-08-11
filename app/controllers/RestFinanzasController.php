@@ -34,7 +34,7 @@ class RestFinanzasController extends BaseController
 
     public function visibilidad(?string $p = null): void
     {
-        $this->requireProgramador();
+        $this->requireSuperAdmin();
         $restauranteId = (int)$this->restauranteId();
         $visibilidadModel = new RestVisibilidadFinancieraModel();
         $configuracion = $visibilidadModel->getConfiguracion($restauranteId);
@@ -50,7 +50,7 @@ class RestFinanzasController extends BaseController
 
     public function guardarVisibilidad(?string $p = null): void
     {
-        $this->requireProgramador();
+        $this->requireSuperAdmin();
         if (!$this->isPost()) {
             $this->redirect('rest-finanzas/visibilidad');
         }
@@ -80,7 +80,7 @@ class RestFinanzasController extends BaseController
 
     public function restaurarVisibilidad(?string $p = null): void
     {
-        $this->requireProgramador();
+        $this->requireSuperAdmin();
         if (!$this->isPost()) {
             $this->redirect('rest-finanzas/visibilidad');
         }
@@ -102,7 +102,7 @@ class RestFinanzasController extends BaseController
 
     public function cuentasPendientes(?string $p = null): void
     {
-        $this->requireProgramador();
+        $this->requireSuperAdmin();
         $restauranteId = (int)$this->restauranteId();
         $cuentasModel = new RestCuentaPendienteModel();
         $pendientes = $cuentasModel->listarPendientes($restauranteId);
@@ -121,7 +121,7 @@ class RestFinanzasController extends BaseController
 
     public function regularizarAdeudo(?string $p = null): void
     {
-        $this->requireProgramador();
+        $this->requireSuperAdmin();
         if (!$this->isPost()) {
             $this->redirect('rest-finanzas/cuentasPendientes');
         }
@@ -142,7 +142,7 @@ class RestFinanzasController extends BaseController
             );
             $folio = (string)($resultado['folio'] ?? ('#' . $registroId));
             $this->log(
-                'Adeudo regularizado desde Modo Macias',
+                'Adeudo regularizado por superadministrador',
                 'finanzas',
                 $tipo . ' ' . $folio . '. Motivo: ' . $motivo
             );
@@ -163,7 +163,7 @@ class RestFinanzasController extends BaseController
 
     public function validarSalidaManual(?string $p = null): void
     {
-        $this->requireProgramador();
+        $this->requireSuperAdmin();
         if (!$this->isPost()) {
             $this->redirect('rest-finanzas/cuentasPendientes');
         }
@@ -180,7 +180,7 @@ class RestFinanzasController extends BaseController
             );
             $referencia = ($resultado['ticket_folio'] ?? '') ?: ('Visita #' . $visitaId);
             $this->log(
-                'Salida validada desde Modo Macias',
+                'Salida validada por superadministrador',
                 'finanzas',
                 $referencia . '. Motivo: ' . $motivo
             );
@@ -201,7 +201,7 @@ class RestFinanzasController extends BaseController
 
     public function liberarPedidos(?string $p = null): void
     {
-        $this->requireProgramador();
+        $this->requireSuperAdmin();
         $restauranteId = (int)$this->restauranteId();
         $busqueda = trim((string)$this->get('q', ''));
         $estado = trim((string)$this->get('estado', 'todos'));
@@ -220,7 +220,7 @@ class RestFinanzasController extends BaseController
 
     public function liberarPedidoManual(?string $p = null): void
     {
-        $this->requireProgramador();
+        $this->requireSuperAdmin();
         if (!$this->isPost()) {
             $this->redirect('rest-finanzas/liberarPedidos');
         }
@@ -237,7 +237,7 @@ class RestFinanzasController extends BaseController
             );
             $folio = ($resultado['folio'] ?? '') ?: ('Pedido #' . $pedidoId);
             $this->log(
-                'Pedido liberado desde Modo Macias',
+                'Pedido liberado por superadministrador',
                 'pedidos',
                 $folio . '. Motivo: ' . $motivo
             );

@@ -2282,7 +2282,7 @@ class ApiController extends BaseController
             
             // Usuarios del portal restaurante que pueden consumir la Admin API.
             $rolActual = $usuario['rol_slug'] ?? $usuario['rol'] ?? '';
-            $rolValido = in_array($rolActual, ['admin', 'admin_restaurante', 'comprador', 'admin_local', 'programador', 'superadmin'], true);
+            $rolValido = in_array($rolActual, ['admin', 'admin_restaurante', 'comprador', 'admin_local', 'superadmin'], true);
             if (!$rolValido) {
                 $this->adminApiError('Acceso denegado. Se requiere rol de administrador.', 403);
             }
@@ -2313,15 +2313,22 @@ class ApiController extends BaseController
             $this->adminApiError('Email y contraseña son requeridos', 422);
         }
         $db   = Database::getInstance();
-        $stmt = $db->prepare("SELECT * FROM usuarios WHERE email = ? AND activo = 1 LIMIT 1");
+        $stmt = $db->prepare(
+            "SELECT u.*, r.slug AS rol, r.slug AS rol_slug, r.nombre AS rol_nombre
+               FROM usuarios u
+               JOIN roles r ON r.id = u.rol_id
+              WHERE u.email = ? AND u.activo = 1
+              LIMIT 1"
+        );
         $stmt->execute([$email]);
         $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$usuario || !password_verify($password, $usuario['password'] ?? '')) {
             $this->adminApiError('Credenciales incorrectas', 401);
         }
-        $rolValido = (
-            $usuario['rol'] === 'admin'
-            || in_array(($usuario['rol_slug'] ?? ''), ['admin_restaurante', 'programador'], true)
+        $rolValido = in_array(
+            ($usuario['rol_slug'] ?? ''),
+            ['admin', 'admin_restaurante', 'superadmin'],
+            true
         );
         if (!$rolValido) {
             $this->adminApiError('Acceso denegado. Se requiere rol de administrador.', 403);
@@ -2838,7 +2845,7 @@ class ApiController extends BaseController
         if (!empty($_SESSION['usuario'])) {
             $user = $_SESSION['usuario'];
             $rol = $user['rol'] ?? $user['rol_slug'] ?? '';
-            if ($requireAdmin && !in_array($rol, ['admin', 'admin_restaurante', 'comprador', 'admin_local', 'programador', 'superadmin'], true)) {
+            if ($requireAdmin && !in_array($rol, ['admin', 'admin_restaurante', 'comprador', 'admin_local', 'superadmin'], true)) {
                 $this->adminApiError('Acceso denegado. Se requiere rol de administrador.', 403);
             }
             return [
@@ -2857,7 +2864,7 @@ class ApiController extends BaseController
         }
         $payload = $this->validateJWT($m[1]);
         if (!$payload) { $this->adminApiError('Token inválido o expirado', 401); }
-        if ($requireAdmin && !in_array($payload['rol'] ?? '', ['admin', 'admin_restaurante', 'comprador', 'admin_local', 'programador', 'superadmin'], true)) {
+        if ($requireAdmin && !in_array($payload['rol'] ?? '', ['admin', 'admin_restaurante', 'comprador', 'admin_local', 'superadmin'], true)) {
             $this->adminApiError('Acceso denegado. Se requiere rol de administrador.', 403);
         }
         return $payload;
@@ -3097,7 +3104,7 @@ class ApiController extends BaseController
         $db = Database::getInstance();
         $where = ['r.empresa_id = ?'];
         $params = [$empresaId];
-        if (($jwtUser['rol'] ?? '') !== 'programador') {
+        if (($jwtUser['rol'] ?? '') !== 'superadmin') {
             $where[] = "NOT EXISTS (
                 SELECT 1 FROM rest_visibilidad_financiera vf
                  WHERE vf.restaurante_id = fs.restaurante_id
@@ -3223,7 +3230,7 @@ class ApiController extends BaseController
 
     private function adminInvoiceRequestRow(int $id, int $empresaId, string $rol = ''): ?array
     {
-        $filtroVisibilidad = $rol === 'programador' ? '' : " AND NOT EXISTS (
+        $filtroVisibilidad = $rol === 'superadmin' ? '' : " AND NOT EXISTS (
             SELECT 1 FROM rest_visibilidad_financiera vf
              WHERE vf.restaurante_id = fs.restaurante_id
                AND vf.activo = 1

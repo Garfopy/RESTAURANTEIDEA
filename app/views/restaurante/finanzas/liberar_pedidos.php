@@ -17,7 +17,7 @@ ob_start();
 
 <div class="release-wrap">
   <section class="release-hero">
-    <h1>Modo Macias · Liberar pedidos</h1>
+    <h1>Superadministraci&oacute;n · Liberar pedidos</h1>
     <p>Herramienta para cerrar pedidos atascados en cualquier estado operativo.</p>
     <div class="release-warning"><strong>Importante:</strong> liberar marca el pedido y todos sus artículos como entregados. No registra pagos, no modifica tickets, puntos ni valida la salida del cliente.</div>
   </section>
@@ -91,7 +91,7 @@ ob_start();
     <?php foreach ($historialLiberaciones as $evento): ?>
       <div class="audit-item">
         <strong><?= $esc($evento['folio'] ?: ('Pedido #' . $evento['pedido_id'])) ?> · <?= $esc($evento['cliente_referencia'] ?? '') ?> · <?= $esc($evento['estado_anterior']) ?> → entregado</strong><br>
-        <span><?= $esc($evento['created_at'] ?? '') ?> · <?= $esc($evento['programador_nombre'] ?? 'Macias') ?> · <?= $esc($evento['motivo'] ?? '') ?></span>
+        <span><?= $esc($evento['created_at'] ?? '') ?> · <?= $esc($evento['programador_nombre'] ?? 'Superadministrador') ?> · <?= $esc($evento['motivo'] ?? '') ?></span>
       </div>
     <?php endforeach; ?>
     <?php if (!$historialLiberaciones): ?><div class="release-empty">Aún no se han realizado liberaciones forzadas.</div><?php endif; ?>

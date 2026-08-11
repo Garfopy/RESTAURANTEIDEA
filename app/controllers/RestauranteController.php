@@ -104,6 +104,9 @@ class RestauranteController extends BaseController
 
         if (count($restaurantes) === 1) {
             $_SESSION['restaurante_activo_id'] = $restaurantes[0]['id'];
+            if ($this->esSuperAdmin()) {
+                $_SESSION['empresa_activa_id'] = (int)$restaurantes[0]['empresa_id'];
+            }
             $this->redirect('restaurante/dashboard');
         }
 

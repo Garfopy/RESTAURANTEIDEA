@@ -509,7 +509,7 @@ class RestConfigController extends BaseController
         $sucursales = [];
         $menuPrincipal = null;
         if (!empty($restaurante['empresa_id'])) {
-            $sucursales = in_array($this->rolActual(), ['admin_restaurante', 'programador'], true)
+            $sucursales = in_array($this->rolActual(), ['admin_restaurante', 'superadmin'], true)
                 ? $this->model->getByEmpresa((int)$restaurante['empresa_id'])
                 : $this->model->getByComprador((int)$this->usuarioId());
             $menuPrincipal = $this->model->getMenuPrincipalPorEmpresa((int)$restaurante['empresa_id']);

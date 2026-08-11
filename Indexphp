@@ -298,7 +298,7 @@ if (strpos($_SERVER['REQUEST_URI'] ?? '', 'api/auth/token') !== false) {
 // ── Redirect root to correct portal ──────────────────────────────────────────
 if ($ctrlSlug === 'auth' && $action === 'index' && isset($_SESSION['usuario'])) {
     $rol = $_SESSION['usuario']['rol_slug'] ?? '';
-    if (in_array($rol, ['admin_local', 'programador', 'superadmin'], true)) {
+    if (in_array($rol, ['admin_local', 'superadmin'], true)) {
         header('Location: ' . BASE_URL . 'restaurante/seleccionar'); exit;
     }
     if ($rol === 'mesero') {

@@ -13,7 +13,7 @@ ob_start();
 
 <div class="debt-wrap">
   <section class="debt-hero">
-    <h1>Modo Macias · Cuentas pendientes</h1>
+    <h1>Superadministraci&oacute;n · Cuentas pendientes</h1>
     <p>Permite reflejar manualmente un pago ya recibido sin borrar el ticket, pedido, visita ni historial del cliente.</p>
     <div class="debt-kpis">
       <div class="debt-kpi"><span>Cuentas detectadas</span><strong><?= (int)($pendientes['total_cuentas'] ?? 0) ?></strong></div>
@@ -128,7 +128,7 @@ ob_start();
       <?php foreach ($historialSalidas as $evento): ?>
         <div class="audit-item">
           <strong><?= $esc($evento['ticket_folio'] ?: ('Visita #' . $evento['visita_id'])) ?> · <?= $esc($evento['cliente_referencia'] ?? '') ?><?= !empty($evento['mesa_referencia']) ? ' · ' . $esc($evento['mesa_referencia']) : '' ?></strong><br>
-          <span><?= $esc($evento['salida_registrada_at'] ?? $evento['created_at'] ?? '') ?> · <?= $esc($evento['programador_nombre'] ?? 'Macias') ?> · <?= $esc($evento['motivo'] ?? '') ?></span>
+          <span><?= $esc($evento['salida_registrada_at'] ?? $evento['created_at'] ?? '') ?> · <?= $esc($evento['programador_nombre'] ?? 'Superadministrador') ?> · <?= $esc($evento['motivo'] ?? '') ?></span>
         </div>
       <?php endforeach; ?>
       <?php if (!$historialSalidas): ?><div class="debt-empty">Aún no se han validado salidas manualmente.</div><?php endif; ?>
@@ -141,7 +141,7 @@ ob_start();
       <?php foreach ($historial as $evento): ?>
         <div class="audit-item">
           <strong><?= $esc($evento['folio'] ?: ('#' . $evento['registro_id'])) ?> · <?= $esc($evento['cliente_referencia'] ?? '') ?> · <?= $money($evento['monto'] ?? 0) ?></strong><br>
-          <span><?= $esc($evento['created_at'] ?? '') ?> · <?= $esc($evento['programador_nombre'] ?? 'Macias') ?> · <?= $esc($evento['metodo_pago'] ?? '') ?> · <?= $esc($evento['motivo'] ?? '') ?></span>
+          <span><?= $esc($evento['created_at'] ?? '') ?> · <?= $esc($evento['programador_nombre'] ?? 'Superadministrador') ?> · <?= $esc($evento['metodo_pago'] ?? '') ?> · <?= $esc($evento['motivo'] ?? '') ?></span>
         </div>
       <?php endforeach; ?>
       <?php if (!$historial): ?><div class="debt-empty">Aún no se han realizado regularizaciones.</div><?php endif; ?>
