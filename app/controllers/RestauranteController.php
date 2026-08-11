@@ -44,9 +44,13 @@ class RestauranteController extends BaseController
         $this->requireRestaurante();
         $compradorId         = $this->usuarioId();
         $rol                 = $this->rolActual();
-        $sucursales = in_array($rol, ['admin_restaurante', 'programador'], true)
-            ? $this->model->getByEmpresa((int)$this->empresaId())
-            : $this->model->getByComprador($compradorId);
+        if ($this->esSuperAdmin()) {
+            $sucursales = $this->model->getAllConEmpresa();
+        } elseif ($rol === 'admin_restaurante') {
+            $sucursales = $this->model->getByEmpresa((int)$this->empresaId());
+        } else {
+            $sucursales = $this->model->getByComprador($compradorId);
+        }
         $restauranteActivoId = $this->restauranteId();
         $menuModel           = new RestMenuModel();
         $invModel            = new RestInventarioModel();
@@ -79,7 +83,7 @@ class RestauranteController extends BaseController
             $local = $this->model->find($localId);
             $puedeVincular = $local && (
                 (int)$local['comprador_id'] === $this->usuarioId()
-                || ($this->esProgramador() && (int)($local['empresa_id'] ?? 0) === (int)$this->empresaId())
+                || $this->esSuperAdmin()
             );
             if ($puedeVincular) {
                 $db   = \Database::getInstance();
@@ -94,8 +98,8 @@ class RestauranteController extends BaseController
     public function seleccionar(?string $p = null): void
     {
         $compradorId   = $this->usuarioId();
-        $restaurantes  = $this->esProgramador()
-            ? $this->model->getByEmpresa((int)$this->empresaId())
+        $restaurantes  = $this->esSuperAdmin()
+            ? $this->model->getAllConEmpresa()
             : $this->model->getByComprador($compradorId);
 
         if (count($restaurantes) === 1) {
@@ -112,14 +116,15 @@ class RestauranteController extends BaseController
     {
         $restauranteId = (int)($id ?? $this->post('restaurante_id'));
         $restaurante = $this->model->find($restauranteId);
-        $accesoProgramador = $this->esProgramador()
-            && $restaurante
-            && (int)($restaurante['empresa_id'] ?? 0) === (int)$this->empresaId();
-        if (!$accesoProgramador && !$this->model->verificarAcceso($restauranteId, $this->usuarioId())) {
+        $accesoSuperAdmin = $this->esSuperAdmin() && $restaurante;
+        if (!$accesoSuperAdmin && !$this->model->verificarAcceso($restauranteId, $this->usuarioId())) {
             $this->flash('error', 'Sin acceso a ese restaurante.');
             $this->redirect('restaurante/seleccionar');
         }
         $_SESSION['restaurante_activo_id'] = $restauranteId;
+        if ($this->esSuperAdmin()) {
+            $_SESSION['empresa_activa_id'] = (int)$restaurante['empresa_id'];
+        }
         $redirect = isset($_GET['redirect']) ? trim($_GET['redirect'], '/') : null;
         if ($redirect && preg_match('/^[a-zA-Z0-9\/_-]+$/', $redirect)) {
             $this->redirect($redirect);

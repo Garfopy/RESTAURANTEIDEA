@@ -1,505 +1,336 @@
 <?php
-$pageTitle = 'Iniciar Sesión';
 $_cfgLogin = new ConfigModel();
-$_appLogo  = $_cfgLogin->get('app_logo', '');
-$_appName  = $_cfgLogin->get('app_name', APP_NAME);
+$_appName  = 'Jungle Pizza';
 $_waNumero = $_cfgLogin->get('whatsapp_numero_contacto', '');
 $_telefono = $_waNumero ?: $_cfgLogin->get('telefono_contacto', '');
-$_waPhone  = preg_replace('/[^0-9]/', '', $_telefono);
-$_isRest   = defined('RESTAURANTE_STANDALONE') && RESTAURANTE_STANDALONE;
-if ($_isRest) { $_appName = 'Restaurante'; }
+$_waPhone  = preg_replace('/[^0-9]/', '', (string)$_telefono);
 ?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title><?= htmlspecialchars($_appName) ?> — Iniciar Sesión</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="<?= BASE_URL ?>public/css/carnihub.css">
+  <meta name="theme-color" content="#13212b">
+  <title><?= htmlspecialchars($_appName) ?> &mdash; Iniciar sesi&oacute;n</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Chewy&family=Nunito:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
     :root {
-      --gold-primary: #D4AF37;
-      --gold-light: #FBE18D;
-      --gold-dark: #AA771C;
-      --black-bg: #050505;
-      --panel-dark: #0A0A0A;
+      --red:#d4143c; --red-deep:#97102c; --green:#006c68; --green-deep:#064641;
+      --ink:#13212b; --cream:#f3f1ea; --paper:#fffefa; --muted:#59636a;
+      --border:#d9ded8; --radius:14px; --ease:180ms ease;
     }
+    *,*::before,*::after{box-sizing:border-box}
+    html{color-scheme:light;background:var(--ink)}
+    body{margin:0;min-width:320px;color:var(--ink);background:var(--ink);font-family:"Nunito",Arial,sans-serif;-webkit-font-smoothing:antialiased}
+    button,input{font:inherit} button,a{touch-action:manipulation}
 
-    @keyframes textShimmer {
-      0%   { background-position: 200% center; }
-      100% { background-position: -200% center; }
-    }
-    .shimmer-heading {
-      background: linear-gradient(
-        90deg,
-        var(--gold-primary) 30%,
-        #FFFFFF 46%,
-        var(--gold-light) 50%,
-        #FFFFFF 54%,
-        var(--gold-primary) 70%
-      );
-      background-size: 200% auto;
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      animation: textShimmer 4s linear infinite;
-    }
-
-    @keyframes loginCardIn {
-      from { opacity: 0; transform: translateY(32px) scale(.97); }
-      to   { opacity: 1; transform: translateY(0) scale(1); }
-    }
-    @keyframes glowPulse {
-      0%, 100% { opacity: .15; transform: scale(1); }
-      50%      { opacity: .30; transform: scale(1.12); }
-    }
-    @keyframes bgShift {
-      0%, 100% { background-position: 0% 50%; }
-      50%      { background-position: 100% 50%; }
-    }
-
-    .login-bg {
-      min-height: 100vh;
-      display: flex; align-items: center; justify-content: center;
-      font-family: 'Inter', sans-serif;
-      background: var(--black-bg);
-      position: relative;
-      padding: 24px 16px;
-      overflow: hidden;
-    }
-    /* Atmospheric blobs behind the card */
-    .login-bg::before {
-      content: '';
-      position: fixed; inset: 0; pointer-events: none;
+    .login-page{
+      position:relative;isolation:isolate;display:grid;min-height:100vh;min-height:100dvh;
+      place-items:center;overflow:hidden;padding:clamp(16px,3vw,48px);
       background:
-        radial-gradient(ellipse 55% 45% at 12% 25%, rgba(212,175,55,.08) 0%, transparent 65%),
-        radial-gradient(ellipse 45% 55% at 88% 75%, rgba(255,255,255,.03) 0%, transparent 65%),
-        radial-gradient(ellipse 70% 35% at 50% 110%, rgba(212,175,55,.05) 0%, transparent 60%);
+        radial-gradient(circle at 8% 15%,rgba(0,108,104,.34),transparent 32rem),
+        radial-gradient(circle at 92% 88%,rgba(212,20,60,.22),transparent 30rem),
+        linear-gradient(135deg,#0b171e 0%,var(--ink) 48%,#08191a 100%);
+    }
+    .login-page::before{
+      position:fixed;z-index:-1;inset:0;content:"";opacity:.2;pointer-events:none;
+      background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);
+      background-size:48px 48px;mask-image:linear-gradient(to bottom,#000,transparent 82%);
+    }
+    .login-layout{width:min(1180px,100%)}
+    .login-card{
+      display:grid;grid-template-columns:minmax(0,1.08fr) minmax(420px,.92fr);
+      min-height:min(720px,calc(100dvh - 64px));overflow:hidden;border:1px solid rgba(255,255,255,.18);
+      border-radius:32px;background:var(--paper);box-shadow:0 32px 90px rgba(5,17,23,.34);
     }
 
-    .login-card-wrap {
-      display: flex;
-      width: 100%;
-      max-width: 1000px;
-      min-height: 640px;
-      border-radius: 24px;
-      overflow: hidden;
-      border: 1px solid rgba(212,175,55,.15);
-      box-shadow:
-        0 0 0 1px rgba(255,255,255,.02),
-        0 32px 80px rgba(0,0,0,.85),
-        0 80px 160px rgba(0,0,0,.60),
-        0 0 120px rgba(212,175,55,.08);
-      animation: loginCardIn .8s cubic-bezier(.22,1,.36,1) both;
-      position: relative; z-index: 1;
+    .login-story{position:relative;min-width:0;overflow:hidden;color:#fff;background:var(--green-deep)}
+    .login-story picture,.story-photo,.story-scrim{position:absolute;inset:0;width:100%;height:100%}
+    .story-photo{display:block;object-fit:cover;object-position:52% center;transform:scale(1.015)}
+    .story-scrim{
+      background:linear-gradient(180deg,rgba(8,20,23,.2),rgba(8,20,23,.08) 32%,rgba(7,18,20,.94) 100%),
+                 linear-gradient(115deg,rgba(0,108,104,.42),transparent 55%,rgba(212,20,60,.2));
     }
+    .brand-link{
+      position:absolute;z-index:2;top:32px;left:36px;display:inline-flex;width:154px;min-height:92px;
+      align-items:center;justify-content:center;border-radius:24px;outline-offset:6px;
+    }
+    .brand-link:focus-visible{outline:3px solid #fff}
+    .brand-logo{display:block;width:154px;height:auto;filter:drop-shadow(0 12px 28px rgba(0,0,0,.32))}
+    .story-content{position:absolute;z-index:2;right:0;bottom:0;left:0;padding:48px}
+    .location-chip{
+      display:inline-flex;min-height:36px;align-items:center;margin-bottom:18px;padding:7px 12px;gap:8px;
+      border:1px solid rgba(255,255,255,.34);border-radius:999px;background:rgba(6,70,65,.65);
+      backdrop-filter:blur(10px);font-size:.78rem;font-weight:900;letter-spacing:.09em;text-transform:uppercase;
+    }
+    .location-chip svg,.story-tag svg{width:16px;height:16px;flex:0 0 auto}
+    .story-title{
+      max-width:540px;margin:0;font-family:"Chewy","Trebuchet MS",sans-serif;
+      font-size:clamp(2.25rem,3.9vw,3.7rem);font-weight:400;line-height:1.02;letter-spacing:.01em;
+      text-wrap:balance;text-shadow:0 3px 24px rgba(0,0,0,.34);
+    }
+    .story-copy{max-width:520px;margin:18px 0 0;color:rgba(255,255,255,.87);font-size:1rem;line-height:1.65}
+    .story-tags{display:flex;flex-wrap:wrap;margin-top:24px;gap:10px}
+    .story-tag{
+      display:inline-flex;min-height:36px;align-items:center;padding:7px 12px;gap:8px;border-radius:999px;
+      background:rgba(19,33,43,.72);backdrop-filter:blur(8px);font-size:.8rem;font-weight:800;
+    }
+    .story-tag svg{color:#b9d4cc}
 
-    /* ── Left panel ── */
-    .login-left {
-      flex: 1;
-      position: relative;
-      overflow: hidden;
-      background: linear-gradient(150deg, #111111 0%, var(--panel-dark) 45%, #000000 100%);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 48px 40px;
-      color: #fff;
+    .login-panel{
+      position:relative;display:flex;align-items:center;justify-content:center;padding:56px clamp(36px,5vw,68px);
+      background:radial-gradient(circle at 100% 0%,rgba(212,20,60,.055),transparent 18rem),var(--paper);
     }
-    /* Dot grid */
-    .login-left::before {
-      content: '';
-      position: absolute; inset: 0;
-      background-image: radial-gradient(circle, rgba(212,175,55,.08) 1px, transparent 1px);
-      background-size: 24px 24px;
-      pointer-events: none;
-      z-index: 0;
+    .login-panel::before{position:absolute;top:0;right:0;left:0;height:5px;content:"";background:linear-gradient(90deg,var(--green) 0 34%,var(--red) 34% 100%)}
+    .form-box{width:100%;max-width:410px}
+    .kicker{
+      display:inline-flex;align-items:center;margin-bottom:14px;gap:9px;color:var(--green);
+      font-size:.76rem;font-weight:900;letter-spacing:.12em;text-transform:uppercase;
     }
-    /* Diagonal stripe overlay — premium texture */
-    .login-left::after {
-      content: '';
-      position: absolute; inset: 0;
-      background: repeating-linear-gradient(
-        -52deg,
-        transparent,
-        transparent 28px,
-        rgba(255,255,255,.015) 28px,
-        rgba(255,255,255,.015) 29px
-      );
-      pointer-events: none;
-      z-index: 0;
+    .kicker::before{width:28px;height:3px;border-radius:999px;content:"";background:var(--red)}
+    .login-title{
+      margin:0;color:var(--ink);font-family:"Chewy","Trebuchet MS",sans-serif;
+      font-size:clamp(2.35rem,4vw,3.15rem);font-weight:400;line-height:1;
     }
-    .login-glow-top {
-      position: absolute;
-      top: -100px; right: -100px;
-      width: 340px; height: 340px;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(212,175,55,.2) 0%, transparent 70%);
-      filter: blur(50px);
-      animation: glowPulse 5s ease-in-out infinite;
-      pointer-events: none;
-      z-index: 0;
-    }
-    .login-glow-btm {
-      position: absolute;
-      bottom: -120px; left: -70px;
-      width: 260px; height: 260px;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(212,175,55,.1) 0%, transparent 70%);
-      filter: blur(60px);
-      animation: glowPulse 5s ease-in-out infinite reverse;
-      pointer-events: none;
-      z-index: 0;
-    }
-    .login-accent-bar {
-      width: 44px; height: 3px;
-      border-radius: 2px;
-      background: linear-gradient(90deg, var(--gold-primary), var(--gold-dark));
-      margin-bottom: 18px;
-      box-shadow: 0 2px 12px rgba(212,175,55,.4);
-    }
+    .login-intro{margin:14px 0 32px;color:var(--muted);font-size:1rem;line-height:1.65}
+    .login-intro strong{color:var(--ink);font-weight:900}
 
-    .login-features {
-      display: flex; flex-direction: column;
-      gap: 14px; width: 100%;
-      margin-top: 28px;
+    .flash-box{
+      display:flex;align-items:flex-start;margin-bottom:24px;padding:14px 15px;gap:11px;
+      border:1px solid;border-radius:13px;font-size:.92rem;font-weight:700;line-height:1.45;
     }
-    .login-feature {
-      display: flex; align-items: center;
-      gap: 12px; font-size: .84rem;
-      color: #D1D5DB; line-height: 1.3;
-      font-weight: 500;
-    }
-    .login-feature-dot {
-      width: 24px; height: 24px; border-radius: 50%;
-      background: transparent;
-      border: 1px solid rgba(212,175,55,.4);
-      display: flex; align-items: center; justify-content: center;
-      flex-shrink: 0;
-    }
-    .login-tagline {
-      position: absolute;
-      bottom: 22px; left: 0; right: 0;
-      text-align: center;
-      font-size: .67rem;
-      color: rgba(212,175,55,.4);
-      letter-spacing: .1em;
-      text-transform: uppercase;
-      z-index: 1;
-      font-weight: 600;
-    }
+    .flash-box svg{width:20px;height:20px;flex:0 0 auto;margin-top:1px}
+    .flash-box.is-error{border-color:#f0b7c3;color:#7f1028;background:#fff1f4}
+    .flash-box.is-success{border-color:#a8d5c4;color:#0b5c42;background:#edf9f4}
 
-    /* ── Right panel ── */
-    .login-right {
-      flex: 1;
-      background: #FFFFFF;
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      padding: 52px 44px;
-      position: relative;
+    .field{margin-bottom:20px}
+    .field-label{display:inline-block;margin-bottom:8px;color:var(--ink);font-size:.94rem;font-weight:800}
+    .field-control{position:relative}
+    .field-icon{
+      position:absolute;z-index:1;top:50%;left:17px;display:grid;width:20px;height:20px;place-items:center;
+      color:#738087;pointer-events:none;transform:translateY(-50%);transition:color var(--ease);
     }
+    .field-icon svg{width:20px;height:20px}.field-control:focus-within .field-icon{color:var(--red)}
+    .field-input{
+      width:100%;min-height:56px;padding:14px 54px 14px 50px;border:1.5px solid var(--border);
+      border-radius:var(--radius);outline:none;color:var(--ink);background:#fff;font-size:1rem;
+      transition:border-color var(--ease),box-shadow var(--ease);
+    }
+    .field-input:hover{border-color:#acb8b3}
+    .field-input:focus{border-color:var(--red);box-shadow:0 0 0 4px rgba(212,20,60,.13)}
+    .field-input::placeholder{color:#89949a;opacity:1}
+    .password-toggle{
+      position:absolute;z-index:2;top:50%;right:5px;display:grid;width:46px;height:46px;padding:0;place-items:center;
+      border:0;border-radius:11px;color:#66747a;background:transparent;cursor:pointer;transform:translateY(-50%);
+      transition:color var(--ease),background-color var(--ease);
+    }
+    .password-toggle:hover{color:var(--red);background:#fff0f3}
+    .password-toggle:focus-visible{outline:3px solid rgba(212,20,60,.32);outline-offset:1px}
+    .password-toggle svg{position:absolute;width:21px;height:21px;transition:opacity var(--ease)}
+    .icon-eye-off,.password-toggle[aria-pressed="true"] .icon-eye{opacity:0}
+    .password-toggle[aria-pressed="true"] .icon-eye-off{opacity:1}
+    .form-options{display:flex;min-height:44px;align-items:center;justify-content:flex-end;margin-top:-8px;margin-bottom:16px}
+    .forgot-link{
+      display:inline-flex;min-height:44px;align-items:center;color:var(--green);font-size:.9rem;
+      font-weight:900;text-decoration:none;transition:color var(--ease);
+    }
+    .forgot-link:hover{color:var(--red-deep);text-decoration:underline;text-underline-offset:4px}
+    .forgot-link:focus-visible{border-radius:6px;outline:3px solid rgba(0,108,104,.28);outline-offset:3px}
 
-    /* Elegant gold top accent line */
-    .login-right::before {
-      content: '';
-      position: absolute; top: 0; left: 0; right: 0;
-      height: 3px;
-      background: linear-gradient(90deg, var(--gold-dark) 0%, var(--gold-light) 50%, var(--gold-dark) 100%);
-      background-size: 200% 100%;
-      animation: bgShift 4s ease infinite;
+    .login-submit{
+      display:inline-flex;width:100%;min-height:56px;align-items:center;justify-content:center;padding:14px 22px;gap:11px;
+      border:0;border-radius:var(--radius);color:#fff;background:var(--red);box-shadow:0 12px 28px rgba(151,16,44,.24);
+      cursor:pointer;font-size:1rem;font-weight:900;transition:background-color var(--ease),box-shadow var(--ease),transform var(--ease);
     }
+    .login-submit:hover{background:var(--red-deep);box-shadow:0 15px 34px rgba(151,16,44,.3)}
+    .login-submit:active{transform:scale(.985)}
+    .login-submit:focus-visible{outline:4px solid rgba(212,20,60,.28);outline-offset:4px}
+    .login-submit:disabled{opacity:.72;cursor:wait;box-shadow:none}
+    .submit-spinner{
+      display:none;width:20px;height:20px;border:2.5px solid rgba(255,255,255,.45);
+      border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;
+    }
+    .login-submit.is-loading .submit-spinner{display:block}
+    .support-box{
+      margin-top:28px;padding:17px 18px;border:1px solid #cbded9;border-radius:14px;
+      color:#44565c;background:#f0f7f4;font-size:.88rem;line-height:1.55;text-align:center;
+    }
+    .support-box strong{display:block;margin-bottom:2px;color:var(--green-deep);font-size:.92rem}
+    .support-box a{display:inline-flex;min-height:44px;align-items:center;color:var(--red-deep);font-weight:900;text-decoration:none}
+    .support-box a:hover{text-decoration:underline;text-underline-offset:4px}
+    .security-note{
+      display:flex;align-items:center;justify-content:center;margin:18px 0 0;gap:8px;
+      color:rgba(255,255,255,.7);font-size:.78rem;font-weight:700;text-align:center;
+    }
+    .security-note svg{width:15px;height:15px;flex:0 0 auto;color:#b9d4cc}
+    @keyframes spin{to{transform:rotate(360deg)}}
 
-    /* ── Inputs ── */
-    .input-wrap {
-      position: relative;
-      margin-bottom: 16px;
+    @media(max-width:980px){
+      .login-card{grid-template-columns:minmax(0,.9fr) minmax(400px,1.1fr)}
+      .story-content{padding:36px}.login-panel{padding-right:36px;padding-left:36px}
     }
-    .input-icon-left {
-      position: absolute; left: 13px; top: 50%;
-      transform: translateY(-50%);
-      color: #9CA3AF;
-      pointer-events: none; display: flex;
-      transition: color .3s ease;
+    @media(max-width:760px){
+      .login-page{display:block;overflow:visible;padding:12px}.login-layout{max-width:560px;margin:0 auto}
+      .login-card{display:block;min-height:auto;border-radius:24px}.login-story{min-height:238px}
+      .story-photo{object-position:center 48%}.brand-link{top:18px;left:20px;width:112px;min-height:72px}
+      .brand-logo{width:112px}.story-content{padding:22px}.location-chip{min-height:32px;margin-bottom:10px;padding:5px 10px;font-size:.67rem}
+      .story-title{font-size:clamp(1.8rem,8vw,2.35rem)}.story-copy,.story-tags{display:none}
+      .login-panel{padding:38px 28px 30px}.login-title{font-size:clamp(2.3rem,12vw,2.8rem)}
     }
-    .input-wrap:focus-within .input-icon-left { color: var(--gold-dark); }
-    .input-login {
-      width: 100%;
-      padding: 12px 44px;
-      border: 1.5px solid #E5E7EB;
-      border-radius: 10px;
-      font-size: .875rem;
-      color: #111827;
-      background: #FAFAFA;
-      outline: none;
-      font-family: 'Inter', sans-serif;
-      transition: all .3s ease;
-      box-sizing: border-box;
+    @media(max-width:420px){
+      .login-page{padding:0;background:var(--paper)}.login-card{border:0;border-radius:0;box-shadow:none}
+      .login-story{min-height:210px}.login-panel{padding:34px 20px 28px}
+      .security-note{color:var(--muted)}.security-note svg{color:var(--green)}
     }
-    .input-login:focus {
-      background: #FFFFFF;
-      border-color: var(--gold-primary);
-      box-shadow: 0 0 0 4px rgba(212,175,55,.1);
+    @media(max-width:760px) and (max-height:560px) and (orientation:landscape){
+      .login-page{padding:10px}.login-layout{max-width:980px}
+      .login-card{display:grid;grid-template-columns:minmax(280px,.82fr) minmax(400px,1.18fr)}
+      .login-story{min-height:0}.brand-link,.brand-logo{width:94px}.story-content{padding:20px}
+      .location-chip,.story-copy,.story-tags{display:none}.story-title{font-size:1.85rem}
+      .login-panel{padding:28px 34px}.login-intro{margin:8px 0 20px}.field{margin-bottom:14px}.support-box{margin-top:18px}
     }
-    .input-login::placeholder { color: #9CA3AF; font-weight: 400; }
-
-    @media (max-width: 768px) {
-      .login-card-wrap {
-        border-radius: 20px;
-        min-height: auto;
-        flex-direction: column;
-        box-shadow: 0 20px 60px rgba(0,0,0,.6), 0 0 60px rgba(212,175,55,.1);
-      }
-      .login-right {
-        padding: 36px 24px;
-      }
+    @media(prefers-reduced-motion:reduce){
+      *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
     }
-
-    /* ── Password toggle icons ── */
-    .pw-toggle-btn {
-      position: absolute; right: 11px; top: 50%;
-      transform: translateY(-50%);
-      background: none; border: none; cursor: pointer;
-      padding: 0; display: flex; align-items: center; justify-content: center;
-      color: #9CA3AF; transition: color .2s;
-      width: 22px; height: 22px;
-    }
-    .pw-toggle-btn:hover { color: var(--gold-dark); }
-    .icon-eye, .icon-eye-off {
-      position: absolute; top: 0; left: 0;
-      transition: opacity .2s ease, transform .2s ease;
-    }
-    .icon-eye-off { opacity: 0; transform: scale(.7); }
-    .pw-wrap.pw-shown .icon-eye     { opacity: 0; transform: scale(.7); }
-    .pw-wrap.pw-shown .icon-eye-off { opacity: 1; transform: scale(1); }
-
-    /* ── Minimalist Premium Button ── */
-    .btn-login-submit {
-      width: 100%; padding: 13px;
-      border: 1.5px solid var(--gold-primary); 
-      border-radius: 10px;
-      font-size: .9375rem; font-weight: 700;
-      font-family: 'Inter', sans-serif;
-      color: var(--gold-primary);
-      background: #050505;
-      cursor: pointer;
-      box-shadow: 0 4px 16px rgba(0,0,0,.1);
-      transition: all .3s ease;
-      letter-spacing: .02em;
-      margin-top: 4px;
-    }
-    .btn-login-submit:hover {
-      background: var(--gold-primary);
-      color: #050505;
-      box-shadow: 0 8px 24px rgba(212,175,55,.25);
-      transform: translateY(-2px);
-    }
-    .btn-login-submit:active {
-      transform: translateY(0);
-      box-shadow: 0 3px 10px rgba(212,175,55,.15);
-    }
-
-    /* ── Flash messages ── */
-    .flash-box {
-      display: flex; align-items: flex-start;
-      gap: 10px; padding: 13px 14px;
-      border-radius: 10px; margin-bottom: 20px;
-      font-size: .85rem; line-height: 1.5;
-    }
-    .flash-box.is-error {
-      background: #FAFAFA;
-      border-left: 4px solid var(--gold-dark);
-      color: #111827;
-      border-top: 1px solid #E5E7EB;
-      border-right: 1px solid #E5E7EB;
-      border-bottom: 1px solid #E5E7EB;
-    }
-    .flash-box.is-success {
-      background: #FAFAFA;
-      border-left: 4px solid #10B981;
-      color: #111827;
-      border-top: 1px solid #E5E7EB;
-      border-right: 1px solid #E5E7EB;
-      border-bottom: 1px solid #E5E7EB;
-    }
-    .flash-box svg { flex-shrink: 0; margin-top: 1px; color: var(--gold-dark); }
-    .flash-box.is-success svg { color: #10B981; }
-
-    /* ── Forgot link ── */
-    .forgot-link {
-      display: block; text-align: right;
-      font-size: .8rem; color: #6B7280;
-      text-decoration: none; font-weight: 500;
-      margin-top: -8px; margin-bottom: 24px;
-      transition: color .2s;
-    }
-    .forgot-link:hover { color: var(--gold-dark); }
   </style>
 </head>
-<body class="login-bg">
-
-<div class="login-card-wrap">
-
-  <div class="login-left hide-mobile">
-
-    <div class="login-glow-top"></div>
-    <div class="login-glow-btm"></div>
-
-    <div style="position:relative;z-index:1;width:100%;display:flex;flex-direction:column;align-items:center">
-
-      <div class="login-accent-bar"></div>
-
-      <img src="<?= BASE_URL ?>base/redesign-assets/jungle-pizza-logo-420.webp" alt="Jungle Pizza" style="height:200px;margin-bottom:20px;object-fit:contain">
-
-      <h2 class="shimmer-heading" style="font-size:1.5rem;font-weight:800;margin-bottom:12px;text-align:center;line-height:1.25">
-        <?php if ($_isRest): ?>
-          Gestión de Restaurantes<br>y Flujo de Ventas
-        <?php else: ?>
-          Abasto Inteligente<br>de Carne
-        <?php endif; ?>
-      </h2>
-      <p style="color:#A3A3A3;text-align:center;font-size:.875rem;line-height:1.65;max-width:280px;margin:0">
-        <?php if ($_isRest): ?>
-          Controla operación, ventas y cocina en un solo flujo en tiempo real.
-        <?php else: ?>
-          La plataforma B2B que conecta tu negocio con el mejor abasto cárnico.
-        <?php endif; ?>
-      </p>
-
-      <div class="login-features">
-        <?php
-          $features = $_isRest ? [
-            ['Mesas, reservas y comandas en vivo', 'M5 13l4 4L19 7'],
-            ['Menú digital y pedidos por QR',      'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2'],
-            ['Flujo de ventas y cobros integrado', 'M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0'],
-            ['Reportes de ventas y propinas',       'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z'],
-          ] : [
-            ['Precios escalonados dinámicos', 'M5 13l4 4L19 7'],
-            ['Pedidos multi-sucursal',        'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2'],
-            ['Logística inteligente',         'M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0'],
-            ['Análisis de consumo',           'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z'],
-          ];
-          foreach ($features as [$label, $path]): ?>
-        <div class="login-feature">
-          <div class="login-feature-dot">
-            <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="var(--gold-primary)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-              <path d="<?= $path ?>"/>
+<body>
+<main class="login-page" id="main-content">
+  <div class="login-layout">
+    <section class="login-card" aria-labelledby="login-title">
+      <aside class="login-story" aria-label="Jungle Pizza en Playa La Ropa">
+        <picture>
+          <source media="(max-width:760px)" srcset="<?= BASE_URL ?>base/redesign-assets/hero-jungle-pizza-760.webp">
+          <img class="story-photo"
+            src="<?= BASE_URL ?>base/redesign-assets/hero-jungle-pizza-1600.webp"
+            srcset="<?= BASE_URL ?>base/redesign-assets/hero-jungle-pizza-760.webp 760w, <?= BASE_URL ?>base/redesign-assets/hero-jungle-pizza-960.webp 960w, <?= BASE_URL ?>base/redesign-assets/hero-jungle-pizza-1600.webp 1600w"
+            sizes="(max-width:760px) 100vw, 58vw" width="1600" height="878"
+            alt="Pizza y margarita junto al horno de Jungle Pizza" fetchpriority="high" decoding="async">
+        </picture>
+        <div class="story-scrim" aria-hidden="true"></div>
+        <a class="brand-link" href="<?= BASE_URL ?>" aria-label="Ir al inicio de Jungle Pizza">
+          <img class="brand-logo" src="<?= BASE_URL ?>base/redesign-assets/jungle-pizza-logo-420.webp"
+            width="420" height="338" alt="Jungle Pizza">
+        </a>
+        <div class="story-content">
+          <span class="location-chip">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 21s7-4.35 7-11A7 7 0 105 10c0 6.65 7 11 7 11z"/><circle cx="12" cy="10" r="2.25"/>
             </svg>
-          </div>
-          <span><?= $label ?></span>
-        </div>
-        <?php endforeach; ?>
-      </div>
-
-    </div>
-
-    <div class="login-tagline"><?= $_isRest ? 'Sistema integral de gestión gastronómica' : 'Plataforma líder en abasto cárnico B2B' ?></div>
-  </div>
-
-  <div class="login-right">
-    <div style="width:100%;max-width:380px">
-
-      <div style="text-align:center;margin-bottom:24px" class="hide-desktop">
-        <?php if ($_appLogo): ?>
-          <img src="<?= htmlspecialchars($_appLogo) ?>" alt="<?= htmlspecialchars($_appName) ?>"
-               style="height:90px;margin-bottom:14px;object-fit:contain">
-        <?php else: ?>
-          <img src="<?= BASE_URL ?>public/img/logo-carnisync.svg" alt="<?= htmlspecialchars($_appName) ?>"
-               style="height:90px;margin-bottom:14px">
-        <?php endif; ?>
-      </div>
-
-      <div style="margin-bottom:32px">
-        <h1 style="font-size:1.75rem;font-weight:800;color:#050505;margin:0 0 8px;letter-spacing:-0.02em">Iniciar sesión</h1>
-        <p style="color:#6B7280;font-size:.9rem;margin:0">
-          Accede a tu panel de <strong style="color:#111827;font-weight:600"><?= htmlspecialchars($_appName) ?></strong>
-        </p>
-      </div>
-
-      <?php if (!empty($flash)): ?>
-      <div class="flash-box <?= $flash['type'] === 'error' ? 'is-error' : 'is-success' ?>">
-        <?php if ($flash['type'] === 'error'): ?>
-          <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-          </svg>
-        <?php else: ?>
-          <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-          </svg>
-        <?php endif; ?>
-        <span><?= htmlspecialchars($flash['message']) ?></span>
-      </div>
-      <?php endif; ?>
-
-      <form method="POST" action="<?= BASE_URL ?>auth/doLogin">
-
-        <div>
-          <label class="form-label" style="display:block;margin-bottom:8px;font-size:0.875rem;font-weight:500;color:#374151">Correo electrónico</label>
-          <div class="input-wrap">
-            <span class="input-icon-left">
-              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-              </svg>
+            Playa La Ropa &middot; Zihuatanejo
+          </span>
+          <h2 class="story-title">Tu restaurante, en movimiento y bajo control.</h2>
+          <p class="story-copy">Reservas, mesas, comandas y ventas conectadas para que el equipo se concentre en servir una experiencia inolvidable.</p>
+          <div class="story-tags" aria-label="Funciones principales">
+            <span class="story-tag">
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" d="M8 7V3m8 4V3M5 11h14M6 5h12a2 2 0 012 2v12H4V7a2 2 0 012-2z"/></svg>
+              Reservaciones
             </span>
-            <input type="email" name="email" class="input-login"
-                   placeholder="ejemplo@restaurante.com" required autocomplete="email">
+            <span class="story-tag">
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" d="M4 6h16M7 6l1 14h8l1-14M9 3h6"/></svg>
+              Comandas
+            </span>
+            <span class="story-tag">
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" d="M5 20V10m7 10V4m7 16v-7"/></svg>
+              Ventas en vivo
+            </span>
           </div>
         </div>
+      </aside>
 
-        <div>
-          <label class="form-label" style="display:block;margin-bottom:8px;font-size:0.875rem;font-weight:500;color:#374151">Contraseña</label>
-          <div class="input-wrap pw-wrap" id="pwWrap">
-            <span class="input-icon-left">
-              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-                <rect x="5" y="11" width="14" height="10" rx="2" ry="2"/>
-                <path stroke-linecap="round" stroke-linejoin="round" d="M8 11V7a4 4 0 018 0v4"/>
-              </svg>
-            </span>
-            <input type="password" name="password" id="passwordInput" class="input-login"
-                   placeholder="••••••••" required autocomplete="current-password">
-            <button type="button" onclick="togglePassword()" class="pw-toggle-btn" aria-label="Mostrar contraseña">
-              <svg class="icon-eye" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-              </svg>
-              <svg class="icon-eye-off" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
-              </svg>
+      <section class="login-panel">
+        <div class="form-box">
+          <span class="kicker">Administraci&oacute;n del restaurante</span>
+          <h1 class="login-title" id="login-title">Bienvenido de vuelta</h1>
+          <p class="login-intro">Ingresa con tu cuenta para acceder al panel de <strong><?= htmlspecialchars($_appName) ?></strong>.</p>
+
+          <?php if (!empty($flash)): ?>
+            <?php $flashIsError = ($flash['type'] ?? '') === 'error'; ?>
+            <div class="flash-box <?= $flashIsError ? 'is-error' : 'is-success' ?>"
+              role="<?= $flashIsError ? 'alert' : 'status' ?>" aria-live="<?= $flashIsError ? 'assertive' : 'polite' ?>">
+              <?php if ($flashIsError): ?>
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path stroke-linecap="round" d="M12 7.5v5M12 16.5h.01"/></svg>
+              <?php else: ?>
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path stroke-linecap="round" d="M8 12l2.5 2.5L16 9"/></svg>
+              <?php endif; ?>
+              <span><?= htmlspecialchars((string)$flash['message']) ?></span>
+            </div>
+          <?php endif; ?>
+
+          <form method="POST" action="<?= BASE_URL ?>auth/doLogin" id="login-form">
+            <div class="field">
+              <label class="field-label" for="login-email">Correo electr&oacute;nico</label>
+              <div class="field-control">
+                <span class="field-icon" aria-hidden="true">
+                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9"><path stroke-linecap="round" d="M3.5 7.5l7.2 5a2.25 2.25 0 002.6 0l7.2-5M5.5 19h13a2 2 0 002-2V7a2 2 0 00-2-2h-13a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                </span>
+                <input class="field-input" type="email" id="login-email" name="email"
+                  placeholder="admin@junglezihua.com" required autocomplete="username"
+                  autocapitalize="none" spellcheck="false" autofocus>
+              </div>
+            </div>
+            <div class="field">
+              <label class="field-label" for="passwordInput">Contrase&ntilde;a</label>
+              <div class="field-control">
+                <span class="field-icon" aria-hidden="true">
+                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9"><rect x="4.5" y="10.5" width="15" height="10" rx="2"/><path stroke-linecap="round" d="M8 10.5V7.75a4 4 0 018 0v2.75"/></svg>
+                </span>
+                <input class="field-input" type="password" id="passwordInput" name="password"
+                  placeholder="Escribe tu contrase&ntilde;a" required autocomplete="current-password">
+                <button class="password-toggle" type="button" id="password-toggle"
+                  aria-label="Mostrar contrase&ntilde;a" aria-controls="passwordInput" aria-pressed="false">
+                  <svg class="icon-eye" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path stroke-linecap="round" d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6z"/><circle cx="12" cy="12" r="2.75"/></svg>
+                  <svg class="icon-eye-off" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path stroke-linecap="round" d="M3 3l18 18M10.7 6.1A10.8 10.8 0 0112 6c6 0 9.5 6 9.5 6a15.4 15.4 0 01-2.1 2.8M6.2 6.3C3.8 8.1 2.5 12 2.5 12s3.5 6 9.5 6c1 0 2-.17 2.9-.49"/></svg>
+                </button>
+              </div>
+            </div>
+            <div class="form-options">
+              <a class="forgot-link" href="<?= BASE_URL ?>auth/forgot">&iquest;Olvidaste tu contrase&ntilde;a?</a>
+            </div>
+            <button class="login-submit" type="submit" id="login-submit">
+              <span class="submit-spinner" aria-hidden="true"></span><span id="submit-label">Entrar al sistema</span>
             </button>
+          </form>
+
+          <div class="support-box">
+            <strong>&iquest;Necesitas ayuda para acceder?</strong>
+            <?php if ($_waPhone): ?>
+              <a href="https://wa.me/<?= htmlspecialchars($_waPhone) ?>?text=<?= urlencode('Hola, necesito ayuda para acceder al sistema de Jungle Pizza.') ?>"
+                target="_blank" rel="noopener">Contactar al administrador</a>
+            <?php else: ?>
+              Contacta al administrador de Jungle Pizza.
+            <?php endif; ?>
           </div>
         </div>
-
-        <a href="<?= BASE_URL ?>auth/forgot" class="forgot-link">¿Olvidaste tu contraseña?</a>
-
-        <button type="submit" class="btn-login-submit">Ingresar al Sistema</button>
-      </form>
-
-      <p style="margin-top:28px;text-align:center;font-size:.8rem;color:#9CA3AF;line-height:1.5">
-        ¿Problemas para acceder?
-        <?php if ($_waPhone): ?>
-          <a href="https://wa.me/<?= htmlspecialchars($_waPhone) ?>?text=<?= urlencode('Hola, necesito ayuda para acceder al sistema.') ?>"
-             target="_blank" rel="noopener"
-             style="color:var(--gold-dark);font-weight:600;text-decoration:none">
-            Contacta al administrador
-          </a>
-        <?php else: ?>
-          <br>Contacta al administrador de tu restaurante.
-        <?php endif; ?>
-      </p>
-
-    </div>
+      </section>
+    </section>
+    <p class="security-note">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" d="M7 10V7a5 5 0 0110 0v3M5 10h14v10H5z"/></svg>
+      Acceso privado y seguro para el equipo de Jungle Pizza
+    </p>
   </div>
-</div>
-
+</main>
 <script>
-function togglePassword() {
-  const input = document.getElementById('passwordInput');
-  const wrap  = document.getElementById('pwWrap');
-  input.type  = input.type === 'password' ? 'text' : 'password';
-  wrap.classList.toggle('pw-shown', input.type === 'text');
-}
+(function(){
+  const input=document.getElementById('passwordInput');
+  const toggle=document.getElementById('password-toggle');
+  const form=document.getElementById('login-form');
+  const submit=document.getElementById('login-submit');
+  const label=document.getElementById('submit-label');
+  toggle.addEventListener('click',function(){
+    const show=input.type==='password';
+    input.type=show?'text':'password';
+    toggle.setAttribute('aria-pressed',show?'true':'false');
+    toggle.setAttribute('aria-label',show?'Ocultar contraseña':'Mostrar contraseña');
+    input.focus({preventScroll:true});
+  });
+  form.addEventListener('submit',function(){
+    submit.disabled=true;submit.classList.add('is-loading');
+    submit.setAttribute('aria-busy','true');label.textContent='Ingresando...';
+  });
+}());
 </script>
 </body>
 </html>

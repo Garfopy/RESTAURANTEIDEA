@@ -156,6 +156,17 @@ class RestauranteModel extends BaseModel
         );
     }
 
+    public function getAllConEmpresa(): array
+    {
+        $this->ensureMenuPrincipalColumn();
+        return $this->query(
+            "SELECT r.*, e.razon_social AS empresa_nombre
+               FROM rest_restaurantes r
+          LEFT JOIN empresas e ON e.id = r.empresa_id
+              ORDER BY e.razon_social ASC, r.nombre ASC"
+        );
+    }
+
     public function getActiveByName(string $name): ?array
     {
         return $this->queryOne(

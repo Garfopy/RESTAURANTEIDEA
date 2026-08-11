@@ -41,7 +41,8 @@ abstract class BaseController
     protected function redirectSegunRol(string $rol): void
     {
         match (true) {
-            $rol === 'admin_restaurante', $rol === 'comprador', $rol === 'programador',
+            $rol === 'superadmin'                                      => $this->redirect('restaurante/seleccionar'),
+            $rol === 'admin_restaurante', $rol === 'comprador',
             $rol === 'admin_local'                                     => $this->redirect('restaurante/dashboard'),
             $rol === 'mesero'                                          => $this->redirect('rest-mesero/dashboard'),
             $rol === 'chef'                                            => $this->redirect('rest-chef/dashboard'),
@@ -103,20 +104,6 @@ abstract class BaseController
         $this->requireRole(['comprador', 'admin_restaurante', 'admin_local']);
         $rol = $this->rolActual();
 
-        // PROGRAMADOR hereda el acceso del administrador del restaurante.
-        // Se admite tanto una asignacion directa como acceso por empresa.
-        if ($rol === 'programador' && empty($_SESSION['restaurante_activo_id'])) {
-            $restId = $_SESSION['usuario']['restaurante_id'] ?? null;
-            if ($restId) {
-                $_SESSION['restaurante_activo_id'] = (int)$restId;
-            } elseif ($this->empresaId()) {
-                $rests = (new RestauranteModel())->getByEmpresa((int)$this->empresaId());
-                if (!empty($rests)) {
-                    $_SESSION['restaurante_activo_id'] = (int)$rests[0]['id'];
-                }
-            }
-        }
-
         // admin_restaurante: auto-seleccionar el primer restaurante de su empresa
         if ($rol === 'admin_restaurante' && empty($_SESSION['restaurante_activo_id'])) {
             $empresaId = $this->empresaId();
@@ -139,7 +126,10 @@ abstract class BaseController
 
         $restauranteId = $_SESSION['restaurante_activo_id'] ?? null;
         if (!$restauranteId) {
-            if (in_array($rol, ['admin_restaurante', 'admin_local', 'programador'], true)) {
+            if ($rol === 'superadmin') {
+                $this->redirect('restaurante/seleccionar');
+            }
+            if (in_array($rol, ['admin_restaurante', 'admin_local'], true)) {
                 // No hay restaurante asociado: cerrar sesión con mensaje.
                 $this->flash('error', 'Tu cuenta no tiene ningún restaurante asignado. Contacta al administrador.');
                 session_destroy();
@@ -188,7 +178,7 @@ abstract class BaseController
         }
         $userRole = $_SESSION['usuario']['rol_slug'] ?? '';
         if (
-            $userRole === 'programador'
+            $userRole === 'superadmin'
             && count(array_intersect($roles, ['comprador', 'admin_restaurante', 'admin_local'])) > 0
         ) {
             return;
@@ -212,6 +202,9 @@ abstract class BaseController
 
     protected function empresaId(): ?int
     {
+        if ($this->esSuperAdmin() && isset($_SESSION['empresa_activa_id'])) {
+            return (int)$_SESSION['empresa_activa_id'];
+        }
         return isset($_SESSION['usuario']['empresa_id'])
             ? (int)$_SESSION['usuario']['empresa_id']
             : null;
@@ -234,17 +227,7 @@ abstract class BaseController
         return $this->rolActual() === 'admin_empresa';
     }
 
-    protected function esProgramador(): bool
-    {
-        return $this->rolActual() === 'programador';
-    }
-
-    protected function requireProgramador(): void
-    {
-        $this->requireRole(['programador']);
-    }
-
-    /** Primera fecha visible para roles no programador; null significa sin filtro. */
+    /** Primera fecha visible para roles no superadmin; null significa sin filtro. */
     protected function fechaFinancieraVisibleDesde(?int $restauranteId = null): ?string
     {
         $restauranteId ??= $this->restauranteId();
