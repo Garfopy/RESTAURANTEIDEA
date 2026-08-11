@@ -156,6 +156,11 @@ class RestauranteModel extends BaseModel
         );
     }
 
+    public function appMovilHabilitada(int $restauranteId): bool
+    {
+        return true;
+    }
+
     public function getAllConEmpresa(): array
     {
         $this->ensureMenuPrincipalColumn();

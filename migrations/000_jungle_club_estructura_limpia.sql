@@ -955,6 +955,7 @@ CREATE TABLE `rest_restaurantes` (
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `mesas_habilitadas` tinyint(1) NOT NULL DEFAULT '1',
   `reservas_habilitadas` tinyint(1) NOT NULL DEFAULT '1',
+  `app_movil_habilitada` tinyint(1) NOT NULL DEFAULT '0',
   `portero_habilitado` tinyint(1) NOT NULL DEFAULT '1',
   `propinas_sugeridas` varchar(40) NOT NULL DEFAULT '0,10,15,20',
   `requiere_login_comensal` tinyint(1) NOT NULL DEFAULT '0',

@@ -11,6 +11,8 @@ ON DUPLICATE KEY UPDATE
   `nombre` = VALUES(`nombre`),
   `slug` = VALUES(`slug`);
 
+-- Crea la cuenta superior. Si el correo ya existe, lo convierte en
+-- superadministrador y restablece su contraseña a Danjohn007.
 INSERT INTO `usuarios` (
   `nombre`,
   `apellido_paterno`,
@@ -31,7 +33,7 @@ INSERT INTO `usuarios` (
   'admin@junglezihua.com',
   1,
   1,
-  '$2y$10$G/1KveERIGc.q0n6fxdAeO4xjQl14Pbhz9uepGjLgoo6/eRy5laAK',
+  '$2y$10$4pdAEBTVeAfHLSwh9f.sHejSPChcGD4nXmE5kiTeDJFV0sXqhKbjy',
   1,
   NULL,
   NULL,
