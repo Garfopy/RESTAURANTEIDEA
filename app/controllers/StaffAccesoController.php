@@ -16,7 +16,7 @@ class StaffAccesoController extends BaseController
     {
         $restaurante = $slug ? $this->restModel->getBySlug($slug) : null;
         $flash       = $this->getFlash();
-        $pageTitle   = ($restaurante['nombre'] ?? 'CarniHub') . ' - Identificacion';
+        $pageTitle   = ($restaurante['nombre'] ?? 'Jungle Pizza') . ' - Identificacion';
         $returnParam = trim($this->get('return', ''));
         $this->render('staff/login', compact('restaurante', 'flash', 'pageTitle', 'slug', 'returnParam'));
     }

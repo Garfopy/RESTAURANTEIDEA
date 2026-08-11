@@ -146,9 +146,9 @@
 
       // Mensajes específicos según el código HTTP
       if (resp.httpCode === 401) {
-        errorMsg = 'Token de conexión con Amare expirado. Reconecta en <strong>Configuración > Conexión API Amare-App</strong>.';
+        errorMsg = 'Token de conexión con la app móvil expirado. Reconecta en <strong>Configuración > Conexión API la app móvil</strong>.';
       } else if (resp.httpCode === 404) {
-        errorMsg = 'Restaurante no vinculado a Amare. Verifica la configuración en el panel de administración.';
+        errorMsg = 'Restaurante no vinculado a la app móvil. Verifica la configuración en el panel de administración.';
       } else if (resp.httpCode >= 500) {
         errorMsg = 'Error de conexión con la app móvil. Intenta más tarde.';
       }
@@ -412,7 +412,7 @@
       if (resp.httpCode === 404) {
         errorMsg = 'Promoción no encontrada.';
       } else if (resp.httpCode === 401) {
-        errorMsg = 'Token de Amare expirado. Reconecta en Configuración.';
+        errorMsg = 'Token de la app móvil expirado. Reconecta en Configuración.';
       }
       ApiClient.flash('error', 'Error al desactivar: ' + errorMsg);
     }

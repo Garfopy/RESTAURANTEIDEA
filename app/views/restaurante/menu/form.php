@@ -177,7 +177,7 @@
               <?php foreach ($ingredientes as $ing): ?>
               <option value="<?= (int)$ing['id'] ?>"
                 <?= ((int)($platillo['ingrediente_directo_id'] ?? 0)) === (int)$ing['id'] ? 'selected' : '' ?>>
-                <?= htmlspecialchars($ing['nombre']) ?> (<?= htmlspecialchars($ing['unidad_principal']) ?>)<?= $ing['proveedor_carnihub'] ? ' 🔗 CarniHub' : '' ?>
+                <?= htmlspecialchars($ing['nombre']) ?> (<?= htmlspecialchars($ing['unidad_principal']) ?>)<?= $ing['proveedor_carnihub'] ? ' 🔗 Proveedor' : '' ?>
               </option>
               <?php endforeach; ?>
             </select>
@@ -197,7 +197,7 @@
       <div class="wpane" data-pane="2">
         <div style="font-weight:700;color:#111827;font-size:1.05rem;margin-bottom:2px">Receta del platillo</div>
         <div style="font-size:.85rem;color:#6B7280;margin-bottom:18px;line-height:1.5">
-          Define qué ingredientes lleva y cuánto. CarniHub
+          Define qué ingredientes lleva y cuánto. Proveedor
           <strong>descontará automáticamente del inventario</strong> cuando el chef marque el ítem como «en preparación».
           <span style="color:#DC2626;font-weight:600">Requerido para publicar.</span>
         </div>
@@ -428,7 +428,7 @@ function ingBuildOpts(query) {
     const catStr = i.categoria || '';
     const nombre = i.nombre.replace(/</g,'&lt;').replace(/>/g,'&gt;');
     const cat    = catStr.replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    const chBadge = i.proveedor_carnihub ? `<span style="font-size:.65rem;font-weight:700;background:#EFF6FF;color:#1D4ED8;border:1px solid #BFDBFE;border-radius:4px;padding:1px 5px;margin-left:4px">🔗 CarniHub</span>` : '';
+    const chBadge = i.proveedor_carnihub ? `<span style="font-size:.65rem;font-weight:700;background:#EFF6FF;color:#1D4ED8;border:1px solid #BFDBFE;border-radius:4px;padding:1px 5px;margin-left:4px">🔗 Proveedor</span>` : '';
     return `<div class="ing-opt"
       onmousedown="ingSeleccionar(event,this)"
       data-id="${i.id}"

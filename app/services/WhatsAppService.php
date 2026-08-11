@@ -50,7 +50,7 @@ class WhatsAppService {
         $telefono = $pedido['telefono'] ?? '';
         if (!$telefono) return false;
 
-        $msg = "✅ *CarniHub* — Tu pedido #{$pedido['folio']} ha sido confirmado.\n";
+        $msg = "✅ *Jungle Pizza* — Tu pedido #{$pedido['folio']} ha sido confirmado.\n";
         $msg .= "Total: $" . number_format($pedido['total'], 2) . "\n";
         if (!empty($pedido['fecha_entrega'])) {
             $msg .= "Entrega estimada: {$pedido['fecha_entrega']}\n";
@@ -63,7 +63,7 @@ class WhatsAppService {
         $telefono = $chofer['telefono'] ?? '';
         if (!$telefono) return false;
 
-        $msg = "🚛 *CarniHub Logística* — Nueva ruta asignada: {$ruta['nombre']}\n";
+        $msg = "🚛 *Jungle Pizza Logística* — Nueva ruta asignada: {$ruta['nombre']}\n";
         $msg .= "Fecha: {$ruta['fecha']}\n";
         $msg .= "Entregas: {$ruta['total_entregas']}\n";
         $msg .= "Ingresa a la app para ver el detalle.";

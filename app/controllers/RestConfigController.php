@@ -523,6 +523,8 @@ class RestConfigController extends BaseController
     {
         if (!$this->isPost()) $this->redirect('rest-config/index');
         $restauranteId = $this->restauranteId();
+        $restauranteActual = $this->model->find((int)$restauranteId) ?: [];
+        $appMovilHabilitada = $this->post('app_movil_habilitada') ? 1 : 0;
 
         $cfgCarniHub = [];
         try {
@@ -583,16 +585,31 @@ class RestConfigController extends BaseController
             'horario_cierre'  => $this->post('horario_cierre') ?: null,
         ];
 
-        $exclusionesApp = $this->post('exclusiones_app_habilitadas') ? 1 : 0;
-        $extrasApp = $this->post('extras_app_habilitados') ? 1 : 0;
+        // Si la app está apagada, sus campos dependientes no se envían.
+        // Conservamos los valores anteriores para restaurarlos al reactivarla.
+        $exclusionesApp = $appMovilHabilitada
+            ? ($this->post('exclusiones_app_habilitadas') ? 1 : 0)
+            : (int)($restauranteActual['exclusiones_app_habilitadas'] ?? 0);
+        $extrasApp = $appMovilHabilitada
+            ? ($this->post('extras_app_habilitados') ? 1 : 0)
+            : (int)($restauranteActual['extras_app_habilitados'] ?? 0);
         $modifierSaveError = null;
         $menuPrincipalError = null;
         $menuPrincipalMarcado = false;
         try {
             $dbModos = \Database::getInstance();
-            $dbModos->prepare(
-                "UPDATE rest_restaurantes SET exclusiones_app_habilitadas=?, extras_app_habilitados=? WHERE id=?"
-            )->execute([$exclusionesApp, $extrasApp, $restauranteId]);
+            if ($this->hasColumn('rest_restaurantes', 'app_movil_habilitada')) {
+                $dbModos->prepare(
+                    "UPDATE rest_restaurantes
+                     SET app_movil_habilitada=?, exclusiones_app_habilitadas=?, extras_app_habilitados=?
+                     WHERE id=?"
+                )->execute([$appMovilHabilitada, $exclusionesApp, $extrasApp, $restauranteId]);
+            } else {
+                $dbModos->prepare(
+                    "UPDATE rest_restaurantes SET exclusiones_app_habilitadas=?, extras_app_habilitados=? WHERE id=?"
+                )->execute([$exclusionesApp, $extrasApp, $restauranteId]);
+                $appMovilHabilitada = 1;
+            }
         } catch (\Throwable $e) {
             $modifierSaveError = 'No se guardaron los modificadores. Ejecuta la migracion 069: ' . $e->getMessage();
             error_log('[RestConfig modificadores] ' . $e->getMessage());
@@ -647,13 +664,25 @@ class RestConfigController extends BaseController
             if (!$bloqueadoPorCarniHub) {
                 $this->model->update($restauranteId, $base);
             }
-            $this->guardarColoresEnGlobalSettings($colorPrimario, $colorSecundario, $appBackgroundColor, $appButtonColor, $appButtonTextColor);
+            $this->guardarColoresEnGlobalSettings(
+                $colorPrimario,
+                $colorSecundario,
+                $appMovilHabilitada ? $appBackgroundColor : null,
+                $appMovilHabilitada ? $appButtonColor : null,
+                $appMovilHabilitada ? $appButtonTextColor : null
+            );
         } catch (PDOException $e) {
             $msg = $e->getMessage();
             if (isset($base['imagen_banner']) && stripos($msg, "Unknown column 'imagen_banner'") !== false) {
                 unset($base['imagen_banner']);
                 $this->model->update($restauranteId, $base);
-                $this->guardarColoresEnGlobalSettings($colorPrimario, $colorSecundario, $appBackgroundColor, $appButtonColor, $appButtonTextColor);
+                $this->guardarColoresEnGlobalSettings(
+                    $colorPrimario,
+                    $colorSecundario,
+                    $appMovilHabilitada ? $appBackgroundColor : null,
+                    $appMovilHabilitada ? $appButtonColor : null,
+                    $appMovilHabilitada ? $appButtonTextColor : null
+                );
             } else {
                 throw $e;
             }
@@ -667,8 +696,10 @@ class RestConfigController extends BaseController
         }
 
         // ── Configuración de pagos (global_settings) ──────────────
-        $this->guardarFacturacionConfig((int)$restauranteId, $facturacion);
-        $this->guardarFacturapiSettings($facturacion);
+        if ($appMovilHabilitada) {
+            $this->guardarFacturacionConfig((int)$restauranteId, $facturacion);
+            $this->guardarFacturapiSettings($facturacion);
+        }
 
         $clavesPagos = ['stripe_public_key','stripe_secret_key','metodos_pago_habilitados',
                         'notif_email_pago','notif_email_pago_destino'];
@@ -703,6 +734,7 @@ class RestConfigController extends BaseController
 
         $syncError = null;
         $bulkSync = null;
+        if ($appMovilHabilitada) {
         // ── Config App Móvil (tipos de entrega + métodos de pago) ──
         try {
             $db = \Database::getInstance();
@@ -829,12 +861,14 @@ class RestConfigController extends BaseController
                 }
             }
         } catch (\Exception $e) {
-            $syncError = 'La configuracion local se guardo, pero fallo la sincronizacion con Amare-App: ' . $e->getMessage();
+            $syncError = 'La configuracion local se guardo, pero fallo la sincronizacion con la app móvil: ' . $e->getMessage();
             // No bloquear si falla la sincronización con Amare
             error_log('[RestConfig] Error guardando config app móvil: ' . $e->getMessage());
         }
 
         // ── CarniHub API config ────────────────────────────────────
+        }
+
         $chMetodoPago    = $this->post('ch_metodo_pago', 'transferencia');
         $chMetodoPago    = in_array($chMetodoPago, ['stripe','paypal','transferencia'], true) ? $chMetodoPago : 'transferencia';
         $chInstrucciones = trim((string)$this->post('ch_instrucciones_transferencia', ''));
@@ -871,7 +905,7 @@ class RestConfigController extends BaseController
         } elseif ($syncError) {
             $this->flash('error', $syncError);
         } elseif (is_array($bulkSync)) {
-            $msg = 'Configuracion guardada y ' . (int)$bulkSync['sincronizados'] . ' platillos preparados para Amare-App.';
+            $msg = 'Configuracion guardada y ' . (int)$bulkSync['sincronizados'] . ' platillos preparados para la app móvil.';
             if ($menuPrincipalMarcado) {
                 $msg .= ' Esta sucursal quedo como menu principal.';
             }
@@ -1087,7 +1121,7 @@ class RestConfigController extends BaseController
 
         if ($error) {
             error_log('[syncConAmareApp] cURL error: ' . $error);
-            return 'Configuracion guardada localmente, pero no se pudo conectar con Amare-App: ' . $error;
+            return 'Configuracion guardada localmente, pero no se pudo conectar con la app móvil: ' . $error;
         }
 
         if ($httpCode < 200 || $httpCode >= 300) {
@@ -1104,9 +1138,9 @@ class RestConfigController extends BaseController
                 } catch (\Throwable $e) {
                     error_log('[syncConAmareApp] No se pudo marcar token como expirado: ' . $e->getMessage());
                 }
-                return 'El token de conexion con Amare-App expiro. Vuelve a conectar la cuenta.';
+                return 'El token de conexion con la app móvil expiro. Vuelve a conectar la cuenta.';
             } else {
-                return 'Amare-App rechazo la configuracion (HTTP ' . $httpCode . '): ' . mb_substr(trim((string)$response), 0, 180);
+                return 'La app móvil rechazo la configuracion (HTTP ' . $httpCode . '): ' . mb_substr(trim((string)$response), 0, 180);
             }
         }
 

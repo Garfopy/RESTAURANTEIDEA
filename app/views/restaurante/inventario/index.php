@@ -180,7 +180,7 @@
 
   <div class="inv-card-meta">
     <?php if ($ing['proveedor_carnihub']): ?>
-    <span class="badge badge-purple" style="font-size:.7rem">CarniHub</span>
+    <span class="badge badge-purple" style="font-size:.7rem">Proveedor</span>
     <?php elseif ($ing['proveedor_nombre']): ?>
     <span class="badge badge-gray" style="font-size:.68rem"><?= htmlspecialchars($ing['proveedor_nombre']) ?></span>
     <?php endif; ?>
@@ -221,7 +221,7 @@
 <div class="empty-state" style="margin-bottom:32px">
   <svg width="40" height="40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
   <div style="font-size:.95rem;font-weight:600;color:#374151;margin-bottom:4px">Sin ingredientes</div>
-  <div style="font-size:.85rem">Agrega ingredientes de CarniHub o de proveedores externos</div>
+  <div style="font-size:.85rem">Agrega ingredientes de Proveedor o de proveedores externos</div>
 </div>
 <?php endif; ?>
 
@@ -240,7 +240,7 @@
       <div>
         <span style="font-weight:600;font-size:.88rem;color:#374151"><?= htmlspecialchars($ing['nombre']) ?></span>
         <?php if (!empty($ing['proveedor_carnihub'])): ?>
-          <span style="font-size:.72rem;background:#EDE9FE;color:#6D28D9;padding:1px 6px;border-radius:6px;margin-left:6px">🔗 CarniHub</span>
+          <span style="font-size:.72rem;background:#EDE9FE;color:#6D28D9;padding:1px 6px;border-radius:6px;margin-left:6px">🔗 Proveedor</span>
         <?php endif; ?>
         <?php if (!empty($ing['categoria'])): ?>
           <span style="font-size:.72rem;color:#9CA3AF;margin-left:6px"><?= htmlspecialchars($ing['categoria']) ?></span>
@@ -339,7 +339,7 @@ sort($ingCategorias);
     <div class="rst-tabs" id="ingTabs">
       <button class="rst-tab active" data-tab="ext" onclick="switchTab('ext')">Proveedor externo</button>
       <button class="rst-tab" data-tab="ch"  onclick="switchTab('ch')">
-        <span style="color:var(--cp);font-weight:700">⚡ Desde CarniHub</span>
+        <span style="color:var(--cp);font-weight:700">⚡ Desde el proveedor</span>
       </button>
     </div>
 
@@ -419,11 +419,11 @@ sort($ingCategorias);
 
       </div>
 
-      <!-- Panel CarniHub -->
+      <!-- Panel Proveedor -->
       <div class="rst-tab-panel" id="panelCh">
         <div style="background:#FAF5FF;border:1.5px solid #DDD6FE;border-radius:10px;padding:14px;margin-bottom:14px;font-size:.85rem">
-          <div style="font-weight:700;color:#5B21B6;margin-bottom:4px">⚡ Vincular con CarniHub</div>
-          <div style="color:#6D28D9;line-height:1.4">Selecciona el producto CarniHub que corresponde a este ingrediente. Los pedidos automáticos se generarán hacia la empresa de ese producto.</div>
+          <div style="font-weight:700;color:#5B21B6;margin-bottom:4px">⚡ Vincular con el proveedor</div>
+          <div style="color:#6D28D9;line-height:1.4">Selecciona el producto del proveedor que corresponde a este ingrediente. Los pedidos automáticos se generarán hacia la empresa de ese producto.</div>
         </div>
         <?php if (!empty($productosCarnihub)): ?>
         <div style="margin-bottom:10px">
@@ -462,14 +462,14 @@ sort($ingCategorias);
                 <?php endif; ?>
               </div>
             </div>
-            <span class="badge badge-purple" style="font-size:.68rem;white-space:nowrap">CarniHub</span>
+            <span class="badge badge-purple" style="font-size:.68rem;white-space:nowrap">Proveedor</span>
           </div>
           <?php endforeach; ?>
           </div>
         </div>
         <?php else: ?>
         <div class="empty-state" style="padding:24px">
-          <div style="font-size:.85rem">No hay productos registrados en CarniHub aún. Agrega productos en el panel de empresa primero.</div>
+          <div style="font-size:.85rem">No hay productos registrados en el proveedor aún. Agrega productos en el panel de empresa primero.</div>
         </div>
         <?php endif; ?>
         <div class="form-group" id="chNombreWrap" style="display:none">
@@ -575,9 +575,9 @@ sort($ingCategorias);
         <input type="hidden" name="proveedor_carnihub" id="modifEditCarnihub" value="0">
         <input type="hidden" name="carnihub_producto_id" id="modifEditCarnihubId" value="">
 
-        <!-- Banner CarniHub (se muestra cuando el ingrediente está vinculado a CarniHub) -->
+        <!-- Banner Proveedor (se muestra cuando el ingrediente está vinculado al proveedor) -->
         <div id="modifChBanner" style="display:none;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:.82rem;color:#1E3A5F">
-          Este ingrediente está vinculado a CarniHub. Los datos se sincronizan automáticamente y no se pueden editar manualmente.
+          Este ingrediente está vinculado al proveedor. Los datos se sincronizan automáticamente y no se pueden editar manualmente.
         </div>
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
@@ -616,7 +616,7 @@ sort($ingCategorias);
           </div>
         </div>
 
-        <!-- Sección proveedor con toggle Externo / CarniHub -->
+        <!-- Sección proveedor con toggle Externo / Proveedor -->
         <div style="border:1.5px solid #E5E7EB;border-radius:10px;overflow:hidden;margin-bottom:12px">
           <div style="padding:7px 12px;background:#F9FAFB;border-bottom:1px solid #E5E7EB;
                       display:flex;align-items:center;gap:8px">
@@ -630,7 +630,7 @@ sort($ingCategorias);
               <button type="button" id="modifProvBtnCh" onclick="switchModifProv('ch')"
                       style="padding:3px 10px;font-size:.72rem;font-weight:600;border-radius:6px;
                              border:1.5px solid #E5E7EB;background:#fff;color:#6B7280;cursor:pointer;transition:.15s">
-                ⚡ CarniHub
+                ⚡ Proveedor
               </button>
             </div>
           </div>
@@ -641,11 +641,11 @@ sort($ingCategorias);
                    placeholder="Ej: Mercado, Walmart, Don José">
           </div>
 
-          <!-- Panel proveedor CarniHub -->
+          <!-- Panel proveedor Proveedor -->
           <div id="modifEditProvPanelCh" style="display:none;padding:10px 12px">
             <?php if (!empty($productosCarnihub)): ?>
             <input type="text" id="modifChBuscar" class="form-input"
-                   placeholder="Buscar producto CarniHub…"
+                   placeholder="Buscar producto del proveedor…"
                    oninput="filtrarChEdit(this.value)"
                    style="font-size:.83rem;margin-bottom:8px">
             <div style="border:1.5px solid #E5E7EB;border-radius:8px;overflow:hidden">
@@ -672,7 +672,7 @@ sort($ingCategorias);
                     <?php endif; ?>
                   </div>
                 </div>
-                <span class="badge badge-purple" style="font-size:.68rem">CarniHub</span>
+                <span class="badge badge-purple" style="font-size:.68rem">Proveedor</span>
               </div>
               <?php endforeach; ?>
               </div>
@@ -685,11 +685,11 @@ sort($ingCategorias);
             <div id="modifChNoMatch" style="display:none;margin-top:8px;padding:8px 10px;
                  background:#FEF3C7;border:1px solid #FDE68A;border-radius:8px;
                  font-size:.8rem;color:#92400E;font-weight:600">
-              ⚠️ No hay coincidencia exacta para este ingrediente en CarniHub. Búscalo y selecciónalo manualmente.
+              ⚠️ No hay coincidencia exacta para este ingrediente en el proveedor. Búscalo y selecciónalo manualmente.
             </div>
             <?php else: ?>
             <div style="font-size:.83rem;color:#9CA3AF;text-align:center;padding:12px 0">
-              No hay productos CarniHub disponibles.
+              No hay productos del proveedor disponibles.
             </div>
             <?php endif; ?>
           </div>
@@ -807,10 +807,10 @@ function seleccionarCarniHub(id, nombre, unidad, precio, categoria = '', rowEl =
   document.getElementById('ingNombreCh').value   = nombre;
   // Propagar al campo nombre del panel externo para que llegue al POST
   document.getElementById('ingNombre').value     = nombre;
-  // Auto-rellenar categoría del producto CarniHub
+  // Auto-rellenar categoría del producto del proveedor
   const catInput = document.getElementById('ingCategoria');
   if (catInput && categoria) catInput.value = categoria;
-  // Propagar unidad del producto CarniHub al select de unidad
+  // Propagar unidad del producto del proveedor al select de unidad
   const selUnidad = document.getElementById('ingUnidad');
   if (selUnidad && unidad) {
     let opt = [...selUnidad.options].find(o => o.value === unidad);
@@ -932,14 +932,14 @@ function abrirModificar(ing) {
         const costoCab = document.getElementById('modifCostoU');
         if (costoCab) costoCab.textContent = precioFila.toFixed(2);
       }
-      // Rellenar categoría desde el producto CarniHub si el ingrediente no la tiene guardada
+      // Rellenar categoría desde el producto del proveedor si el ingrediente no la tiene guardada
       const catFila = row.dataset.categoria || '';
       const catEditEl = document.getElementById('modifEditCategoria');
       if (catEditEl && catFila && !catEditEl.value) catEditEl.value = catFila;
     }
     syncPrecioCarniHub(ing.carnihub_producto_id, 'edit');
   } else if (!ing.carnihub_producto_id) {
-    // Auto-detectar coincidencia en CarniHub por nombre del ingrediente
+    // Auto-detectar coincidencia en el proveedor por nombre del ingrediente
     // (siempre, aunque el proveedor actual sea externo: queda listo si toggle a CH)
     autoDetectarCarniHub(ing.nombre);
   }
@@ -988,7 +988,7 @@ function switchModifProv(tipo) {
     const buscar = document.getElementById('modifChBuscar');
     if (buscar) { buscar.value = ''; filtrarChEdit(''); }
   } else if (!yaTeniaCh && !document.getElementById('modifEditCarnihubId').value && modifIngNombreActual) {
-    // Usuario está cambiando a CarniHub manualmente y aún no hay producto seleccionado
+    // Usuario está cambiando al proveedor manualmente y aún no hay producto seleccionado
     autoDetectarCarniHub(modifIngNombreActual);
   } else if (!isExt) {
     // Ya había selección previa: hacer scroll al producto resaltado
@@ -1010,7 +1010,7 @@ function seleccionarCarniHubEdit(id, nombre, unidad, precio, categoria = '', row
   if (costo > 0) {
     document.getElementById('modifEditCosto').value = costo.toFixed(4);
   }
-  // Auto-rellenar unidad de medida del producto CarniHub
+  // Auto-rellenar unidad de medida del producto del proveedor
   const selUnidad = document.getElementById('modifEditUnidad');
   if (selUnidad && unidad) {
     let opt = [...selUnidad.options].find(o => o.value === unidad);
@@ -1019,7 +1019,7 @@ function seleccionarCarniHubEdit(id, nombre, unidad, precio, categoria = '', row
     const lbl = document.getElementById('modifEditUnidadLabel');
     if (lbl) lbl.textContent = unidad;
   }
-  // Auto-rellenar categoría del producto CarniHub
+  // Auto-rellenar categoría del producto del proveedor
   const catEdit = document.getElementById('modifEditCategoria');
   if (catEdit && categoria) catEdit.value = categoria;
   const noMatchBox = document.getElementById('modifChNoMatch');
@@ -1048,7 +1048,7 @@ function aplicarBloqueoCarniHub(bloquear) {
     if (elNombre) { elNombre.readOnly = true; Object.assign(elNombre.style, bloqStyle); }
     if (elCosto)  { elCosto.readOnly  = true; Object.assign(elCosto.style,  bloqStyle); }
     if (elUnidad) { elUnidad.disabled = true; Object.assign(elUnidad.style, bloqStyle); }
-    if (btn) { btn.textContent = 'Sincronizado por CarniHub'; btn.style.background = '#5B21B6'; btn.style.borderColor = '#5B21B6'; }
+    if (btn) { btn.textContent = 'Sincronizado por el proveedor'; btn.style.background = '#5B21B6'; btn.style.borderColor = '#5B21B6'; }
   } else {
     if (banner)   banner.style.display = 'none';
     if (elNombre) { elNombre.readOnly = false; elNombre.style.background = ''; elNombre.style.cursor = ''; elNombre.style.color = ''; }
@@ -1073,7 +1073,7 @@ function _ngramas(s, n) {
 }
 
 // Auto-detección con MATCH EXACTO únicamente.
-// Solo selecciona un producto de CarniHub si su nombre normalizado
+// Solo selecciona un producto de Proveedor si su nombre normalizado
 // (sin acentos, sin signos, en minúsculas) coincide EXACTAMENTE con
 // el nombre normalizado del ingrediente. Evita falsos positivos por
 // similitud (p.ej. "Tamales Oaxaqueños" ≠ "Mole Oaxaqueño").
@@ -1085,7 +1085,7 @@ function autoDetectarCarniHub(nombreIng) {
   const needle = normalizarNombre(nombreIng);
   if (!needle) return;
 
-  // Si NO hay productos cargados en el panel CarniHub, igual mostramos
+  // Si NO hay productos cargados en el panel Proveedor, igual mostramos
   // el aviso amarillo para que el usuario sepa que no hay coincidencia.
   if (!rows.length) {
     if (selWrap) selWrap.style.display = 'none';

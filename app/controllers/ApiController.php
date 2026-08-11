@@ -93,7 +93,7 @@ class ApiController extends BaseController
         $this->json(['planes' => $planes, 'hash' => $hash]);
     }
 
-    /** GET /api/promociones?usuario_id=X - promociones activas para la app movil */
+    /** GET /api/promociones?usuario_id=X - promociones activas para la app móvil */
     public function promociones(?string $p = null): void
     {
         header('Access-Control-Allow-Origin: *');
@@ -108,6 +108,7 @@ class ApiController extends BaseController
         if ($mobileUsuarioId <= 0) {
             $this->json(['ok' => false, 'error' => 'usuario_id requerido'], 400);
         }
+        $this->requireAppMovilUsuarioApi($mobileUsuarioId);
 
         $model = new RestClienteModel();
         $promociones = array_map(
@@ -667,11 +668,49 @@ class ApiController extends BaseController
         exit;
     }
 
-    private function apiError(string $message, int $code = 400): void
+    private function apiError(string $message, int $code = 400, ?string $errorCode = null): void
     {
         http_response_code($code);
-        echo json_encode(['ok' => false, 'error' => $message]);
+        $payload = ['ok' => false, 'error' => $message];
+        if ($errorCode !== null) {
+            $payload['code'] = $errorCode;
+        }
+        echo json_encode($payload);
         exit;
+    }
+
+    private function apiAppMovilDisabled(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $this->apiError(
+            'La app móvil está desactivada para este restaurante.',
+            403,
+            'APP_MOVIL_DISABLED'
+        );
+    }
+
+    private function requireAppMovilApi(int $restauranteId): void
+    {
+        if ($restauranteId > 0 && !(new RestauranteModel())->appMovilHabilitada($restauranteId)) {
+            $this->apiAppMovilDisabled();
+        }
+    }
+
+    private function restauranteMovilDeUsuario(int $mobileUsuarioId): int
+    {
+        if ($mobileUsuarioId <= 0 || !$this->adminColumnExists('mobile_usuarios', 'current_restaurante_id')) {
+            return 0;
+        }
+        $stmt = Database::getInstance()->prepare(
+            "SELECT current_restaurante_id FROM mobile_usuarios WHERE id = ? LIMIT 1"
+        );
+        $stmt->execute([$mobileUsuarioId]);
+        return (int)($stmt->fetchColumn() ?: 0);
+    }
+
+    private function requireAppMovilUsuarioApi(int $mobileUsuarioId): void
+    {
+        $this->requireAppMovilApi($this->restauranteMovilDeUsuario($mobileUsuarioId));
     }
 
     private function v1PromocionesMobile(): void
@@ -686,6 +725,7 @@ class ApiController extends BaseController
         if ($mobileUsuarioId <= 0) {
             $this->apiError('usuario_id requerido', 400);
         }
+        $this->requireAppMovilUsuarioApi($mobileUsuarioId);
 
         $model = new RestClienteModel();
         $promociones = array_map(
@@ -712,6 +752,7 @@ class ApiController extends BaseController
         if ($mobileUsuarioId <= 0) {
             $this->apiError('usuario_id requerido', 400);
         }
+        $this->requireAppMovilUsuarioApi($mobileUsuarioId);
         if ($code === '' && $promotionId <= 0) {
             $this->apiError('code o promotion_id requerido', 400);
         }
@@ -742,6 +783,7 @@ class ApiController extends BaseController
         if ($mobileUsuarioId <= 0) {
             $this->apiError('usuario_id requerido', 400);
         }
+        $this->requireAppMovilUsuarioApi($mobileUsuarioId);
         if ($fcmToken === '') {
             $this->apiError('fcm_token requerido', 400);
         }
@@ -873,6 +915,7 @@ class ApiController extends BaseController
         if ($restauranteId <= 0) {
             $this->apiError('restaurante_id o branch_id requerido', 400);
         }
+        $this->requireAppMovilApi($restauranteId);
 
         $restaurante = (new RestauranteModel())->find($restauranteId);
         if (!$restaurante || empty($restaurante['activo'])) {
@@ -1032,6 +1075,7 @@ class ApiController extends BaseController
         if ($restauranteId <= 0) {
             $this->apiError('restaurante_id o branch_id requerido', 400);
         }
+        $this->requireAppMovilApi($restauranteId);
         if (!$this->mobilePickupEnabled($restauranteId)) {
             $this->apiError('Pickup no esta habilitado para este restaurante', 422);
         }
@@ -1040,7 +1084,6 @@ class ApiController extends BaseController
         if ($mobileUsuarioId <= 0) {
             $this->apiError('usuario_id requerido', 400);
         }
-
         $itemsPayload = $body['items'] ?? $body['productos'] ?? [];
         if (!is_array($itemsPayload) || empty($itemsPayload)) {
             $this->apiError('items requerido', 422);
@@ -1160,6 +1203,11 @@ class ApiController extends BaseController
         if ($mobileUsuarioId <= 0) {
             $this->apiError('usuario_id requerido', 400);
         }
+        $stmtRestaurante = Database::getInstance()->prepare(
+            "SELECT restaurante_id FROM rest_pedidos WHERE id = ? LIMIT 1"
+        );
+        $stmtRestaurante->execute([$pedidoId]);
+        $this->requireAppMovilApi((int)($stmtRestaurante->fetchColumn() ?: 0));
         $pedido = $this->mobileRestPedidoResource($pedidoId, $mobileUsuarioId);
         if (!$pedido) {
             $this->apiError('Pedido no encontrado', 404);
@@ -2184,7 +2232,7 @@ class ApiController extends BaseController
 
     /**
      * GET /api/legal/terminos?slug={restaurante}
-     * Terminos publicos para app movil o clientes web.
+     * Terminos publicos para app móvil o clientes web.
      */
     public function legal(?string $resource = null): void
     {
@@ -2392,6 +2440,12 @@ class ApiController extends BaseController
         $id       = (isset($parts[1]) && ctype_digit((string)$parts[1])) ? (int)$parts[1] : null;
         $subAct   = $parts[2] ?? null;
 
+        if (in_array($resType, ['users', 'promo-catalog', 'promotions', 'social'], true)) {
+            $restauranteMovilId = (int)($_SESSION['restaurante_activo_id'] ?? 0)
+                ?: (int)($this->adminRestauranteIdByEmpresa((int)($jwtUser['empresa_id'] ?? 0)) ?? 0);
+            $this->requireAppMovilApi($restauranteMovilId);
+        }
+
         switch ($resType) {
             case 'users':
                 if ($method === 'GET') $this->adminListUsers($jwtUser);
@@ -2456,6 +2510,7 @@ class ApiController extends BaseController
         }
         try {
             $restauranteId = $this->restauranteIdPorSucursal($db, $branchId);
+            $this->requireAppMovilApi((int)($restauranteId ?? 0));
             if ($esModificadores && !$restauranteId) {
                 $this->adminApiError('La sucursal no tiene un restaurante vinculado.', 404);
             }
@@ -2504,6 +2559,9 @@ class ApiController extends BaseController
                     'tipos_entrega' => json_decode($config['tipos_entrega'] ?? '[]', true) ?: [],
                     'costo_envio' => (float)($config['costo_envio'] ?? 0),
                     'pedido_minimo' => (float)($config['pedido_minimo'] ?? 0),
+                    'app_movil_habilitada' => $restauranteId
+                        ? (new RestauranteModel())->appMovilHabilitada((int)$restauranteId)
+                        : false,
                     'modificadores' => json_decode($modsConfig['modificadores_config'] ?? '{}', true) ?: [],
                     'facturacion' => $this->branchFacturacionConfig($db, $restauranteId),
                     'platillos_modificadores' => $platillos,
@@ -2936,7 +2994,7 @@ class ApiController extends BaseController
         }
 
         if (!$branchId) {
-            $this->adminApiError('No se encontró la sucursal vinculada para tu empresa en la API Amare.', 404);
+            $this->adminApiError('No se encontró la sucursal vinculada para tu empresa en el servicio de app móvil.', 404);
         }
 
         $search      = trim($this->get('search', ''));
@@ -2945,7 +3003,7 @@ class ApiController extends BaseController
         $fetchAll    = in_array(strtolower($perPageRaw), ['all', 'todos', '0', '-1', '*'], true);
         $perPage     = $fetchAll ? 500 : min(100, max(1, (int)$perPageRaw));
 
-        // Proxy: llamar a la API Amare para obtener usuarios móviles de esa sucursal
+        // Proxy: llamar a el servicio de app móvil para obtener usuarios móviles de esa sucursal
         $endpoint = "branches/{$branchId}/users?" . http_build_query([
             'search'   => $search,
             'page'     => $page,
@@ -3279,14 +3337,14 @@ class ApiController extends BaseController
         $branchId  = $this->getAmareBranchId($empresaId);
 
         if (!$branchId) {
-            $this->adminApiError('No se encontró la sucursal vinculada para tu empresa en la API Amare.', 404);
+            $this->adminApiError('No se encontró la sucursal vinculada para tu empresa en el servicio de app móvil.', 404);
         }
 
         $page      = max(1, (int)$this->get('page', 1));
         $perPage   = min(100, max(1, (int)$this->get('per_page', 20)));
         $usuarioId = $this->get('usuario_id') ? (int)$this->get('usuario_id') : null;
 
-        // Proxy: llamar a la API Amare para obtener promociones de esa sucursal
+        // Proxy: llamar a el servicio de app móvil para obtener promociones de esa sucursal
         $queryParams = [
             'page'     => $page,
             'per_page' => $perPage,
@@ -3333,7 +3391,7 @@ class ApiController extends BaseController
         $branchId  = $this->getAmareBranchId($empresaId);
 
         if (!$branchId) {
-            $this->adminApiError('No se encontró la sucursal vinculada para tu empresa en la API Amare.', 404);
+            $this->adminApiError('No se encontró la sucursal vinculada para tu empresa en el servicio de app móvil.', 404);
         }
 
         $endpoint = "branches/{$branchId}/promotions/{$id}";
@@ -3380,7 +3438,7 @@ class ApiController extends BaseController
         $branchId  = $this->getAmareBranchId($empresaId);
 
         if (!$branchId) {
-            $this->adminApiError('No se encontró la sucursal vinculada para tu empresa en la API Amare.', 404);
+            $this->adminApiError('No se encontró la sucursal vinculada para tu empresa en el servicio de app móvil.', 404);
         }
 
         $body   = $this->readAdminPromotionPayload();
@@ -3409,7 +3467,7 @@ class ApiController extends BaseController
                 $created[] = $this->adminLocalCreatePromotion($empresaId, $userBody);
             }
 
-            $this->adminApiOk(count($created) . ' promociones guardadas localmente para la app movil', [
+            $this->adminApiOk(count($created) . ' promociones guardadas localmente para la app móvil', [
                 'promotions' => $created,
                 'count' => count($created),
                 'source' => 'local',
@@ -3456,7 +3514,7 @@ class ApiController extends BaseController
         $branchId  = $this->getAmareBranchId($empresaId);
 
         if (!$branchId) {
-            $this->adminApiError('No se encontró la sucursal vinculada para tu empresa en la API Amare.', 404);
+            $this->adminApiError('No se encontró la sucursal vinculada para tu empresa en el servicio de app móvil.', 404);
         }
 
         $body   = $this->readAdminPromotionPayload();
@@ -3507,7 +3565,7 @@ class ApiController extends BaseController
         $branchId  = $this->getAmareBranchId($empresaId);
 
         if (!$branchId) {
-            $this->adminApiError('No se encontró la sucursal vinculada para tu empresa en la API Amare.', 404);
+            $this->adminApiError('No se encontró la sucursal vinculada para tu empresa en el servicio de app móvil.', 404);
         }
 
         $endpoint = "branches/{$branchId}/promotions/{$id}";
@@ -3553,7 +3611,7 @@ class ApiController extends BaseController
                 null,
                 'skipped',
                 (string)($promotion['titulo'] ?? 'Nueva promocion'),
-                (string)($promotion['descripcion'] ?? 'Tienes una nueva promocion en Amare.'),
+                (string)($promotion['descripcion'] ?? 'Tienes una nueva promocion en Jungle Pizza.'),
                 null,
                 'no_push_token'
             );
@@ -3578,7 +3636,7 @@ class ApiController extends BaseController
         $branchId  = $this->getAmareBranchId($empresaId);
 
         if (!$branchId) {
-            $this->adminApiError('No se encontró la sucursal vinculada para tu empresa en la API Amare.', 404);
+            $this->adminApiError('No se encontró la sucursal vinculada para tu empresa en el servicio de app móvil.', 404);
         }
 
         $endpoint = "branches/{$branchId}/promotions/{$id}/deactivate";
@@ -3837,7 +3895,7 @@ class ApiController extends BaseController
             $errors['titulo'] = ['El título no puede exceder los 255 caracteres.']; 
         }
         
-        // code: validación de unicidad delegada a la API Amare (BD remota, validación 409)
+        // code: validación de unicidad delegada a el servicio de app móvil (BD remota, validación 409)
         // Aquí solo validamos formato básico si es necesario. Amare retorna 409 si duplicado.
         if (!empty($data['code']) && !is_string($data['code'])) {
             $errors['code'] = ['El código debe ser una cadena de texto.'];
@@ -5332,7 +5390,7 @@ class ApiController extends BaseController
         $usuarioId = (int)($promotion['usuario_id'] ?? $body['usuario_id'] ?? 0);
         $activo = array_key_exists('activo', $promotion) ? (int)$promotion['activo'] : (int)($body['activo'] ?? 1);
         $title = trim((string)($promotion['titulo'] ?? $body['titulo'] ?? 'Nueva promocion'));
-        $message = trim((string)($promotion['descripcion'] ?? $body['descripcion'] ?? 'Tienes una nueva promocion en Amare.'));
+        $message = trim((string)($promotion['descripcion'] ?? $body['descripcion'] ?? 'Tienes una nueva promocion en Jungle Pizza.'));
         $code = trim((string)($promotion['code'] ?? $body['code'] ?? ''));
         $deepLink = $this->adminPromotionDeepLink($code);
 
@@ -5340,7 +5398,7 @@ class ApiController extends BaseController
             $title = 'Nueva promocion';
         }
         if ($message === '') {
-            $message = 'Tienes una nueva promocion en Amare.';
+            $message = 'Tienes una nueva promocion en Jungle Pizza.';
         }
 
         if ($usuarioId <= 0) {
@@ -6502,7 +6560,7 @@ class ApiController extends BaseController
     // ══════════════════════════════════════════════════════════════════
 
     /**
-     * Obtiene la configuración de conexión con la API Amare.
+     * Obtiene la configuración de conexión con el servicio de app móvil.
      * @return array{url: string, token: string}|null null si no está configurada
      */
     private function getAmareConfig(): ?array
@@ -6586,14 +6644,14 @@ class ApiController extends BaseController
     }
 
     /**
-     * Realiza una llamada HTTP a la API Amare.
+     * Realiza una llamada HTTP a el servicio de app móvil.
      * @return array{success: bool, httpCode: int, data: array|null, error: string|null}
      */
     private function callAmareApi(string $method, string $endpoint, ?array $body = null): array
     {
         $config = $this->getAmareConfig();
         if (!$config) {
-            return ['success' => false, 'httpCode' => 0, 'data' => null, 'error' => 'API Amare no configurada. Configura amare_api_url y amare_api_token en Configuración.'];
+            return ['success' => false, 'httpCode' => 0, 'data' => null, 'error' => 'Servicio de app móvil no configurado. Configura amare_api_url y amare_api_token en Configuración.'];
         }
 
         $url = $config['url'] . '/' . ltrim($endpoint, '/');
@@ -6630,12 +6688,12 @@ class ApiController extends BaseController
 
         if ($error) {
             error_log('[callAmareApi] cURL error: ' . $error . ' | URL: ' . $url);
-            return ['success' => false, 'httpCode' => 0, 'data' => null, 'error' => 'Error de conexión con la API Amare: ' . $error];
+            return ['success' => false, 'httpCode' => 0, 'data' => null, 'error' => 'Error de conexión con el servicio de app móvil: ' . $error];
         }
 
         $decoded = json_decode($response, true);
         if (!is_array($decoded)) {
-            return ['success' => false, 'httpCode' => $httpCode, 'data' => null, 'error' => 'Respuesta inválida de la API Amare (HTTP ' . $httpCode . ')'];
+            return ['success' => false, 'httpCode' => $httpCode, 'data' => null, 'error' => 'Respuesta inválida del servicio de app móvil (HTTP ' . $httpCode . ')'];
         }
 
         if ($httpCode >= 200 && $httpCode < 300) {

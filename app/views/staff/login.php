@@ -25,7 +25,7 @@
       </div>
       <?php endif; ?>
       <div style="font-weight:700;font-size:1.1rem;color:#111827">
-        <?= htmlspecialchars($restaurante['nombre'] ?? 'CarniHub') ?>
+        <?= htmlspecialchars($restaurante['nombre'] ?? 'Jungle Pizza') ?>
       </div>
       <div style="font-size:.78rem;color:#9CA3AF;margin-top:3px">Identifícate para ordenar</div>
     </div>
@@ -76,7 +76,7 @@
     <?php endif; ?>
 
     <div style="text-align:center;margin-top:20px;font-size:.75rem;color:#9CA3AF">
-      Potenciado por <strong>CarniHub</strong>
+      Acceso de <strong>Jungle Pizza</strong>
     </div>
   </div>
 </div>

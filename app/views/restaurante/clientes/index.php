@@ -1,11 +1,15 @@
 <?php ob_start(); ?>
 <?php
+$appMovilHabilitada = $appMovilHabilitada ?? true;
 $tipo = in_array(($tipo ?? 'todos'), ['todos', 'web', 'mobile'], true) ? $tipo : 'todos';
 $filtros = [
   'todos' => 'Todos',
   'web' => 'Web',
   'mobile' => 'App movil',
 ];
+if (!$appMovilHabilitada) {
+  unset($filtros['mobile']);
+}
 ?>
 <div class="client-page">
   <div class="client-toolbar">
@@ -59,7 +63,7 @@ $filtros = [
               <?php if (!$esMobile): ?>
                 <span class="client-source-badge web">Web</span>
               <?php endif; ?>
-              <?php if ($tieneApp): ?>
+              <?php if ($appMovilHabilitada && $tieneApp): ?>
                 <span class="client-source-badge app">App</span>
               <?php endif; ?>
             </div>

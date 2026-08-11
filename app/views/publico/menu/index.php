@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -358,7 +358,7 @@ $catNombres = array_column($categorias, 'nombre', 'id');
 <?php endif; ?>
 
 <div class="mn-footer">
-  Potenciado por <strong>CarniHub</strong><br>
+  Potenciado por <strong>Jungle Pizza</strong><br>
   <a href="<?= BASE_URL ?>legal/terminos?slug=<?= urlencode($restaurante['slug'] ?? '') ?>"
      style="display:inline-flex;margin-top:8px;color:rgba(0,0,0,.42);font-weight:700;text-decoration:underline;text-underline-offset:3px">
     Terminos y condiciones

@@ -158,7 +158,15 @@ class RestauranteModel extends BaseModel
 
     public function appMovilHabilitada(int $restauranteId): bool
     {
-        return true;
+        if ($restauranteId <= 0) return false;
+        if (!$this->columnExists('app_movil_habilitada')) return true;
+
+        $restaurante = $this->queryOne(
+            "SELECT app_movil_habilitada FROM rest_restaurantes WHERE id = ? LIMIT 1",
+            [$restauranteId]
+        );
+
+        return $restaurante !== null && !empty($restaurante['app_movil_habilitada']);
     }
 
     public function getAllConEmpresa(): array

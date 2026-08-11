@@ -104,7 +104,7 @@
     <div style="width:44px;height:44px;background:#DCFCE7;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0">✅</div>
     <div>
       <div style="font-size:1rem;font-weight:700;color:#14532D">Pedido generado automáticamente</div>
-      <div style="font-size:.78rem;color:#16A34A"><?= date('d/m/Y \a \l\a\s H:i') ?> &middot; <?= count($comprobante) ?> pedido(s) enviado(s) al proveedor CarniHub</div>
+      <div style="font-size:.78rem;color:#16A34A"><?= date('d/m/Y \a \l\a\s H:i') ?> &middot; <?= count($comprobante) ?> pedido(s) enviado(s) al proveedor Proveedor</div>
     </div>
   </div>
   <?php foreach ($comprobante as $c): ?>
@@ -138,7 +138,7 @@
     </table>
     <div style="padding:8px 16px;font-size:.72rem;color:#6B7280;display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px">
       <?php if ($c['enviado'] ?? false): ?>
-        <span style="color:#166534">✅ Enviado a CarniHub · Estado inicial: <strong>pendiente</strong></span>
+        <span style="color:#166534">✅ Enviado al proveedor · Estado inicial: <strong>pendiente</strong></span>
       <?php else: ?>
         <span style="color:#92400E">⚠️ No se pudo enviar automáticamente: <?= htmlspecialchars($c['carnihub_error'] ?? 'Error desconocido') ?></span>
         &nbsp;·&nbsp;
@@ -187,21 +187,21 @@ $puedenPedirse = count(array_filter($analisis, fn($i) => $i['requiere_pedido'] &
   </div>
   <div class="fc-kpi" style="border-color:#BFDBFE;background:#EFF6FF">
     <div class="fc-kpi-val" style="color:#1D4ED8"><?= $puedenPedirse ?></div>
-    <div class="fc-kpi-label">📦 Listo para pedir (tienen proveedor CarniHub)</div>
+    <div class="fc-kpi-label">📦 Listo para pedir (tienen proveedor Proveedor)</div>
   </div>
 </div>
 
 <?php
-// Ingredientes críticos sin vínculo CarniHub (no pueden pedirse automáticamente)
+// Ingredientes críticos sin vínculo Proveedor (no pueden pedirse automáticamente)
 $criticosSinLink = count(array_filter($analisis, fn($i) => $i['requiere_pedido'] && empty($i['empresa'])));
 ?>
 <?php if ($criticosSinLink > 0): ?>
 <div class="fc-actions" style="border-color:#FDE68A;background:#FFFBEB">
-  <h3 style="color:#92400E">⚠️ <?= $criticosSinLink ?> ingrediente<?= $criticosSinLink>1?'s':'' ?> crítico<?= $criticosSinLink>1?'s':'' ?> sin proveedor CarniHub</h3>
+  <h3 style="color:#92400E">⚠️ <?= $criticosSinLink ?> ingrediente<?= $criticosSinLink>1?'s':'' ?> crítico<?= $criticosSinLink>1?'s':'' ?> sin proveedor Proveedor</h3>
   <p style="font-size:.85rem;color:#374151;margin:0">
     Para que los pedidos se generen automáticamente al cargar esta página,
-    vincula estos ingredientes a productos de tu empresa proveedora CarniHub
-    desde el formulario de inventario (<strong>Proveedor CarniHub</strong>).
+    vincula estos ingredientes a productos de tu empresa proveedoral proveedor
+    desde el formulario de inventario (<strong>Proveedor Proveedor</strong>).
   </p>
 </div>
 <?php endif; ?>
@@ -336,7 +336,7 @@ $criticosSinLink = count(array_filter($analisis, fn($i) => $i['requiere_pedido']
             <div style="font-size:.68rem;color:#9CA3AF">$<?= number_format($ing['empresa']['precio_base'], 2) ?>/<?= htmlspecialchars($ing['empresa']['unidad']) ?></div>
             <?php elseif ($ing['proveedor_nombre']): ?>
             <span style="font-size:.75rem;color:#6B7280"><?= htmlspecialchars($ing['proveedor_nombre']) ?></span>
-            <div style="font-size:.68rem;color:#F59E0B;margin-top:2px">Sin vínculo CarniHub</div>
+            <div style="font-size:.68rem;color:#F59E0B;margin-top:2px">Sin vínculo Proveedor</div>
             <?php else: ?>
             <span style="font-size:.75rem;color:#D1D5DB">Sin proveedor</span>
             <?php endif; ?>

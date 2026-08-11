@@ -1,6 +1,9 @@
 <?php
 $money = static fn($value): string => '$' . number_format((float)$value, 2);
 $number = static fn($value): string => number_format((float)$value, 0);
+$appMovilHabilitada = (new RestauranteModel())->appMovilHabilitada(
+  (int)($_SESSION['restaurante_activo_id'] ?? 0)
+);
 
 $ingresos = (float)($kpis['ingresos'] ?? 0);
 $gastos = (float)($kpis['gastos'] ?? 0);
@@ -28,12 +31,20 @@ $metodosVista = array_map(static function (array $m) use ($metodoPagoLabel): arr
   $m['metodo_pago_label'] = $metodoPagoLabel($m['metodo_pago'] ?? 'efectivo');
   return $m;
 }, $metodos);
+if (!$appMovilHabilitada) {
+  $metodosVista = array_values(array_filter($metodosVista, static function (array $m): bool {
+    $key = strtolower(trim((string)($m['metodo_pago'] ?? '')));
+    return !in_array($key, ['jungle_wallet','saldo_jungle','wallet','app movil','app_movil','social_cover'], true);
+  }));
+}
 
 $ingresoBreakdown = [
   ['label' => 'Tickets de mesa', 'value' => $ingresosTickets],
-  ['label' => 'Pedidos app', 'value' => $ingresosPedidosApp],
-  ['label' => 'Recargas Saldo Jungle', 'value' => $ingresosRecargasAmare],
 ];
+if ($appMovilHabilitada) {
+  $ingresoBreakdown[] = ['label' => 'Pedidos app', 'value' => $ingresosPedidosApp];
+  $ingresoBreakdown[] = ['label' => 'Recargas Saldo Jungle', 'value' => $ingresosRecargasAmare];
+}
 
 ob_start();
 ?>
@@ -287,7 +298,9 @@ ob_start();
     <div class="finance-hero-top">
       <div>
         <h1 class="finance-title">Dashboard financiero</h1>
-        <p class="finance-subtitle">Vista ejecutiva del periodo: ingresos reales, egresos, utilidad, pagos, ventas app y recargas de Saldo Jungle.</p>
+        <p class="finance-subtitle"><?= $appMovilHabilitada
+          ? 'Vista ejecutiva del periodo: ingresos reales, egresos, utilidad, pagos, ventas app y recargas de Saldo Jungle.'
+          : 'Vista ejecutiva del periodo: ingresos contables completos, egresos, utilidad y pagos del restaurante.' ?></p>
       </div>
       <form class="finance-filter" method="GET" action="<?= BASE_URL ?>rest-finanzas/dashboard">
         <input type="date" name="desde" value="<?= htmlspecialchars($desde) ?>">
@@ -337,7 +350,7 @@ ob_start();
       <h3>Operacion</h3>
       <div class="finance-mini">
         <div class="finance-mini-row"><span>Tickets pagados</span><strong><?= $number($kpis['totalTickets'] ?? 0) ?></strong></div>
-        <div class="finance-mini-row"><span>Pedidos app</span><strong><?= $number($kpis['totalPedidosApp'] ?? 0) ?></strong></div>
+        <?php if ($appMovilHabilitada): ?><div class="finance-mini-row"><span>Pedidos app</span><strong><?= $number($kpis['totalPedidosApp'] ?? 0) ?></strong></div><?php endif; ?>
         <div class="finance-mini-row"><span>Ticket promedio mesa</span><strong><?= $money($kpis['ticketPromedio'] ?? 0) ?></strong></div>
         <div class="finance-mini-row"><span>Pendiente por cobrar</span><strong><?= $money($kpis['pendiente'] ?? 0) ?></strong></div>
       </div>

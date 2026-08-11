@@ -10,6 +10,7 @@ $totalGastado = (float)($comensal['gasto_total'] ?? $comensal['total_gastado'] ?
 $visitasTotales = (int)($comensal['total_visitas'] ?? $comensal['num_visitas'] ?? 0);
 $ultimaVisita = !empty($comensal['ultima_visita']) ? date('d/m/Y', strtotime($comensal['ultima_visita'])) : '&mdash;';
 $esMobile = ($comensal['origen'] ?? '') === 'mobile';
+$appMovilHabilitada = $appMovilHabilitada ?? true;
 $productosFavoritos = $productosFavoritos ?? [];
 $promocionSugerida = $promocionSugerida ?? [
   'titulo' => 'Promocion de bienvenida',
@@ -18,7 +19,7 @@ $promocionSugerida = $promocionSugerida ?? [
 ];
 $promocionApp = $promocionApp ?? [];
 $detalleParam = $detalleParam ?? (string)($comensal['id'] ?? '');
-$puedeEnviarPromoApp = !empty($comensal['mobile_usuario_id']) && !empty($promocionApp['code']);
+$puedeEnviarPromoApp = $appMovilHabilitada && !empty($comensal['mobile_usuario_id']) && !empty($promocionApp['code']);
 $promoProductoObjetivo = trim((string)($promocionApp['producto_favorito'] ?? ''));
 $maxCantidad = 1;
 foreach ($productosFavoritos as $producto) {
@@ -35,12 +36,12 @@ foreach ($productosFavoritos as $producto) {
     <div class="client-hero-main">
       <div class="client-title-row">
         <div class="client-title"><?= htmlspecialchars($nombre) ?></div>
-        <span class="client-source-badge <?= $esMobile ? 'app' : 'web' ?>"><?= $esMobile ? 'App' : 'Web' ?></span>
+        <span class="client-source-badge <?= $appMovilHabilitada && $esMobile ? 'app' : 'web' ?>"><?= $appMovilHabilitada && $esMobile ? 'App' : 'Web' ?></span>
       </div>
       <div class="client-subtitle">
         <?= $telefono !== '' ? htmlspecialchars($telefono) : '&mdash;' ?>
         <?= $email !== '' ? ' &middot; ' . htmlspecialchars($email) : '' ?>
-        <?= !empty($comensal['mobile_usuario_id']) ? ' &middot; App #' . (int)$comensal['mobile_usuario_id'] : '' ?>
+        <?= $appMovilHabilitada && !empty($comensal['mobile_usuario_id']) ? ' &middot; App #' . (int)$comensal['mobile_usuario_id'] : '' ?>
       </div>
 
       <div class="client-stats-grid">
@@ -91,6 +92,7 @@ foreach ($productosFavoritos as $producto) {
       <?php endif; ?>
     </section>
 
+    <?php if ($appMovilHabilitada): ?>
     <aside class="client-promo-card">
       <div class="client-promo-eyebrow">Promocion sugerida</div>
       <div class="client-promo-title"><?= htmlspecialchars((string)($promocionApp['titulo'] ?? $promocionSugerida['titulo'])) ?></div>
@@ -120,6 +122,7 @@ foreach ($productosFavoritos as $producto) {
         </div>
       <?php endif; ?>
     </aside>
+    <?php endif; ?>
   </div>
 
   <section class="client-panel">

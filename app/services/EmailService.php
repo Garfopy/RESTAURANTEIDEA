@@ -60,7 +60,7 @@ class EmailService
                 'username'   => $get(['smtp_username', 'smtp_user']),
                 'password'   => $get(['smtp_password', 'smtp_pass']),
                 'from_email' => $get(['smtp_from_email', 'smtp_from', 'smtp_username', 'smtp_user']),
-                'from_name'  => $get(['smtp_from_name', 'app_name'], 'CarniHub'),
+                'from_name'  => 'Jungle Pizza',
             ];
 
             self::$configCache['from_email'] = self::$configCache['from_email'] ?: self::$configCache['username'];
@@ -121,7 +121,7 @@ class EmailService
 
     private function fromName(): string
     {
-        return $this->smtpFromName ?: 'CarniHub';
+        return $this->smtpFromName ?: 'Jungle Pizza';
     }
 
     private function encodeHeader(string $text): string
@@ -243,7 +243,7 @@ class EmailService
             // â”€â”€ Contenido â”€â”€
             $mail->isHTML(true);
             $mail->CharSet = 'UTF-8';
-            $mail->Subject = 'Bienvenido a CarniHub - Verifica tu email';
+            $mail->Subject = 'Bienvenido a Jungle Pizza - Verifica tu email';
 
             $mail->Body = $this->plantillaCredenciales([
                 'nombre'      => trim($nombreUsuario),
@@ -320,7 +320,7 @@ class EmailService
 
             $mail->isHTML(true);
             $mail->CharSet = 'UTF-8';
-            $mail->Subject = 'Recupera tu contraseÃ±a â€” CarniHub';
+            $mail->Subject = 'Recupera tu contraseÃ±a â€” Jungle Pizza';
 
             $nombreEsc   = htmlspecialchars($nombreUsuario);
             $urlResetEsc = htmlspecialchars($urlReset);
@@ -341,7 +341,7 @@ class EmailService
         <td style="padding:40px 30px;">
           <p style="margin:0 0 16px;color:#333;font-size:16px;line-height:1.6;">Hola <strong>' . $nombreEsc . '</strong>,</p>
           <p style="margin:0 0 30px;color:#666;font-size:14px;line-height:1.6;">
-            Recibimos una solicitud para restablecer la contraseÃ±a de tu cuenta en CarniHub.
+            Recibimos una solicitud para restablecer la contraseÃ±a de tu cuenta en Jungle Pizza.
             Haz clic en el botÃ³n de abajo para crear una nueva contraseÃ±a.
           </p>
           <table width="100%" cellpadding="0" cellspacing="0">
@@ -368,7 +368,7 @@ class EmailService
       </tr>
       <tr>
         <td style="background-color:#f8f9fa;padding:20px 30px;text-align:center;border-top:1px solid #e9ecef;">
-          <p style="margin:0 0 10px;color:#6c757d;font-size:12px;">Â© ' . date('Y') . ' CarniHub â€” Sistema de gestiÃ³n para distribuidores de carne</p>
+          <p style="margin:0 0 10px;color:#6c757d;font-size:12px;">Â© ' . date('Y') . ' Jungle Pizza â€” Sistema de gestiÃ³n para la operación del restaurante</p>
           <p style="margin:0;"><a href="' . BASE_URL . '" style="color:#C8102E;text-decoration:none;font-size:12px;">Visitar sitio web</a></p>
         </td>
       </tr>
@@ -378,13 +378,13 @@ class EmailService
 </body>
 </html>';
 
-            $mail->AltBody = "RECUPERA TU CONTRASEÃ‘A â€” CARNIHUB\n\n"
+            $mail->AltBody = "RECUPERA TU CONTRASEÃ‘A â€” JUNGLE PIZZA\n\n"
                 . "Hola $nombreUsuario,\n\n"
                 . "Recibimos una solicitud para restablecer tu contraseÃ±a.\n"
                 . "Haz clic en el siguiente enlace (vÃ¡lido por 1 hora):\n\n"
                 . "$urlReset\n\n"
                 . "Si no solicitaste este cambio, ignora este mensaje.\n\n"
-                . "---\nÂ© " . date('Y') . " CarniHub\n";
+                . "---\nÂ© " . date('Y') . " Jungle Pizza\n";
 
             $mail->send();
             error_log("[EmailService] Reset de contraseÃ±a enviado a: $destinatario");
@@ -447,7 +447,7 @@ class EmailService
     </table>
   </td></tr>
   <tr><td style="background:#F9FAFB;padding:16px 30px;text-align:center;border-top:1px solid #E5E7EB;">
-    <p style="margin:0;color:#9CA3AF;font-size:.72rem;">(c) ' . date('Y') . ' CarniHub</p>
+    <p style="margin:0;color:#9CA3AF;font-size:.72rem;">(c) ' . date('Y') . ' Jungle Pizza</p>
   </td></tr>
 </table>
 </td></tr></table>
@@ -492,7 +492,7 @@ class EmailService
     </table>
   </td></tr>
   <tr><td style="background:#F9FAFB;padding:16px 30px;text-align:center;border-top:1px solid #E5E7EB;">
-    <p style="margin:0;color:#9CA3AF;font-size:.72rem;">Â© ' . date('Y') . ' CarniHub</p>
+    <p style="margin:0;color:#9CA3AF;font-size:.72rem;">Â© ' . date('Y') . ' Jungle Pizza</p>
   </td></tr>
 </table>
 </td></tr></table>
@@ -618,7 +618,7 @@ class EmailService
     </p>
   </td></tr>
   <tr><td style="background:#F9FAFB;padding:16px 30px;text-align:center;border-top:1px solid #E5E7EB;">
-    <p style="margin:0;color:#9CA3AF;font-size:.72rem;">Â© ' . date('Y') . ' CarniHub</p>
+    <p style="margin:0;color:#9CA3AF;font-size:.72rem;">Â© ' . date('Y') . ' Jungle Pizza</p>
   </td></tr>
 </table>
 </td></tr></table>
@@ -933,7 +933,7 @@ class EmailService
     }
 
     /**
-     * Notifica al admin del restaurante que un pedido B2B fue cancelado o rechazado por CarniHub.
+     * Notifica al admin del restaurante que un pedido B2B fue cancelado o rechazado por Jungle Pizza.
      */
     public function enviarCancelacionPedido(
         string $destEmail,
@@ -965,20 +965,20 @@ class EmailService
             $mail->addAddress($destEmail, $destNombre);
             $mail->isHTML(true);
             $mail->CharSet = 'UTF-8';
-            $mail->Subject = "Pedido CarniHub $folioSafe fue $estadoSafe";
+            $mail->Subject = "Pedido Jungle Pizza $folioSafe fue $estadoSafe";
             $mail->Body = "<!DOCTYPE html><html lang='es'><head><meta charset='UTF-8'></head>
 <body style='font-family:Arial,sans-serif;background:#F3F4F6;padding:24px;'>
 <div style='max-width:540px;margin:0 auto;background:#fff;border-radius:10px;padding:28px;box-shadow:0 2px 8px rgba(0,0,0,.08);'>
   <h2 style='color:#1F2937;margin-top:0;'>Pedido $folioSafe fue $estadoSafe</h2>
   <p>Hola <strong>$nombreSafe</strong>,</p>
-  <p>Tu pedido <strong>$folioSafe</strong> (ID CarniHub: $carnihubPedidoId) fue <strong style='color:#DC2626;'>$estadoSafe</strong> por el proveedor.</p>
+  <p>Tu pedido <strong>$folioSafe</strong> (ID del proveedor: $carnihubPedidoId) fue <strong style='color:#DC2626;'>$estadoSafe</strong> por el proveedor.</p>
   <p>Por favor revisa tu inventario y genera un nuevo pedido si es necesario.</p>
   <a href='" . BASE_URL . "rest-inventario/pedidosSugeridos' style='display:inline-block;background:#1F2937;color:#fff;text-decoration:none;padding:10px 24px;border-radius:6px;font-weight:700;margin-top:12px;'>
     Ver pedidos â†’
   </a>
 </div>
 </body></html>";
-            $mail->AltBody = "Hola $destNombre, tu pedido $folio (ID CarniHub: $carnihubPedidoId) fue $estado por el proveedor.";
+            $mail->AltBody = "Hola $destNombre, tu pedido $folio (ID del proveedor: $carnihubPedidoId) fue $estado por el proveedor.";
             $mail->send();
             return true;
         } catch (\Exception $e) {
@@ -1021,7 +1021,7 @@ class EmailService
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bienvenido a CarniHub</title>
+    <title>Bienvenido a Jungle Pizza</title>
 </head>
 <body style="margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,sans-serif;">
     <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f4;padding:20px 0;">
@@ -1032,7 +1032,7 @@ class EmailService
                     <!-- Header -->
                     <tr>
                         <td style="background:linear-gradient(135deg, #C8102E 0%, #8B0A1F 100%);padding:40px 30px;text-align:center;">
-                            <h1 style="margin:0;color:#ffffff;font-size:28px;font-weight:bold;">Â¡Bienvenido a CarniHub!</h1>
+                            <h1 style="margin:0;color:#ffffff;font-size:28px;font-weight:bold;">Â¡Bienvenido a Jungle Pizza!</h1>
                         </td>
                     </tr>
 
@@ -1043,7 +1043,7 @@ class EmailService
                                 Hola <strong>' . $nombre . '</strong>,
                             </p>
                             <p style="margin:0 0 30px;color:#666;font-size:14px;line-height:1.6;">
-                                Tu cuenta en CarniHub ha sido creada exitosamente. ' .
+                                Tu cuenta en Jungle Pizza ha sido creada exitosamente. ' .
                                 ($urlVerificar ? '<strong>Primero debes verificar tu email</strong> haciendo clic en el botÃ³n de abajo.' : 'A continuaciÃ³n encontrarÃ¡s tus credenciales de acceso:') . '
                             </p>
 
@@ -1111,7 +1111,7 @@ class EmailService
                     <tr>
                         <td style="background-color:#f8f9fa;padding:20px 30px;text-align:center;border-top:1px solid #e9ecef;">
                             <p style="margin:0 0 10px;color:#6c757d;font-size:12px;">
-                                Â© ' . date('Y') . ' CarniHub - Sistema de gestiÃ³n para distribuidores de carne
+                                Â© ' . date('Y') . ' Jungle Pizza - Sistema de gestiÃ³n para la operación del restaurante
                             </p>
                             <p style="margin:0;color:#6c757d;font-size:12px;">
                                 <a href="' . BASE_URL . '" style="color:#C8102E;text-decoration:none;">Visitar sitio web</a>
@@ -1138,9 +1138,9 @@ class EmailService
         $token = $data['token'] ?? null;
         $urlVerificar = $token ? BASE_URL . "auth/verificar?token=" . urlencode($token) : null;
 
-        $texto = "Â¡BIENVENIDO A CARNIHUB!\n\n";
+        $texto = "Â¡BIENVENIDO A JUNGLE PIZZA!\n\n";
         $texto .= "Hola {$data['nombre']},\n\n";
-        $texto .= "Tu cuenta en CarniHub ha sido creada exitosamente.\n";
+        $texto .= "Tu cuenta en Jungle Pizza ha sido creada exitosamente.\n";
 
         if ($urlVerificar) {
             $texto .= "Primero debes verificar tu email haciendo clic en el siguiente link:\n\n";
@@ -1167,8 +1167,8 @@ class EmailService
         }
 
         $texto .= "---\n";
-        $texto .= "Â© " . date('Y') . " CarniHub\n";
-        $texto .= "Sistema de gestiÃ³n para distribuidores de carne\n";
+        $texto .= "Â© " . date('Y') . " Jungle Pizza\n";
+        $texto .= "Sistema de gestiÃ³n para la operación del restaurante\n";
 
         return $texto;
     }

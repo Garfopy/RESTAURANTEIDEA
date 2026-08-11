@@ -633,7 +633,7 @@ $notas[] = 'Rango técnico de conservación para cadena fría: 0°C a 4°C.';
       doc.setFontSize(7);
       doc.setTextColor(156,163,175);
       doc.setFont('helvetica','normal');
-      doc.text('Generado automáticamente por el módulo de Mermas de CarniHub', W/2, H - 16, { align:'center' });
+      doc.text('Generado automáticamente por el módulo de Mermas de Jungle Pizza', W/2, H - 16, { align:'center' });
       doc.text('Página ' + p + ' de ' + total, W - MARGIN, H - 16, { align:'right' });
       doc.text('Folio: ' + folio, MARGIN, H - 16);
     }

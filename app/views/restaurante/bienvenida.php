@@ -9,7 +9,7 @@
       ¡Tu restaurante está listo!
     </div>
     <div style="color:#047857;font-size:.95rem">
-      <strong><?= htmlspecialchars($restaurante['nombre']) ?></strong> ya forma parte de CarniHub.
+      <strong><?= htmlspecialchars($restaurante['nombre']) ?></strong> ya est&aacute; listo para operar.
     </div>
   </div>
 

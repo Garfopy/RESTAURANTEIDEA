@@ -1,4 +1,4 @@
-﻿<?php ob_start(); ?>
+<?php ob_start(); ?>
 <!-- Modal informativo de pedido -->
 <div id="modalRevision"
      style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.5);
@@ -38,7 +38,7 @@
 .estado-rechazado  { background:#FEE2E2;color:#991B1B; }
 .estado-cancelado  { background:#F3F4F6;color:#6B7280; }
 
-/* Estado CarniHub */
+/* Estado Proveedor */
 .ch-pendiente   { background:#DBEAFE;color:#1E40AF; }
 .ch-aprobado    { background:#D1FAE5;color:#065F46; }
 .ch-en_camino   { background:#EDE9FE;color:#5B21B6; }
@@ -61,7 +61,7 @@
   <div>
     <h2>📋 Pedidos Automáticos de Reabastecimiento</h2>
     <p style="font-size:.8rem;color:#6B7280;margin:2px 0 0">
-      El sistema genera y envía los pedidos automáticamente a CarniHub
+      El sistema genera y envía los pedidos automáticamente al proveedor
     </p>
   </div>
   <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -80,9 +80,9 @@
 
 <div style="background:#EFF6FF;border:1.5px solid #BFDBFE;border-radius:12px;padding:14px 18px;margin-bottom:20px;font-size:.84rem;color:#1E40AF">
   ⚡ <strong>Flujo automático:</strong>
-  Cuando hay ingredientes críticos el sistema <em>crea y envía el pedido directamente a CarniHub</em>.
+  Cuando hay ingredientes críticos el sistema <em>crea y envía el pedido directamente al proveedor</em>.
   Si el envío falla, el pedido queda en estado <em>Sugerido</em> para reintento manual.
-  Una vez enviado puedes consultar el seguimiento o cancelarlo mientras CarniHub no lo haya aprobado.
+  Una vez enviado puedes consultar el seguimiento o cancelarlo mientras Proveedor no lo haya aprobado.
 </div>
 
 <!-- Tabla -->
@@ -94,7 +94,7 @@
           <th>#</th>
           <th>Distribuidor</th>
           <th>Estado local</th>
-          <th>Estado CarniHub</th>
+          <th>Estado Proveedor</th>
           <th>Total estimado</th>
           <th>Pago</th>
           <th>Items</th>
@@ -229,7 +229,7 @@
             <?php elseif ($est === 'aprobado'): ?>
               <button class="btn-accion btn-reintentar"
                       onclick="accionPedido('reintentar', <?= $pid ?>, this)">
-                🚀 Enviar a CarniHub
+                🚀 Enviar al proveedor
               </button>
               <button class="btn-accion btn-actualizar"
                       onclick="abrirRevision(<?= $pid ?>, this)">
@@ -337,7 +337,7 @@ async function _pollUno(id) {
     _actualizarBadgeCH(id, est);
     if (est === 'cancelado') {
       delete _pollingActivo[id];
-      mostrarToast('⚠️ Pedido #' + id + ' cancelado por CarniHub', '#DC2626');
+      mostrarToast('⚠️ Pedido #' + id + ' cancelado por el proveedor', '#DC2626');
       setTimeout(() => _eliminarFila(id), 2200);
     } else if (est === 'entregado') {
       delete _pollingActivo[id];
@@ -438,8 +438,8 @@ async function abrirRevision(id, btn = null) {
     document.getElementById('modalRevisionContent').innerHTML = `
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;font-size:.83rem;color:#374151">
         <div><strong>Distribuidor:</strong> ${(p.empresa_nombre || '—').replace(/</g, '&lt;')}</div>
-        <div><strong>CarniHub:</strong> ${(p.pedido_carnihub_id || 0) > 0 ? ('#' + p.pedido_carnihub_id) : '—'}</div>
-        <div><strong>Estado CarniHub:</strong> ${(p.estado_carnihub || '—').replace(/</g, '&lt;')}</div>
+        <div><strong>Proveedor:</strong> ${(p.pedido_carnihub_id || 0) > 0 ? ('#' + p.pedido_carnihub_id) : '—'}</div>
+        <div><strong>Estado Proveedor:</strong> ${(p.estado_carnihub || '—').replace(/</g, '&lt;')}</div>
         <div><strong>Generado:</strong> ${(p.created_at || '—').replace(/</g, '&lt;')}</div>
       </div>
       <div style="border:1px solid #E5E7EB;border-radius:10px;overflow:hidden">
@@ -522,11 +522,11 @@ async function actualizarEstado(id, btn) {
         cell.dataset.est = est;
       }
       if (est === 'cancelado') {
-        mostrarToast('Pedido cancelado por CarniHub', '#DC2626');
+        mostrarToast('Pedido cancelado por el proveedor', '#DC2626');
         delete _pollingActivo[id];
         setTimeout(() => _eliminarFila(id), 1800);
       } else {
-        mostrarToast('Estado CarniHub: ' + est, '#7C3AED');
+        mostrarToast('Estado Proveedor: ' + est, '#7C3AED');
       }
     } else {
       mostrarToast('Error: ' + (data.error || 'No se pudo consultar'), '#DC2626');

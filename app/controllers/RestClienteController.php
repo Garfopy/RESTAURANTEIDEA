@@ -15,15 +15,21 @@ class RestClienteController extends BaseController
     public function index(?string $p = null): void
     {
         $restauranteId = $this->restauranteId();
-        $this->enviarPromocionesAutomaticasReactivacion($restauranteId);
+        $appMovilHabilitada = $this->appMovilHabilitada($restauranteId);
+        if ($appMovilHabilitada) {
+            $this->enviarPromocionesAutomaticasReactivacion($restauranteId);
+        }
         $page      = (int)$this->get('page', 1);
         $tipoParam = $p ?: (string)$this->get('tipo', 'todos');
         $tipo      = in_array($tipoParam, ['todos', 'web', 'mobile'], true) ? $tipoParam : 'todos';
+        if (!$appMovilHabilitada) {
+            $tipo = 'web';
+        }
         $resultado = $this->model->getByRestaurante($restauranteId, $page, $tipo);
         $flash     = $this->getFlash();
         $pageTitle  = 'Comensales';
         $activeMenu = 'rest_clientes';
-        $this->render('restaurante/clientes/index', array_merge($resultado, compact('flash','pageTitle','activeMenu','tipo')));
+        $this->render('restaurante/clientes/index', array_merge($resultado, compact('flash','pageTitle','activeMenu','tipo','appMovilHabilitada')));
     }
 
     public function detalle(?string $id = null): void
@@ -33,6 +39,11 @@ class RestClienteController extends BaseController
         $esDetalleMobile = $parsed['es_mobile'];
         $mobileDetalleId = $parsed['mobile_id'];
         $restauranteId = $this->restauranteId();
+        $appMovilHabilitada = $this->appMovilHabilitada($restauranteId);
+        if ($esDetalleMobile && !$appMovilHabilitada) {
+            $this->flash('warning', 'Los perfiles exclusivos de la app están ocultos mientras la app móvil está apagada.');
+            $this->redirect('rest-cliente/index');
+        }
         $comensal = $esDetalleMobile
             ? $this->model->getDetalleMobile($mobileDetalleId, $restauranteId)
             : $this->model->getDetalle($clienteId);
@@ -40,7 +51,7 @@ class RestClienteController extends BaseController
         $historial = $esDetalleMobile
             ? $this->model->getHistorialMobile($mobileDetalleId, $restauranteId)
             : $this->model->getHistorialVisitas($clienteId);
-        if (!$esDetalleMobile && $clienteId > 0 && !empty($comensal['mobile_usuario_id'])) {
+        if ($appMovilHabilitada && !$esDetalleMobile && $clienteId > 0 && !empty($comensal['mobile_usuario_id'])) {
             $historial = array_merge(
                 $historial,
                 $this->model->getHistorialMobile((int)$comensal['mobile_usuario_id'], $restauranteId)
@@ -52,18 +63,19 @@ class RestClienteController extends BaseController
             ? $this->model->getProductosFavoritosMobile($mobileUsuarioId, $restauranteId)
             : $this->model->getProductosFavoritosComensal($clienteId, $restauranteId, $mobileUsuarioId ?: null);
         $promocionSugerida = $this->model->sugerirPromocion($productosFavoritos, $comensal);
-        $promocionApp = $mobileUsuarioId > 0
+        $promocionApp = $appMovilHabilitada && $mobileUsuarioId > 0
             ? $this->model->definirPromocionApp($productosFavoritos, $comensal, $restauranteId, 'manual')
             : [];
         $detalleParam = $esDetalleMobile ? 'app-' . $mobileDetalleId : (string)$clienteId;
         $flash     = $this->getFlash();
         $pageTitle  = $comensal['nombre'] ?? $comensal['mobile_nombre'] ?? 'Comensal';
         $activeMenu = 'rest_clientes';
-        $this->render('restaurante/clientes/detalle', compact('comensal','historial','productosFavoritos','promocionSugerida','promocionApp','detalleParam','flash','pageTitle','activeMenu'));
+        $this->render('restaurante/clientes/detalle', compact('comensal','historial','productosFavoritos','promocionSugerida','promocionApp','detalleParam','flash','pageTitle','activeMenu','appMovilHabilitada'));
     }
 
     public function enviarPromocion(?string $id = null): void
     {
+        $this->requireAppMovil();
         if (!$this->isPost()) {
             $this->redirect('rest-cliente/index');
         }
@@ -115,7 +127,7 @@ class RestClienteController extends BaseController
             $clienteId > 0 ? $clienteId : null
         );
 
-        $this->flash('success', 'Promocion enviada a la app movil correctamente.');
+        $this->flash('success', 'Promocion enviada a la app móvil correctamente.');
         $this->redirect('rest-cliente/detalle/' . $redirectId);
     }
 
@@ -164,6 +176,9 @@ class RestClienteController extends BaseController
 
     private function enviarPromocionesAutomaticasReactivacion(int $restauranteId): void
     {
+        if (!$this->appMovilHabilitada($restauranteId)) {
+            return;
+        }
         try {
             $candidatos = $this->model->getClientesMobileParaReactivacion($restauranteId, 5);
             foreach ($candidatos as $comensal) {
@@ -195,6 +210,9 @@ class RestClienteController extends BaseController
 
     private function crearPromocionEnApp(int $restauranteId, array $payload): array
     {
+        if (!$this->appMovilHabilitada($restauranteId)) {
+            return ['success' => false, 'remote_id' => null, 'message' => 'La app móvil está desactivada.'];
+        }
         $branchId = $this->getAmareBranchIdByRestaurante($restauranteId);
         if (!$branchId) {
             return $this->guardarPromocionAppLocal($payload, 'Restaurante sin sucursal remota vinculada.');
@@ -240,7 +258,7 @@ class RestClienteController extends BaseController
 
             return [
                 'success' => false,
-                'message' => $result['error'] ?? 'Error de conexion con Amare-App.',
+                'message' => $result['error'] ?? 'Error de conexion con la app móvil.',
                 'remote_id' => null,
             ];
         }
@@ -262,7 +280,7 @@ class RestClienteController extends BaseController
 
             return [
                 'success' => true,
-                'message' => 'Promocion guardada localmente para la app movil',
+                'message' => 'Promocion guardada localmente para la app móvil',
                 'remote_id' => $localId,
                 'source' => 'local',
             ];
@@ -395,7 +413,7 @@ class RestClienteController extends BaseController
     {
         $config = $this->getAmareConfig();
         if (!$config) {
-            return ['success' => false, 'httpCode' => 0, 'data' => null, 'error' => 'API Amare no configurada.'];
+            return ['success' => false, 'httpCode' => 0, 'data' => null, 'error' => 'Servicio de app móvil no configurado.'];
         }
 
         if (!function_exists('curl_init')) {
@@ -432,7 +450,7 @@ class RestClienteController extends BaseController
 
         $decoded = json_decode((string)$response, true);
         if (!is_array($decoded)) {
-            return ['success' => false, 'httpCode' => $httpCode, 'data' => null, 'error' => 'Respuesta invalida de Amare-App.'];
+            return ['success' => false, 'httpCode' => $httpCode, 'data' => null, 'error' => 'Respuesta invalida del servicio de app móvil.'];
         }
 
         if ($httpCode >= 200 && $httpCode < 300) {

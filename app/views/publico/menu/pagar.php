@@ -260,7 +260,7 @@
   <?php endif; ?>
 
   <div style="text-align:center;margin-top:16px;font-size:.72rem;color:rgba(255,255,255,.5)">
-    Potenciado por <strong style="color:rgba(255,255,255,.7)">CarniHub</strong>
+    Potenciado por <strong style="color:rgba(255,255,255,.7)">Jungle Pizza</strong>
   </div>
 </div>
 

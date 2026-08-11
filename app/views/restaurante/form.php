@@ -12,7 +12,7 @@ $colorPrimario = $restaurante['color_primario'] ?? '#C8102E';
 $colorSecundario = $restaurante['color_secundario'] ?? '#1F2937';
 $formAction = BASE_URL . ($isEdit ? 'restaurante/actualizar/' . (int)$restaurante['id'] : 'restaurante/guardar');
 $cancelUrl = BASE_URL . ($isEdit || !empty($_SESSION['restaurante_activo_id']) ? 'restaurante/dashboard' : 'restaurante/seleccionar');
-$title = ($isEdit ? 'Editar local' : 'Crear local') . ' - CarniHub';
+$title = ($isEdit ? 'Editar local' : 'Crear local') . ' - Jungle Pizza';
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -536,7 +536,7 @@ $title = ($isEdit ? 'Editar local' : 'Crear local') . ' - CarniHub';
                     required
                     maxlength="120"
                     autocomplete="organization"
-                    placeholder="Ej. Amare Restaurant"
+                    placeholder="Ej. Jungle Pizza Zihuatanejo"
                   >
                 </div>
 

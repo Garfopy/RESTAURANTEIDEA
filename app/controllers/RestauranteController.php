@@ -141,6 +141,7 @@ class RestauranteController extends BaseController
         $this->requireRestaurante();
         $restauranteId = $this->restauranteId();
         $restaurante   = $this->model->getConStats($restauranteId);
+        $appMovilHabilitada = $this->appMovilHabilitada($restauranteId);
 
         $finanzas   = new RestFinanzasModel();
         $hoy        = date('Y-m-d');
@@ -171,7 +172,9 @@ class RestauranteController extends BaseController
         $topVendidos   = $menuModel->getTopVendidos($restauranteId, 5, $visibleDesde);
         $menosVendidos = $menuModel->getMenosVendidos($restauranteId, 5, $visibleDesde);
 
-        $moderacionSocial = (new RestSocialModeracionModel())->resumenDashboard($restauranteId, 5);
+        $moderacionSocial = $appMovilHabilitada
+            ? (new RestSocialModeracionModel())->resumenDashboard($restauranteId, 5)
+            : ['available' => false, 'kpis' => [], 'reportes' => [], 'bloqueos' => [], 'usuarios_observados' => []];
 
         $linkStaff  = BASE_URL . 'auth/login';
         $linkMenu   = BASE_URL . 'menu/'   . $restaurante['slug'];
@@ -181,7 +184,7 @@ class RestauranteController extends BaseController
         $this->render('restaurante/dashboard', compact(
             'restaurante','kpis','amareKpis','comparativaFinanzas','activos','alertas','proximas',
             'reservasCanal','topVendidos','menosVendidos','moderacionSocial',
-            'linkStaff','linkMenu','flash','pageTitle','activeMenu'
+            'linkStaff','linkMenu','flash','pageTitle','activeMenu','appMovilHabilitada'
         ));
     }
 

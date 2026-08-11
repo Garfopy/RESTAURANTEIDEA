@@ -126,7 +126,7 @@ class PayPalOrdenService
             'application_context' => [
                 'return_url'          => $returnUrl,
                 'cancel_url'          => $cancelUrl,
-                'brand_name'          => 'CarniHub',
+                'brand_name'          => 'Jungle Pizza',
                 'landing_page'        => 'NO_PREFERENCE',
                 'user_action'         => 'PAY_NOW',
             ],

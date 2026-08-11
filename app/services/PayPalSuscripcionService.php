@@ -148,7 +148,7 @@ class PayPalSuscripcionService
 
         if (!$productId) {
             $productId = $this->crearProducto(
-                'CarniHub SaaS',
+                'Jungle Pizza - Administracion',
                 'Plataforma de gestión para carnicerías'
             );
             $config->set($productKey, $productId);
@@ -195,7 +195,7 @@ class PayPalSuscripcionService
         $data = $this->request('POST', '/v1/billing/subscriptions', [
             'plan_id'             => $paypalPlanId,
             'application_context' => [
-                'brand_name'          => 'CarniHub',
+                'brand_name'          => 'Jungle Pizza',
                 'locale'              => 'es-MX',
                 'shipping_preference' => 'NO_SHIPPING',
                 'user_action'         => 'SUBSCRIBE_NOW',

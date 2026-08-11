@@ -264,7 +264,7 @@ $qrImgUrl  = $visitaQr
   <?php endif; ?>
 
   <div style="margin-top:16px;font-size:.7rem;color:#9CA3AF;text-align:center">
-    Potenciado por <strong>CarniHub</strong>
+    Potenciado por <strong>Jungle Pizza</strong>
   </div>
 </div>
 

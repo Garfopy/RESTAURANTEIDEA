@@ -1,5 +1,6 @@
 <?php ob_start(); ?>
 <?php
+$appMovilHabilitada = $appMovilHabilitada ?? true;
 // Onboarding banner — checklist primera vez
 $pasos = [
   ['ok' => !empty($restaurante['telefono']) && !empty($restaurante['direccion']),
@@ -127,12 +128,14 @@ $generalCards = [
     'val'=>'$'.number_format($ingresosTickets, 2),
     'sub'=>'Ventas en mesas',
   ],
-  [
+];
+if ($appMovilHabilitada) {
+  $generalCards[] = [
     'label'=>'Pedido app',
     'val'=>'$'.number_format($ingresosPedidosApp, 2),
     'sub'=>'Ventas desde app',
-  ],
-];
+  ];
+}
 $infoBtn = static function (string $text, string $theme = 'light'): string {
   $classes = $theme === 'dark' ? 'kpi-info kpi-info-dark' : 'kpi-info';
   $safeText = htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
@@ -143,11 +146,12 @@ $infoBtn = static function (string $text, string $theme = 'light'): string {
   <div style="background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:18px">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:14px">
       <div>
-        <div style="font-weight:800;color:#111827">Métricas Jungle</div>
+        <div style="font-weight:800;color:#111827"><?= $appMovilHabilitada ? 'Métricas Jungle' : 'Métricas del restaurante' ?></div>
       </div>
       <span style="font-size:.72rem;color:#6B7280;background:#F3F4F6;border-radius:99px;padding:4px 10px;font-weight:700"><?= date('M Y') ?></span>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px">
+      <?php if ($appMovilHabilitada): ?>
       <?php foreach ($amareCards as $c): ?>
       <div style="border:1px solid #EEF2F7;background:#F9FAFB;border-radius:10px;padding:14px;min-height:100px">
         <div style="font-size:.74rem;color:#6B7280;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:8px">
@@ -158,6 +162,7 @@ $infoBtn = static function (string $text, string $theme = 'light'): string {
         <div style="font-size:.68rem;color:#9CA3AF;margin-top:8px"><?= htmlspecialchars($c['sub']) ?></div>
       </div>
       <?php endforeach; ?>
+      <?php endif; ?>
     </div>
     <div style="border-top:1px solid #EEF2F7;margin-top:18px;padding-top:16px">
       <div style="font-weight:800;color:#111827;margin-bottom:12px">Ingresos generales</div>
@@ -193,7 +198,7 @@ $infoBtn = static function (string $text, string $theme = 'light'): string {
           </div>
           <div style="display:grid;gap:4px;margin-top:8px;font-size:.72rem;color:#D1D5DB">
             <span>Tickets: $<?= number_format($ingresosTickets, 2) ?></span>
-            <span>Pedido app: $<?= number_format($ingresosPedidosApp, 2) ?></span>
+            <?php if ($appMovilHabilitada): ?><span>Pedido app: $<?= number_format($ingresosPedidosApp, 2) ?></span><?php endif; ?>
           </div>
         </div>
 
@@ -212,6 +217,7 @@ $infoBtn = static function (string $text, string $theme = 'light'): string {
         </div>
       </div>
 
+      <?php if ($appMovilHabilitada): ?>
       <div style="border:1px solid #253044;background:#151F2E;border-radius:12px;padding:14px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
           <span style="font-weight:800;color:#F9FAFB">Jungle</span>
@@ -250,6 +256,7 @@ $infoBtn = static function (string $text, string $theme = 'light'): string {
           </div>
         </div>
       </div>
+      <?php endif; ?>
     </div>
   </div>
 </div>
@@ -273,6 +280,7 @@ $infoBtn = static function (string $text, string $theme = 'light'): string {
   </div>
 </div>
 
+<?php if ($appMovilHabilitada): ?>
 <?php
 $moderacionSocial = $moderacionSocial ?? [
   'available' => false,
@@ -419,6 +427,7 @@ $shortText = static function (?string $value, int $max = 130): string {
     </div>
   </div>
 </div>
+<?php endif; ?>
 
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;margin-bottom:20px">
   <!-- Próximas reservas -->
@@ -435,6 +444,7 @@ $shortText = static function (?string $value, int $max = 130): string {
     <?php endforeach; ?>
     <?php endif; ?>
   </div>
+  <?php if ($appMovilHabilitada): ?>
   <div style="background:#fff;border-radius:12px;padding:20px;border:1px solid #E5E7EB;display:flex;flex-direction:column;gap:16px">
     <div>
       <div style="font-weight:700;color:#111827">Reservas por canal</div>
@@ -462,6 +472,7 @@ $shortText = static function (?string $value, int $max = 130): string {
       </div>
     </div>
   </div>
+  <?php endif; ?>
 </div>
 
 <!-- Productos: más / menos vendidos -->

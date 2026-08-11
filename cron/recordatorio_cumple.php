@@ -555,20 +555,31 @@ try {
     $nowDb = (string)($timeRow['now_db'] ?? date('Y-m-d H:i:s'));
 
     $where = [
-        'activo = 1',
-        "rol = 'user'",
-        'fecha_nacimiento IS NOT NULL',
-        "DATE_FORMAT(fecha_nacimiento, '%m-%d') = DATE_FORMAT(CURDATE(), '%m-%d')",
+        'mu.activo = 1',
+        "mu.rol = 'user'",
+        'mu.fecha_nacimiento IS NOT NULL',
+        "DATE_FORMAT(mu.fecha_nacimiento, '%m-%d') = DATE_FORMAT(CURDATE(), '%m-%d')",
     ];
     if ($requireMarketingOptIn && birthday_column_exists($db, 'mobile_usuarios', 'marketing_opt_in')) {
-        $where[] = 'COALESCE(marketing_opt_in, 0) = 1';
+        $where[] = 'COALESCE(mu.marketing_opt_in, 0) = 1';
+    }
+
+    $appJoin = '';
+    if (
+        birthday_column_exists($db, 'mobile_usuarios', 'current_restaurante_id')
+        && birthday_column_exists($db, 'rest_restaurantes', 'app_movil_habilitada')
+    ) {
+        $appJoin = ' INNER JOIN rest_restaurantes rr
+                       ON rr.id = mu.current_restaurante_id
+                      AND rr.app_movil_habilitada = 1';
     }
 
     $stmt = $db->query(
-        'SELECT id, nombre, email, fecha_nacimiento
-           FROM mobile_usuarios
+        'SELECT mu.id, mu.nombre, mu.email, mu.fecha_nacimiento
+           FROM mobile_usuarios mu
+           ' . $appJoin . '
           WHERE ' . implode(' AND ', $where) . '
-          ORDER BY id ASC'
+          ORDER BY mu.id ASC'
     );
     $users = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
 

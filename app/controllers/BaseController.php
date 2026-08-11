@@ -217,6 +217,29 @@ abstract class BaseController
             : null;
     }
 
+    /**
+     * Estado central del canal móvil. Si la migración todavía no fue aplicada,
+     * RestauranteModel conserva el comportamiento anterior (habilitado).
+     */
+    protected function appMovilHabilitada(?int $restauranteId = null): bool
+    {
+        $restauranteId ??= $this->restauranteId();
+        return $restauranteId
+            ? (new RestauranteModel())->appMovilHabilitada((int)$restauranteId)
+            : false;
+    }
+
+    /** Protege módulos web que solo existen para la app móvil. */
+    protected function requireAppMovil(): void
+    {
+        if ($this->appMovilHabilitada()) {
+            return;
+        }
+
+        $this->flash('warning', 'La app móvil está apagada para este restaurante. Puedes activarla desde Configuración.');
+        $this->redirect('rest-config/index');
+    }
+
     protected function esSuperAdmin(): bool
     {
         return $this->rolActual() === 'superadmin';

@@ -9,6 +9,7 @@ class RestPromocionController extends BaseController
     {
         parent::__construct();
         $this->requireRestaurante();
+        $this->requireAppMovil();
         $this->model = new RestPromocionModel();
     }
 

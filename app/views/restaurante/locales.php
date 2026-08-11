@@ -41,7 +41,7 @@
   </svg>
   <div style="font-size:.85rem;color:#1E40AF;line-height:1.5">
     <strong>Cada local es independiente.</strong> Tiene su propio menú, inventario y configuración.
-    Vincula cada local a una sucursal de CarniHub para que los pedidos actualicen el inventario automáticamente.
+    Vincula cada local a una sucursal de Proveedor para que los pedidos actualicen el inventario automáticamente.
   </div>
 </div>
 
@@ -50,7 +50,7 @@
   <?php foreach ($sucursales as $s):
     $activo = ((int)$s['id'] === (int)$restauranteActivoId);
     $sucursalVinculadaId = (int)($s['sucursal_id'] ?? 0);
-    // Find linked CarniHub sucursal name
+    // Find linked Proveedor sucursal name
     $sucursalVinculadaNombre = null;
     foreach ($sucursalesCarniHub as $sc) {
       if ((int)$sc['id'] === $sucursalVinculadaId) {
@@ -111,12 +111,12 @@
         <?php endif; ?>
       </div>
 
-      <!-- Vinculación a sucursal CarniHub -->
+      <!-- Vinculación a sucursal Proveedor -->
       <?php if (!empty($sucursalesCarniHub)): ?>
       <div style="margin-bottom:10px">
         <div style="font-size:.7rem;font-weight:700;color:#9CA3AF;text-transform:uppercase;
                     letter-spacing:.04em;margin-bottom:5px">
-          Sucursal CarniHub vinculada
+          Sucursal Proveedor vinculada
         </div>
         <?php if ($sucursalVinculadaNombre): ?>
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">

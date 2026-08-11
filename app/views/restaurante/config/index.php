@@ -4,10 +4,53 @@ $menuPrincipalId = (int)($menuPrincipal['id'] ?? 0);
 $esMenuPrincipal = $menuPrincipalId > 0 && $menuPrincipalId === (int)($restaurante['id'] ?? 0);
 $hayCadenaMenu = !empty($sucursales) && count($sucursales) > 1;
 $mapsApiKey = trim((string)($mapsApiKey ?? ''));
+$appMovilHabilitada = !array_key_exists('app_movil_habilitada', (array)$restaurante)
+  || !empty($restaurante['app_movil_habilitada']);
 ?>
 <div>
   <div class="rst-card">
     <form method="POST" action="<?= BASE_URL ?>rest-config/guardar" enctype="multipart/form-data" accept-charset="UTF-8">
+
+      <style>
+        .app-master-toggle{display:flex;align-items:center;gap:16px;padding:18px;margin-bottom:22px;border:1.5px solid #CBD5E1;border-radius:14px;background:linear-gradient(135deg,#F8FAFC,#FFF)}
+        .app-master-toggle__copy{flex:1;min-width:0}
+        .app-master-toggle__control{position:relative;display:inline-flex;align-items:center;min-width:58px;height:44px;cursor:pointer}
+        .app-master-toggle__control input{position:absolute;opacity:0;width:1px;height:1px}
+        .app-master-toggle__track{width:52px;height:30px;padding:3px;border-radius:999px;background:#94A3B8;transition:background .18s ease}
+        .app-master-toggle__track:after{content:"";display:block;width:24px;height:24px;border-radius:50%;background:#FFF;box-shadow:0 2px 5px rgba(15,23,42,.25);transition:transform .18s ease}
+        .app-master-toggle__control input:checked + .app-master-toggle__track{background:#0F766E}
+        .app-master-toggle__control input:checked + .app-master-toggle__track:after{transform:translateX(22px)}
+        .app-master-toggle__control input:focus-visible + .app-master-toggle__track{outline:3px solid rgba(14,116,144,.3);outline-offset:3px}
+        .app-mobile-status{display:inline-flex;align-items:center;border-radius:999px;padding:5px 10px;font-size:.75rem;font-weight:800}
+        .app-mobile-status.is-on{color:#166534;background:#DCFCE7}
+        .app-mobile-status.is-off{color:#475569;background:#E2E8F0}
+        [data-app-mobile-section][hidden]{display:none!important}
+        @media(max-width:640px){.app-master-toggle{align-items:flex-start;flex-wrap:wrap}.app-master-toggle__control{margin-left:auto}}
+        @media(prefers-reduced-motion:reduce){.app-master-toggle__track,.app-master-toggle__track:after{transition:none}}
+      </style>
+
+      <section class="app-master-toggle" aria-labelledby="appMobileTitle">
+        <div class="app-master-toggle__copy">
+          <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:5px">
+            <h2 id="appMobileTitle" style="margin:0;font-size:1rem;color:#0F172A">Activar app móvil</h2>
+            <span id="appMobileStatus" class="app-mobile-status <?= $appMovilHabilitada ? 'is-on' : 'is-off' ?>" aria-live="polite">
+              <?= $appMovilHabilitada ? 'Activo' : 'Apagado' ?>
+            </span>
+          </div>
+          <p style="margin:0;color:#64748B;font-size:.8rem;line-height:1.45">
+            Controla promociones, reportes, pedidos, reservaciones, configuración y sincronizaciones de la app para este restaurante.
+            Al apagarla no se elimina ningún dato.
+          </p>
+        </div>
+        <label class="app-master-toggle__control" aria-label="Activar app móvil">
+          <input type="checkbox" id="appMovilHabilitada" name="app_movil_habilitada" value="1"
+                 aria-controls="appMobileSettings" aria-expanded="<?= $appMovilHabilitada ? 'true' : 'false' ?>"
+                 <?= $appMovilHabilitada ? 'checked' : '' ?>>
+          <span class="app-master-toggle__track" aria-hidden="true"></span>
+        </label>
+      </section>
+
+      <div data-app-mobile-section <?= $appMovilHabilitada ? '' : 'hidden' ?>>
 
       <div style="font-weight:700;font-size:.95rem;color:#111827;margin-bottom:6px;
                   display:flex;align-items:center;gap:8px">
@@ -95,11 +138,13 @@ $mapsApiKey = trim((string)($mapsApiKey ?? ''));
         </div>
       </div>
 
+      </div>
+
       <?php if (!empty($bloqueadoPorCarniHub)): ?>
       <div style="background:#EFF6FF;border:1.5px solid #BFDBFE;border-radius:12px;padding:12px 14px;margin-bottom:16px;
                   font-size:.82rem;color:#1E40AF;line-height:1.45">
-        <strong>Local sincronizado con CarniHub.</strong>
-        Los datos del restaurante se autocompletan desde CarniHub y no se pueden editar aquí para evitar desajustes en el pedido automático.
+        <strong>Local sincronizado con el proveedor.</strong>
+        Los datos del restaurante se autocompletan desde Proveedor y no se pueden editar aquí para evitar desajustes en el pedido automático.
       </div>
       <?php endif; ?>
 
@@ -319,7 +364,7 @@ $mapsApiKey = trim((string)($mapsApiKey ?? ''));
           Modos de operación
         </div>
         <div style="font-size:.8rem;color:#6B7280;margin-bottom:14px">
-          Adapta CarniHub a cómo opera tu sucursal: restaurante con mesas, taquería, take-away, etc.
+          Adapta el sistema a cómo opera tu sucursal: restaurante con mesas, taquería, take-away, etc.
         </div>
 
         <?php
@@ -335,7 +380,10 @@ $mapsApiKey = trim((string)($mapsApiKey ?? ''));
           foreach ($toggles as [$key, $def, $label, $desc]):
             $val = (int)($r[$key] ?? $def);
         ?>
-        <label class="rst-toggle-row <?= $val ? 'is-on' : '' ?>">
+        <label class="rst-toggle-row <?= $val ? 'is-on' : '' ?>"
+               <?= in_array($key, ['exclusiones_app_habilitadas','extras_app_habilitados'], true)
+                 ? 'data-app-mobile-section' . ($appMovilHabilitada ? '' : ' hidden')
+                 : '' ?>>
           <span class="rst-toggle">
             <input type="checkbox" name="<?= $key ?>" value="1" <?= $val ? 'checked' : '' ?>
                    onchange="this.closest('.rst-toggle-row').classList.toggle('is-on', this.checked)">
@@ -382,7 +430,7 @@ $mapsApiKey = trim((string)($mapsApiKey ?? ''));
         🛵 Tipos de entrega (App Móvil)
       </div>
       <div style="font-size:.8rem;color:#6B7280;margin-bottom:14px">
-        Controla cómo los clientes pueden recibir sus pedidos desde la app móvil (CarniHub / Amare).
+        Controla cómo los clientes pueden recibir sus pedidos desde la app móvil (Jungle Pizza).
       </div>
 
       <?php
@@ -393,6 +441,7 @@ $mapsApiKey = trim((string)($mapsApiKey ?? ''));
           'eat_in'   => '🍽️ Comer en el restaurante',
         ];
       ?>
+      <div id="appMobileSettings" data-app-mobile-section <?= $appMovilHabilitada ? '' : 'hidden' ?>>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
         <?php foreach ($tiposEntregaOpts as $val => $label): ?>
         <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;
@@ -421,7 +470,7 @@ $mapsApiKey = trim((string)($mapsApiKey ?? ''));
         💳 Métodos de pago (App Móvil)
       </div>
       <div style="font-size:.8rem;color:#6B7280;margin-bottom:14px">
-        Controla qué métodos de pago estarán disponibles en la app móvil (CarniHub / Amare).
+        Controla qué métodos de pago estarán disponibles en la app móvil (Jungle Pizza).
       </div>
 
       <?php
@@ -432,7 +481,7 @@ $mapsApiKey = trim((string)($mapsApiKey ?? ''));
       <div style="background:#F9FAFB;border:1.5px solid #E5E7EB;border-radius:12px;padding:14px;margin-bottom:18px">
         <div style="font-weight:700;font-size:.88rem;color:#111827;margin-bottom:6px">Colores de la app m&oacute;vil</div>
         <div style="font-size:.76rem;color:#6B7280;margin-bottom:12px">
-          Ajusta el fondo y los botones principales que se sincronizan con Amare-App.
+          Ajusta el fondo y los botones principales que se sincronizan con Jungle Pizza.
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px">
           <div class="form-group" style="margin-bottom:0">
@@ -521,22 +570,22 @@ $mapsApiKey = trim((string)($mapsApiKey ?? ''));
       </div>
 
       <!-- ══════════════════════════════════════════════════════════
-           SECCIÓN: CONEXIÓN API AMARE-APP
+           SECCIÓN: CONEXIÓN API APP MOVIL
            ═════════════════════════════════════════════════════════ -->
       <hr style="border:none;border-top:1.5px solid #F3F4F6;margin:24px 0">
       <div style="font-weight:700;font-size:.95rem;color:#111827;margin-bottom:6px;
                   display:flex;align-items:center;gap:8px">
         <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg>
-        🔗 Conexión con API Amare-App
+        🔗 Conexión con la app m&oacute;vil de Jungle Pizza
       </div>
       <div style="font-size:.8rem;color:#6B7280;margin-bottom:14px">
-        Configura la URL y el token de la API de Amare-App para sincronizar automáticamente métodos de pago y tipos de entrega. Al guardar, se enviarán los cambios a la app móvil.
+        Configura la URL y el token de la app m&oacute;vil de Jungle Pizza para sincronizar automáticamente métodos de pago y tipos de entrega. Al guardar, se enviarán los cambios a la app móvil.
       </div>
 
       <div style="background:#F0F9FF;border:1.5px solid #BAE6FD;border-radius:12px;
                   padding:16px 18px;margin-bottom:20px">
         <div class="form-group">
-          <label class="form-label" style="font-size:.8rem">URL de la API Amare-App</label>
+          <label class="form-label" style="font-size:.8rem">URL de la la app m&oacute;vil de Jungle Pizza</label>
           <input type="url" name="amare_api_url" id="amareApiUrl" class="form-input"
                  value="<?= htmlspecialchars($cfgPagos['amare_api_url'] ?? '') ?>"
                  placeholder="https://api.turestaurante.com/api"
@@ -765,6 +814,7 @@ $mapsApiKey = trim((string)($mapsApiKey ?? ''));
         msg.textContent = texto;
       }
       </script>
+      </div>
 
       <!-- ══════════════════════════════════════════════════════════
            SECCIÓN: PAGOS DE COMENSALES
@@ -853,18 +903,18 @@ $mapsApiKey = trim((string)($mapsApiKey ?? ''));
       </div>
 
       <!-- ══════════════════════════════════════════════════════════
-           SECCIÓN: CARNIHUB — PAGO DE PEDIDOS A PROVEEDOR
+           SECCIÓN: PROVEEDOR — PAGO DE PEDIDOS A PROVEEDOR
            ═════════════════════════════════════════════════════════ -->
       <?php if (!empty($cfgCarniHub)): ?>
       <hr style="border:none;border-top:1.5px solid #F3F4F6;margin:24px 0">
       <div style="font-weight:700;font-size:.95rem;color:#111827;margin-bottom:16px;
                   display:flex;align-items:center;gap:8px">
         <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10"/></svg>
-        CarniHub — Pago de pedidos a proveedor
+        Proveedor — Pago de pedidos a proveedor
       </div>
       <div style="background:#FFF7ED;border:1.5px solid #FED7AA;border-radius:12px;
                   padding:14px 16px;margin-bottom:14px;font-size:.8rem;color:#92400E">
-        Cuando envíes un pedido de insumos a CarniHub, el sistema usará el método configurado aquí
+        Cuando envíes un pedido de insumos al proveedor, el sistema usará el método configurado aquí
         para procesar el cobro automáticamente.
       </div>
 
@@ -887,10 +937,10 @@ $mapsApiKey = trim((string)($mapsApiKey ?? ''));
            style="display:<?= ($cfgCarniHub['metodo_pago'] ?? 'transferencia') === 'transferencia' ? 'block' : 'none' ?>;
                   background:#F9FAFB;border:1.5px solid #E5E7EB;border-radius:10px;padding:14px;margin-bottom:16px">
         <label class="form-label" style="font-size:.8rem">
-          Instrucciones de transferencia (proporcionadas por CarniHub)
+          Instrucciones de transferencia (proporcionadas por el proveedor)
         </label>
         <textarea name="ch_instrucciones_transferencia" class="form-textarea" rows="4"
-                  placeholder="Banco: BBVA&#10;CLABE: 012345678901234567&#10;Beneficiario: CarniHub S.A."><?= htmlspecialchars($cfgCarniHub['instrucciones_transferencia'] ?? '') ?></textarea>
+                  placeholder="Banco: BBVA&#10;CLABE: 012345678901234567&#10;Beneficiario: Proveedor S.A."><?= htmlspecialchars($cfgCarniHub['instrucciones_transferencia'] ?? '') ?></textarea>
         <div style="font-size:.73rem;color:#9CA3AF;margin-top:4px">
           Estas instrucciones se mostrarán al administrador al enviar un pedido de insumos.
         </div>
@@ -933,7 +983,7 @@ $mapsApiKey = trim((string)($mapsApiKey ?? ''));
           </div>
 
           <div style="font-size:.73rem;color:#0C4A6E;margin-top:10px">
-            Al enviar un pedido a CarniHub se cobrará automáticamente, sin necesidad de confirmar manualmente.
+            Al enviar un pedido al proveedor se cobrará automáticamente, sin necesidad de confirmar manualmente.
           </div>
         </div>
       </div>
@@ -942,13 +992,13 @@ $mapsApiKey = trim((string)($mapsApiKey ?? ''));
 
 <!-- Nota footer -->
       <div style="background:#F9FAFB;border-radius:8px;padding:12px;font-size:.8rem;color:#6B7280;margin-bottom:20px">
-        El footer del menú siempre mostrará: <strong>Potenciado por CarniHub</strong>
+        El footer del menú siempre mostrará: <strong>Jungle Pizza</strong>
       </div>
 
       <div style="display:flex;justify-content:flex-end">
         <?php if (!empty($bloqueadoPorCarniHub)): ?>
         <button type="button" class="btn btn-outline" disabled>
-          Sincronizado por CarniHub
+          Sincronizado por el proveedor
         </button>
         <?php else: ?>
         <button type="submit" class="btn btn-primary">Guardar configuración</button>
@@ -1014,6 +1064,38 @@ $mapsApiKey = trim((string)($mapsApiKey ?? ''));
 
 <script>
 const BASE = '<?= BASE_URL ?>';
+const appMobileToggle = document.getElementById('appMovilHabilitada');
+const appMobileStatus = document.getElementById('appMobileStatus');
+const appMobileSections = Array.from(document.querySelectorAll('[data-app-mobile-section]'));
+const appMobileMain = document.getElementById('appMobileSettings');
+if (appMobileMain) {
+  let sibling = appMobileMain.previousElementSibling;
+  for (let i = 0; i < 3 && sibling; i++) {
+    sibling.setAttribute('data-app-mobile-section', '');
+    if (!appMobileSections.includes(sibling)) appMobileSections.push(sibling);
+    sibling = sibling.previousElementSibling;
+  }
+}
+function refreshAppMobileVisibility() {
+  const enabled = !!appMobileToggle?.checked;
+  appMobileSections.forEach(section => {
+    section.hidden = !enabled;
+    section.querySelectorAll('input,select,textarea,button').forEach(control => {
+      control.disabled = !enabled;
+    });
+  });
+  if (appMobileToggle) {
+    appMobileToggle.disabled = false;
+    appMobileToggle.setAttribute('aria-expanded', enabled ? 'true' : 'false');
+  }
+  if (appMobileStatus) {
+    appMobileStatus.textContent = enabled ? 'Activo' : 'Apagado';
+    appMobileStatus.className = 'app-mobile-status ' + (enabled ? 'is-on' : 'is-off');
+  }
+}
+appMobileToggle?.addEventListener('change', refreshAppMobileVisibility);
+refreshAppMobileVisibility();
+
 const GOOGLE_MAPS_API_KEY = '<?= htmlspecialchars($mapsApiKey, ENT_QUOTES) ?>';
 const GOOGLE_MAPS_ENABLED = GOOGLE_MAPS_API_KEY.length > 0;
 const DEFAULT_REST_CENTER = { lat: 20.6736, lng: -103.344 };
@@ -1199,7 +1281,7 @@ function renderLeafletAddressMap(lat, lng, label) {
     setTimeout(function(){ rstLeafletMap.invalidateSize(); }, 80);
   });
 }
-// ── CarniHub: método de pago + tarjeta guardada ──────────────────────────────
+// ── Proveedor: método de pago + tarjeta guardada ──────────────────────────────
 function chOnMetodoChange(val) {
   document.getElementById('chTransfPanel').style.display     = val === 'transferencia' ? 'block' : 'none';
   document.getElementById('chStripeCardPanel').style.display = val === 'stripe'        ? 'block' : 'none';

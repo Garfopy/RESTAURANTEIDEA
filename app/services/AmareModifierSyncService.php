@@ -15,6 +15,14 @@ class AmareModifierSyncService
      */
     public function syncPlatillo(int $restauranteId, int $platilloId): array
     {
+        if (!(new RestauranteModel())->appMovilHabilitada($restauranteId)) {
+            return [
+                'ok' => false,
+                'http_code' => 403,
+                'code' => 'APP_MOVIL_DISABLED',
+                'message' => 'La app móvil está desactivada para este restaurante.',
+            ];
+        }
         try {
             $platillo = $this->menuModel->find($platilloId);
             if (!$platillo || (int)$platillo['restaurante_id'] !== $restauranteId) {
@@ -90,6 +98,16 @@ class AmareModifierSyncService
 
     public function syncTodos(int $restauranteId): array
     {
+        if (!(new RestauranteModel())->appMovilHabilitada($restauranteId)) {
+            return [
+                'ok' => false,
+                'code' => 'APP_MOVIL_DISABLED',
+                'shared_database' => true,
+                'sincronizados' => 0,
+                'total' => 0,
+                'errores' => [],
+            ];
+        }
         try {
             $this->menuModel->prepararSelectorUnificado($restauranteId);
             $platillos = $this->menuModel->getByRestaurante($restauranteId, true);
