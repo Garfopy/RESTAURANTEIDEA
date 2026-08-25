@@ -559,6 +559,78 @@ class RestFinanzasModel extends BaseModel
         );
     }
 
+    /**
+     * KPIs del dashboard de Admin basados en rest_pedidos (pickup/delivery), no en
+     * rest_tickets (dine-in). Único punto de venta del negocio en el modelo marketplace.
+     */
+    public function kpisPedidosDashboard(int $restauranteId, string $desde, string $hasta): array
+    {
+        $params = [$restauranteId, $desde, $hasta];
+
+        $ingresos = (float) $this->queryOne(
+            "SELECT COALESCE(SUM(total),0) AS v FROM rest_pedidos
+             WHERE restaurante_id=? AND estado <> 'cancelado' AND DATE(created_at) BETWEEN ? AND ?",
+            $params
+        )['v'];
+
+        $totalPedidos = (int) $this->queryOne(
+            "SELECT COUNT(*) AS c FROM rest_pedidos
+             WHERE restaurante_id=? AND estado <> 'cancelado' AND DATE(created_at) BETWEEN ? AND ?",
+            $params
+        )['c'];
+
+        $ticketPromedio = $totalPedidos > 0 ? round($ingresos / $totalPedidos, 2) : 0.0;
+
+        $gastos = (float) $this->queryOne(
+            "SELECT COALESCE(SUM(monto),0) AS v FROM rest_gastos
+             WHERE restaurante_id=? AND fecha BETWEEN ? AND ?",
+            $params
+        )['v'];
+
+        $retiros = (float) $this->queryOne(
+            "SELECT COALESCE(SUM(monto),0) AS v FROM rest_retiros
+             WHERE restaurante_id=? AND DATE(created_at) BETWEEN ? AND ?",
+            $params
+        )['v'];
+
+        $pendientePorCobrar = (float) $this->queryOne(
+            "SELECT COALESCE(SUM(total),0) AS v FROM rest_pedidos
+             WHERE restaurante_id=? AND estado <> 'cancelado' AND pagado_at IS NULL
+               AND DATE(created_at) BETWEEN ? AND ?",
+            $params
+        )['v'];
+
+        $pedidosPendientes = (int) $this->queryOne(
+            "SELECT COUNT(*) AS c FROM rest_pedidos
+             WHERE restaurante_id=? AND estado IN ('pendiente','en_preparacion','listo','en_camino')",
+            [$restauranteId]
+        )['c'];
+
+        $utilidad = $ingresos - $gastos - $retiros;
+        $margen   = $ingresos > 0 ? round(($utilidad / $ingresos) * 100, 2) : 0.0;
+
+        $porTipoEntrega = $this->query(
+            "SELECT tipo_pedido, COUNT(*) AS c, COALESCE(SUM(total),0) AS total
+             FROM rest_pedidos
+             WHERE restaurante_id=? AND estado <> 'cancelado' AND DATE(created_at) BETWEEN ? AND ?
+             GROUP BY tipo_pedido",
+            $params
+        );
+
+        return compact(
+            'ingresos',
+            'totalPedidos',
+            'ticketPromedio',
+            'gastos',
+            'retiros',
+            'pendientePorCobrar',
+            'pedidosPendientes',
+            'utilidad',
+            'margen',
+            'porTipoEntrega'
+        );
+    }
+
     public function amareDashboardKpis(int $restauranteId, string $desde, string $hasta): array
     {
         [$desde, $hasta] = $this->ajustarRangoVisible($restauranteId, $desde, $hasta);

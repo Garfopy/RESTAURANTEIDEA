@@ -140,51 +140,30 @@ class RestauranteController extends BaseController
     {
         $this->requireRestaurante();
         $restauranteId = $this->restauranteId();
-        $restaurante   = $this->model->getConStats($restauranteId);
-        $appMovilHabilitada = $this->appMovilHabilitada($restauranteId);
+        $restaurante   = $this->model->getStatsMarketplace($restauranteId);
 
-        $finanzas   = new RestFinanzasModel();
-        $hoy        = date('Y-m-d');
-        $inicioMes  = date('Y-m-01');
-        $kpis       = $finanzas->kpisDashboard($restauranteId, $inicioMes, $hoy);
-        $amareKpis  = $finanzas->amareDashboardKpis($restauranteId, $inicioMes, $hoy);
-        $perdidasMes = (float)($kpis['gastos'] ?? 0)
-            + (float)($kpis['retiros'] ?? 0)
-            + (float)($amareKpis['perdidaAmare'] ?? 0);
-        $comparativaFinanzas = [
-            'ingresos' => (float)($kpis['ingresos'] ?? 0),
-            'perdidas' => $perdidasMes,
-            'neto' => (float)($kpis['ingresos'] ?? 0) - $perdidasMes,
-        ];
-
-        $pedidos    = new RestPedidoModel();
-        $activos    = $pedidos->getKitchenQueue($restauranteId);
+        $finanzas  = new RestFinanzasModel();
+        $hoy       = date('Y-m-d');
+        $inicioMes = date('Y-m-01');
+        $kpisHoy   = $finanzas->kpisPedidosDashboard($restauranteId, $hoy, $hoy);
+        $kpisMes   = $finanzas->kpisPedidosDashboard($restauranteId, $inicioMes, $hoy);
 
         $inventario = new RestInventarioModel();
         $alertas    = $inventario->alertasStockBajo($restauranteId);
-
-        $reservas   = new RestReservaModel();
-        $proximas   = $reservas->getProximas($restauranteId, 3);
-        $reservasCanal = $reservas->getResumenCanal($restauranteId);
 
         $menuModel     = new RestMenuModel();
         $visibleDesde  = $this->fechaFinancieraVisibleDesde();
         $topVendidos   = $menuModel->getTopVendidos($restauranteId, 5, $visibleDesde);
         $menosVendidos = $menuModel->getMenosVendidos($restauranteId, 5, $visibleDesde);
 
-        $moderacionSocial = $appMovilHabilitada
-            ? (new RestSocialModeracionModel())->resumenDashboard($restauranteId, 5)
-            : ['available' => false, 'kpis' => [], 'reportes' => [], 'bloqueos' => [], 'usuarios_observados' => []];
-
-        $linkStaff  = BASE_URL . 'auth/login';
-        $linkMenu   = BASE_URL . 'menu/'   . $restaurante['slug'];
+        $linkMenu   = BASE_URL . 'menu/' . $restaurante['slug'];
         $flash      = $this->getFlash();
         $pageTitle  = 'Dashboard — ' . $restaurante['nombre'];
         $activeMenu = 'rest_dashboard';
         $this->render('restaurante/dashboard', compact(
-            'restaurante','kpis','amareKpis','comparativaFinanzas','activos','alertas','proximas',
-            'reservasCanal','topVendidos','menosVendidos','moderacionSocial',
-            'linkStaff','linkMenu','flash','pageTitle','activeMenu','appMovilHabilitada'
+            'restaurante', 'kpisHoy', 'kpisMes', 'alertas',
+            'topVendidos', 'menosVendidos',
+            'linkMenu', 'flash', 'pageTitle', 'activeMenu'
         ));
     }
 

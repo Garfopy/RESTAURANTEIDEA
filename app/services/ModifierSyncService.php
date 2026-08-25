@@ -1,6 +1,6 @@
 <?php
 
-class AmareModifierSyncService
+class ModifierSyncService
 {
     private RestMenuModel $menuModel;
 
@@ -10,7 +10,7 @@ class AmareModifierSyncService
     }
 
     /**
-     * Web y Amare-App comparten base de datos. Sincronizar significa dejar
+     * Web y app móvil comparten base de datos. Sincronizar significa dejar
      * materializadas las relaciones oficiales; no se replica por HTTP.
      */
     public function syncPlatillo(int $restauranteId, int $platilloId): array
@@ -37,7 +37,7 @@ class AmareModifierSyncService
                 'payload' => $payload,
             ];
         } catch (\Throwable $e) {
-            error_log('[ModificadoresAmare] ' . $e->getMessage());
+            error_log('[ModificadoresSync] ' . $e->getMessage());
             return ['ok' => false, 'http_code' => 0, 'message' => $e->getMessage()];
         }
     }
@@ -119,7 +119,7 @@ class AmareModifierSyncService
                 'errores' => [],
             ];
         } catch (\Throwable $e) {
-            error_log('[ModificadoresAmare] ' . $e->getMessage());
+            error_log('[ModificadoresSync] ' . $e->getMessage());
             return [
                 'ok' => false,
                 'shared_database' => true,

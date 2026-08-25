@@ -898,7 +898,7 @@ class RestConfigController extends BaseController
                     $facturacion
                 );
                 if ($syncError === null && $modifierSaveError === null) {
-                    $bulkSync = (new AmareModifierSyncService())->syncTodos($restauranteId);
+                    $bulkSync = (new ModifierSyncService())->syncTodos($restauranteId);
                     if (empty($bulkSync['ok'])) {
                         $first = $bulkSync['errores'][0] ?? [];
                         $result = $first['result'] ?? [];

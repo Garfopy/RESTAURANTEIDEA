@@ -2524,7 +2524,7 @@ class ApiController extends BaseController
                 }
             }
             if ($method === 'GET' && $esModificadores) {
-                $payload = (new AmareModifierSyncService())->buildPayload($restauranteId, $menuItemId);
+                $payload = (new ModifierSyncService())->buildPayload($restauranteId, $menuItemId);
                 $this->adminApiOk('Modificadores obtenidos correctamente', $payload);
             }
             if ($method === 'GET' && $subAct === 'config') {
@@ -2549,7 +2549,7 @@ class ApiController extends BaseController
                         "SELECT id FROM rest_platillos WHERE restaurante_id=? AND activo=1 ORDER BY id"
                     );
                     $menuStmt->execute([$restauranteId]);
-                    $modifierService = new AmareModifierSyncService();
+                    $modifierService = new ModifierSyncService();
                     foreach ($menuStmt->fetchAll(\PDO::FETCH_COLUMN) as $platilloId) {
                         $platillos[(int)$platilloId] = $modifierService->buildPayload($restauranteId, (int)$platilloId);
                     }

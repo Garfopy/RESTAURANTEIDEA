@@ -177,15 +177,15 @@ class RestMenuController extends BaseController
 
         $this->model->sincronizarExclusionesDesdeReceta($restauranteId, $platilloId);
         $this->model->sincronizarCatalogoExtras($restauranteId);
-        $syncError = $this->syncModificadoresAmare($restauranteId, $platilloId);
+        $syncError = $this->syncModificadoresApp($restauranteId, $platilloId);
 
         $this->flash($syncError ? 'error' : 'success', $syncError ?: 'Platillo guardado.');
         $this->redirect('rest-menu/index');
     }
 
-    private function syncModificadoresAmare(int $restauranteId, int $platilloId): ?string
+    private function syncModificadoresApp(int $restauranteId, int $platilloId): ?string
     {
-        $result = (new AmareModifierSyncService())->syncPlatillo($restauranteId, $platilloId);
+        $result = (new ModifierSyncService())->syncPlatillo($restauranteId, $platilloId);
         if (!empty($result['ok'])) return null;
         return 'Platillo guardado, pero no se pudieron preparar sus modificadores: '
             . mb_substr((string)($result['message'] ?? ''), 0, 180);

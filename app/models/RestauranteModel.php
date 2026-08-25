@@ -254,6 +254,22 @@ class RestauranteModel extends BaseModel
         );
     }
 
+    /**
+     * Stats básicas para el dashboard de Admin en el modelo marketplace (pickup/delivery).
+     * A diferencia de getConStats(), no depende de rest_mesas ni rest_staff — tablas que
+     * no existen en el esquema recortado (idactivo_cafeteq.sql).
+     */
+    public function getStatsMarketplace(int $restauranteId): ?array
+    {
+        return $this->queryOne(
+            "SELECT r.*,
+                    (SELECT COUNT(*) FROM rest_pedidos WHERE restaurante_id = r.id AND estado IN ('pendiente','en_preparacion','listo','en_camino')) AS pedidos_activos,
+                    (SELECT COUNT(*) FROM rest_platillos WHERE restaurante_id = r.id AND activo = 1) AS total_platillos
+             FROM rest_restaurantes r WHERE r.id = ?",
+            [$restauranteId]
+        );
+    }
+
     public function slugExiste(string $slug, int $excludeId = 0): bool
     {
         $r = $this->queryOne(
