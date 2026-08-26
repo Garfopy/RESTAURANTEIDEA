@@ -42,9 +42,10 @@
   box-shadow:0 10px 24px rgba(0,0,0,.12);padding:6px;
 }
 .menu-action-menu.open .menu-action-dropdown { display:block; }
-.menu-action-dropdown a {
+.menu-action-dropdown a,
+.menu-action-dropdown button {
   display:block;padding:7px 10px;border-radius:7px;font-size:.75rem;
-  text-decoration:none;margin:2px 0;
+  text-decoration:none;margin:2px 0;font-family:inherit;
 }
 .menu-chain-panel {
   background:#F9FAFB;border:1px solid #E5E7EB;border-radius:10px;padding:9px 12px;
@@ -86,6 +87,7 @@ $esMenuPrincipal = $menuPrincipalId > 0 && $menuPrincipalId === (int)$restaurant
     <?php if ($menuPrincipalId): ?>
     <form method="POST" action="<?= BASE_URL ?>rest-menu/importarPrincipal"
           onsubmit="return confirm('Importar el menu principal a esta sucursal? No se borraran platillos locales y se conservara la disponibilidad de los existentes.')">
+      <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf, ENT_QUOTES) ?>">
       <button type="submit" class="btn btn-outline" style="padding:6px 10px;font-size:.76rem">
         Importar
       </button>
@@ -184,13 +186,17 @@ $esMenuPrincipal = $menuPrincipalId > 0 && $menuPrincipalId === (int)$restaurant
               style="background:#EFF6FF;color:#1D4ED8">Editar</a>
             <a href="<?= BASE_URL ?>rest-menu/detalle/<?= $p['id'] ?>"
               style="background:#F0FDF4;color:#16A34A">Ver costos</a>
-            <a href="<?= BASE_URL ?>rest-menu/toggleDisponible/<?= $p['id'] ?>"
-              style="background:#F9FAFB;color:#6B7280">
-             <?= $p['disponible'] ? 'Pausar' : 'Activar' ?>
-            </a>
-            <a href="<?= BASE_URL ?>rest-menu/eliminar/<?= $p['id'] ?>"
-              onclick="return confirm('¿Desactivar este platillo?')"
-              style="background:#FEF2F2;color:#EF4444">Quitar</a>
+            <form method="POST" action="<?= BASE_URL ?>rest-menu/toggleDisponible/<?= $p['id'] ?>" style="margin:0">
+              <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf, ENT_QUOTES) ?>">
+              <button type="submit" style="width:100%;border:0;background:#F9FAFB;color:#6B7280;text-align:left;cursor:pointer">
+                <?= $p['disponible'] ? 'Pausar' : 'Activar' ?>
+              </button>
+            </form>
+            <form method="POST" action="<?= BASE_URL ?>rest-menu/eliminar/<?= $p['id'] ?>" style="margin:0"
+                  onsubmit="return confirm('¿Desactivar este platillo?')">
+              <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf, ENT_QUOTES) ?>">
+              <button type="submit" style="width:100%;border:0;background:#FEF2F2;color:#EF4444;text-align:left;cursor:pointer">Quitar</button>
+            </form>
           </div>
          </div>
         </div>
@@ -237,6 +243,7 @@ $esMenuPrincipal = $menuPrincipalId > 0 && $menuPrincipalId === (int)$restaurant
     </div>
     <?php endif; ?>
     <form method="POST" action="<?= BASE_URL ?>rest-menu/guardarCategoria" onsubmit="return validarCat()">
+      <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf, ENT_QUOTES) ?>">
       <input type="hidden" name="id" value="">
       <div class="form-group">
         <label class="form-label">Nombre de la categoría *</label>

@@ -18,6 +18,7 @@ class RestMenuController extends BaseController
         $platillos  = $this->model->getByRestaurante($restauranteId, true);
         $categorias = $this->model->getCategorias($restauranteId);
         $flash      = $this->getFlash();
+        $csrf       = $this->csrfToken();
         $pageTitle  = 'Menú';
         $activeMenu = 'rest_menu';
         $restModel = new RestauranteModel();
@@ -33,12 +34,16 @@ class RestMenuController extends BaseController
         } catch (\Throwable $e) {
             if (!$flash) $flash = ['type' => 'error', 'message' => $e->getMessage()];
         }
-        $this->render('restaurante/menu/index', compact('platillos','categorias','flash','pageTitle','activeMenu','sucursales','restaurante','menuPrincipal'));
+        $this->render('restaurante/menu/index', compact('platillos','categorias','flash','csrf','pageTitle','activeMenu','sucursales','restaurante','menuPrincipal'));
     }
 
     public function importarPrincipal(?string $p = null): void
     {
         if (!$this->isPost()) $this->redirect('rest-menu/index');
+        if (!$this->validarCsrf()) {
+            $this->flash('error', 'La sesión venció. Vuelve a intentarlo.');
+            $this->redirect('rest-menu/index');
+        }
         $destinoId = (int)$this->restauranteId();
         $restModel = new RestauranteModel();
         $destino = $restModel->find($destinoId);
@@ -87,40 +92,109 @@ class RestMenuController extends BaseController
     {
         $restauranteId = $this->restauranteId();
         $platillo   = $id ? $this->model->getPlatilloConReceta((int)$id) : null;
+        if ($id && (!$platillo || (int)($platillo['restaurante_id'] ?? 0) !== $restauranteId)) {
+            $this->flash('error', 'El platillo solicitado no pertenece a este restaurante.');
+            $this->redirect('rest-menu/index');
+        }
         $categorias = $this->model->getCategorias($restauranteId, true);
         $ingredientes = (new RestInventarioModel())->getByRestaurante($restauranteId, true);
         $flash      = $this->getFlash();
+        $csrf       = $this->csrfToken();
         $pageTitle  = $platillo ? 'Editar Platillo' : 'Nuevo Platillo';
         $activeMenu = 'rest_menu';
-        $this->render('restaurante/menu/form', compact('platillo','categorias','ingredientes','flash','pageTitle','activeMenu'));
+        $this->render('restaurante/menu/form', compact('platillo','categorias','ingredientes','flash','csrf','pageTitle','activeMenu'));
     }
 
     public function guardar(?string $p = null): void
     {
         if (!$this->isPost()) $this->redirect('rest-menu/index');
+        if (!$this->validarCsrf()) {
+            $this->flash('error', 'La sesión del formulario venció. Vuelve a intentarlo.');
+            $this->redirect('rest-menu/index');
+        }
         $restauranteId = $this->restauranteId();
 
         $id = (int)$this->post('id');
+        $existente = $id ? $this->model->find($id) : null;
+        if ($id && (!$existente || (int)($existente['restaurante_id'] ?? 0) !== $restauranteId)) {
+            $this->flash('error', 'No tienes permiso para modificar ese platillo.');
+            $this->redirect('rest-menu/index');
+        }
+
+        $nombre = trim((string)$this->post('nombre', ''));
+        $precio = (float)$this->post('precio', 0);
+        if ($nombre === '' || mb_strlen($nombre) > 200 || $precio <= 0 || $precio > 99999999.99) {
+            $this->flash('error', 'Captura un nombre y un precio mayor a cero.');
+            $this->redirect($id ? 'rest-menu/form/' . $id : 'rest-menu/form');
+        }
+
+        $categoriaId = (int)$this->post('categoria_id', 0);
+        $nuevaCategoria = trim((string)$this->post('nueva_categoria', ''));
+        if ($categoriaId > 0) {
+            $categoria = $this->model->findCategoria($categoriaId);
+            if (!$categoria || (int)($categoria['restaurante_id'] ?? 0) !== $restauranteId) {
+                $this->flash('error', 'La categoría seleccionada no es válida para este restaurante.');
+                $this->redirect($id ? 'rest-menu/form/' . $id : 'rest-menu/form');
+            }
+        } elseif ($nuevaCategoria !== '') {
+            if (mb_strlen($nuevaCategoria) > 100) {
+                $this->flash('error', 'El nombre de la categoría no puede superar 100 caracteres.');
+                $this->redirect($id ? 'rest-menu/form/' . $id : 'rest-menu/form');
+            }
+            $stmtCategoria = \Database::getInstance()->prepare(
+                'SELECT id FROM rest_categorias_menu WHERE restaurante_id = ? AND nombre = ? LIMIT 1'
+            );
+            $stmtCategoria->execute([$restauranteId, $nuevaCategoria]);
+            $categoriaId = (int)($stmtCategoria->fetchColumn() ?: 0);
+            if ($categoriaId === 0) {
+                $categoriaId = $this->model->insertCategoria([
+                    'restaurante_id' => $restauranteId,
+                    'nombre' => $nuevaCategoria,
+                    'descripcion' => null,
+                    'orden' => count($this->model->getCategorias($restauranteId)),
+                ]);
+            }
+        }
+
+        $ingredienteDirectoId = (int)$this->post('ingrediente_directo_id', 0);
+        if ($ingredienteDirectoId > 0) {
+            $stmtDirecto = \Database::getInstance()->prepare(
+                'SELECT id FROM rest_ingredientes WHERE id = ? AND restaurante_id = ? AND activo = 1 LIMIT 1'
+            );
+            $stmtDirecto->execute([$ingredienteDirectoId, $restauranteId]);
+            if (!$stmtDirecto->fetchColumn()) {
+                $this->flash('error', 'El ingrediente de inventario seleccionado no es válido.');
+                $this->redirect($id ? 'rest-menu/form/' . $id : 'rest-menu/form');
+            }
+        }
 
         // Alérgenos: array of checkbox values → comma-separated string
         $alergenosArr = $this->post('alergenos', []);
-        $alergenosStr = is_array($alergenosArr) ? implode(',', array_filter(array_map('trim', $alergenosArr))) : '';
+        $alergenosPermitidos = ['Gluten', 'Lactosa', 'Mariscos', 'Frutos secos', 'Huevo', 'Soya', 'Cacahuate', 'Mostaza'];
+        $alergenosStr = is_array($alergenosArr)
+            ? implode(',', array_values(array_intersect($alergenosPermitidos, array_map('trim', $alergenosArr))))
+            : '';
 
         $data = [
             'restaurante_id'         => $restauranteId,
-            'categoria_id'           => $this->post('categoria_id') ?: null,
-            'nombre'                 => trim($this->post('nombre', '')),
-            'descripcion'            => $this->post('descripcion'),
-            'precio'                 => (float)$this->post('precio', 0),
-            'tiempo_preparacion_min' => (int)$this->post('tiempo_preparacion_min', 15),
-            'disponible'             => $this->post('disponible', 1),
+            'categoria_id'           => $categoriaId ?: null,
+            'nombre'                 => $nombre,
+            'descripcion'            => trim((string)$this->post('descripcion', '')) ?: null,
+            'precio'                 => $precio,
+            'tiempo_preparacion_min' => min(127, max(1, (int)$this->post('tiempo_preparacion_min', 15))),
+            'disponible'             => $this->post('disponible', 0) == '1' ? 1 : 0,
             'alergenos'              => $alergenosStr ?: null,
-            'contiene'               => $this->post('contiene') ?: null,
-            'ingrediente_directo_id' => $this->post('ingrediente_directo_id') ?: null,
+            'contiene'               => trim((string)$this->post('contiene', '')) ?: null,
+            'ingrediente_directo_id' => $ingredienteDirectoId ?: null,
         ];
 
         // Imagen del platillo (subida)
-        $imagenPath = $this->procesarImagenPlatillo($restauranteId, $id);
+        try {
+            $imagenPath = $this->procesarImagenPlatillo($restauranteId, $id);
+        } catch (\InvalidArgumentException $e) {
+            $this->flash('error', $e->getMessage());
+            $this->redirect($id ? 'rest-menu/form/' . $id : 'rest-menu/form');
+        }
         if ($imagenPath !== null) {
             $data['imagen'] = $imagenPath ?: null;
         }
@@ -147,31 +221,44 @@ class RestMenuController extends BaseController
         $ingredientesIds  = $this->post('ingrediente_id', []);
         $cantidades       = $this->post('cantidad', []);
         $unidades         = $this->post('unidad', []);
+        $ingredientesIds  = is_array($ingredientesIds) ? $ingredientesIds : [];
+        $cantidades       = is_array($cantidades) ? $cantidades : [];
+        $unidades         = is_array($unidades) ? $unidades : [];
         $tipoIngredienteStmt = \Database::getInstance()->prepare(
             "SELECT tipo FROM rest_ingredientes WHERE id=? AND restaurante_id=? LIMIT 1"
         );
 
-        if (!empty($ingredientesIds)) {
+        $ings = [];
+        $ingredientesAgregados = [];
+        $unidadesPermitidas = ['g', 'kg', 'mg', 'L', 'ml', 'mL', 'pza', 'caja', 'bolsa'];
+        foreach ($ingredientesIds as $k => $ingId) {
+            if (!$ingId) continue;
+            $ingId = (int)$ingId;
+            if (isset($ingredientesAgregados[$ingId])) continue;
+            $tipoIngredienteStmt->execute([$ingId, $restauranteId]);
+            $tipoIngrediente = $tipoIngredienteStmt->fetchColumn();
+            $cantidad = (float)($cantidades[$k] ?? 0);
+            if ($tipoIngrediente === false || $cantidad <= 0) continue;
+            $ingredientesAgregados[$ingId] = true;
+            $unidad = (string)($unidades[$k] ?? 'kg');
+            $ings[] = [
+                'ingrediente_id'  => $ingId,
+                'cantidad'        => $cantidad,
+                'unidad'          => in_array($unidad, $unidadesPermitidas, true) ? $unidad : 'kg',
+                'es_informativo'  => 0,
+                'tipo_componente' => $tipoIngrediente === 'guarnicion' ? 'guarnicion' : 'materia_prima',
+                'codigo_display'  => null,
+                'precio_extra'    => 0.0,
+            ];
+        }
+
+        $recetaExistente = $this->model->getReceta($platilloId);
+        if ($ings || $recetaExistente) {
             $recetaId = $this->model->upsertReceta(
                 $platilloId,
-                (int)$this->post('porciones_base', 1),
-                $this->post('receta_notas')
+                min(127, max(1, (int)$this->post('porciones_base', 1))),
+                trim((string)$this->post('receta_notas', '')) ?: null
             );
-            $ings = [];
-            foreach ($ingredientesIds as $k => $ingId) {
-                if (!$ingId) continue;
-                $tipoIngredienteStmt->execute([(int)$ingId, $restauranteId]);
-                $tipoIngrediente = (string)($tipoIngredienteStmt->fetchColumn() ?: 'materia_prima');
-                $ings[] = [
-                    'ingrediente_id'  => (int)$ingId,
-                    'cantidad'        => (float)($cantidades[$k] ?? 0),
-                    'unidad'          => $unidades[$k] ?? 'kg',
-                    'es_informativo'  => 0,
-                    'tipo_componente' => $tipoIngrediente === 'guarnicion' ? 'guarnicion' : 'materia_prima',
-                    'codigo_display'  => null,
-                    'precio_extra'    => 0.0,
-                ];
-            }
             $this->model->syncIngredientesReceta($recetaId, $ings);
         }
 
@@ -179,7 +266,9 @@ class RestMenuController extends BaseController
         // la app (personalización "sin X" / "extra Y") — es una función avanzada que no
         // hace falta para el flujo simple de menú + receta. La receta de arriba ya es lo
         // que descuenta inventario automático al vender, eso sí sigue funcionando igual.
-        $this->flash('success', 'Platillo guardado.');
+        $this->flash('success', empty($ings)
+            ? 'Platillo guardado. Puedes completar su receta después.'
+            : 'Platillo y receta guardados.');
         $this->redirect('rest-menu/index');
     }
 
@@ -229,6 +318,15 @@ class RestMenuController extends BaseController
 
     public function eliminar(?string $id = null): void
     {
+        if (!$this->isPost() || !$this->validarCsrf()) {
+            $this->flash('error', 'La acción no es válida o la sesión venció.');
+            $this->redirect('rest-menu/index');
+        }
+        $platillo = $this->model->find((int)$id);
+        if (!$platillo || (int)($platillo['restaurante_id'] ?? 0) !== (int)$this->restauranteId()) {
+            $this->flash('error', 'No tienes permiso para desactivar ese platillo.');
+            $this->redirect('rest-menu/index');
+        }
         $this->model->update((int)$id, ['activo' => 0]);
         $this->flash('success', 'Platillo desactivado.');
         $this->redirect('rest-menu/index');
@@ -236,9 +334,15 @@ class RestMenuController extends BaseController
 
     public function toggleDisponible(?string $id = null): void
     {
+        if (!$this->isPost() || !$this->validarCsrf()) {
+            $this->flash('error', 'La acción no es válida o la sesión venció.');
+            $this->redirect('rest-menu/index');
+        }
         $platillo = $this->model->find((int)$id);
-        if ($platillo) {
+        if ($platillo && (int)($platillo['restaurante_id'] ?? 0) === (int)$this->restauranteId()) {
             $this->model->update((int)$id, ['disponible' => $platillo['disponible'] ? 0 : 1]);
+        } else {
+            $this->flash('error', 'No tienes permiso para modificar ese platillo.');
         }
         $this->redirect('rest-menu/index');
     }
@@ -248,9 +352,25 @@ class RestMenuController extends BaseController
     public function guardarCategoria(?string $p = null): void
     {
         if (!$this->isPost()) $this->redirect('rest-menu/index');
+        if (!$this->validarCsrf()) {
+            $this->flash('error', 'La sesión venció. Vuelve a intentarlo.');
+            $this->redirect('rest-menu/index');
+        }
         $id = (int)$this->post('id');
+        $nombre = trim((string)$this->post('nombre', ''));
+        if ($nombre === '') {
+            $this->flash('error', 'El nombre de la categoría es obligatorio.');
+            $this->redirect('rest-menu/index');
+        }
+        if ($id) {
+            $categoria = $this->model->findCategoria($id);
+            if (!$categoria || (int)($categoria['restaurante_id'] ?? 0) !== (int)$this->restauranteId()) {
+                $this->flash('error', 'No tienes permiso para modificar esa categoría.');
+                $this->redirect('rest-menu/index');
+            }
+        }
         $data = [
-            'nombre'      => trim($this->post('nombre', '')),
+            'nombre'      => $nombre,
             'descripcion' => $this->post('descripcion'),
             'orden'       => (int)$this->post('orden', 0),
         ];
@@ -276,21 +396,25 @@ class RestMenuController extends BaseController
             return null;
         }
         if ($_FILES['imagen']['error'] !== UPLOAD_ERR_OK) {
-            return null;
+            throw new \InvalidArgumentException('No se pudo recibir la imagen. Intenta con otro archivo.');
         }
         if ($_FILES['imagen']['size'] > 3 * 1024 * 1024) {
-            return null;
+            throw new \InvalidArgumentException('La imagen debe pesar menos de 3 MB.');
         }
         $allowed = ['jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp'];
         $ext = strtolower(pathinfo($_FILES['imagen']['name'], PATHINFO_EXTENSION));
-        if (!isset($allowed[$ext])) return null;
+        $imageInfo = @getimagesize($_FILES['imagen']['tmp_name']);
+        $mime = is_array($imageInfo) ? (string)($imageInfo['mime'] ?? '') : '';
+        if (!isset($allowed[$ext]) || $mime !== $allowed[$ext]) {
+            throw new \InvalidArgumentException('La imagen debe ser un archivo JPG, PNG o WebP válido.');
+        }
 
-        $filename = 'platillo_' . $restauranteId . '_' . ($platilloId ?: 'new') . '_' . time() . '.' . $ext;
+        $filename = 'platillo_' . $restauranteId . '_' . ($platilloId ?: 'new') . '_' . bin2hex(random_bytes(8)) . '.' . $ext;
         $dest     = ROOT_PATH . '/public/uploads/platillos/' . $filename;
         @mkdir(dirname($dest), 0755, true);
         if (move_uploaded_file($_FILES['imagen']['tmp_name'], $dest)) {
             return 'public/uploads/platillos/' . $filename;
         }
-        return null;
+        throw new \InvalidArgumentException('No se pudo guardar la imagen. Revisa los permisos de la carpeta de cargas.');
     }
 }

@@ -55,8 +55,8 @@ Este archivo se actualiza en cada entrega. Una tarea solo se marca como terminad
 - [x] Validación sintáctica de JavaScript (12 archivos).
 - [x] `git diff --check` sin errores.
 - [x] Checklist actualizado.
-- [ ] Commit creado.
-- [ ] Commit publicado en `origin/feature/sistema-completo`.
+- [x] Commit creado: `96ae3cb`.
+- [x] Commit publicado en `origin/feature/sistema-completo`.
 
 ## Entrega 2 — Flujo correcto Caja → Cocina → Entrega
 
@@ -98,15 +98,20 @@ Este archivo se actualiza en cada entrega. Una tarea solo se marca como terminad
 - [ ] Revisar contraste, navegación por teclado y lector de pantalla.
 - [ ] Actualizar checklist, commit y push.
 
-## Entrega 5 — Crear platillo simplificado
+## Entrega 5 — Crear platillo simplificado (en progreso)
 
-- [ ] Reducir la alta inicial a: nombre, categoría, precio, disponibilidad y foto opcional.
-- [ ] Mover descripción, tiempo, alérgenos, receta y modificadores a “Opciones avanzadas”.
-- [ ] Permitir crear una categoría sin salir del formulario.
-- [ ] Mostrar vista previa sencilla del producto.
-- [ ] Explicar en lenguaje simple qué verá Caja, Cocina y la app.
-- [ ] Conservar los mismos campos/tablas/API para no romper la aplicación móvil.
-- [ ] Validar precio, imagen y campos obligatorios en cliente y servidor.
+- [x] Reducir la alta inicial a: nombre, categoría, precio y disponibilidad; foto opcional.
+- [x] Mover descripción, tiempo, alérgenos y receta a secciones opcionales desplegables.
+- [x] Permitir crear una categoría sin salir del formulario ni perder lo capturado.
+- [x] Mostrar vista previa sencilla de la foto del producto.
+- [x] Explicar en lenguaje simple qué verá Caja, Cocina y el menú.
+- [x] Conservar los mismos campos, tablas y rutas para no romper la aplicación móvil.
+- [x] Validar precio, imagen, pertenencia al restaurante y campos obligatorios en cliente y servidor.
+- [x] Permitir publicar sin receta y explicar cuándo se activa el descuento de inventario.
+- [x] Permitir agregar y retirar renglones de receta sin bloquear el alta inicial.
+- [x] Proteger alta, edición, disponibilidad, desactivación, importación y categorías con POST + CSRF.
+- [x] Añadir navegación por teclado, foco visible, controles táctiles y reducción de movimiento.
+- [x] Implementar adaptación responsive para escritorio, tablet y móvil web.
 - [ ] Guardar borrador cuando sea seguro hacerlo.
 - [ ] Confirmar éxito con accesos directos: “Crear otro” y “Ver menú”.
 - [ ] Probar en escritorio, tablet y móvil.
@@ -150,12 +155,12 @@ Este archivo se actualiza en cada entrega. Una tarea solo se marca como terminad
 
 | Entrega | Estado | Commit | Resumen |
 |---|---|---|---|
-| Diagnóstico | Completado localmente | Pendiente | Plan, correcciones y checklist creados. |
-| 1. Integridad y seguridad | En progreso | Pendiente | Detección de columnas corregida; diagnósticos retirados; CSRF y sesión reforzados. Falta prueba MySQL y transición de autenticación móvil. |
+| Diagnóstico | Publicado | `96ae3cb` | Plan, correcciones y checklist creados. |
+| 1. Integridad y seguridad | En progreso | `96ae3cb` | Detección de columnas corregida; diagnósticos retirados; CSRF y sesión reforzados. Falta prueba MySQL y transición de autenticación móvil. |
 | 2. Caja–Cocina–Entrega | Pendiente | — | — |
 | 3. Cocina UX | Pendiente | — | — |
 | 4. Caja UX | Pendiente | — | — |
-| 5. Crear platillo | Pendiente | — | — |
+| 5. Crear platillo | En progreso local | Pendiente | Alta simplificada, receta opcional, validaciones, CSRF y diseño café accesible implementados; faltan prueba visual y mejoras secundarias. |
 | 6. Inventario | Pendiente | — | — |
 | 7. Admin/Superadmin | Pendiente | — | — |
 | 8. Producción | Pendiente | — | — |
