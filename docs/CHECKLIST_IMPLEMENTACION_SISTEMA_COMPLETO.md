@@ -121,7 +121,11 @@ Este archivo se actualiza en cada entrega. Una tarea solo se marca como terminad
 ## Entrega 6 — Inventario y recetas confiables
 
 - [ ] Detectar productos sin receta o con cantidades cero.
-- [ ] Crear asistente simple de receta y unidades.
+- [x] Crear selector simple: sin descuento, receta o producto por unidad.
+- [x] Añadir búsqueda y selección rápida de ingredientes mostrando existencias.
+- [x] Adaptar automáticamente la unidad de la receta a la unidad principal del inventario.
+- [x] Hacer funcional `ingrediente_directo_id`: descontar una unidad por venta con compatibilidad por código.
+- [x] Mantener el descuento directo y por receta sin cambios de esquema ni contrato móvil.
 - [ ] Definir el momento único de descuento de inventario.
 - [ ] Garantizar movimientos idempotentes.
 - [ ] Implementar reversa o merma al cancelar después de preparar.
@@ -162,6 +166,6 @@ Este archivo se actualiza en cada entrega. Una tarea solo se marca como terminad
 | 3. Cocina UX | Pendiente | — | — |
 | 4. Caja UX | Pendiente | — | — |
 | 5. Crear platillo | Publicado, en progreso | `de12b45` | Alta simplificada, receta opcional, categoría en línea, validaciones, CSRF y diseño café accesible; faltan prueba visual y mejoras secundarias. |
-| 6. Inventario | Pendiente | — | — |
+| 6. Inventario | En progreso local | Pendiente | Selector de consumo simplificado y vínculo unitario funcional; faltan alertas, reversas y pruebas integrales. |
 | 7. Admin/Superadmin | Pendiente | — | — |
 | 8. Producción | Pendiente | — | — |

@@ -263,16 +263,25 @@ class RestInventarioModel extends BaseModel
                  JOIN rest_platillos pl ON pl.id = pi.platillo_id
                  JOIN rest_ingredientes i
                       ON i.restaurante_id = ?
-                     AND TRIM(i.codigo) != ''
-                     AND TRIM(i.codigo) = TRIM(COALESCE(pl.codigo, ''))
                      AND i.activo = 1
+                     AND (
+                         i.id = pl.ingrediente_directo_id
+                         OR (
+                             pl.ingrediente_directo_id IS NULL
+                             AND TRIM(i.codigo) != ''
+                             AND TRIM(i.codigo) = TRIM(COALESCE(pl.codigo, ''))
+                         )
+                     )
                  LEFT JOIN rest_recetas rec
                       ON rec.platillo_id = pl.id
                  LEFT JOIN rest_receta_ingredientes ri_check
                       ON ri_check.receta_id = rec.id
                  WHERE pi.pedido_id = ?
                    AND ri_check.id IS NULL
-                   AND COALESCE(TRIM(pl.codigo), '') != ''",
+                   AND (
+                       pl.ingrediente_directo_id IS NOT NULL
+                       OR COALESCE(TRIM(pl.codigo), '') != ''
+                   )",
                 [$restauranteId, $pedidoId]
             );
 
@@ -403,9 +412,15 @@ class RestInventarioModel extends BaseModel
                  FROM rest_platillos pl
                  JOIN rest_ingredientes i
                       ON i.restaurante_id = ?
-                     AND TRIM(i.codigo) != ''
-                     AND TRIM(i.codigo) = TRIM(COALESCE(pl.codigo, ''))
                      AND i.activo = 1
+                     AND (
+                         i.id = pl.ingrediente_directo_id
+                         OR (
+                             pl.ingrediente_directo_id IS NULL
+                             AND TRIM(i.codigo) != ''
+                             AND TRIM(i.codigo) = TRIM(COALESCE(pl.codigo, ''))
+                         )
+                     )
                  LEFT JOIN rest_recetas rec
                       ON rec.platillo_id = pl.id
                  LEFT JOIN rest_receta_ingredientes ri_check
@@ -413,7 +428,10 @@ class RestInventarioModel extends BaseModel
                      AND COALESCE(ri_check.es_informativo, 0) = 0
                  WHERE pl.id = ?
                    AND ri_check.id IS NULL
-                   AND COALESCE(TRIM(pl.codigo), '') != ''
+                   AND (
+                       pl.ingrediente_directo_id IS NOT NULL
+                       OR COALESCE(TRIM(pl.codigo), '') != ''
+                   )
                  LIMIT 1",
                 [$restauranteId, (int)$item['platillo_id']]
             );

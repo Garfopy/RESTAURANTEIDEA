@@ -156,7 +156,23 @@ class RestMenuController extends BaseController
             }
         }
 
-        $ingredienteDirectoId = (int)$this->post('ingrediente_directo_id', 0);
+        $ingredientesEnviados = $this->post('ingrediente_id', []);
+        $ingredientesEnviados = is_array($ingredientesEnviados) ? array_filter($ingredientesEnviados) : [];
+        $modoInventario = (string)$this->post('inventory_mode', '');
+        if (!in_array($modoInventario, ['none', 'recipe', 'unit'], true)) {
+            // Compatibilidad con formularios anteriores: inferir el modo por sus campos.
+            $modoInventario = (int)$this->post('ingrediente_directo_id', 0) > 0
+                ? 'unit'
+                : ($ingredientesEnviados ? 'recipe' : 'none');
+        }
+
+        $ingredienteDirectoId = $modoInventario === 'unit'
+            ? (int)$this->post('ingrediente_directo_id', 0)
+            : 0;
+        if ($modoInventario === 'unit' && $ingredienteDirectoId <= 0) {
+            $this->flash('error', 'Selecciona el producto de inventario que se descontará por unidad.');
+            $this->redirect($id ? 'rest-menu/form/' . $id : 'rest-menu/form');
+        }
         if ($ingredienteDirectoId > 0) {
             $stmtDirecto = \Database::getInstance()->prepare(
                 'SELECT id FROM rest_ingredientes WHERE id = ? AND restaurante_id = ? AND activo = 1 LIMIT 1'
@@ -218,14 +234,14 @@ class RestMenuController extends BaseController
         }
 
         // Guardar receta si vienen ingredientes
-        $ingredientesIds  = $this->post('ingrediente_id', []);
+        $ingredientesIds  = $modoInventario === 'recipe' ? $this->post('ingrediente_id', []) : [];
         $cantidades       = $this->post('cantidad', []);
         $unidades         = $this->post('unidad', []);
         $ingredientesIds  = is_array($ingredientesIds) ? $ingredientesIds : [];
         $cantidades       = is_array($cantidades) ? $cantidades : [];
         $unidades         = is_array($unidades) ? $unidades : [];
         $tipoIngredienteStmt = \Database::getInstance()->prepare(
-            "SELECT tipo FROM rest_ingredientes WHERE id=? AND restaurante_id=? LIMIT 1"
+            "SELECT tipo, unidad_principal FROM rest_ingredientes WHERE id=? AND restaurante_id=? AND activo=1 LIMIT 1"
         );
 
         $ings = [];
@@ -236,15 +252,21 @@ class RestMenuController extends BaseController
             $ingId = (int)$ingId;
             if (isset($ingredientesAgregados[$ingId])) continue;
             $tipoIngredienteStmt->execute([$ingId, $restauranteId]);
-            $tipoIngrediente = $tipoIngredienteStmt->fetchColumn();
+            $ingredienteValido = $tipoIngredienteStmt->fetch(\PDO::FETCH_ASSOC);
             $cantidad = (float)($cantidades[$k] ?? 0);
-            if ($tipoIngrediente === false || $cantidad <= 0) continue;
+            if (!$ingredienteValido || $cantidad <= 0) continue;
             $ingredientesAgregados[$ingId] = true;
-            $unidad = (string)($unidades[$k] ?? 'kg');
+            $tipoIngrediente = (string)($ingredienteValido['tipo'] ?? 'materia_prima');
+            $unidadPrincipal = trim((string)($ingredienteValido['unidad_principal'] ?? 'kg')) ?: 'kg';
+            $unidad = trim((string)($unidades[$k] ?? $unidadPrincipal));
+            if (!in_array($unidad, $unidadesPermitidas, true)
+                && strcasecmp($unidad, $unidadPrincipal) !== 0) {
+                $unidad = $unidadPrincipal;
+            }
             $ings[] = [
                 'ingrediente_id'  => $ingId,
                 'cantidad'        => $cantidad,
-                'unidad'          => in_array($unidad, $unidadesPermitidas, true) ? $unidad : 'kg',
+                'unidad'          => mb_substr($unidad, 0, 20),
                 'es_informativo'  => 0,
                 'tipo_componente' => $tipoIngrediente === 'guarnicion' ? 'guarnicion' : 'materia_prima',
                 'codigo_display'  => null,
@@ -266,9 +288,14 @@ class RestMenuController extends BaseController
         // la app (personalización "sin X" / "extra Y") — es una función avanzada que no
         // hace falta para el flujo simple de menú + receta. La receta de arriba ya es lo
         // que descuenta inventario automático al vender, eso sí sigue funcionando igual.
-        $this->flash('success', empty($ings)
-            ? 'Platillo guardado. Puedes completar su receta después.'
-            : 'Platillo y receta guardados.');
+        $mensaje = match ($modoInventario) {
+            'unit' => 'Platillo guardado. Se descontará una unidad del producto elegido por cada venta.',
+            'recipe' => $ings
+                ? 'Platillo y receta guardados.'
+                : 'Platillo guardado sin ingredientes válidos; puedes completar la receta después.',
+            default => 'Platillo guardado sin descuento automático de inventario.',
+        };
+        $this->flash('success', $mensaje);
         $this->redirect('rest-menu/index');
     }
 

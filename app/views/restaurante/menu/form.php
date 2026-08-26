@@ -5,6 +5,9 @@ $alergenosActivos = array_filter(array_map('trim', explode(',', (string)($platil
 $alergenosList = ['Gluten', 'Lactosa', 'Mariscos', 'Frutos secos', 'Huevo', 'Soya', 'Cacahuate', 'Mostaza'];
 $abrirInformacion = !empty($alergenosActivos) || !empty($platillo['contiene']);
 $abrirReceta = !empty($ingredientesReceta) || !empty($platillo['ingrediente_directo_id']);
+$modoInventario = !empty($platillo['ingrediente_directo_id'])
+    ? 'unit'
+    : (!empty($ingredientesReceta) ? 'recipe' : 'none');
 ob_start();
 ?>
 
@@ -150,16 +153,37 @@ ob_start();
       </summary>
       <div class="dish-details-content">
         <div class="dish-info-note" role="note">
-          Puedes guardar el platillo sin receta. Hasta que agregues ingredientes, las ventas no descontarán automáticamente esas existencias.
+          Elige una sola forma de descontar existencias. Puedes cambiarla después sin modificar el platillo en Caja o en la app.
         </div>
+
+        <fieldset class="dish-inventory-modes">
+          <legend>¿Cómo se descuenta del inventario?</legend>
+          <div class="dish-inventory-mode-grid">
+            <label class="dish-mode-card">
+              <input type="radio" name="inventory_mode" value="none" <?= $modoInventario === 'none' ? 'checked' : '' ?>>
+              <span><strong>Sin descuento</strong><small>Solo publicar el platillo</small></span>
+            </label>
+            <label class="dish-mode-card <?= empty($ingredientes) ? 'is-disabled' : '' ?>">
+              <input type="radio" name="inventory_mode" value="recipe" <?= $modoInventario === 'recipe' ? 'checked' : '' ?>
+                     <?= empty($ingredientes) ? 'disabled' : '' ?>>
+              <span><strong>Usar receta</strong><small>Varios ingredientes y cantidades</small></span>
+            </label>
+            <label class="dish-mode-card <?= empty($ingredientes) ? 'is-disabled' : '' ?>">
+              <input type="radio" name="inventory_mode" value="unit" <?= $modoInventario === 'unit' ? 'checked' : '' ?>
+                     <?= empty($ingredientes) ? 'disabled' : '' ?>>
+              <span><strong>Producto por unidad</strong><small>Descontar 1 por cada venta</small></span>
+            </label>
+          </div>
+        </fieldset>
 
         <?php if (empty($ingredientes)): ?>
           <div class="dish-warning" role="status">
-            <strong>Aún no hay ingredientes disponibles.</strong>
-            <span>Crea primero los insumos que usarás en este platillo.</span>
+            <strong>Aún no hay productos en inventario.</strong>
+            <span>Puedes guardar sin descuento o crear primero los productos que vas a controlar.</span>
             <a href="<?= BASE_URL ?>rest-inventario/index" target="_blank" rel="noopener">Abrir inventario</a>
           </div>
         <?php else: ?>
+        <section id="inventoryRecipePanel" class="dish-inventory-panel" <?= $modoInventario !== 'recipe' ? 'hidden' : '' ?> aria-labelledby="recipePanelTitle">
           <div class="dish-form-grid">
             <div class="form-group">
               <label class="form-label" for="inpPorciones">Porciones que rinde la receta</label>
@@ -176,10 +200,27 @@ ob_start();
 
           <div class="dish-recipe-heading">
             <div>
-              <h3>Ingredientes de la receta</h3>
+              <h3 id="recipePanelTitle">Ingredientes de la receta</h3>
               <p>Indica cuánto se consume para el total de porciones.</p>
             </div>
-            <button type="button" class="btn btn-outline btn-sm" id="addIngredientButton">+ Agregar ingrediente</button>
+            <button type="button" class="btn btn-outline btn-sm" id="addIngredientButton">+ Renglón vacío</button>
+          </div>
+
+          <div class="dish-ingredient-picker">
+            <label class="form-label" for="ingredientQuickSearch">Agregar rápidamente desde inventario</label>
+            <input type="search" id="ingredientQuickSearch" class="form-input" placeholder="Buscar café, leche, pan…" autocomplete="off">
+            <div id="ingredientCatalog" class="dish-ingredient-catalog">
+              <?php foreach ($ingredientes as $ingrediente): ?>
+              <button type="button" class="dish-ingredient-option"
+                      data-id="<?= (int)$ingrediente['id'] ?>"
+                      data-unit="<?= htmlspecialchars($ingrediente['unidad_principal'], ENT_QUOTES) ?>"
+                      data-search="<?= htmlspecialchars(mb_strtolower((string)$ingrediente['nombre'] . ' ' . (string)$ingrediente['unidad_principal']), ENT_QUOTES) ?>">
+                <span><?= htmlspecialchars($ingrediente['nombre']) ?></span>
+                <small><?= number_format((float)($ingrediente['stock'] ?? 0), 2) ?> <?= htmlspecialchars($ingrediente['unidad_principal']) ?> disponibles</small>
+              </button>
+              <?php endforeach; ?>
+            </div>
+            <p id="ingredientSearchEmpty" class="dish-search-empty" hidden>No se encontraron productos con ese nombre.</p>
           </div>
 
           <div id="ingredientes-lista" class="dish-recipe-list" aria-live="polite">
@@ -192,8 +233,9 @@ ob_start();
                     <?php foreach ($ingredientes as $ingrediente): ?>
                       <option value="<?= (int)$ingrediente['id'] ?>"
                               data-unidad="<?= htmlspecialchars($ingrediente['unidad_principal'], ENT_QUOTES) ?>"
+                              data-stock="<?= (float)($ingrediente['stock'] ?? 0) ?>"
                         <?= (int)$ingredienteReceta['ingrediente_id'] === (int)$ingrediente['id'] ? 'selected' : '' ?>>
-                        <?= htmlspecialchars($ingrediente['nombre']) ?> · <?= htmlspecialchars($ingrediente['unidad_principal']) ?>
+                        <?= htmlspecialchars($ingrediente['nombre']) ?> · <?= number_format((float)($ingrediente['stock'] ?? 0), 2) ?> <?= htmlspecialchars($ingrediente['unidad_principal']) ?>
                       </option>
                     <?php endforeach; ?>
                   </select>
@@ -221,20 +263,39 @@ ob_start();
             <p id="recipeEmptyState" class="dish-empty-recipe">No has agregado ingredientes. Puedes hacerlo ahora o más tarde.</p>
           <?php endif; ?>
 
-          <hr class="dish-divider">
-          <div class="form-group dish-direct-stock">
-            <label class="form-label" for="ingredienteDirecto">Producto directo de inventario</label>
-            <select name="ingrediente_directo_id" id="ingredienteDirecto" class="form-select">
-              <option value="">Sin vínculo directo</option>
-              <?php foreach ($ingredientes as $ingrediente): ?>
-                <option value="<?= (int)$ingrediente['id'] ?>"
-                  <?= (int)($platillo['ingrediente_directo_id'] ?? 0) === (int)$ingrediente['id'] ? 'selected' : '' ?>>
-                  <?= htmlspecialchars($ingrediente['nombre']) ?> · <?= htmlspecialchars($ingrediente['unidad_principal']) ?>
-                </option>
-              <?php endforeach; ?>
-            </select>
-            <small class="dish-help">Úsalo solo para bebidas o productos que descuentan una unidad y no necesitan receta.</small>
+        </section>
+
+        <section id="inventoryUnitPanel" class="dish-inventory-panel" <?= $modoInventario !== 'unit' ? 'hidden' : '' ?> aria-labelledby="unitPanelTitle">
+          <div class="dish-unit-heading">
+            <h3 id="unitPanelTitle">Producto que representa una venta</h3>
+            <p>Ideal para latas, botellas, bolsas, piezas o cualquier producto que controlas individualmente.</p>
           </div>
+          <div class="dish-unit-picker">
+            <div class="form-group">
+              <label class="form-label" for="directSearch">Buscar en inventario</label>
+              <input type="search" id="directSearch" class="form-input" placeholder="Escribe el nombre del producto" autocomplete="off">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="ingredienteDirecto">Seleccionar producto</label>
+              <select name="ingrediente_directo_id" id="ingredienteDirecto" class="form-select">
+                <option value="">Selecciona un producto</option>
+                <?php foreach ($ingredientes as $ingrediente): ?>
+                  <option value="<?= (int)$ingrediente['id'] ?>"
+                          data-unit="<?= htmlspecialchars($ingrediente['unidad_principal'], ENT_QUOTES) ?>"
+                          data-stock="<?= (float)($ingrediente['stock'] ?? 0) ?>"
+                          data-name="<?= htmlspecialchars($ingrediente['nombre'], ENT_QUOTES) ?>"
+                          data-search="<?= htmlspecialchars(mb_strtolower((string)$ingrediente['nombre'] . ' ' . (string)$ingrediente['unidad_principal']), ENT_QUOTES) ?>"
+                    <?= (int)($platillo['ingrediente_directo_id'] ?? 0) === (int)$ingrediente['id'] ? 'selected' : '' ?>>
+                    <?= htmlspecialchars($ingrediente['nombre']) ?> · <?= number_format((float)($ingrediente['stock'] ?? 0), 2) ?> <?= htmlspecialchars($ingrediente['unidad_principal']) ?>
+                  </option>
+                <?php endforeach; ?>
+              </select>
+            </div>
+          </div>
+          <div id="directStockSummary" class="dish-unit-summary" role="status" aria-live="polite">
+            Selecciona un producto para ver cómo se descontará.
+          </div>
+        </section>
         <?php endif; ?>
       </div>
     </details>
@@ -285,8 +346,10 @@ ob_start();
       <select name="ingrediente_id[]" class="form-select dish-ingredient-select">
         <option value="">Seleccionar ingrediente</option>
         <?php foreach ($ingredientes as $ingrediente): ?>
-          <option value="<?= (int)$ingrediente['id'] ?>" data-unidad="<?= htmlspecialchars($ingrediente['unidad_principal'], ENT_QUOTES) ?>">
-            <?= htmlspecialchars($ingrediente['nombre']) ?> · <?= htmlspecialchars($ingrediente['unidad_principal']) ?>
+          <option value="<?= (int)$ingrediente['id'] ?>"
+                  data-unidad="<?= htmlspecialchars($ingrediente['unidad_principal'], ENT_QUOTES) ?>"
+                  data-stock="<?= (float)($ingrediente['stock'] ?? 0) ?>">
+            <?= htmlspecialchars($ingrediente['nombre']) ?> · <?= number_format((float)($ingrediente['stock'] ?? 0), 2) ?> <?= htmlspecialchars($ingrediente['unidad_principal']) ?>
           </option>
         <?php endforeach; ?>
       </select>
@@ -317,6 +380,14 @@ ob_start();
   const categoryToggle = document.getElementById('toggleNewCategory');
   const newCategoryFields = document.getElementById('newCategoryFields');
   const newCategoryInput = document.getElementById('inpNuevaCategoria');
+  const inventoryModes = [...document.querySelectorAll('input[name="inventory_mode"]')];
+  const recipePanel = document.getElementById('inventoryRecipePanel');
+  const unitPanel = document.getElementById('inventoryUnitPanel');
+  const ingredientQuickSearch = document.getElementById('ingredientQuickSearch');
+  const ingredientOptions = [...document.querySelectorAll('.dish-ingredient-option')];
+  const directSearch = document.getElementById('directSearch');
+  const directSelect = document.getElementById('ingredienteDirecto');
+  const directSummary = document.getElementById('directStockSummary');
   let rowSequence = <?= count($ingredientesReceta) ?>;
 
   const syncRecipeEmptyState = () => {
@@ -345,9 +416,14 @@ ob_start();
     const ingredient = row.querySelector('.dish-ingredient-select');
     const unit = row.querySelector('.dish-unit-select');
     ingredient?.addEventListener('change', () => {
+      ingredient.setCustomValidity('');
       const selectedUnit = ingredient.selectedOptions[0]?.dataset.unidad;
       if (!selectedUnit || !unit) return;
-      const matchingOption = [...unit.options].find(option => option.value.toLowerCase() === selectedUnit.toLowerCase());
+      let matchingOption = [...unit.options].find(option => option.value.toLowerCase() === selectedUnit.toLowerCase());
+      if (!matchingOption) {
+        matchingOption = new Option(selectedUnit, selectedUnit);
+        unit.add(matchingOption);
+      }
       if (matchingOption) unit.value = matchingOption.value;
     });
     row.querySelector('.dish-remove-row')?.addEventListener('click', () => {
@@ -356,13 +432,48 @@ ob_start();
     });
   };
 
-  list?.querySelectorAll('.dish-recipe-row').forEach(prepareRow);
-  addButton?.addEventListener('click', () => {
+  const addIngredient = (ingredientId = '', mainUnit = '') => {
+    const existing = [...(list?.querySelectorAll('.dish-ingredient-select') || [])]
+      .find(select => select.value === String(ingredientId) && ingredientId !== '');
+    if (existing) {
+      existing.closest('.dish-recipe-row')?.classList.add('is-highlighted');
+      setTimeout(() => existing.closest('.dish-recipe-row')?.classList.remove('is-highlighted'), 900);
+      existing.closest('.dish-recipe-row')?.querySelector('input[name="cantidad[]"]')?.focus();
+      return;
+    }
     const row = template.content.firstElementChild.cloneNode(true);
     prepareRow(row);
     list.appendChild(row);
+    if (ingredientId !== '') {
+      const select = row.querySelector('.dish-ingredient-select');
+      select.value = String(ingredientId);
+      select.dispatchEvent(new Event('change'));
+      if (['pza', 'pieza', 'unidad', 'caja', 'bolsa'].includes(String(mainUnit).toLowerCase())) {
+        row.querySelector('input[name="cantidad[]"]').value = '1';
+      }
+    }
     syncRecipeEmptyState();
-    row.querySelector('select')?.focus();
+    (ingredientId !== ''
+      ? row.querySelector('input[name="cantidad[]"]')
+      : row.querySelector('select'))?.focus();
+  };
+
+  list?.querySelectorAll('.dish-recipe-row').forEach(prepareRow);
+  addButton?.addEventListener('click', () => addIngredient());
+
+  ingredientOptions.forEach(option => option.addEventListener('click', () => {
+    addIngredient(option.dataset.id, option.dataset.unit);
+  }));
+  ingredientQuickSearch?.addEventListener('input', () => {
+    const query = ingredientQuickSearch.value.trim().toLocaleLowerCase('es-MX');
+    let visible = 0;
+    ingredientOptions.forEach(option => {
+      const matches = !query || (option.dataset.search || '').includes(query);
+      option.hidden = !matches;
+      if (matches) visible++;
+    });
+    const empty = document.getElementById('ingredientSearchEmpty');
+    if (empty) empty.hidden = visible > 0;
   });
 
   categoryToggle?.addEventListener('click', () => {
@@ -378,6 +489,52 @@ ob_start();
       newCategoryInput.value = '';
     }
   });
+
+  const setPanelState = (panel, enabled) => {
+    if (!panel) return;
+    panel.hidden = !enabled;
+    panel.querySelectorAll('input, select, textarea, button').forEach(control => {
+      control.disabled = !enabled;
+    });
+  };
+
+  const syncInventoryMode = () => {
+    const mode = inventoryModes.find(radio => radio.checked)?.value || 'none';
+    setPanelState(recipePanel, mode === 'recipe');
+    setPanelState(unitPanel, mode === 'unit');
+    if (directSelect) directSelect.required = mode === 'unit';
+  };
+  inventoryModes.forEach(radio => radio.addEventListener('change', syncInventoryMode));
+
+  const syncDirectSummary = () => {
+    if (!directSelect || !directSummary) return;
+    const selected = directSelect.selectedOptions[0];
+    if (!selected?.value) {
+      directSummary.textContent = 'Selecciona un producto para ver cómo se descontará.';
+      directSummary.classList.remove('is-ready');
+      return;
+    }
+    const unit = selected.dataset.unit || 'unidad';
+    const name = selected.dataset.name || selected.textContent.trim();
+    const stock = Number(selected.dataset.stock || 0).toLocaleString('es-MX', { maximumFractionDigits: 3 });
+    const title = document.createElement('strong');
+    title.textContent = `Cada venta descontará 1 ${unit}`;
+    const detail = document.createElement('span');
+    detail.textContent = `de ${name}. Existencia actual: ${stock} ${unit}.`;
+    directSummary.replaceChildren(title, detail);
+    directSummary.classList.add('is-ready');
+  };
+  directSelect?.addEventListener('change', syncDirectSummary);
+  directSearch?.addEventListener('input', () => {
+    const query = directSearch.value.trim().toLocaleLowerCase('es-MX');
+    [...directSelect.options].forEach((option, index) => {
+      if (index === 0) return;
+      option.hidden = Boolean(query) && !(option.dataset.search || '').includes(query) && !option.selected;
+    });
+  });
+
+  syncInventoryMode();
+  syncDirectSummary();
 
   const imageInput = document.getElementById('inpImg');
   imageInput?.addEventListener('change', () => {
@@ -405,16 +562,19 @@ ob_start();
     nameError.textContent = name.value.trim() ? '' : 'Escribe el nombre del platillo.';
     priceError.textContent = Number(price.value) > 0 ? '' : 'El precio debe ser mayor a cero.';
 
+    const inventoryMode = inventoryModes.find(radio => radio.checked)?.value || 'none';
     list?.querySelectorAll('.dish-recipe-row').forEach(row => {
       const ingredient = row.querySelector('.dish-ingredient-select');
       const quantity = row.querySelector('input[name="cantidad[]"]');
-      quantity.setCustomValidity(ingredient.value && Number(quantity.value) <= 0
+      quantity.setCustomValidity(inventoryMode === 'recipe' && ingredient.value && Number(quantity.value) <= 0
         ? 'Captura una cantidad mayor a cero para este ingrediente.'
         : '');
     });
-    const selectedIngredients = [...(list?.querySelectorAll('.dish-ingredient-select') || [])]
+    const selectedIngredients = inventoryMode === 'recipe'
+      ? [...(list?.querySelectorAll('.dish-ingredient-select') || [])]
       .map(select => select.value)
-      .filter(Boolean);
+      .filter(Boolean)
+      : [];
     if (new Set(selectedIngredients).size !== selectedIngredients.length) {
       event.preventDefault();
       const duplicate = [...list.querySelectorAll('.dish-ingredient-select')]
