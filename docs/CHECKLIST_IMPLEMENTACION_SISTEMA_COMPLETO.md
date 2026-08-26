@@ -126,6 +126,7 @@ Este archivo se actualiza en cada entrega. Una tarea solo se marca como terminad
 - [x] Adaptar automáticamente la unidad de la receta a la unidad principal del inventario.
 - [x] Hacer funcional `ingrediente_directo_id`: descontar una unidad por venta con compatibilidad por código.
 - [x] Mantener el descuento directo y por receta sin cambios de esquema ni contrato móvil.
+- [x] Validar este bloque con lint de 140 archivos PHP, sintaxis JavaScript y `git diff --check`.
 - [ ] Definir el momento único de descuento de inventario.
 - [ ] Garantizar movimientos idempotentes.
 - [ ] Implementar reversa o merma al cancelar después de preparar.
@@ -166,6 +167,6 @@ Este archivo se actualiza en cada entrega. Una tarea solo se marca como terminad
 | 3. Cocina UX | Pendiente | — | — |
 | 4. Caja UX | Pendiente | — | — |
 | 5. Crear platillo | Publicado, en progreso | `de12b45` | Alta simplificada, receta opcional, categoría en línea, validaciones, CSRF y diseño café accesible; faltan prueba visual y mejoras secundarias. |
-| 6. Inventario | En progreso local | Pendiente | Selector de consumo simplificado y vínculo unitario funcional; faltan alertas, reversas y pruebas integrales. |
+| 6. Inventario | Publicado, en progreso | `70a6dac` | Selector de consumo simplificado y vínculo unitario funcional; faltan alertas, reversas y pruebas integrales. |
 | 7. Admin/Superadmin | Pendiente | — | — |
 | 8. Producción | Pendiente | — | — |
