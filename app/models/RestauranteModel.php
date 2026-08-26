@@ -203,6 +203,73 @@ class RestauranteModel extends BaseModel
         );
     }
 
+    /**
+     * Ficha completa de un negocio para el detalle de Superadmin: datos generales, empresa,
+     * plan, ventas históricas y del mes, staff y puntos de referencia asociados.
+     * Degrada a valores neutros si las migraciones 003 no han corrido en este entorno.
+     */
+    public function getDetalleParaSuperadmin(int $restauranteId): ?array
+    {
+        $tienePlataforma = $this->columnExists('estado_plataforma') && $this->columnExists('plan_id');
+        $selectPlan = $tienePlataforma
+            ? "r.estado_plataforma, r.plan_id, p.nombre AS plan_nombre, p.comision_pct, p.cuota_mensual"
+            : "NULL AS estado_plataforma, NULL AS plan_id, NULL AS plan_nombre, NULL AS comision_pct, NULL AS cuota_mensual";
+        $joinPlan = $tienePlataforma ? "LEFT JOIN planes_negocio p ON p.id = r.plan_id" : '';
+
+        $negocio = $this->queryOne(
+            "SELECT r.*, e.razon_social AS empresa_nombre, e.rfc AS empresa_rfc,
+                    e.email AS empresa_email, e.telefono AS empresa_telefono, $selectPlan
+               FROM rest_restaurantes r
+          LEFT JOIN empresas e ON e.id = r.empresa_id
+               $joinPlan
+              WHERE r.id = ?",
+            [$restauranteId]
+        );
+        if (!$negocio) return null;
+
+        $ventas = $this->queryOne(
+            "SELECT
+                COUNT(*) AS pedidos_totales,
+                COALESCE(SUM(total), 0) AS ventas_totales,
+                COALESCE(SUM(CASE WHEN created_at >= DATE_FORMAT(NOW(),'%Y-%m-01') THEN total ELSE 0 END), 0) AS ventas_mes,
+                COALESCE(AVG(total), 0) AS ticket_promedio,
+                MAX(created_at) AS ultimo_pedido
+             FROM rest_pedidos WHERE restaurante_id = ?",
+            [$restauranteId]
+        );
+
+        $staff = $this->query(
+            "SELECT u.id, u.nombre, u.apellido_paterno, u.email, u.activo, ro.nombre AS rol_nombre
+               FROM usuarios u
+               JOIN roles ro ON ro.id = u.rol_id
+              WHERE u.restaurante_id = ?
+              ORDER BY ro.id, u.nombre",
+            [$restauranteId]
+        );
+
+        $puntos = [];
+        try {
+            $puntos = $this->query(
+                "SELECT pr.nombre, pr.ciudad, rp.distancia_km, rp.destacado_manual
+                   FROM rest_puntos_referencia rp
+                   JOIN puntos_referencia pr ON pr.id = rp.punto_referencia_id
+                  WHERE rp.restaurante_id = ?
+                  ORDER BY rp.distancia_km ASC",
+                [$restauranteId]
+            );
+        } catch (\Throwable $e) {
+            // Migracion 003 aun no aplicada en este entorno.
+            error_log('[RestauranteModel::getDetalleParaSuperadmin] puntos: ' . $e->getMessage());
+        }
+
+        return [
+            'negocio' => $negocio,
+            'ventas'  => $ventas,
+            'staff'   => $staff,
+            'puntos'  => $puntos,
+        ];
+    }
+
     /** KPIs globales para el dashboard de Superadmin. Degrada si migration 003 no ha corrido. */
     public function getResumenPlataforma(): array
     {

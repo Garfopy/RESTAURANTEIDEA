@@ -92,6 +92,170 @@ class SuperadminController extends BaseController
         $this->redirect('superadmin/negocios');
     }
 
+    public function negocio(?string $id = null): void
+    {
+        $restauranteId = (int)$id;
+        $detalle = $this->restModel->getDetalleParaSuperadmin($restauranteId);
+        if (!$detalle) {
+            $this->flash('error', 'Negocio no encontrado.');
+            $this->redirect('superadmin/negocios');
+        }
+
+        $planes = [];
+        try {
+            $planes = Database::getInstance()
+                ->query('SELECT * FROM planes_negocio WHERE activo = 1 ORDER BY nombre')
+                ->fetchAll(PDO::FETCH_ASSOC);
+        } catch (\Throwable $e) {
+            error_log('[SuperadminController::negocio] planes: ' . $e->getMessage());
+        }
+
+        $flash      = $this->getFlash();
+        $pageTitle  = $detalle['negocio']['nombre'];
+        $activeMenu = 'sa_negocios';
+        $this->render('superadmin/negocios/detalle', array_merge(
+            $detalle,
+            compact('planes', 'flash', 'pageTitle', 'activeMenu')
+        ));
+    }
+
+    public function asignarPlan(?string $id = null): void
+    {
+        if (!$this->isPost()) {
+            $this->redirect('superadmin/negocios');
+        }
+
+        $restauranteId = (int)$id;
+        $planId = (int)$this->post('plan_id', 0) ?: null;
+        $negocio = $this->restModel->find($restauranteId);
+        if (!$negocio) {
+            $this->flash('error', 'Negocio no encontrado.');
+            $this->redirect('superadmin/negocios');
+        }
+
+        try {
+            $this->restModel->update($restauranteId, ['plan_id' => $planId]);
+        } catch (\Throwable $e) {
+            // Entorno sin la migracion 003 aplicada: no existe rest_restaurantes.plan_id.
+            error_log('[SuperadminController::asignarPlan] ' . $e->getMessage());
+            $this->flash('error', 'No se pudo asignar el plan: falta correr la migración 003 en esta base.');
+            $this->redirect('superadmin/negocio/' . $restauranteId);
+        }
+
+        $this->logModel->registrar(
+            $this->usuarioId(),
+            'superadmin',
+            (int)($negocio['empresa_id'] ?? 0) ?: null,
+            'Asignar plan',
+            'superadmin',
+            "Negocio #{$restauranteId} ({$negocio['nombre']}) → plan_id " . ($planId ?? 'NULL')
+        );
+        $this->flash('success', 'Plan actualizado.');
+        $this->redirect('superadmin/negocio/' . $restauranteId);
+    }
+
+    public function config(?string $p = null): void
+    {
+        $ajustes    = (new ConfigModel())->getAllAgrupado();
+        $flash      = $this->getFlash();
+        $pageTitle  = 'Configuración global';
+        $activeMenu = 'sa_config';
+        $this->render('superadmin/config/index', compact('ajustes', 'flash', 'pageTitle', 'activeMenu'));
+    }
+
+    public function configGuardar(?string $p = null): void
+    {
+        if (!$this->isPost()) {
+            $this->redirect('superadmin/config');
+        }
+
+        $configModel = new ConfigModel();
+        $enviados = (array)$this->post('ajustes', []);
+        $guardados = 0;
+        $errores = [];
+
+        // Solo se aceptan claves que YA existen en global_settings: evita que un POST
+        // manipulado inserte ajustes nuevos o rompa los que la app movil consume.
+        $existentes = [];
+        foreach ($configModel->getAllAgrupado() as $filas) {
+            foreach ($filas as $fila) {
+                $existentes[$fila['clave']] = $fila;
+            }
+        }
+
+        foreach ($enviados as $clave => $valor) {
+            if (!isset($existentes[$clave])) continue;
+
+            $valor  = trim((string)$valor);
+            $actual = (string)($existentes[$clave]['valor'] ?? '');
+            $tipo   = (string)($existentes[$clave]['tipo'] ?? 'text');
+
+            // Validaciones para no dejar la app movil con un valor que no puede leer.
+            if ($tipo === 'color' && !preg_match('/^#[0-9A-Fa-f]{6}$/', $valor)) {
+                $errores[] = "{$clave}: debe ser un color hex (#RRGGBB)";
+                continue;
+            }
+            // Si el valor actual es JSON, el nuevo tambien tiene que serlo.
+            $actualEsJson = $actual !== '' && json_decode($actual, true) !== null;
+            if (($tipo === 'json' || $actualEsJson) && $valor !== '' && json_decode($valor, true) === null) {
+                $errores[] = "{$clave}: JSON inválido";
+                continue;
+            }
+            if ($tipo === 'number' && $valor !== '' && !is_numeric($valor)) {
+                $errores[] = "{$clave}: debe ser numérico";
+                continue;
+            }
+
+            if ($valor === $actual) continue;
+
+            $configModel->set($clave, $valor);
+            $guardados++;
+        }
+
+        if ($guardados > 0) {
+            $this->logModel->registrar(
+                $this->usuarioId(),
+                'superadmin',
+                null,
+                'Editar configuración global',
+                'superadmin',
+                "{$guardados} ajuste(s) actualizado(s)"
+            );
+        }
+
+        if ($errores) {
+            $this->flash('error', 'No se guardaron algunos ajustes → ' . implode(' · ', $errores));
+        } else {
+            $this->flash('success', $guardados > 0 ? "{$guardados} ajuste(s) guardado(s)." : 'Sin cambios que guardar.');
+        }
+        $this->redirect('superadmin/config');
+    }
+
+    public function bitacora(?string $p = null): void
+    {
+        $filtros = [
+            'modulo'     => trim((string)$this->get('modulo', '')) ?: null,
+            'usuario_id' => (int)$this->get('usuario_id', 0) ?: null,
+            'fecha'      => trim((string)$this->get('fecha', '')) ?: null,
+        ];
+        $page = max(1, (int)$this->get('page', 1));
+
+        $resultado = (new LogModel())->getBitacora($filtros, $page);
+        $modulos = [];
+        try {
+            $modulos = Database::getInstance()
+                ->query("SELECT DISTINCT modulo FROM action_logs WHERE modulo IS NOT NULL AND modulo <> '' ORDER BY modulo")
+                ->fetchAll(PDO::FETCH_COLUMN);
+        } catch (\Throwable $e) {
+            error_log('[SuperadminController::bitacora] modulos: ' . $e->getMessage());
+        }
+
+        $flash      = $this->getFlash();
+        $pageTitle  = 'Bitácora';
+        $activeMenu = 'sa_bitacora';
+        $this->render('superadmin/bitacora/index', compact('resultado', 'modulos', 'filtros', 'flash', 'pageTitle', 'activeMenu'));
+    }
+
     public function puntosReferencia(?string $p = null): void
     {
         $puntos     = $this->puntoModel->getAllConConteo();

@@ -43,4 +43,19 @@ class ConfigModel extends BaseModel
         }
         return $result;
     }
+
+    /**
+     * Filas completas agrupadas por `grupo`, conservando tipo/etiqueta.
+     * getAll() aplana a clave=>valor y pierde esa metadata, que el panel de
+     * Superadmin necesita para renderizar el input correcto por cada ajuste.
+     */
+    public function getAllAgrupado(): array
+    {
+        $rows = $this->query('SELECT * FROM global_settings ORDER BY grupo, clave');
+        $agrupado = [];
+        foreach ($rows as $row) {
+            $agrupado[$row['grupo'] ?: 'otros'][] = $row;
+        }
+        return $agrupado;
+    }
 }

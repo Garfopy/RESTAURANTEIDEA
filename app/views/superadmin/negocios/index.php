@@ -45,7 +45,8 @@
         <?php foreach ($negocios as $n): ?>
         <tr>
           <td>
-            <strong><?= htmlspecialchars($n['nombre']) ?></strong><br>
+            <a href="<?= BASE_URL ?>superadmin/negocio/<?= (int)$n['id'] ?>"
+               style="color:#1E293B;font-weight:700;text-decoration:none"><?= htmlspecialchars($n['nombre']) ?></a><br>
             <span style="color:#94A3B8;font-size:.78rem"><?= htmlspecialchars($n['slug']) ?></span>
           </td>
           <td><?= htmlspecialchars($n['empresa_nombre'] ?? '—') ?></td>
