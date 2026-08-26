@@ -115,7 +115,8 @@ Este archivo se actualiza en cada entrega. Una tarea solo se marca como terminad
 - [ ] Guardar borrador cuando sea seguro hacerlo.
 - [ ] Confirmar éxito con accesos directos: “Crear otro” y “Ver menú”.
 - [ ] Probar en escritorio, tablet y móvil.
-- [ ] Actualizar checklist, commit y push.
+- [x] Ejecutar lint PHP, validación sintáctica JavaScript y `git diff --check`.
+- [x] Actualizar checklist, commit y push (`de12b45`).
 
 ## Entrega 6 — Inventario y recetas confiables
 
@@ -160,7 +161,7 @@ Este archivo se actualiza en cada entrega. Una tarea solo se marca como terminad
 | 2. Caja–Cocina–Entrega | Pendiente | — | — |
 | 3. Cocina UX | Pendiente | — | — |
 | 4. Caja UX | Pendiente | — | — |
-| 5. Crear platillo | En progreso local | Pendiente | Alta simplificada, receta opcional, validaciones, CSRF y diseño café accesible implementados; faltan prueba visual y mejoras secundarias. |
+| 5. Crear platillo | Publicado, en progreso | `de12b45` | Alta simplificada, receta opcional, categoría en línea, validaciones, CSRF y diseño café accesible; faltan prueba visual y mejoras secundarias. |
 | 6. Inventario | Pendiente | — | — |
 | 7. Admin/Superadmin | Pendiente | — | — |
 | 8. Producción | Pendiente | — | — |
