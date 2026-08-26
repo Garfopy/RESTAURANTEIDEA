@@ -24,8 +24,7 @@ $appMovilHabilitada = !array_key_exists('app_movil_habilitada', (array)$restaura
 
 // Roles para visibilidad del sidebar
 $_rol      = $usuario['rol_slug'] ?? '';
-$_isAdmin  = in_array($_rol, ['admin_restaurante', 'comprador', 'superadmin'], true); // gestión del restaurante
-$_isMesero = in_array($_rol, ['mesero', 'comprador', 'superadmin'], true);             // operación de salón
+$_isAdmin  = in_array($_rol, ['admin_restaurante', 'comprador', 'superadmin'], true); // gestión del negocio
 $_isSuperAdmin = $_rol === 'superadmin';
 ?>
 <!DOCTYPE html>
@@ -108,30 +107,11 @@ $_isSuperAdmin = $_rol === 'superadmin';
     </a>
 
     <div class="rst-nav-section">Operación</div>
-    <a class="rst-nav-link <?= $activeMenu === 'rest_mesas' ? 'active' : '' ?>"
-       href="<?= BASE_URL ?>rest-mesa/index">
-      <svg style="width:16px;height:16px;flex-shrink:0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
-      Mesas
-    </a>
-    <?php if ($_isMesero): ?>
+    <?php if ($_isAdmin): ?>
     <a class="rst-nav-link <?= $activeMenu === 'rest_pedidos' ? 'active' : '' ?>"
        href="<?= BASE_URL ?>rest-pedido/index">
       <svg style="width:16px;height:16px;flex-shrink:0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
       Pedidos
-    </a>
-    <?php endif; ?>
-    <?php if ($_isAdmin || $_isMesero): ?>
-    <a class="rst-nav-link <?= $activeMenu === 'rest_reservas' ? 'active' : '' ?>"
-       href="<?= BASE_URL ?>rest-reserva/index">
-      <svg style="width:16px;height:16px;flex-shrink:0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-      Reservaciones
-    </a>
-    <?php endif; ?>
-    <?php if ($_isMesero): ?>
-    <a class="rst-nav-link <?= $activeMenu === 'rest_tickets' ? 'active' : '' ?>"
-       href="<?= BASE_URL ?>rest-ticket/index">
-      <svg style="width:16px;height:16px;flex-shrink:0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"/></svg>
-      Tickets
     </a>
     <?php endif; ?>
 
@@ -198,11 +178,6 @@ $_isSuperAdmin = $_rol === 'superadmin';
       Comensales
     </a>
     <?php if ($appMovilHabilitada): ?>
-    <a class="rst-nav-link <?= $activeMenu === 'rest_moderacion' ? 'active' : '' ?>"
-       href="<?= BASE_URL ?>rest-moderacion/index">
-      <svg style="width:16px;height:16px;flex-shrink:0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M12 3l7 4v5c0 5-3 8-7 9-4-1-7-4-7-9V7l7-4z"/></svg>
-      Reportes App
-    </a>
     <a class="rst-nav-link <?= $activeMenu === 'rest_promociones' ? 'active' : '' ?>"
        href="<?= BASE_URL ?>rest-promocion/index">
       <svg style="width:16px;height:16px;flex-shrink:0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
@@ -246,7 +221,7 @@ $_isSuperAdmin = $_rol === 'superadmin';
       Cerrar sesión
     </a>
     <div style="text-align:center;font-size:.7rem;color:#9CA3AF">
-      Administraci&oacute;n de <strong>Jungle Pizza</strong>
+      Administraci&oacute;n de <strong><?= htmlspecialchars($restNombre) ?></strong>
     </div>
   </div>
 </aside>

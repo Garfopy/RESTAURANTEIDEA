@@ -44,10 +44,8 @@ abstract class BaseController
             $rol === 'superadmin'                                      => $this->redirect('restaurante/seleccionar'),
             $rol === 'admin_restaurante', $rol === 'comprador',
             $rol === 'admin_local'                                     => $this->redirect('restaurante/dashboard'),
-            $rol === 'mesero'                                          => $this->redirect('rest-mesero/dashboard'),
-            $rol === 'chef'                                            => $this->redirect('rest-chef/dashboard'),
-            $rol === 'barra'                                           => $this->redirect('rest-bar/dashboard'),
-            $rol === 'portero'                                         => $this->redirect('rest-portero/dashboard'),
+            // mesero/chef/barra/portero: roles retirados (modelo marketplace
+            // pickup/delivery, sin servicio en mesa) — caen al default.
             // Evita un ciclo /auth/login -> /auth/login cuando una sesion
             // contiene un rol nuevo, eliminado o todavia no desplegado.
             default                                                    => $this->redirect('auth/logout'),

@@ -24,13 +24,14 @@ if (strpos($_SERVER['REQUEST_URI'] ?? '', 'api/auth/token') !== false) {
  *
  * URL pattern: /{controller}/{action}/{param}
  * Portales:
- *   /restaurante/  → Admin local del restaurante
- *   /rest-{mod}/   → Módulos del restaurante (menú, pedidos, inventario, etc.)
- *   /rest-mesero/  → Portal mesero
- *   /rest-chef/    → Portal chef
- *   /rest-portero/ → Portal portero
+ *   /restaurante/  → Admin del negocio
+ *   /rest-{mod}/   → Módulos del negocio (menú, pedidos, inventario, etc.)
  *   /menu/         → Menú público (sin login)
  *   /acceso/       → Acceso de comensal por slug y compatibilidad legacy
+ *
+ * Nota (2026-08-25): se quitaron los portales de mesero/chef/barra/portero y los
+ * módulos de mesas/reservaciones/moderación — no aplican al modelo marketplace
+ * (pickup/delivery). Ver plan-web-marketplace.md.
  */
 
 define('ROOT_PATH', __DIR__);
@@ -62,10 +63,6 @@ $_earlyCtrl     = strtolower($_earlySegments[0] ?? '');
 $_earlyAction   = strtolower($_earlySegments[1] ?? '');
 
 $_roleCookies = [
-    'rest-chef'     => '_chef',
-    'rest-bar'      => '_barra',
-    'rest-mesero'   => '_mesero',
-    'rest-portero'  => '_portero',
     'menu'          => '_comensal',
     'acceso'        => '_login',
 ];
@@ -74,7 +71,7 @@ $_cookieSuffix = $_roleCookies[$_earlyCtrl] ?? '';
 // auth/logoutStaff/{rol} destruye SOLO la cookie de ese rol
 if ($_earlyCtrl === 'auth' && $_earlyAction === 'logoutstaff') {
     $_logoutRol = strtolower($_earlySegments[2] ?? '');
-    if (in_array($_logoutRol, ['chef', 'barra', 'mesero', 'portero', 'staff', 'comensal', 'login'], true)) {
+    if (in_array($_logoutRol, ['staff', 'comensal', 'login'], true)) {
         $_cookieSuffix = '_' . $_logoutRol;
     }
 }
@@ -168,7 +165,6 @@ $routes = [
     // Portal admin del restaurante
     'restaurante'   => 'RestauranteController',
     'rest-config'   => 'RestConfigController',
-    'rest-mesa'     => 'RestMesaController',
     'rest-menu'     => 'RestMenuController',
     'rest-inventario' => 'RestInventarioController',
     'rest-mermas'   => 'RestMermasController',
@@ -176,15 +172,7 @@ $routes = [
     'rest-finanzas' => 'RestFinanzasController',
     'rest-factura'  => 'RestFacturaController',
     'rest-cliente'  => 'RestClienteController',
-    'rest-moderacion' => 'RestModeracionController',
-    'rest-reserva'  => 'RestReservaController',
     'rest-promocion'=> 'RestPromocionController',
-    'rest-ticket'   => 'RestTicketController',
-    // Portales staff
-    'rest-mesero'   => 'RestMeseroController',
-    'rest-chef'     => 'RestChefController',
-    'rest-bar'      => 'RestBarController',
-    'rest-portero'  => 'RestPorteroController',
     'rest-staff'    => 'RestStaffController',
     'rest-propinas' => 'RestPropinaController',
     // Menú público (sin login)
@@ -301,18 +289,7 @@ if ($ctrlSlug === 'auth' && $action === 'index' && isset($_SESSION['usuario'])) 
     if (in_array($rol, ['admin_local', 'superadmin'], true)) {
         header('Location: ' . BASE_URL . 'restaurante/seleccionar'); exit;
     }
-    if ($rol === 'mesero') {
-        header('Location: ' . BASE_URL . 'rest-mesero/dashboard'); exit;
-    }
-    if ($rol === 'chef') {
-        header('Location: ' . BASE_URL . 'rest-chef/dashboard'); exit;
-    }
-    if ($rol === 'barra') {
-        header('Location: ' . BASE_URL . 'rest-bar/dashboard'); exit;
-    }
-    if ($rol === 'portero') {
-        header('Location: ' . BASE_URL . 'rest-portero/dashboard'); exit;
-    }
+    // mesero/chef/barra/portero: roles retirados, sin portal — cae a logout.
     header('Location: ' . BASE_URL . 'auth/login'); exit;
 }
 

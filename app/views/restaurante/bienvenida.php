@@ -19,8 +19,8 @@
       🔑 Link de acceso para tu equipo
     </div>
     <div style="font-size:.85rem;color:#6B7280;margin-bottom:16px;line-height:1.5">
-      Comparte este link con tus meseros, chef y portero. Todos inician sesión
-      en el portal centralizado de tu restaurante usando su correo y contraseña.
+      Comparte este link con tu equipo (por ejemplo, cajeros). Inician sesión
+      en el portal centralizado de tu negocio usando su correo y contraseña.
     </div>
 
     <div style="display:flex;gap:8px;align-items:stretch;margin-bottom:14px;flex-wrap:wrap">
@@ -43,7 +43,7 @@
       <div>
         <div style="font-weight:600;color:#111827;margin-bottom:4px">QR del portal staff</div>
         <div style="font-size:.82rem;color:#6B7280;line-height:1.5">
-          Imprime este QR y pégalo en la cocina o área de personal.
+          Imprime este QR y pégalo en el área de personal.
           Cualquier integrante lo escanea desde su celular para entrar al portal.
         </div>
       </div>
@@ -60,15 +60,15 @@
         <div class="rst-step-num">1</div>
         <div>
           <div style="font-weight:600;color:#111827">Crea a tu equipo</div>
-          <div style="font-size:.82rem;color:#6B7280">Mesero, chef y portero — cada uno con su correo y contraseña.</div>
+          <div style="font-size:.82rem;color:#6B7280">Cajeros — cada uno con su correo y contraseña.</div>
         </div>
         <div style="color:#9CA3AF">→</div>
       </a>
-      <a href="<?= BASE_URL ?>rest-mesa/index" class="rst-step">
+      <a href="<?= BASE_URL ?>rest-inventario/index" class="rst-step">
         <div class="rst-step-num">2</div>
         <div>
-          <div style="font-weight:600;color:#111827">Configura tus mesas</div>
-          <div style="font-size:.82rem;color:#6B7280">Genera el QR de cada mesa para que el comensal ordene desde su celular.</div>
+          <div style="font-weight:600;color:#111827">Carga tu inventario</div>
+          <div style="font-size:.82rem;color:#6B7280">Ingredientes y stock, para que el menú descuente automático.</div>
         </div>
         <div style="color:#9CA3AF">→</div>
       </a>
@@ -84,7 +84,7 @@
         <div class="rst-step-num">4</div>
         <div>
           <div style="font-weight:600;color:#111827">Personaliza tu marca</div>
-          <div style="font-size:.82rem;color:#6B7280">Logo, colores y modos de operación (mesas, reservas, portero, propinas).</div>
+          <div style="font-size:.82rem;color:#6B7280">Logo, colores, horarios, pickup y delivery.</div>
         </div>
         <div style="color:#9CA3AF">→</div>
       </a>
@@ -103,7 +103,7 @@
       📱 Link público del menú
     </div>
     <div style="font-size:.85rem;color:#78350F;margin-bottom:10px;line-height:1.5">
-      Este es el link que ven tus clientes al escanear el QR de la mesa.
+      Este es el link que ven tus clientes para ordenar (pickup o delivery).
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <input type="text" id="linkMenu" readonly value="<?= htmlspecialchars($linkMenu) ?>"

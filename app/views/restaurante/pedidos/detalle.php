@@ -43,12 +43,6 @@
        style="padding:8px 16px;background:#FEE2E2;color:#991B1B;border-radius:8px;font-size:.875rem;font-weight:500;text-decoration:none">
       Cancelar pedido
     </a>
-    <?php if ($pedido['visita_id']): ?>
-    <a href="<?= BASE_URL ?>rest-ticket/generar/<?= $pedido['visita_id'] ?>"
-       style="padding:8px 16px;background:var(--color-primary);color:#fff;border-radius:8px;font-size:.875rem;font-weight:500;text-decoration:none">
-      Generar ticket
-    </a>
-    <?php endif; ?>
   </div>
   <?php endif; ?>
 </div>
