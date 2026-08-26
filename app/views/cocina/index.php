@@ -94,19 +94,44 @@
 
 <script>
 const BASE_URL = '<?= BASE_URL ?>';
-function avanzar(itemId, btn) {
-  btn.disabled = true;
-  fetch(BASE_URL + 'rest-cocina/avanzarItem/' + itemId, { method: 'POST' })
-    .then(r => r.json())
-    .then(() => location.reload())
-    .catch(() => { btn.disabled = false; alert('No se pudo actualizar, intenta de nuevo.'); });
+const CSRF = <?= json_encode($csrf) ?>;
+
+async function postAction(path) {
+  const response = await fetch(BASE_URL + path, {
+    method: 'POST',
+    headers: {
+      'Accept': 'application/json',
+      'X-CSRF-Token': CSRF
+    }
+  });
+  let data = {};
+  try { data = await response.json(); } catch (_) {}
+  if (!response.ok || !data.ok) {
+    throw new Error(data.msg || 'No se pudo actualizar el pedido.');
+  }
+  return data;
 }
-function entregar(pedidoId, btn) {
+
+async function avanzar(itemId, btn) {
   btn.disabled = true;
-  fetch(BASE_URL + 'rest-cocina/entregarPedido/' + pedidoId, { method: 'POST' })
-    .then(r => r.json())
-    .then(() => location.reload())
-    .catch(() => { btn.disabled = false; alert('No se pudo actualizar, intenta de nuevo.'); });
+  try {
+    await postAction('rest-cocina/avanzarItem/' + itemId);
+    location.reload();
+  } catch (error) {
+    btn.disabled = false;
+    alert(error.message || 'No se pudo actualizar, intenta de nuevo.');
+  }
+}
+
+async function entregar(pedidoId, btn) {
+  btn.disabled = true;
+  try {
+    await postAction('rest-cocina/entregarPedido/' + pedidoId);
+    location.reload();
+  } catch (error) {
+    btn.disabled = false;
+    alert(error.message || 'No se pudo actualizar, intenta de nuevo.');
+  }
 }
 // Refresco automático — modelo simple de polling (v1)
 setTimeout(() => location.reload(), 20000);

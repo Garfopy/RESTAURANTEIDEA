@@ -1163,7 +1163,10 @@ class ApiController extends BaseController
             'metodo_pago' => isset($body['metodo_pago']) ? substr(trim((string)$body['metodo_pago']), 0, 40) : null,
             'pickup_at' => $this->mobileNormalizeDateTime($body['pickup_at'] ?? $body['hora_recoger'] ?? $body['fecha_recoger'] ?? null),
             'app_order_id' => $appOrderId !== '' ? substr($appOrderId, 0, 80) : null,
-            'pagado_at' => !empty($body['pagado']) ? date('Y-m-d H:i:s') : null,
+            // Compatibilidad: el cliente puede seguir enviando `pagado`,
+            // pero nunca es autoridad financiera. Efectivo se confirma en
+            // Caja y tarjeta mediante el flujo/webhook verificado del servidor.
+            'pagado_at' => null,
         ];
 
         try {

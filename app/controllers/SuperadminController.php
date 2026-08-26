@@ -89,20 +89,22 @@ class SuperadminController extends BaseController
         $negocios = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         $flash = $this->getFlash();
+        $csrf = $this->csrfToken();
         $pageTitle = 'Negocios';
-        $this->render('superadmin/negocios', compact('negocios', 'q', 'estado', 'flash', 'pageTitle'));
+        $this->render('superadmin/negocios', compact('negocios', 'q', 'estado', 'flash', 'csrf', 'pageTitle'));
     }
 
     public function nuevoNegocio(?string $p = null): void
     {
         $flash = $this->getFlash();
+        $csrf = $this->csrfToken();
         $pageTitle = 'Nuevo Negocio';
-        $this->render('superadmin/negocio_form', compact('flash', 'pageTitle'));
+        $this->render('superadmin/negocio_form', compact('flash', 'csrf', 'pageTitle'));
     }
 
     public function crearNegocio(?string $p = null): void
     {
-        if (!$this->isPost()) $this->redirect('superadmin/negocios');
+        $this->requirePostWithCsrf('superadmin/nuevoNegocio');
         $db = Database::getInstance();
 
         $razonSocial = trim($this->post('razon_social', ''));
@@ -180,7 +182,7 @@ class SuperadminController extends BaseController
         } catch (\Throwable $e) {
             $db->rollBack();
             error_log('[SuperadminController::crearNegocio] ' . $e->getMessage());
-            $this->flash('error', 'No se pudo crear el negocio: ' . $e->getMessage());
+            $this->flash('error', 'No se pudo crear el negocio. Revisa los datos e intenta nuevamente.');
             $this->redirect('superadmin/nuevoNegocio');
         }
 
@@ -191,6 +193,7 @@ class SuperadminController extends BaseController
 
     public function toggleActivo(?string $id = null): void
     {
+        $this->requirePostWithCsrf('superadmin/negocios');
         $restauranteId = (int)$id;
         $db = Database::getInstance();
         $st = $db->prepare("SELECT activo, nombre FROM rest_restaurantes WHERE id = ?");
@@ -221,5 +224,19 @@ class SuperadminController extends BaseController
         if ($value === '' || !is_numeric($value)) return null;
         $c = (float)$value;
         return ($c >= $min && $c <= $max) ? $c : null;
+    }
+
+    private function requirePostWithCsrf(string $fallback): void
+    {
+        if (!$this->isPost()) {
+            http_response_code(405);
+            $this->flash('error', 'La accion solicitada requiere confirmacion.');
+            $this->redirect($fallback);
+        }
+        if (!$this->validarCsrf()) {
+            http_response_code(419);
+            $this->flash('error', 'La sesion expiro. Vuelve a intentarlo.');
+            $this->redirect($fallback);
+        }
     }
 }

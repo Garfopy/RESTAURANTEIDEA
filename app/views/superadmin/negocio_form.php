@@ -3,6 +3,7 @@
 <h1 style="font-size:1.3rem;font-weight:800;margin-bottom:20px">Nuevo negocio</h1>
 
 <form method="POST" action="<?= BASE_URL ?>superadmin/crearNegocio" style="background:#fff;border-radius:12px;padding:24px;border:1px solid #E5E7EB;max-width:640px">
+  <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf, ENT_QUOTES) ?>">
   <div style="font-weight:700;margin-bottom:12px">Datos del negocio</div>
   <div style="display:grid;gap:12px;margin-bottom:20px">
     <div>

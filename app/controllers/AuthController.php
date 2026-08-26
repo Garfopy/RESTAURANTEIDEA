@@ -106,6 +106,9 @@ class AuthController extends BaseController
         }
 
         if (!$esStaffLogin) {
+            // Evita fijacion de sesion: el identificador usado antes de
+            // autenticar nunca se conserva como sesion administrativa.
+            session_regenerate_id(true);
             $_SESSION['usuario'] = $usuario;
 
             if (!empty($usuario['empresa_id'])) {

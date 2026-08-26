@@ -18,13 +18,15 @@ class RestCocinaController extends BaseController
         $restaurante   = (new RestauranteModel())->find($restauranteId);
         $pedidos       = $this->model->getColaCocina($restauranteId);
         $flash         = $this->getFlash();
+        $csrf          = $this->csrfToken();
         $pageTitle     = 'Cocina';
-        $this->render('cocina/index', compact('pedidos', 'restaurante', 'flash', 'pageTitle'));
+        $this->render('cocina/index', compact('pedidos', 'restaurante', 'flash', 'csrf', 'pageTitle'));
     }
 
     /** POST — avanza el estado de un item: pendiente -> en_preparacion -> listo. Responde JSON (fetch). */
     public function avanzarItem(?string $id = null): void
     {
+        $this->requireMutation();
         $itemId = (int)$id;
         $siguiente = [
             'pendiente'      => 'en_preparacion',
@@ -68,6 +70,7 @@ class RestCocinaController extends BaseController
     /** POST — marca el pedido completo como entregado/recogido (sale de la cola). */
     public function entregarPedido(?string $id = null): void
     {
+        $this->requireMutation();
         $pedidoId = (int)$id;
         $pedido = $this->model->getConItemsSinMesas($pedidoId, $this->restauranteId());
         if (!$pedido) {
@@ -75,5 +78,16 @@ class RestCocinaController extends BaseController
         }
         $this->model->cambiarEstadoPedido($pedidoId, 'entregado');
         $this->json(['ok' => true]);
+    }
+
+    /** Toda mutacion del KDS exige POST y el token de la sesion de Cocina. */
+    private function requireMutation(): void
+    {
+        if (!$this->isPost()) {
+            $this->json(['ok' => false, 'msg' => 'Metodo no permitido.'], 405);
+        }
+        if (!$this->validarCsrf()) {
+            $this->json(['ok' => false, 'msg' => 'La sesion expiro. Recarga la pantalla.'], 419);
+        }
     }
 }

@@ -16,10 +16,24 @@ class RestPedidoModel extends BaseModel
         }
 
         try {
-            $stmt = $this->db->prepare("SHOW COLUMNS FROM `{$table}` LIKE ?");
-            $stmt->execute([$column]);
-            return self::$columnCache[$key] = (bool)$stmt->fetch(PDO::FETCH_ASSOC);
+            // MySQL 5.7 con PDO::ATTR_EMULATE_PREPARES=false no acepta de
+            // forma consistente un placeholder en `SHOW COLUMNS ... LIKE ?`.
+            // Cuando fallaba, el catch devolvia false y `crear()` descartaba
+            // silenciosamente estado, turno, cajero, pago y UUID del POS.
+            // Leer el esquema completo una sola vez evita esa incompatibilidad.
+            $stmt = $this->db->query("SHOW COLUMNS FROM `{$table}`");
+            $found = false;
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $definition) {
+                $field = (string)($definition['Field'] ?? '');
+                if ($field === '') continue;
+                self::$columnCache[$table . '.' . $field] = true;
+                if (strcasecmp($field, $column) === 0) {
+                    $found = true;
+                }
+            }
+            return self::$columnCache[$key] = $found;
         } catch (\Throwable $e) {
+            error_log('[RestPedidoModel] No se pudo leer el esquema de ' . $table . ': ' . $e->getMessage());
             return self::$columnCache[$key] = false;
         }
     }

@@ -46,11 +46,14 @@
           </span>
         </td>
         <td style="padding:10px 16px;white-space:nowrap">
-          <a href="<?= BASE_URL ?>superadmin/toggleActivo/<?= (int)$n['id'] ?>"
-             onclick="return confirm('<?= $n['activo'] ? '¿Suspender' : '¿Reactivar' ?> <?= htmlspecialchars($n['nombre'], ENT_QUOTES) ?>?')"
-             style="font-size:.78rem;font-weight:600;color:<?= $n['activo'] ? '#DC2626' : '#059669' ?>;text-decoration:none">
-            <?= $n['activo'] ? 'Suspender' : 'Reactivar' ?>
-          </a>
+          <form method="POST" action="<?= BASE_URL ?>superadmin/toggleActivo/<?= (int)$n['id'] ?>" style="margin:0">
+            <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf, ENT_QUOTES) ?>">
+            <button type="submit"
+                    onclick="return confirm('<?= $n['activo'] ? '¿Suspender' : '¿Reactivar' ?> <?= htmlspecialchars($n['nombre'], ENT_QUOTES) ?>?')"
+                    style="border:0;background:transparent;padding:0;cursor:pointer;font-size:.78rem;font-weight:600;color:<?= $n['activo'] ? '#DC2626' : '#059669' ?>">
+              <?= $n['activo'] ? 'Suspender' : 'Reactivar' ?>
+            </button>
+          </form>
         </td>
       </tr>
       <?php endforeach; ?>
