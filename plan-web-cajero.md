@@ -354,9 +354,11 @@ Nada de esto se hardcodea. Todo se lee de BD con un default sensato.
 - [ ] Tiempo real: v1 va con **polling configurable**. Si el equipo elige Firebase/Pusher, solo se
       reemplaza la función que rellena la cola.
 - [ ] Stripe en modo live y quién ejecuta los reembolsos pendientes.
-- [ ] Multi-sucursal: si un cajero puede tener acceso a más de un negocio, hay que agregar un selector
-      de sucursal antes del PIN. Hoy `usuarios.restaurante_id` es uno solo, pero `rest_staff_restaurantes`
-      ya soporta varios.
+- [ ] Multi-sucursal: hoy `usuarios.restaurante_id` es una sola columna, un cajero pertenece a un
+      único negocio. ⚠️ Corrección: la nota anterior mencionaba `rest_staff_restaurantes` como
+      soporte ya existente para varios negocios por usuario — esa tabla es del esquema viejo
+      (Jungle) y **no existe** en la BD real (`idactivo_cafeteq`). Si se necesita multi-sucursal,
+      hay que diseñarla desde cero: no hay nada que reusar hoy.
 - [ ] Si el POS necesita facturación CFDI en mostrador (`facturacion_solicitudes` ya existe).
 
 ---
