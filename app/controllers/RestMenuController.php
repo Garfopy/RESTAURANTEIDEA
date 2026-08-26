@@ -175,20 +175,12 @@ class RestMenuController extends BaseController
             $this->model->syncIngredientesReceta($recetaId, $ings);
         }
 
-        $this->model->sincronizarExclusionesDesdeReceta($restauranteId, $platilloId);
-        $this->model->sincronizarCatalogoExtras($restauranteId);
-        $syncError = $this->syncModificadoresApp($restauranteId, $platilloId);
-
-        $this->flash($syncError ? 'error' : 'success', $syncError ?: 'Platillo guardado.');
+        // Nota: se quitó a propósito la sincronización de modificadores/exclusiones para
+        // la app (personalización "sin X" / "extra Y") — es una función avanzada que no
+        // hace falta para el flujo simple de menú + receta. La receta de arriba ya es lo
+        // que descuenta inventario automático al vender, eso sí sigue funcionando igual.
+        $this->flash('success', 'Platillo guardado.');
         $this->redirect('rest-menu/index');
-    }
-
-    private function syncModificadoresApp(int $restauranteId, int $platilloId): ?string
-    {
-        $result = (new ModifierSyncService())->syncPlatillo($restauranteId, $platilloId);
-        if (!empty($result['ok'])) return null;
-        return 'Platillo guardado, pero no se pudieron preparar sus modificadores: '
-            . mb_substr((string)($result['message'] ?? ''), 0, 180);
     }
 
     public function detalle(?string $id = null): void

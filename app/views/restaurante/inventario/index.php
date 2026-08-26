@@ -335,12 +335,9 @@ sort($ingCategorias);
       <button class="rst-modal-close" onclick="rstModal('modalIng')">✕</button>
     </div>
 
-    <!-- Tabs fuente -->
-    <div class="rst-tabs" id="ingTabs">
+    <!-- Tab único: se quitó "Desde el proveedor" (integración CarniHub, no aplica a este negocio) -->
+    <div class="rst-tabs" id="ingTabs" style="display:none">
       <button class="rst-tab active" data-tab="ext" onclick="switchTab('ext')">Proveedor externo</button>
-      <button class="rst-tab" data-tab="ch"  onclick="switchTab('ch')">
-        <span style="color:var(--cp);font-weight:700">⚡ Desde el proveedor</span>
-      </button>
     </div>
 
     <form method="POST" action="<?= BASE_URL ?>rest-inventario/guardar" id="formIng">
