@@ -112,11 +112,54 @@ class RestPedidoModel extends BaseModel
         return 'P-' . str_pad((int)($count['c'] ?? 0) + 1, 5, '0', STR_PAD_LEFT);
     }
 
-    public function crear(array $data, array $items): int
+    /**
+     * ¿Este restaurante permite exclusiones ("sin cebolla") y extras?
+     *
+     * El esquema nuevo movió estas banderas de `rest_restaurantes` a
+     * `rest_configuracion`. Se buscan en ese orden y, si no existen en
+     * ninguna de las dos, se permiten: bloquear todos los modificadores
+     * porque falta una columna deja la venta sin poder capturarse.
+     *
+     * @return array{sin:bool, extra:bool}
+     */
+    private function flagsModificadores(int $restauranteId): array
     {
-        $menuModel = new RestMenuModel();
-        $restauranteId = (int)$data['restaurante_id'];
-        $restaurante = (new RestauranteModel())->find($restauranteId) ?: [];
+        $rest = (new RestauranteModel())->find($restauranteId) ?: [];
+        if (array_key_exists('exclusiones_app_habilitadas', $rest)) {
+            return [
+                'sin'   => !empty($rest['exclusiones_app_habilitadas']),
+                'extra' => !empty($rest['extras_app_habilitados']),
+            ];
+        }
+
+        $cfg = $this->queryOne(
+            "SELECT exclusiones_habilitadas, extras_habilitados FROM rest_configuracion WHERE restaurante_id = ? LIMIT 1",
+            [$restauranteId]
+        );
+        if ($cfg) {
+            return [
+                'sin'   => !empty($cfg['exclusiones_habilitadas']),
+                'extra' => !empty($cfg['extras_habilitados']),
+            ];
+        }
+
+        return ['sin' => true, 'extra' => true];
+    }
+
+    /**
+     * Valida los items y les pone precio SIN escribir nada en la base.
+     *
+     * Existe aparte de `crear()` porque el POS necesita el subtotal antes
+     * de poder calcular descuento, propina y total, y esos van en el mismo
+     * INSERT del pedido.
+     *
+     * @return array{items:array, subtotal:float}
+     */
+    public function prepararItems(int $restauranteId, array $items): array
+    {
+        $menuModel   = new RestMenuModel();
+        $flags       = $this->flagsModificadores($restauranteId);
+
         foreach ($items as &$item) {
             $platillo = $menuModel->find((int)$item['platillo_id']);
             if (!$platillo || (int)$platillo['restaurante_id'] !== $restauranteId) {
@@ -133,8 +176,8 @@ class RestPedidoModel extends BaseModel
                 if (!$mod || $cantidad > (int)$mod['max_seleccion']) {
                     throw new \InvalidArgumentException('Modificador invalido o cantidad superior al maximo permitido.');
                 }
-                if (($mod['tipo'] === 'sin' && empty($restaurante['exclusiones_app_habilitadas']))
-                    || ($mod['tipo'] === 'extra' && empty($restaurante['extras_app_habilitados']))) {
+                if (($mod['tipo'] === 'sin' && !$flags['sin'])
+                    || ($mod['tipo'] === 'extra' && !$flags['extra'])) {
                     throw new \InvalidArgumentException('Este tipo de modificador esta deshabilitado para el restaurante.');
                 }
                 if ($mod['tipo'] === 'sin') { $cantidad = 1; $exclusiones[] = $mod['ingrediente_nombre'] ?: $mod['nombre']; }
@@ -153,26 +196,62 @@ class RestPedidoModel extends BaseModel
             ], array_filter($selecciones, fn($s) => $s['modificador']['tipo'] === 'extra'))), JSON_UNESCAPED_UNICODE);
         }
         unset($item);
-        $this->db->beginTransaction();
-        try {
-            $folio = $this->generarFolio($data['restaurante_id']);
-            $subtotal = array_sum(array_column($items, 'subtotal'));
 
+        return [
+            'items'    => $items,
+            'subtotal' => round(array_sum(array_column($items, 'subtotal')), 2),
+        ];
+    }
+
+    /**
+     * Crea el pedido con sus items y modificadores.
+     *
+     * Dos detalles importantes para el POS:
+     *  - Si ya hay una transacción abierta (el cobro de caja abre la suya
+     *    para meter pagos y wallet en el mismo bloque), aquí no se abre otra:
+     *    PDO no anida transacciones.
+     *  - El folio se arma DESPUÉS del INSERT, a partir del id autoincremental.
+     *    El método viejo contaba filas y con dos cajeros vendiendo al mismo
+     *    tiempo generaba folios repetidos.
+     */
+    public function crear(array $data, array $items): int
+    {
+        $restauranteId = (int)$data['restaurante_id'];
+
+        // El POS ya trae los items con precio (necesita el subtotal antes,
+        // para calcular el descuento); el resto del sistema no.
+        $primero = $items ? reset($items) : [];
+        if (!is_array($primero) || !array_key_exists('selecciones_validadas', $primero)) {
+            $preparados = $this->prepararItems($restauranteId, $items);
+            $items      = $preparados['items'];
+            $subtotal   = $preparados['subtotal'];
+        } else {
+            $subtotal = round(array_sum(array_column($items, 'subtotal')), 2);
+        }
+
+        $transaccionPropia = !$this->db->inTransaction();
+        if ($transaccionPropia) {
+            $this->db->beginTransaction();
+        }
+
+        try {
             $pedidoData = [
-                'restaurante_id' => $data['restaurante_id'],
-                'folio' => $folio,
-                'notas' => $data['notas'] ?? null,
-                'subtotal' => $subtotal,
-                'total' => $data['total'] ?? $subtotal,
+                'restaurante_id' => $restauranteId,
+                'folio'          => 'TMP',   // se reemplaza abajo con el id real
+                'notas'          => $data['notas'] ?? null,
+                'subtotal'       => $subtotal,
+                'total'          => $data['total'] ?? $subtotal,
             ];
 
             foreach ([
                 'mesa_id',
                 'visita_id',
                 'mesero_id',
+                'estado',
                 'tipo_origen',
                 'tipo_pedido',
                 'tipo_entrega',
+                'pedido_origen',
                 'direccion_entrega',
                 'mobile_usuario_id',
                 'cliente_nombre',
@@ -183,6 +262,14 @@ class RestPedidoModel extends BaseModel
                 'pickup_at',
                 'app_order_id',
                 'pagado_at',
+                // Columnas del POS (migración 002_cajero_pos.sql)
+                'descuento',
+                'promo_code',
+                'propina_mxn',
+                'iva_mxn',
+                'turno_caja_id',
+                'cajero_id',
+                'pos_client_uuid',
             ] as $column) {
                 if (array_key_exists($column, $data) && $this->hasColumn($column)) {
                     $pedidoData[$column] = $data[$column];
@@ -195,6 +282,10 @@ class RestPedidoModel extends BaseModel
                 array_values($pedidoData)
             );
             $pedidoId = (int) $this->db->lastInsertId();
+
+            $folio = ($data['folio'] ?? null)
+                ?: (($data['folio_prefijo'] ?? 'P') . '-' . str_pad((string)$pedidoId, 5, '0', STR_PAD_LEFT));
+            $this->execute("UPDATE rest_pedidos SET folio = ? WHERE id = ?", [$folio, $pedidoId]);
 
             foreach ($items as $item) {
                 $this->execute(
@@ -211,11 +302,87 @@ class RestPedidoModel extends BaseModel
                 }
             }
 
-            $this->db->commit();
+            if ($transaccionPropia) {
+                $this->db->commit();
+            }
             return $pedidoId;
         } catch (\Throwable $e) {
-            $this->db->rollBack();
+            if ($transaccionPropia && $this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
             throw $e;
+        }
+    }
+
+    // ── Caja (POS) ───────────────────────────────────────────────
+
+    /** Un pedido, siempre acotado a su restaurante (aislamiento entre negocios). */
+    public function delRestaurante(int $pedidoId, int $restauranteId): ?array
+    {
+        return $this->queryOne(
+            "SELECT * FROM rest_pedidos WHERE id = ? AND restaurante_id = ? LIMIT 1",
+            [$pedidoId, $restauranteId]
+        );
+    }
+
+    /** Idempotencia del cobro: si el mismo uuid ya existe, esto es un reintento. */
+    public function porUuidPos(string $uuid, int $restauranteId): ?array
+    {
+        if (!$this->hasColumn('pos_client_uuid')) {
+            return null;
+        }
+        return $this->queryOne(
+            "SELECT * FROM rest_pedidos WHERE pos_client_uuid = ? AND restaurante_id = ? LIMIT 1",
+            [$uuid, $restauranteId]
+        );
+    }
+
+    /** Ata un pedido de la app al turno de caja que lo atendió. */
+    public function tomarEnCaja(int $pedidoId, array $campos): bool
+    {
+        $sets = [];
+        $vals = [];
+        foreach ($campos as $columna => $valor) {
+            if (!$this->hasColumn($columna)) continue;
+            $sets[] = "`{$columna}` = ?";
+            $vals[] = $valor;
+        }
+        if (!$sets) return false;
+
+        $vals[] = $pedidoId;
+        return $this->execute(
+            "UPDATE rest_pedidos SET " . implode(', ', $sets) . " WHERE id = ?",
+            $vals
+        );
+    }
+
+    /** Cancelación desde el POS: motivo obligatorio y rastro de quién la hizo. */
+    public function cancelarDesdeCaja(int $pedidoId, string $motivo, int $cajeroId, bool $reembolsoPendiente): void
+    {
+        $this->tomarEnCaja($pedidoId, [
+            'estado'              => 'cancelado',
+            'motivo_cancelacion'  => mb_substr($motivo, 0, 255),
+            'cancelado_por_id'    => $cajeroId,
+            'cancelado_at'        => date('Y-m-d H:i:s'),
+            'reembolso_pendiente' => $reembolsoPendiente ? 1 : 0,
+        ]);
+        $this->cancelarItemsActivos($pedidoId);
+    }
+
+    /**
+     * Descuenta inventario de una venta ya entregada.
+     * Se llama FUERA de la transacción del cobro, igual que en
+     * `cambiarEstadoPedido()`: que falte una receta no debe tumbar un cobro.
+     */
+    public function descontarStockEntrega(int $pedidoId): void
+    {
+        $row = $this->queryOne("SELECT restaurante_id FROM rest_pedidos WHERE id = ?", [$pedidoId]);
+        if (!$row) return;
+
+        try {
+            (new RestInventarioModel())->descontarPorOrden($pedidoId, (int)$row['restaurante_id']);
+        } catch (\Throwable $e) {
+            error_log('[caja] stock pedido=' . $pedidoId . ' ' . $e->getMessage());
         }
     }
 
