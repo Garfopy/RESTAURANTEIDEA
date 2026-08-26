@@ -98,10 +98,8 @@
 
 <?php
 $roles = [
-  ['slug'=>'mesero',  'label'=>'Mesero',  'icon'=>'&#128188;', 'desc'=>'Toma pedidos y atiende mesas', 'badge'=>'badge-blue'],
-  ['slug'=>'chef',    'label'=>'Chef',    'icon'=>'&#127859;', 'desc'=>'Ve el KDS y marca platillos listos', 'badge'=>'badge-amber'],
-  ['slug'=>'portero', 'label'=>'Portero', 'icon'=>'&#128273;', 'desc'=>'Escanea QR de entrada y salida', 'badge'=>'badge-green'],
-  ['slug'=>'barra',   'label'=>'Barra',   'icon'=>'&#127866;', 'desc'=>'Ve solo bebidas y las marca listas', 'badge'=>'badge-purple'],
+  ['slug'=>'cocina', 'label'=>'Cocina', 'icon'=>'&#127859;', 'desc'=>'Ve la cola de pedidos y marca platillos listos', 'badge'=>'badge-amber'],
+  ['slug'=>'cajero', 'label'=>'Cajero', 'icon'=>'&#128179;', 'desc'=>'Cobra en mostrador y confirma pedidos de la app', 'badge'=>'badge-blue'],
 ];
 ?>
 
@@ -112,7 +110,6 @@ $roles = [
       <p class="staff-copy">Administra accesos por rol, comparte el enlace de entrada y prepara el turno del equipo.</p>
     </div>
     <div class="staff-actions">
-      <a href="<?= BASE_URL ?>rest-staff/turno" class="btn btn-outline btn-sm">Turno de hoy</a>
       <button onclick="rstModal('modalStaff')" class="btn btn-primary btn-sm">+ Nuevo staff</button>
     </div>
   </section>
@@ -131,7 +128,7 @@ $roles = [
 
   <section class="staff-role-grid">
     <?php foreach ($roles as $r): ?>
-      <?php $count = count(array_filter($staff, fn($s) => $s['rol_slug'] === $r['slug'] && $s['staff_activo'])); ?>
+      <?php $count = count(array_filter($staff, fn($s) => $s['rol_slug'] === $r['slug'] && $s['activo'])); ?>
       <button type="button" class="staff-role-card" data-role="<?= $r['slug'] ?>" onclick="preseleccionarRol('<?= $r['slug'] ?>')">
         <span class="staff-role-top">
           <span class="staff-role-icon"><?= $r['icon'] ?></span>
@@ -156,7 +153,6 @@ $roles = [
           <th>Nombre</th>
           <th>Correo</th>
           <th>Rol</th>
-          <th>Codigo</th>
           <th>Estado</th>
           <th>Acciones</th>
         </tr>
@@ -167,17 +163,16 @@ $roles = [
           <td style="font-weight:600"><?= htmlspecialchars($s['nombre']) ?></td>
           <td style="color:#6B7280;font-size:.85rem"><?= htmlspecialchars($s['email']) ?></td>
           <td>
-            <?php $badgeRol = ['mesero'=>'badge-blue','chef'=>'badge-amber','barra'=>'badge-purple','portero'=>'badge-green'][$s['rol_slug']] ?? 'badge-gray'; ?>
+            <?php $badgeRol = ['cocina'=>'badge-amber','cajero'=>'badge-blue'][$s['rol_slug']] ?? 'badge-gray'; ?>
             <span class="badge <?= $badgeRol ?>"><?= htmlspecialchars($s['rol_nombre']) ?></span>
           </td>
-          <td style="font-family:monospace;font-size:.85rem;font-weight:600"><?= htmlspecialchars($s['codigo'] ?? '') ?></td>
           <td>
-            <span class="badge <?= $s['staff_activo'] ? 'badge-green' : 'badge-red' ?>">
-              <?= $s['staff_activo'] ? 'Activo' : 'Inactivo' ?>
+            <span class="badge <?= $s['activo'] ? 'badge-green' : 'badge-red' ?>">
+              <?= $s['activo'] ? 'Activo' : 'Inactivo' ?>
             </span>
           </td>
           <td>
-            <?php if ($s['staff_activo']): ?>
+            <?php if ($s['activo']): ?>
             <a href="<?= BASE_URL ?>rest-staff/desactivar/<?= $s['id'] ?>"
                onclick="return confirm('Desactivar a <?= htmlspecialchars($s['nombre'], ENT_QUOTES) ?>?')"
                class="btn btn-danger btn-sm">Desactivar</a>
@@ -191,11 +186,11 @@ $roles = [
         <?php endforeach; ?>
         <?php if (empty($staff)): ?>
         <tr>
-          <td colspan="6">
+          <td colspan="5">
             <div class="empty-state">
               <svg width="40" height="40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
               <div style="font-size:.95rem;font-weight:600;color:#374151;margin-bottom:4px">Sin staff registrado</div>
-              <div>Crea cuentas para meseros, chefs, barra y porteros.</div>
+              <div>Crea cuentas para cocina y cajero.</div>
             </div>
           </td>
         </tr>
@@ -233,13 +228,9 @@ $roles = [
           <label class="form-label">Correo electronico *</label>
           <input type="email" name="email" class="form-input" required placeholder="correo@ejemplo.com">
         </div>
-        <div class="form-group">
+        <div class="form-group" style="grid-column:span 2">
           <label class="form-label">Contrasena *</label>
           <input type="password" name="password" class="form-input" required placeholder="Min. 6 caracteres" minlength="6">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Codigo <span style="color:#9CA3AF;font-weight:400">(auto)</span></label>
-          <input type="text" name="codigo" class="form-input" placeholder="Ej: ME001" style="text-transform:uppercase">
         </div>
       </div>
       <div style="background:#F0FDF4;border-radius:8px;padding:10px 12px;font-size:.8rem;color:#166534;margin-bottom:4px">

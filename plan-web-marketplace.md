@@ -2,10 +2,11 @@
 
 **Creado:** 2026-08-25 | **Alcance:** solo la parte **web** del sistema (PHP + HTML + CSS + JS, cPanel)
 
-> Este documento es el checklist maestro para el equipo. Cubre únicamente los 3 roles web:
-> **Superadmin** (nosotros, dueños de la plataforma), **Admin** (dueño de cada cafetería/restaurante) y
-> **Cajero** (punto de venta / POS). **Cocina** y **Cliente** viven 100% en la app móvil y no son parte
-> de este documento — ver `PLAN_RECORTE_UTEQ.md` del repo de la app para esa parte.
+> Este documento es el checklist maestro para el equipo. Cubre 4 roles web:
+> **Superadmin** (nosotros, dueños de la plataforma), **Admin** (dueño de cada cafetería/restaurante),
+> **Cajero** (punto de venta / POS) y **Cocina** (KDS web — corrección 2026-08-25: cocina vive
+> tanto en web como en la app móvil, no solo en móvil como se dijo al inicio). **Cliente** sigue
+> siendo 100% app móvil — ver `PLAN_RECORTE_UTEQ.md` del repo de la app para esa parte.
 
 ---
 
@@ -88,7 +89,7 @@ módulos completos del sistema actual no aplican al nuevo modelo.
 | Módulo actual | Decisión | Por qué |
 |---|---|---|
 | `RestPorteroController` + vistas + rutas `_portero` | 🗑️ **Eliminar** | No hay control de entrada/salida física en un modelo pickup/delivery |
-| `RestChefController` (KDS web) + vistas `chef/` | 🗑️ **Eliminar del web** | Cocina se maneja 100% desde la app móvil (confirmado) |
+| `RestChefController` legado (KDS atado a mesas/mesero) + vistas `chef/` | 🗑️ **Eliminar** (hecho) | Se reemplaza por `RestCocinaController` nuevo (`rest-cocina/`), sin mesas — cocina vive en web **y** en la app móvil (corrección 2026-08-25 al plan original) |
 | `RestMeseroController` + vistas `mesero/` | 🗑️ **Eliminar** | No hay servicio en mesa en el marketplace |
 | `RestMesaController` (mesas, layout, zonas) | 🗑️ **Eliminar** | No hay mesas físicas que gestionar |
 | `RestReservaController` (reservaciones) | 🗑️ **Eliminar** | No aplica a pickup/delivery |

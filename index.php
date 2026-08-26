@@ -32,6 +32,8 @@ if (strpos($_SERVER['REQUEST_URI'] ?? '', 'api/auth/token') !== false) {
  * Nota (2026-08-25): se quitaron los portales de mesero/chef/barra/portero y los
  * módulos de mesas/reservaciones/moderación — no aplican al modelo marketplace
  * (pickup/delivery). Ver plan-web-marketplace.md.
+ * Nota (2026-08-25 cont.): se agrega el portal /rest-cocina/ (KDS web para el
+ * modelo marketplace, sin mesas) — cocina vive en web Y en la app móvil.
  */
 
 define('ROOT_PATH', __DIR__);
@@ -63,6 +65,7 @@ $_earlyCtrl     = strtolower($_earlySegments[0] ?? '');
 $_earlyAction   = strtolower($_earlySegments[1] ?? '');
 
 $_roleCookies = [
+    'rest-cocina'   => '_cocina',
     'menu'          => '_comensal',
     'acceso'        => '_login',
 ];
@@ -175,6 +178,10 @@ $routes = [
     'rest-promocion'=> 'RestPromocionController',
     'rest-staff'    => 'RestStaffController',
     'rest-propinas' => 'RestPropinaController',
+    // Portal cocina (KDS web, modelo marketplace sin mesas)
+    'rest-cocina'   => 'RestCocinaController',
+    // Portal cajero / POS — pendiente de construir (ver plan-web-cajero.md)
+    'rest-caja'     => 'RestCajaController',
     // Menú público (sin login)
     'menu'          => 'RestPublicoController',
     // Acceso de comensal por slug de restaurante
@@ -288,6 +295,12 @@ if ($ctrlSlug === 'auth' && $action === 'index' && isset($_SESSION['usuario'])) 
     $rol = $_SESSION['usuario']['rol_slug'] ?? '';
     if (in_array($rol, ['admin_local', 'superadmin'], true)) {
         header('Location: ' . BASE_URL . 'restaurante/seleccionar'); exit;
+    }
+    if ($rol === 'cocina') {
+        header('Location: ' . BASE_URL . 'rest-cocina/index'); exit;
+    }
+    if ($rol === 'cajero') {
+        header('Location: ' . BASE_URL . 'rest-caja/venta'); exit;
     }
     // mesero/chef/barra/portero: roles retirados, sin portal — cae a logout.
     header('Location: ' . BASE_URL . 'auth/login'); exit;

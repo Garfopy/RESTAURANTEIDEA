@@ -160,9 +160,6 @@ class RestPedidoModel extends BaseModel
 
             $pedidoData = [
                 'restaurante_id' => $data['restaurante_id'],
-                'mesa_id' => $data['mesa_id'] ?? null,
-                'visita_id' => $data['visita_id'] ?? null,
-                'mesero_id' => $data['mesero_id'] ?? null,
                 'folio' => $folio,
                 'notas' => $data['notas'] ?? null,
                 'subtotal' => $subtotal,
@@ -170,6 +167,9 @@ class RestPedidoModel extends BaseModel
             ];
 
             foreach ([
+                'mesa_id',
+                'visita_id',
+                'mesero_id',
                 'tipo_origen',
                 'tipo_pedido',
                 'tipo_entrega',
@@ -258,6 +258,107 @@ class RestPedidoModel extends BaseModel
         }
         unset($item);
         return $pedido;
+    }
+
+    /**
+     * Igual que getConItems() pero sin JOIN a rest_mesas/mesero_id — columnas que
+     * no existen en el esquema marketplace (pickup/delivery, idactivo_cafeteq.sql).
+     */
+    public function getConItemsSinMesas(int $pedidoId, ?int $restauranteId = null, ?string $visibleDesde = null): ?array
+    {
+        $whereRestaurante = $restauranteId !== null ? ' AND p.restaurante_id = ?' : '';
+        $whereVisible = $visibleDesde !== null ? ' AND DATE(' . $this->sqlFechaFinanciera('p') . ') >= ?' : '';
+        $params = [$pedidoId];
+        if ($restauranteId !== null) {
+            $params[] = $restauranteId;
+        }
+        if ($visibleDesde !== null) {
+            $params[] = $visibleDesde;
+        }
+
+        $pedido = $this->queryOne(
+            "SELECT p.* FROM rest_pedidos p WHERE p.id = ?{$whereRestaurante}{$whereVisible}",
+            $params
+        );
+        if (!$pedido) return null;
+        $pedido['items'] = $this->query(
+            "SELECT pi.*, pl.nombre AS platillo_nombre
+             FROM rest_pedido_items pi
+             JOIN rest_platillos pl ON pl.id = pi.platillo_id
+             WHERE pi.pedido_id = ?",
+            [$pedidoId]
+        );
+        foreach ($pedido['items'] as &$item) {
+            $item['modificadores'] = $this->query(
+                "SELECT pim.cantidad, pim.precio_extra, m.nombre, m.tipo, m.ingrediente_id, m.cantidad_unidad, m.unidad
+                 FROM rest_pedido_item_modificadores pim
+                 JOIN rest_modificadores m ON m.id = pim.modificador_id
+                 WHERE pim.pedido_item_id = ? ORDER BY m.tipo, m.nombre",
+                [(int)$item['id']]
+            );
+        }
+        unset($item);
+        return $pedido;
+    }
+
+    /** Igual que listar() pero sin JOIN a rest_mesas/mesero_id. */
+    public function listarSinMesas(int $restauranteId, int $page = 1, string $estado = '', ?string $visibleDesde = null): array
+    {
+        $noStore = $this->sqlNoStore('p');
+        $params = [$restauranteId];
+        $where = '';
+        if ($estado !== '') {
+            $where = 'AND p.estado = ?';
+            $params[] = $estado;
+        }
+        if ($visibleDesde !== null) {
+            $where .= ' AND DATE(' . $this->sqlFechaFinanciera('p') . ') >= ?';
+            $params[] = $visibleDesde;
+        }
+        $sql = "SELECT p.*
+                FROM rest_pedidos p
+                WHERE p.restaurante_id = ? $where
+                $noStore
+                ORDER BY p.created_at DESC";
+        return $this->paginate($sql, $params, $page);
+    }
+
+    /** Cola de cocina: pedidos activos con sus items, sin JOIN a rest_mesas. */
+    public function getColaCocina(int $restauranteId): array
+    {
+        $pedidos = $this->query(
+            "SELECT p.id, p.folio, p.created_at, p.notas AS pedido_notas,
+                    p.tipo_pedido, p.tipo_entrega, p.direccion_entrega,
+                    TIMESTAMPDIFF(MINUTE, p.created_at, NOW()) AS minutos_espera
+             FROM rest_pedidos p
+             WHERE p.restaurante_id = ?
+               AND p.estado IN ('pendiente','en_preparacion','listo')
+             ORDER BY p.created_at ASC",
+            [$restauranteId]
+        );
+        foreach ($pedidos as &$pedido) {
+            $pedido['items'] = $this->query(
+                "SELECT pi.id, pi.platillo_id, pi.cantidad, pi.notas, pi.estado,
+                        pl.nombre AS platillo_nombre, pl.tiempo_preparacion_min
+                 FROM rest_pedido_items pi
+                 JOIN rest_platillos pl ON pl.id = pi.platillo_id
+                 WHERE pi.pedido_id = ? AND pi.estado <> 'cancelado'
+                 ORDER BY pi.id ASC",
+                [(int)$pedido['id']]
+            );
+            foreach ($pedido['items'] as &$item) {
+                $item['extras'] = $this->query(
+                    "SELECT mo.nombre, pim.cantidad
+                     FROM rest_pedido_item_modificadores pim
+                     JOIN rest_modificadores mo ON mo.id = pim.modificador_id
+                     WHERE pim.pedido_item_id = ?",
+                    [(int)$item['id']]
+                );
+            }
+            unset($item);
+        }
+        unset($pedido);
+        return $pedidos;
     }
 
     public function getActivosPorMesa(int $mesaId): array

@@ -10,9 +10,9 @@
 ## 1. Objetivo del rol
 
 El Admin es dueño/operador de **un negocio** (o varios, si tiene multi-sucursal). Administra
-menú, inventario, pedidos, personal (cajeros), finanzas, promociones y su relación con la
-plataforma (comisión/plan). No cocina ni cobra directamente — para eso están la app móvil
-(cocina) y el rol Cajero.
+menú, inventario, pedidos, personal (cajeros y cocina), finanzas, promociones y su relación con
+la plataforma (comisión/plan). No cocina ni cobra directamente — para eso están los roles
+Cocina y Cajero (que el propio Admin da de alta).
 
 ---
 
@@ -139,11 +139,78 @@ estado de cuenta:
 
 ---
 
+## 6.12 Cocina (web) — nace también en Admin
+
+> Corrección 2026-08-25: cocina **sí** tiene portal web (`/rest-cocina/`), además de la app
+> móvil. El Admin es quien crea las cuentas de cocina (ver §6.6) — cocina no administra menú
+> ni inventario, solo ve y avanza el estado de los pedidos activos.
+
+- [x] `RestCocinaController` — cola de pedidos activos (`pendiente`/`en_preparacion`/`listo`), agrupados por pedido con sus items
+- [x] Avanzar estado por item (`pendiente → en_preparacion → listo`), auto-avanza el pedido completo cuando todos sus items están listos
+- [x] Botón "Entregar / recogido" cuando el pedido ya está listo — lo saca de la cola
+- [x] Vista propia (no comparte el sidebar de Admin), pensada para pantalla de cocina, refresco automático por polling (20s)
+- [ ] Alerta sonora de pedido nuevo (fase futura, no implementado aún)
+- [ ] Filtro/columnas por estación (comida vs bebidas) si el volumen lo justifica más adelante
+
 ## 7. Checklist de implementación
 
 - [ ] Migración SQL con columnas/tablas de §3
 - [ ] Controladores: reusar/adaptar `RestMenuController`, `RestInventarioController`, `RestFinanzasController`, `RestPedidoController`, `RestPromocionController`, `RestClienteController`, `RestFacturaController`, `RestConfigController` — quitando todo lo de mesas/reservas/mesero (ver tabla de recorte en `plan-web-marketplace.md` §1)
-- [ ] `RestStaffController` adaptado para solo gestionar cajeros (ya no mesero/chef/portero)
+- [x] `RestStaffController` reescrito — ya no depende de `rest_staff`/`rest_zonas`/`rest_mesero_turno` (no existen en el esquema), guarda todo en `usuarios`, gestiona cajero + cocina
 - [ ] Vistas de §4
-- [ ] Dashboard con las queries de §5
+- [x] Dashboard con las queries de §5 (ver `RestFinanzasModel::kpisPedidosDashboard`)
 - [ ] Pruebas: crear negocio (vía Superadmin) → Admin configura menú/inventario → recibe pedido → cajero cobra → Admin ve reflejado en finanzas y comisión
+
+---
+
+## 8. Procedimientos operativos del Admin (día a día)
+
+Guía práctica de lo que el dueño/operador del negocio hace en el sistema, paso a paso.
+
+### 8.1 Alta inicial (una sola vez, al empezar)
+
+1. Entra con el usuario que te dio Superadmin (`restaurante/dashboard`)
+2. **Configuración** (`rest-config/index`): completa teléfono, dirección, ubicación (lat/lng), horarios, colores de marca
+3. **Menú** (`rest-menu/index`): crea tus categorías (ej. Comida, Bebidas, Postres) y agrega tus productos con precio y foto
+4. **Inventario** (`rest-inventario/index`): da de alta tus ingredientes con stock actual y stock mínimo (para que te avise cuando se esté acabando)
+5. **Staff** (`rest-staff/index`): crea las cuentas de tu equipo — un usuario por cada **cocina** y **cajero**, cada quien con su propio correo y contraseña
+6. Comparte con tu equipo el link de acceso (`auth/login`) — cada uno entra con su correo/contraseña y el sistema los manda directo a su portal (cocina → cola de pedidos, cajero → punto de venta)
+
+### 8.2 Rutina diaria
+
+1. Entra al **Dashboard** al abrir — revisa ventas del día anterior, alertas de stock bajo y pedidos activos
+2. Si hay ingredientes en alerta de stock bajo, ve a **Inventario → Movimientos** y registra la entrada de mercancía nueva
+3. Durante el día: los pedidos entran solos (desde la app móvil o desde el cajero) — cocina los ve en su cola y los va marcando, el Admin puede supervisar desde **Pedidos** (`rest-pedido/index`)
+4. Al final del día: revisa **Finanzas → Dashboard Financiero** para ver el resumen de ventas, gastos y utilidad del día
+
+### 8.3 Cómo agregar un producto nuevo al menú
+
+1. **Menú → Categorías**: si el producto es de una categoría que no existe, créala primero
+2. **Menú → Nuevo producto**: nombre, descripción, precio, foto, tiempo de preparación estimado
+3. Márcalo como "disponible" para que aparezca en la app y en el punto de venta del cajero
+4. Si el producto usa ingredientes que quieres descontar automático del inventario, liga su receta (Inventario/Recetas)
+
+### 8.4 Cómo dar de alta un cajero o cocina
+
+1. **Staff → + Nuevo staff**
+2. Elige el rol (Cocina o Cajero), nombre completo, correo y contraseña
+3. Comparte el link de acceso y sus credenciales con esa persona
+4. Si esa persona deja de trabajar ahí, **desactívala** desde la misma pantalla (no se borra su historial, solo pierde acceso)
+
+### 8.5 Cómo manejar un pedido con problema
+
+1. Ve a **Pedidos**, busca el pedido por folio
+2. Si hay que cancelarlo: botón "Cancelar pedido" (requiere confirmar)
+3. Si el cliente reporta un problema después de entregado, revisa el detalle del pedido para ver exactamente qué se le cobró y qué llevaba
+
+### 8.6 Cierre de comisión con la plataforma (cuando Superadmin lo active)
+
+1. **Finanzas → (pendiente: pestaña de comisión)**: verás cuánto debes a la plataforma del periodo actual
+2. El cobro/pago se coordina fuera del sistema por ahora (transferencia manual) hasta que se decida el modelo de Stripe Connect (ver `plan-web-marketplace.md` §11)
+
+### 8.7 Checklist de errores comunes
+
+- [ ] "No puedo entrar" → confirma que tu cuenta esté **activa** (Superadmin puede reactivarla)
+- [ ] "No aparecen mis productos en la app" → revisa que el producto esté marcado **disponible** y **activo**
+- [ ] "El inventario no baja solo" → revisa que el producto tenga una receta ligada en Inventario
+- [ ] "Mi cajero/cocina no puede entrar" → confirma que su cuenta esté activa y que esté usando el correo/contraseña correctos (no hay recuperación de contraseña automática todavía — el Admin puede pedir a Superadmin restablecerla)

@@ -8,11 +8,7 @@ class RestPedidoController extends BaseController
     public function __construct()
     {
         parent::__construct();
-        if ($this->rolActual() === 'mesero') {
-            $this->requireMesero();
-        } else {
-            $this->requireRestaurante();
-        }
+        $this->requireRestaurante();
         $this->model = new RestPedidoModel();
     }
 
@@ -21,7 +17,7 @@ class RestPedidoController extends BaseController
         $restauranteId = $this->restauranteId();
         $estado        = $this->get('estado', '');
         $page          = (int)$this->get('page', 1);
-        $resultado     = $this->model->listar($restauranteId, $page, $estado, $this->fechaFinancieraVisibleDesde());
+        $resultado     = $this->model->listarSinMesas($restauranteId, $page, $estado, $this->fechaFinancieraVisibleDesde());
         $soportaTipoOrigen = $this->model->soportaTipoOrigen();
         $flash         = $this->getFlash();
         $pageTitle     = 'Pedidos';
@@ -44,7 +40,7 @@ class RestPedidoController extends BaseController
 
     public function detalle(?string $id = null): void
     {
-        $pedido    = $this->model->getConItems((int)$id, (int)$this->restauranteId(), $this->fechaFinancieraVisibleDesde());
+        $pedido    = $this->model->getConItemsSinMesas((int)$id, (int)$this->restauranteId(), $this->fechaFinancieraVisibleDesde());
         if (!$pedido) { $this->flash('error', 'Pedido no encontrado.'); $this->redirect('rest-pedido/index'); }
         $flash     = $this->getFlash();
         $pageTitle = 'Pedido ' . $pedido['folio'];
@@ -110,7 +106,7 @@ class RestPedidoController extends BaseController
 
     public function cambiarEstado(?string $id = null): void
     {
-        $pedido = $this->model->getConItems((int)$id, (int)$this->restauranteId(), $this->fechaFinancieraVisibleDesde());
+        $pedido = $this->model->getConItemsSinMesas((int)$id, (int)$this->restauranteId(), $this->fechaFinancieraVisibleDesde());
         if (!$pedido) {
             $this->json(['ok' => false, 'msg' => 'Pedido no encontrado'], 404);
         }
@@ -141,7 +137,7 @@ class RestPedidoController extends BaseController
     {
         $pedidoId = $this->model->getPedidoIdPorItem((int)$id);
         $pedido = $pedidoId
-            ? $this->model->getConItems($pedidoId, (int)$this->restauranteId(), $this->fechaFinancieraVisibleDesde())
+            ? $this->model->getConItemsSinMesas($pedidoId, (int)$this->restauranteId(), $this->fechaFinancieraVisibleDesde())
             : null;
         if (!$pedido) {
             $this->json(['ok' => false, 'msg' => 'Item no encontrado'], 404);
@@ -153,7 +149,7 @@ class RestPedidoController extends BaseController
 
     public function cancelar(?string $id = null): void
     {
-        $pedido = $this->model->getConItems((int)$id, (int)$this->restauranteId(), $this->fechaFinancieraVisibleDesde());
+        $pedido = $this->model->getConItemsSinMesas((int)$id, (int)$this->restauranteId(), $this->fechaFinancieraVisibleDesde());
         if (!$pedido) {
             $this->flash('error', 'Pedido no encontrado.');
             $this->redirect('rest-pedido/index');

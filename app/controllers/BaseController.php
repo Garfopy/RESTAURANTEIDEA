@@ -44,6 +44,8 @@ abstract class BaseController
             $rol === 'superadmin'                                      => $this->redirect('restaurante/seleccionar'),
             $rol === 'admin_restaurante', $rol === 'comprador',
             $rol === 'admin_local'                                     => $this->redirect('restaurante/dashboard'),
+            $rol === 'cocina'                                          => $this->redirect('rest-cocina/index'),
+            $rol === 'cajero'                                          => $this->redirect('rest-caja/venta'),
             // mesero/chef/barra/portero: roles retirados (modelo marketplace
             // pickup/delivery, sin servicio en mesa) — caen al default.
             // Evita un ciclo /auth/login -> /auth/login cuando una sesion
@@ -137,28 +139,26 @@ abstract class BaseController
         }
     }
 
-    /** Staff: mesero */
-    protected function requireMesero(): void
+    /** Fija restaurante_activo_id desde el usuario logueado (staff: cajero/cocina). */
+    private function autoSeleccionarRestauranteStaff(): void
     {
-        $this->requireRole(['mesero', 'comprador']);
+        if (empty($_SESSION['restaurante_activo_id']) && !empty($_SESSION['usuario']['restaurante_id'])) {
+            $_SESSION['restaurante_activo_id'] = (int)$_SESSION['usuario']['restaurante_id'];
+        }
     }
 
-    /** Staff: chef */
-    protected function requireChef(): void
+    /** Staff: cajero (POS) */
+    protected function requireCajero(): void
     {
-        $this->requireRole(['chef', 'comprador']);
+        $this->requireRole(['cajero', 'admin_restaurante', 'comprador']);
+        $this->autoSeleccionarRestauranteStaff();
     }
 
-    /** Staff: barra */
-    protected function requireBar(): void
+    /** Staff: cocina (KDS web) */
+    protected function requireCocina(): void
     {
-        $this->requireRole(['barra', 'comprador']);
-    }
-
-    /** Staff: portero */
-    protected function requirePortero(): void
-    {
-        $this->requireRole(['portero', 'comprador']);
+        $this->requireRole(['cocina', 'admin_restaurante', 'comprador']);
+        $this->autoSeleccionarRestauranteStaff();
     }
 
     /** Cualquier usuario autenticado */
