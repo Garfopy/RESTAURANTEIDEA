@@ -136,18 +136,33 @@ contenido y da soporte. Es el único rol con visión de **todos** los negocios a
 
 ## 4. Pantallas (vistas) a construir
 
-- [ ] `superadmin/dashboard.php` — KPIs globales
-- [ ] `superadmin/negocios/index.php`, `superadmin/negocios/solicitudes.php`, `superadmin/negocios/detalle.php`
-- [ ] `superadmin/puntos-referencia/index.php`, `superadmin/puntos-referencia/form.php`, `superadmin/puntos-referencia/mapa.php` — la etiqueta visible en pantalla puede decir "Universidades" mientras el único caso real sea UTEQ
-- [ ] `superadmin/planes/index.php`, `superadmin/planes/form.php`
-- [ ] `superadmin/comisiones/index.php` — estado de cuenta por negocio, marcar pagado
-- [ ] `superadmin/destacados/index.php`, `superadmin/destacados/form.php`
-- [ ] `superadmin/moderacion/index.php` — módulo nuevo con tabla de cola propia (ver nota de §2: no hay nada de social que reusar)
-- [ ] `superadmin/soporte/index.php`, `superadmin/soporte/detalle.php`
-- [ ] `superadmin/usuarios/index.php` — cuentas Admin/Cajero de todos los negocios
-- [ ] `superadmin/config/categorias.php`, `superadmin/config/global.php` (edita `global_settings`)
-- [ ] `superadmin/reportes/index.php` — analítica global, exportables
-- [ ] `superadmin/marketing/notificaciones.php` — push masivo segmentado
+> Estado al 2026-08-26. Lo marcado con ✅ ya está construido y es probable en el servidor.
+
+**Construido (núcleo operativo):**
+
+- [x] `superadmin/dashboard/index.php` — KPIs globales
+- [x] `superadmin/negocios/index.php` — listado global con filtro visual por estado
+- [x] `superadmin/negocios/detalle.php` — ficha completa: KPIs de ventas, staff, puntos cercanos, asignar plan, aprobar/suspender
+- [x] `superadmin/puntos-referencia/index.php` — listado + alta inline (el `form.php` separado no hizo falta)
+- [x] `superadmin/usuarios/index.php` — cuentas de todos los negocios: alta, activar/desactivar, reset password
+- [x] `superadmin/config/index.php` — edita `global_settings` con validación por tipo (era `config/global.php` en el plan)
+- [x] `superadmin/bitacora/index.php` — **no estaba en esta lista**, se agregó para cerrar §5.5 (visor de `action_logs`)
+
+**Falta — bloqueado por decisión pendiente del equipo:**
+
+- [ ] `superadmin/planes/index.php`, `superadmin/planes/form.php` — CRUD de planes. Espera la decisión de modelo de comisión (§3.3). Hoy existe solo el plan «Básico» sembrado por la migración 003 y ya se puede asignar desde el detalle de negocio
+- [ ] `superadmin/comisiones/index.php` — requiere `rest_negocio_comisiones` (tabla no creada) + el modelo de comisión decidido
+- [ ] `superadmin/destacados/index.php`, `form.php` — requiere `promos_destacadas` (tabla no creada)
+- [ ] `superadmin/negocios/solicitudes.php` — **no tiene productor de datos**: no existe formulario público de alta de negocio, así que hoy Superadmin da de alta negocios directamente. Definir si se construye ese registro público o si esta pantalla no aplica
+
+**Falta — diferido, sin bloqueo técnico:**
+
+- [ ] `superadmin/puntos-referencia/mapa.php` — mapa visual de cobertura (el listado ya muestra la asociación por texto)
+- [ ] `superadmin/reportes/index.php` — analítica global y exportables PDF/Excel (el dashboard ya cubre los KPIs básicos y el ranking)
+- [ ] `superadmin/config/categorias.php` — requiere `rest_categorias_negocio` (§3.7, diferido a propósito)
+- [ ] `superadmin/moderacion/index.php` — módulo nuevo con tabla de cola propia (ver §2: social eliminado, no hay nada que reusar)
+- [ ] `superadmin/soporte/index.php`, `detalle.php` — requiere `soporte_tickets` (tabla no creada)
+- [ ] `superadmin/marketing/notificaciones.php` — push masivo; depende de la decisión de tiempo real (Firebase/Pusher) de §11 del plan maestro
 
 ---
 
