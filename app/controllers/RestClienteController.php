@@ -16,61 +16,33 @@ class RestClienteController extends BaseController
     {
         $restauranteId = $this->restauranteId();
         $appMovilHabilitada = $this->appMovilHabilitada($restauranteId);
-        if ($appMovilHabilitada) {
-            $this->enviarPromocionesAutomaticasReactivacion($restauranteId);
-        }
         $page      = (int)$this->get('page', 1);
         $tipoParam = $p ?: (string)$this->get('tipo', 'todos');
         $tipo      = in_array($tipoParam, ['todos', 'web', 'mobile'], true) ? $tipoParam : 'todos';
         if (!$appMovilHabilitada) {
             $tipo = 'web';
         }
-        $resultado = $this->model->getByRestaurante($restauranteId, $page, $tipo);
+        $resultado = $this->model->getByRestauranteSimple($restauranteId, $page, $tipo);
         $flash     = $this->getFlash();
-        $pageTitle  = 'Comensales';
+        $pageTitle  = 'Clientes';
         $activeMenu = 'rest_clientes';
         $this->render('restaurante/clientes/index', array_merge($resultado, compact('flash','pageTitle','activeMenu','tipo','appMovilHabilitada')));
     }
 
     public function detalle(?string $id = null): void
     {
-        $parsed = $this->parseClienteDetalleId($id);
-        $clienteId = $parsed['cliente_id'];
-        $esDetalleMobile = $parsed['es_mobile'];
-        $mobileDetalleId = $parsed['mobile_id'];
+        $clienteKey = trim((string)$id);
         $restauranteId = $this->restauranteId();
         $appMovilHabilitada = $this->appMovilHabilitada($restauranteId);
-        if ($esDetalleMobile && !$appMovilHabilitada) {
-            $this->flash('warning', 'Los perfiles exclusivos de la app están ocultos mientras la app móvil está apagada.');
-            $this->redirect('rest-cliente/index');
-        }
-        $comensal = $esDetalleMobile
-            ? $this->model->getDetalleMobile($mobileDetalleId, $restauranteId)
-            : $this->model->getDetalle($clienteId);
-        if (!$comensal) { $this->flash('error', 'Comensal no encontrado.'); $this->redirect('rest-cliente/index'); }
-        $historial = $esDetalleMobile
-            ? $this->model->getHistorialMobile($mobileDetalleId, $restauranteId)
-            : $this->model->getHistorialVisitas($clienteId);
-        if ($appMovilHabilitada && !$esDetalleMobile && $clienteId > 0 && !empty($comensal['mobile_usuario_id'])) {
-            $historial = array_merge(
-                $historial,
-                $this->model->getHistorialMobile((int)$comensal['mobile_usuario_id'], $restauranteId)
-            );
-            usort($historial, fn($a, $b) => strtotime($b['created_at'] ?? '1970-01-01') <=> strtotime($a['created_at'] ?? '1970-01-01'));
-        }
-        $mobileUsuarioId = $esDetalleMobile ? $mobileDetalleId : (int)($comensal['mobile_usuario_id'] ?? 0);
-        $productosFavoritos = $esDetalleMobile
-            ? $this->model->getProductosFavoritosMobile($mobileUsuarioId, $restauranteId)
-            : $this->model->getProductosFavoritosComensal($clienteId, $restauranteId, $mobileUsuarioId ?: null);
-        $promocionSugerida = $this->model->sugerirPromocion($productosFavoritos, $comensal);
-        $promocionApp = $appMovilHabilitada && $mobileUsuarioId > 0
-            ? $this->model->definirPromocionApp($productosFavoritos, $comensal, $restauranteId, 'manual')
-            : [];
-        $detalleParam = $esDetalleMobile ? 'app-' . $mobileDetalleId : (string)$clienteId;
+
+        $comensal = $this->model->getDetalleSimple($clienteKey, $restauranteId);
+        if (!$comensal) { $this->flash('error', 'Cliente no encontrado.'); $this->redirect('rest-cliente/index'); }
+        $historial = $this->model->getHistorialSimple($clienteKey, $restauranteId);
+
         $flash     = $this->getFlash();
-        $pageTitle  = $comensal['nombre'] ?? $comensal['mobile_nombre'] ?? 'Comensal';
+        $pageTitle  = $comensal['nombre'] ?? 'Cliente';
         $activeMenu = 'rest_clientes';
-        $this->render('restaurante/clientes/detalle', compact('comensal','historial','productosFavoritos','promocionSugerida','promocionApp','detalleParam','flash','pageTitle','activeMenu','appMovilHabilitada'));
+        $this->render('restaurante/clientes/detalle', compact('comensal','historial','flash','pageTitle','activeMenu','appMovilHabilitada'));
     }
 
     public function enviarPromocion(?string $id = null): void

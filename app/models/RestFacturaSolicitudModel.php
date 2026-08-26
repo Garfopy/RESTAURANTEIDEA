@@ -77,11 +77,10 @@ class RestFacturaSolicitudModel extends BaseModel
                        NULL AS ticket_id,
                        NULL AS ticket_folio,
                        r.nombre AS restaurante_nombre,
-                       m.nombre AS mesa_nombre,
+                       NULL AS mesa_nombre,
                        p.folio AS pedido_folio
                   FROM facturacion_solicitudes fs
                   JOIN rest_restaurantes r ON r.id = fs.restaurante_id
-             LEFT JOIN rest_mesas m ON m.id = fs.mesa_id
              LEFT JOIN rest_pedidos p ON p.id = fs.pedido_id
                  WHERE " . implode(' AND ', $where) . "
               ORDER BY fs.created_at DESC, fs.id DESC";
@@ -102,11 +101,10 @@ class RestFacturaSolicitudModel extends BaseModel
                     NULL AS ticket_id,
                     NULL AS ticket_folio,
                     r.nombre AS restaurante_nombre,
-                    m.nombre AS mesa_nombre,
+                    NULL AS mesa_nombre,
                     p.folio AS pedido_folio
                FROM facturacion_solicitudes fs
                JOIN rest_restaurantes r ON r.id = fs.restaurante_id
-          LEFT JOIN rest_mesas m ON m.id = fs.mesa_id
           LEFT JOIN rest_pedidos p ON p.id = fs.pedido_id
               WHERE fs.id = ? AND fs.restaurante_id = ?{$filtroVisible}
               LIMIT 1",

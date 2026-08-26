@@ -494,12 +494,14 @@ class RestFinanzasModel extends BaseModel
         [$desde, $hasta] = $this->ajustarRangoVisible($restauranteId, $desde, $hasta);
         $params = [$restauranteId, $desde, $hasta];
 
-        $ingresosTickets = (float) $this->queryOne(
+        // rest_tickets es del modelo dine-in (mesas) — no existe en el esquema marketplace
+        // (idactivo_cafeteq.sql). Se degrada a 0 en vez de tronar cuando falta la tabla.
+        $ingresosTickets = $this->tableExists('rest_tickets') ? (float) $this->queryOne(
             "SELECT COALESCE(SUM({$this->ticketIngresoContableExpr('t')}),0) AS v
              FROM rest_tickets t
              WHERE t.restaurante_id=? AND t.estado='pagado' AND DATE(t.pagado_at) BETWEEN ? AND ?",
             $params
-        )['v'];
+        )['v'] : 0.0;
 
         $pedidosApp = $this->ingresosPedidosApp($restauranteId, $desde, $hasta);
         $ingresosPedidosApp = (float)$pedidosApp['total'];
@@ -519,23 +521,29 @@ class RestFinanzasModel extends BaseModel
             $params
         )['v'];
 
-        $propinas = (float) $this->queryOne(
+        $propinas = $this->tableExists('rest_tickets') ? (float) $this->queryOne(
             "SELECT COALESCE(SUM(propina),0) AS v FROM rest_tickets
              WHERE restaurante_id=? AND estado='pagado' AND DATE(pagado_at) BETWEEN ? AND ?",
             $params
-        )['v'];
+        )['v'] : 0.0;
 
-        $totalTickets = (int) $this->queryOne(
+        $totalTickets = $this->tableExists('rest_tickets') ? (int) $this->queryOne(
             "SELECT COUNT(*) AS c FROM rest_tickets
              WHERE restaurante_id=? AND estado='pagado' AND DATE(pagado_at) BETWEEN ? AND ?",
             $params
-        )['c'];
+        )['c'] : 0;
 
         $ticketPromedio = $totalTickets > 0 ? round($ingresosTickets / $totalTickets, 2) : 0.0;
 
-        $pendiente = (float) $this->queryOne(
+        // Pendiente por cobrar: sin tickets (dine-in), se calcula sobre pedidos sin pagar.
+        $pendiente = $this->tableExists('rest_tickets') ? (float) $this->queryOne(
             "SELECT COALESCE(SUM(total),0) AS v FROM rest_tickets
              WHERE restaurante_id=? AND estado='pendiente' AND DATE(created_at) BETWEEN ? AND ?",
+            $params
+        )['v'] : (float) $this->queryOne(
+            "SELECT COALESCE(SUM(total),0) AS v FROM rest_pedidos
+             WHERE restaurante_id=? AND estado <> 'cancelado' AND pagado_at IS NULL
+               AND DATE(created_at) BETWEEN ? AND ?",
             $params
         )['v'];
 
@@ -742,14 +750,14 @@ class RestFinanzasModel extends BaseModel
     public function ingresosVsEgresosGrafica(int $restauranteId, string $desde, string $hasta): array
     {
         [$desde, $hasta] = $this->ajustarRangoVisible($restauranteId, $desde, $hasta);
-        $ingTickets = $this->query(
+        $ingTickets = $this->tableExists('rest_tickets') ? $this->query(
             "SELECT DATE(t.pagado_at) AS dia,
                     SUM({$this->ticketIngresoContableExpr('t')}) AS total
              FROM rest_tickets t
              WHERE t.restaurante_id=? AND t.estado='pagado' AND DATE(t.pagado_at) BETWEEN ? AND ?
              GROUP BY dia ORDER BY dia",
             [$restauranteId, $desde, $hasta]
-        );
+        ) : [];
         $ing = $this->mergeDailyTotals(
             $ingTickets,
             $this->ingresosPedidosAppPorDia($restauranteId, $desde, $hasta),
@@ -778,7 +786,7 @@ class RestFinanzasModel extends BaseModel
     public function metodosPago(int $restauranteId, string $desde, string $hasta): array
     {
         [$desde, $hasta] = $this->ajustarRangoVisible($restauranteId, $desde, $hasta);
-        $metodos = $this->query(
+        $metodos = $this->tableExists('rest_tickets') ? $this->query(
             "SELECT t.metodo_pago,
                     COUNT(*) AS cantidad,
                     SUM({$this->ticketIngresoContableExpr('t')}) AS total
@@ -786,7 +794,7 @@ class RestFinanzasModel extends BaseModel
              WHERE t.restaurante_id=? AND t.estado='pagado' AND DATE(t.pagado_at) BETWEEN ? AND ?
              GROUP BY t.metodo_pago",
             [$restauranteId, $desde, $hasta]
-        );
+        ) : [];
 
         if ($this->tableExists('rest_pedidos')) {
             $fechaExpr = $this->pedidoFechaExpr('p');

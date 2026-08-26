@@ -42,19 +42,11 @@ if (!$appMovilHabilitada) {
           $visitas = (int)($c['num_visitas'] ?? $c['total_visitas'] ?? 0);
           $gasto = (float)($c['gasto_total'] ?? $c['total_gastado'] ?? 0);
           $ult = $c['ultima_visita_real'] ?? $c['ultima_visita'] ?? null;
-          $nombre = trim((string)($c['nombre'] ?? ''))
-            ?: trim((string)($c['mobile_nombre'] ?? ''))
-            ?: trim((string)($c['mobile_email'] ?? ''))
-            ?: 'Usuario app';
-          $telefono = trim((string)($c['telefono'] ?? '')) ?: trim((string)($c['mobile_telefono'] ?? ''));
+          $nombre = trim((string)($c['nombre'] ?? '')) ?: 'Cliente';
+          $telefono = trim((string)($c['telefono'] ?? ''));
           $detalleId = (string)($c['detalle_id'] ?? $c['id'] ?? '');
           $esMobile = ($c['origen'] ?? '') === 'mobile';
           $tieneApp = !empty($c['mobile_usuario_id']);
-          if ($esMobile && $tieneApp) {
-            $detalleId = 'app-' . abs((int)$c['mobile_usuario_id']);
-          } elseif (($detalleId === '' || $detalleId === '0') && $tieneApp) {
-            $detalleId = 'app-' . abs((int)$c['mobile_usuario_id']);
-          }
         ?>
         <tr>
           <td>

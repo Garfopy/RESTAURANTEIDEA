@@ -4,6 +4,94 @@ class RestClienteModel extends BaseModel
     protected string $table = 'rest_comensales';
     private static array $schemaCache = [];
 
+    /**
+     * CRM simplificado para el modelo marketplace: agrega directo desde rest_pedidos
+     * (app móvil vía mobile_usuario_id, o walk-in/teléfono vía comprador_telefono).
+     * No depende de rest_visitas/rest_tickets/rest_mesas — no existen en el esquema
+     * marketplace (idactivo_cafeteq.sql).
+     */
+    public function getByRestauranteSimple(int $restauranteId, int $page = 1, string $tipo = 'todos'): array
+    {
+        $tipo = in_array($tipo, ['todos', 'web', 'mobile'], true) ? $tipo : 'todos';
+        $tipoWhere = '';
+        if ($tipo === 'mobile') $tipoWhere = ' AND p.mobile_usuario_id IS NOT NULL';
+        if ($tipo === 'web') $tipoWhere = ' AND p.mobile_usuario_id IS NULL';
+
+        $sql = "SELECT
+                    COALESCE(NULLIF(p.mobile_usuario_id,0), CONCAT('tel:', NULLIF(p.comprador_telefono,'')), CONCAT('ped:', p.id)) AS detalle_id,
+                    COALESCE(mu.nombre, p.cliente_nombre, 'Cliente') AS nombre,
+                    COALESCE(mu.telefono, p.comprador_telefono) AS telefono,
+                    mu.email AS email,
+                    p.mobile_usuario_id AS mobile_usuario_id,
+                    IF(p.mobile_usuario_id IS NOT NULL, 'mobile', 'web') AS origen,
+                    COUNT(*) AS num_visitas,
+                    SUM(p.total) AS total_gastado,
+                    MAX(p.created_at) AS ultima_visita
+                FROM rest_pedidos p
+                LEFT JOIN mobile_usuarios mu ON mu.id = p.mobile_usuario_id
+                WHERE p.restaurante_id = ? AND p.estado <> 'cancelado' {$tipoWhere}
+                GROUP BY detalle_id
+                ORDER BY total_gastado DESC";
+
+        return $this->paginate($sql, [$restauranteId], $page);
+    }
+
+    /** Detalle de un cliente simplificado — cliente_key en formato de getByRestauranteSimple(). */
+    public function getDetalleSimple(string $clienteKey, int $restauranteId): ?array
+    {
+        [$where, $param] = $this->clienteKeyWhere($clienteKey);
+        if (!$where) return null;
+
+        $row = $this->queryOne(
+            "SELECT
+                COALESCE(mu.nombre, p.cliente_nombre, 'Cliente') AS nombre,
+                COALESCE(mu.telefono, p.comprador_telefono) AS telefono,
+                mu.email AS email,
+                (p.mobile_usuario_id IS NOT NULL) AS es_mobile,
+                COUNT(*) AS total_pedidos,
+                SUM(p.total) AS total_gastado,
+                MAX(p.created_at) AS ultima_compra,
+                MIN(p.created_at) AS primera_compra
+             FROM rest_pedidos p
+             LEFT JOIN mobile_usuarios mu ON mu.id = p.mobile_usuario_id
+             WHERE p.restaurante_id = ? AND p.estado <> 'cancelado' AND {$where}",
+            [$restauranteId, $param]
+        );
+        if (!$row) return null;
+        $row['cliente_key'] = $clienteKey;
+        return $row;
+    }
+
+    /** Historial de pedidos de un cliente (mismo cliente_key). */
+    public function getHistorialSimple(string $clienteKey, int $restauranteId): array
+    {
+        [$where, $param] = $this->clienteKeyWhere($clienteKey);
+        if (!$where) return [];
+
+        return $this->query(
+            "SELECT p.id, p.folio, p.total, p.estado, p.tipo_pedido, p.created_at
+             FROM rest_pedidos p
+             WHERE p.restaurante_id = ? AND {$where}
+             ORDER BY p.created_at DESC
+             LIMIT 50",
+            [$restauranteId, $param]
+        );
+    }
+
+    private function clienteKeyWhere(string $clienteKey): array
+    {
+        if (str_starts_with($clienteKey, 'tel:')) {
+            return ['p.comprador_telefono = ?', substr($clienteKey, 4)];
+        }
+        if (str_starts_with($clienteKey, 'ped:')) {
+            return ['p.id = ?', (int)substr($clienteKey, 4)];
+        }
+        if (is_numeric($clienteKey)) {
+            return ['p.mobile_usuario_id = ?', (int)$clienteKey];
+        }
+        return [null, null];
+    }
+
     private function tableExists(string $table): bool
     {
         $key = 'table:' . $table;
