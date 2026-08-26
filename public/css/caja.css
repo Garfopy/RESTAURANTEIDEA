@@ -1,0 +1,259 @@
+/* ============================================================
+   caja.css — Punto de venta (POS)
+   Pensado para tablet/touch: objetivos grandes, nada depende de hover.
+   Ver plan-web-cajero-ui.md §1 para los criterios de diseño.
+   ============================================================ */
+
+:root {
+  --cp: #A97C3F;              /* color primario del negocio (se inyecta inline) */
+  --cs: #2B1B12;
+  --bg: #0F1115;
+  --panel: #171A21;
+  --panel-2: #1F242E;
+  --linea: #2C323D;
+  --txt: #F3F5F7;
+  --txt-2: #9AA4B2;
+  --ok: #10B981;
+  --alerta: #F59E0B;
+  --error: #EF4444;
+  --radio: 12px;
+  --tap: 48px;                /* objetivo táctil mínimo */
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--txt);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+
+/* ── Barra superior ───────────────────────────────────────── */
+.caja-top {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 16px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--linea);
+  position: sticky; top: 0; z-index: 20;
+}
+.caja-top h1 { font-size: 1rem; margin: 0; font-weight: 800; letter-spacing: -.01em; }
+.caja-top .sep { flex: 1; }
+.caja-top .meta { font-size: .78rem; color: var(--txt-2); }
+.caja-top .meta strong { color: var(--txt); font-weight: 600; }
+
+.pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--panel-2); border: 1px solid var(--linea);
+  border-radius: 99px; padding: 6px 12px; font-size: .78rem; font-weight: 600;
+  color: var(--txt); text-decoration: none;
+}
+.pill--acento { background: var(--cp); border-color: transparent; color: #fff; }
+.pill--alerta { background: #7C2D12; border-color: #9A3412; color: #FED7AA; }
+.pill .badge {
+  background: var(--error); color: #fff; border-radius: 99px;
+  padding: 1px 7px; font-size: .7rem; font-weight: 800;
+}
+
+/* ── Botones ──────────────────────────────────────────────── */
+.btn {
+  min-height: var(--tap);
+  border: 1px solid var(--linea); background: var(--panel-2); color: var(--txt);
+  border-radius: var(--radio); padding: 12px 18px;
+  font-weight: 700; font-size: .9rem;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  text-decoration: none; transition: transform .06s ease, filter .15s ease;
+}
+.btn:active { transform: scale(.98); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn--primario { background: var(--cp); border-color: transparent; color: #fff; }
+.btn--ok { background: var(--ok); border-color: transparent; color: #04231A; }
+.btn--peligro { background: var(--error); border-color: transparent; color: #fff; }
+.btn--fantasma { background: transparent; }
+.btn--bloque { width: 100%; }
+.btn--xl { min-height: 64px; font-size: 1.05rem; }
+
+/* ── Estructura de la venta ───────────────────────────────── */
+.caja-venta {
+  display: grid;
+  grid-template-columns: 1fr minmax(330px, 400px);
+  height: calc(100vh - 57px);
+}
+.catalogo { display: flex; flex-direction: column; min-width: 0; border-right: 1px solid var(--linea); }
+.catalogo-head { padding: 12px 16px; display: flex; gap: 10px; flex-wrap: wrap; }
+.buscador {
+  flex: 1; min-width: 220px; min-height: var(--tap);
+  background: var(--panel); border: 1px solid var(--linea);
+  border-radius: var(--radio); padding: 0 16px; font-size: 1rem;
+}
+.buscador:focus { outline: 2px solid var(--cp); outline-offset: 1px; }
+
+.tabs { display: flex; gap: 8px; overflow-x: auto; padding: 0 16px 12px; }
+.tab {
+  white-space: nowrap; min-height: 40px; padding: 8px 16px;
+  background: var(--panel); border: 1px solid var(--linea);
+  border-radius: 99px; font-size: .85rem; font-weight: 600; color: var(--txt-2);
+}
+.tab[aria-selected="true"] { background: var(--cp); border-color: transparent; color: #fff; }
+
+.grid-productos {
+  flex: 1; overflow-y: auto; padding: 4px 16px 20px;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px;
+  align-content: start;
+}
+.producto {
+  min-height: 104px; padding: 14px;
+  background: var(--panel); border: 1px solid var(--linea); border-radius: var(--radio);
+  display: flex; flex-direction: column; justify-content: space-between; gap: 8px;
+  text-align: left;
+}
+.producto:active { border-color: var(--cp); }
+.producto .nom { font-weight: 700; font-size: .92rem; line-height: 1.25; overflow-wrap: anywhere; }
+.producto .precio { font-weight: 800; color: var(--cp); font-size: 1rem; }
+.producto .cod { font-size: .7rem; color: var(--txt-2); }
+
+/* ── Carrito ──────────────────────────────────────────────── */
+.carrito { display: flex; flex-direction: column; background: var(--panel); min-width: 0; }
+.carrito-head {
+  padding: 14px 16px 10px; display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid var(--linea);
+}
+.carrito-head h2 { margin: 0; font-size: .95rem; }
+.carrito-items { flex: 1; overflow-y: auto; padding: 8px 12px; }
+.linea {
+  display: grid; grid-template-columns: 1fr auto; gap: 4px 10px;
+  padding: 10px; border-radius: 10px; border: 1px solid transparent;
+}
+.linea[aria-selected="true"] { border-color: var(--cp); background: var(--panel-2); }
+.linea .nom { font-weight: 600; font-size: .9rem; overflow-wrap: anywhere; }
+.linea .det { grid-column: 1 / -1; font-size: .75rem; color: var(--txt-2); }
+.linea .imp { font-weight: 700; font-variant-numeric: tabular-nums; }
+.linea-acciones { grid-column: 1 / -1; display: flex; gap: 6px; margin-top: 6px; }
+.linea-acciones button {
+  min-width: 40px; min-height: 36px; border-radius: 8px;
+  border: 1px solid var(--linea); background: var(--panel-2); font-weight: 800;
+}
+
+.totales { padding: 12px 16px; border-top: 1px solid var(--linea); }
+.tot-row { display: flex; justify-content: space-between; font-size: .85rem; padding: 3px 0; color: var(--txt-2); }
+.tot-row.total { font-size: 1.5rem; font-weight: 800; color: var(--txt); padding-top: 10px; }
+.tot-row .n { font-variant-numeric: tabular-nums; }
+.tot-row.desc { color: var(--ok); }
+.carrito-acciones { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 0 16px 10px; }
+.carrito-cobrar { padding: 0 16px 16px; }
+
+/* ── Modales ──────────────────────────────────────────────── */
+.modal[hidden] { display: none; }
+.modal {
+  position: fixed; inset: 0; z-index: 50;
+  background: rgba(3, 5, 10, .72);
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+.modal-caja {
+  background: var(--panel); border: 1px solid var(--linea); border-radius: 16px;
+  width: min(560px, 100%); max-height: 92vh; overflow-y: auto; padding: 20px;
+}
+.modal-caja h3 { margin: 0 0 4px; font-size: 1.15rem; }
+.modal-caja .sub { color: var(--txt-2); font-size: .85rem; margin-bottom: 16px; }
+.modal-acciones { display: flex; gap: 10px; margin-top: 18px; }
+.modal-acciones .btn { flex: 1; }
+
+.campo { display: block; margin-bottom: 14px; }
+.campo span { display: block; font-size: .8rem; color: var(--txt-2); margin-bottom: 6px; font-weight: 600; }
+.campo input, .campo select, .campo textarea {
+  width: 100%; min-height: var(--tap);
+  background: var(--panel-2); border: 1px solid var(--linea);
+  border-radius: 10px; padding: 10px 14px; font-size: 1rem;
+}
+.campo input:focus, .campo select:focus, .campo textarea:focus { outline: 2px solid var(--cp); outline-offset: 1px; }
+.campo--monto input { font-size: 1.6rem; font-weight: 800; text-align: right; font-variant-numeric: tabular-nums; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  min-height: 44px; padding: 8px 16px; border-radius: 10px;
+  border: 1px solid var(--linea); background: var(--panel-2); font-weight: 700; font-size: .9rem;
+}
+.chip[aria-pressed="true"] { background: var(--cp); border-color: transparent; color: #fff; }
+
+.aviso {
+  border-radius: 10px; padding: 12px 14px; font-size: .86rem; margin-bottom: 14px;
+  border: 1px solid var(--linea); background: var(--panel-2);
+}
+.aviso--error { background: #3F1D1D; border-color: #7F1D1D; color: #FECACA; }
+.aviso--ok { background: #06281F; border-color: #065F46; color: #A7F3D0; }
+.aviso--alerta { background: #3B2A08; border-color: #92400E; color: #FDE68A; }
+
+.cambio-caja {
+  background: var(--ok); color: #04231A; border-radius: 12px;
+  padding: 14px; text-align: center; font-weight: 800; margin: 14px 0;
+}
+.cambio-caja .n { font-size: 2rem; display: block; font-variant-numeric: tabular-nums; }
+
+/* ── Teclado numérico (PIN y montos) ──────────────────────── */
+.teclado { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; max-width: 300px; margin: 0 auto; }
+.teclado button { min-height: 60px; font-size: 1.4rem; font-weight: 700; border-radius: 12px; border: 1px solid var(--linea); background: var(--panel-2); }
+.pin-puntos { display: flex; gap: 12px; justify-content: center; margin: 18px 0; }
+.pin-punto { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--txt-2); }
+.pin-punto.lleno { background: var(--cp); border-color: var(--cp); }
+
+/* ── Pantalla de acceso ───────────────────────────────────── */
+.acceso { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.acceso-caja { width: min(520px, 100%); text-align: center; }
+.acceso-caja h1 { font-size: 1.5rem; margin: 0 0 4px; }
+.acceso-caja .sub { color: var(--txt-2); margin-bottom: 24px; }
+.cajeros { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-bottom: 24px; }
+.cajero-btn {
+  width: 128px; padding: 16px 10px; border-radius: 14px;
+  border: 1px solid var(--linea); background: var(--panel);
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+}
+.cajero-btn[aria-pressed="true"] { border-color: var(--cp); background: var(--panel-2); }
+.cajero-btn:disabled { opacity: .5; }
+.cajero-avatar {
+  width: 52px; height: 52px; border-radius: 50%;
+  background: var(--cp); color: #fff;
+  display: grid; place-items: center; font-weight: 800; font-size: 1.1rem;
+}
+.cajero-btn .nom { font-size: .85rem; font-weight: 600; }
+.cajero-btn .estado { font-size: .7rem; color: var(--txt-2); }
+
+/* ── Listas y tablas ──────────────────────────────────────── */
+.contenido { padding: 20px; max-width: 1100px; margin: 0 auto; }
+.contenido h2 { margin: 0 0 16px; font-size: 1.2rem; }
+.tarjeta { background: var(--panel); border: 1px solid var(--linea); border-radius: var(--radio); padding: 16px; margin-bottom: 16px; }
+.tabla-wrap { overflow-x: auto; }
+table.tabla { width: 100%; border-collapse: collapse; font-size: .88rem; }
+table.tabla th, table.tabla td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--linea); white-space: nowrap; }
+table.tabla th { color: var(--txt-2); font-size: .76rem; text-transform: uppercase; letter-spacing: .04em; }
+table.tabla td.n, table.tabla th.n { text-align: right; font-variant-numeric: tabular-nums; }
+.estado-badge { border-radius: 99px; padding: 3px 10px; font-size: .74rem; font-weight: 700; }
+.estado-badge.ok { background: #06281F; color: #A7F3D0; }
+.estado-badge.no { background: #3F1D1D; color: #FECACA; }
+.estado-badge.esp { background: #3B2A08; color: #FDE68A; }
+
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.vacio { text-align: center; padding: 56px 20px; color: var(--txt-2); }
+.vacio .icono { font-size: 2.5rem; display: block; margin-bottom: 10px; }
+
+.resumen-fila { display: flex; justify-content: space-between; padding: 7px 0; font-size: .9rem; border-bottom: 1px dashed var(--linea); }
+.resumen-fila:last-child { border-bottom: 0; }
+.resumen-fila .n { font-variant-numeric: tabular-nums; font-weight: 600; }
+.resumen-fila.fuerte { font-size: 1.1rem; font-weight: 800; border-bottom: 0; padding-top: 12px; }
+
+/* ── Responsive ───────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .caja-venta { grid-template-columns: 1fr; height: auto; }
+  .catalogo { border-right: 0; border-bottom: 1px solid var(--linea); }
+  .carrito { position: sticky; bottom: 0; max-height: 62vh; }
+}
+
+@media print {
+  .no-print { display: none !important; }
+  body { background: #fff; color: #000; }
+}

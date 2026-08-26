@@ -90,25 +90,19 @@ class AuthController extends BaseController
         $stmt->execute([$ip]);
 
         $rolSlug = $usuario['rol_slug'] ?? '';
-        $esStaffLogin = in_array($rolSlug, ['mesero', 'chef', 'barra', 'portero'], true);
+        // El staff operativo (caja, cocina) entra con su propia cookie de sesión
+        // para que un admin y un cajero puedan estar logueados a la vez en la
+        // misma computadora sin pisarse.
+        $esStaffLogin = in_array($rolSlug, ['cajero', 'cocina'], true);
         if ($esStaffLogin) {
-            $stmtStaff = $db->prepare(
-                "SELECT rs.restaurante_id
-                   FROM rest_staff rs
-                  WHERE rs.usuario_id = ?
-                    AND rs.activo = 1
-                  ORDER BY rs.id ASC
-                  LIMIT 1"
-            );
-            $stmtStaff->execute([(int)$usuario['id']]);
-            $restauranteId = (int)($stmtStaff->fetchColumn() ?: 0);
+            // El staff queda ligado a un negocio por `usuarios.restaurante_id`
+            // (la tabla `rest_staff` del sistema anterior ya no existe).
+            $restauranteId = (int)($usuario['restaurante_id'] ?? 0);
 
             if (!$restauranteId) {
-                $this->flash('error', 'Tu usuario de staff no tiene un restaurante activo asignado.');
+                $this->flash('error', 'Tu usuario no tiene un restaurante asignado. Pídele a tu administrador que te lo asigne.');
                 $this->redirect('auth/login');
             }
-
-            $usuario['restaurante_id'] = $restauranteId;
         }
 
         if (!$esStaffLogin) {
@@ -231,7 +225,7 @@ class AuthController extends BaseController
     public function logoutStaff(?string $rol = null): void
     {
         $rol = strtolower($rol ?? '');
-        if (!in_array($rol, ['chef', 'barra', 'mesero', 'portero', 'staff', 'comensal'], true)) {
+        if (!in_array($rol, ['cajero', 'cocina', 'staff', 'comensal'], true)) {
             header('Location: ' . BASE_URL); exit;
         }
         // Capturar slug del restaurante ANTES de destruir la sesión para

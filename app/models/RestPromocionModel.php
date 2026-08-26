@@ -152,6 +152,61 @@ class RestPromocionModel extends BaseModel
         );
     }
 
+    // ── Caja (POS) ───────────────────────────────────────────────
+
+    /** Cupón por código, solo si es de este negocio y está vigente hoy. */
+    public function porCodigoVigente(int $restauranteId, string $code): ?array
+    {
+        return $this->queryOne(
+            "SELECT * FROM rest_promociones
+              WHERE restaurante_id = ? AND UPPER(code) = UPPER(?) AND activo = 1
+                AND CURDATE() BETWEEN fecha_inicio AND fecha_fin
+                AND (expires_at IS NULL OR expires_at > NOW())
+              LIMIT 1",
+            [$restauranteId, $code]
+        );
+    }
+
+    /**
+     * Deja constancia de que un cupón se usó en una venta.
+     * `mobile_promocion_usos` tiene UNIQUE por (usuario, promoción), así que
+     * un cliente identificado que repite cupón choca ahí: se ignora el error
+     * porque el descuento ya se aplicó y la venta no debe caerse por la bitácora.
+     */
+    public function registrarUso(int $promocionId, string $code, int $pedidoId, ?int $mobileUsuarioId, float $descuento): void
+    {
+        try {
+            $this->execute(
+                "INSERT IGNORE INTO mobile_promocion_usos
+                   (promocion_id, usuario_id, pedido_id, codigo, descuento_mxn, estado)
+                 VALUES (?,?,?,?,?, 'usado')",
+                [$promocionId, $mobileUsuarioId ?? 0, $pedidoId, $code, $descuento]
+            );
+        } catch (\Throwable $e) {
+            error_log('[caja] No se pudo registrar el uso del cupón ' . $code . ': ' . $e->getMessage());
+        }
+    }
+
+    /** Auditoría de descuentos manuales hechos en caja (decisión D9). */
+    public function registrarDescuentoManual(array $datos): void
+    {
+        try {
+            $this->execute(
+                "INSERT INTO rest_descuentos_log
+                   (pedido_id, restaurante_id, cajero_id, tipo, valor, monto_aplicado,
+                    motivo, requirio_autorizacion, autorizado_por_id)
+                 VALUES (?,?,?,?,?,?,?,?,?)",
+                [
+                    $datos['pedido_id'], $datos['restaurante_id'], $datos['cajero_id'],
+                    $datos['tipo'], $datos['valor'], $datos['monto_aplicado'],
+                    $datos['motivo'], $datos['requirio_autorizacion'], $datos['autorizado_por_id'],
+                ]
+            );
+        } catch (\Throwable $e) {
+            error_log('[caja] No se pudo registrar el descuento manual: ' . $e->getMessage());
+        }
+    }
+
     /**
      * Devuelve promociones activas hoy para un comensal específico.
      * Útil para el menú público.

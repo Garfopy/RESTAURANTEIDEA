@@ -66,6 +66,7 @@ $_earlyAction   = strtolower($_earlySegments[1] ?? '');
 
 $_roleCookies = [
     'rest-cocina'   => '_cocina',
+    'rest-caja'     => '_cajero',
     'menu'          => '_comensal',
     'acceso'        => '_login',
 ];
@@ -74,7 +75,7 @@ $_cookieSuffix = $_roleCookies[$_earlyCtrl] ?? '';
 // auth/logoutStaff/{rol} destruye SOLO la cookie de ese rol
 if ($_earlyCtrl === 'auth' && $_earlyAction === 'logoutstaff') {
     $_logoutRol = strtolower($_earlySegments[2] ?? '');
-    if (in_array($_logoutRol, ['staff', 'comensal', 'login'], true)) {
+    if (in_array($_logoutRol, ['cajero', 'cocina', 'staff', 'comensal', 'login'], true)) {
         $_cookieSuffix = '_' . $_logoutRol;
     }
 }

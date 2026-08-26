@@ -291,6 +291,41 @@ abstract class BaseController
         return $_GET[$key] ?? $default;
     }
 
+    // ── CSRF ──────────────────────────────────────────────────────
+    // Token por sesión, compartido por todos los formularios. Se manda en
+    // el campo oculto `_csrf` o en la cabecera `X-CSRF-Token` (peticiones
+    // fetch). Comparación con hash_equals para no filtrar el token por
+    // diferencias de tiempo.
+
+    protected function csrfToken(): string
+    {
+        if (empty($_SESSION['_csrf_token'])) {
+            $_SESSION['_csrf_token'] = bin2hex(random_bytes(32));
+        }
+        return (string)$_SESSION['_csrf_token'];
+    }
+
+    protected function validarCsrf(?string $recibido = null): bool
+    {
+        $esperado = (string)($_SESSION['_csrf_token'] ?? '');
+        if ($esperado === '') {
+            return false;
+        }
+
+        $token = $recibido
+            ?? $_POST['_csrf']
+            ?? $_SERVER['HTTP_X_CSRF_TOKEN']
+            ?? '';
+
+        return is_string($token) && $token !== '' && hash_equals($esperado, $token);
+    }
+
+    /** Campo oculto listo para pegar dentro de un <form>. */
+    protected function csrfInput(): string
+    {
+        return '<input type="hidden" name="_csrf" value="' . htmlspecialchars($this->csrfToken(), ENT_QUOTES) . '">';
+    }
+
     // ── Flash messages ────────────────────────────────────────────
     protected function flash(string $type, string $message): void
     {
