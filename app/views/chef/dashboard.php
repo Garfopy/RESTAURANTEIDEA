@@ -266,7 +266,12 @@
       border-left-width: 4px;
       border-radius: 8px;
       box-shadow: var(--shadow);
+      cursor: pointer;
+      transition: transform .12s, box-shadow .15s, border-color .15s;
     }
+
+    .kds-card:hover { border-color: #454540; box-shadow: 0 16px 38px rgba(0, 0, 0, .32); }
+    .kds-card:active { transform: translateY(1px); }
 
     .kds-card.normal { border-left-color: var(--info); }
     .kds-card.alerta { border-left-color: var(--work); }
@@ -508,6 +513,138 @@
       text-align: center;
     }
 
+    .card-items-preview { margin-top: 2px; }
+
+    .preview-item {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      padding: 9px 0;
+      border-top: 1px solid var(--line-soft);
+      font-size: .88rem;
+    }
+
+    .preview-item:first-child { border-top: 0; padding-top: 11px; }
+
+    .preview-qty {
+      flex-shrink: 0;
+      min-width: 24px;
+      color: var(--muted);
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .preview-name { min-width: 0; overflow-wrap: anywhere; color: var(--text); font-weight: 700; }
+
+    .preview-flags { flex-shrink: 0; display: inline-flex; gap: 4px; margin-left: auto; }
+    .preview-flag { width: 7px; height: 7px; border-radius: 50%; }
+    .preview-flag.exclu { background: var(--danger); }
+    .preview-flag.nota { background: var(--info); }
+
+    .card-footer {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 11px;
+      padding-top: 11px;
+      border-top: 1px solid var(--line-soft);
+    }
+
+    .card-footer .chip { flex-shrink: 0; }
+    .card-footer .btn-action { flex-shrink: 0; min-width: 0; }
+
+    .tap-hint {
+      flex: 1;
+      min-width: 0;
+      color: var(--faint);
+      font-size: .68rem;
+      font-weight: 700;
+      text-align: center;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .kds-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 90;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      background: rgba(6, 7, 6, .68);
+      backdrop-filter: blur(3px);
+    }
+
+    .kds-modal-backdrop.open { display: flex; }
+
+    .kds-modal {
+      width: 100%;
+      max-width: 560px;
+      max-height: min(86vh, 900px);
+      display: flex;
+      flex-direction: column;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, .5);
+      overflow: hidden;
+    }
+
+    .kds-modal-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel-soft);
+    }
+
+    .kds-modal-title { font-size: 1.1rem; font-weight: 900; }
+
+    .kds-modal-close {
+      flex-shrink: 0;
+      width: 32px;
+      height: 32px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      color: var(--muted);
+      font-size: .9rem;
+      font-weight: 900;
+      cursor: pointer;
+    }
+
+    .kds-modal-close:hover { color: var(--text); background: var(--panel-soft); }
+
+    .kds-modal-notas {
+      margin: 14px 18px 0;
+      padding: 10px 12px;
+      border-left: 3px solid var(--info);
+      border-radius: 6px;
+      background: rgba(95, 148, 214, .10);
+      color: #cfe0f5;
+      font-size: .84rem;
+      line-height: 1.4;
+    }
+
+    .kds-modal-body {
+      padding: 14px 18px 18px;
+      overflow-y: auto;
+    }
+
+    .kds-modal-body .item-row:first-child { padding-top: 0; }
+
+    @media (max-width: 560px) {
+      .kds-modal-backdrop { padding: 0; align-items: flex-end; }
+      .kds-modal { max-width: 100%; max-height: 92vh; border-radius: 12px 12px 0 0; }
+    }
+
     #kds-toast {
       position: fixed;
       left: 50%;
@@ -612,12 +749,28 @@
 
   <div id="kds-toast" role="status" aria-live="polite"></div>
 
+  <div id="kds-modal-backdrop" class="kds-modal-backdrop">
+    <div class="kds-modal" role="dialog" aria-modal="true" aria-labelledby="kds-modal-title">
+      <header class="kds-modal-header">
+        <div>
+          <div class="kds-modal-title" id="kds-modal-title"></div>
+          <div class="card-meta-row" id="kds-modal-meta"></div>
+        </div>
+        <button type="button" class="kds-modal-close" id="kds-modal-close" aria-label="Cerrar">✕</button>
+      </header>
+      <div class="kds-modal-notas" id="kds-modal-notas" hidden></div>
+      <div class="kds-modal-body" id="kds-modal-body"></div>
+    </div>
+  </div>
+
   <script>
     let prevIds = new Set();
     let currentItems = [];
     let activeFilter = 'all';
     let loading = false;
     let toastT;
+    let pedidoStore = {};
+    let modalKey = null;
 
     const BASE = <?= json_encode(BASE_URL) ?>;
     const KDS_ROUTE = <?= json_encode($kdsBaseRoute ?? 'rest-chef') ?>;
@@ -639,7 +792,14 @@
       netLabel: document.getElementById('net-label'),
       sound: document.getElementById('sound-toggle'),
       compact: document.getElementById('compact-toggle'),
-      refresh: document.getElementById('refresh-btn')
+      refresh: document.getElementById('refresh-btn'),
+      grid: document.querySelector('main.kds-grid'),
+      modalBackdrop: document.getElementById('kds-modal-backdrop'),
+      modalTitle: document.getElementById('kds-modal-title'),
+      modalMeta: document.getElementById('kds-modal-meta'),
+      modalNotas: document.getElementById('kds-modal-notas'),
+      modalBody: document.getElementById('kds-modal-body'),
+      modalClose: document.getElementById('kds-modal-close')
     };
 
     const ORDER_TYPE_LABELS = {
@@ -837,12 +997,55 @@
       return sortPedidos(Object.values(map));
     }
 
+    function buildItemsHtml(ped, isPrep) {
+      return ped.items.map(it => `
+        <div class="item-row">
+          <div>
+            <div class="item-title">
+              ${it.platillo_codigo ? `<span class="platillo-codigo">${esc(it.platillo_codigo)}</span>` : ''}
+              <span class="item-name">${esc(it.platillo_nombre)}</span>
+            </div>
+            <div class="item-sub">${formatQty(it.cantidad)} unidad${Number(it.cantidad) === 1 ? '' : 'es'}${it.tiempo_preparacion_min ? ' · ' + esc(it.tiempo_preparacion_min) + ' min' : ''}</div>
+            <div class="pill-row">
+              ${it.exclusiones ? `<span class="pill pill-exclu">Sin: ${esc(it.exclusiones)}</span>` : ''}
+              ${it.item_notas ? `<span class="pill pill-nota">${esc(it.item_notas)}</span>` : ''}
+              ${it.extras_display ? `<span class="pill pill-nota">Extras: ${esc(it.extras_display)}</span>` : ''}
+            </div>
+            ${renderReceta(it.ingredientes_raw, it.cantidad, it.instrucciones_armado)}
+          </div>
+          <button
+            type="button"
+            class="btn-action ${isPrep ? 'btn-listo' : 'btn-prep'}"
+            data-action-url="${BASE}${KDS_ROUTE}/${isPrep ? 'marcarListo' : 'marcarPreparacion'}/${encodeURIComponent(it.item_id)}">
+            ${isPrep ? 'Listo' : 'Preparar'}
+          </button>
+        </div>
+      `).join('');
+    }
+
+    function buildPreviewHtml(ped) {
+      return ped.items.map(it => {
+        const hasExclu = !!it.exclusiones;
+        const hasNota = !!(it.item_notas || it.extras_display);
+        return `
+          <div class="preview-item">
+            <span class="preview-qty">${formatQty(it.cantidad)}&times;</span>
+            <span class="preview-name">${esc(it.platillo_nombre)}</span>
+            ${(hasExclu || hasNota) ? `<span class="preview-flags">${hasExclu ? '<span class="preview-flag exclu" title="Tiene exclusiones"></span>' : ''}${hasNota ? '<span class="preview-flag nota" title="Tiene nota o extras"></span>' : ''}</span>` : ''}
+          </div>`;
+      }).join('');
+    }
+
     function renderColumn(pedidos, colId, estado) {
       const target = colId === 'col-pendiente' ? els.pending : els.prep;
       if (!pedidos.length) {
         target.innerHTML = `<div class="empty-col">Sin ordenes ${estado === 'pendiente' ? 'pendientes' : 'en preparacion'}</div>`;
         return;
       }
+
+      const isPrep = estado === 'en_preparacion';
+      const bulkEndpoint = isPrep ? 'marcarListo' : 'marcarPreparacion';
+      const bulkLabel = isPrep ? 'Todo listo' : 'Preparar todo';
 
       target.innerHTML = pedidos.map((ped, idx) => {
         const tipo = tipoPedido(ped);
@@ -852,35 +1055,15 @@
           : '';
         const timer = elapsed(ped.created_at);
         const urgent = urgencyClass(ped.created_at);
-        const isPrep = estado === 'en_preparacion';
         const location = ubicacionPedido(ped, tipo);
+        const key = estado + ':' + ped.id;
+        pedidoStore[key] = { ped, isPrep, tipo, location };
 
-        const itemsHtml = ped.items.map(it => `
-          <div class="item-row">
-            <div>
-              <div class="item-title">
-                ${it.platillo_codigo ? `<span class="platillo-codigo">${esc(it.platillo_codigo)}</span>` : ''}
-                <span class="item-name">${esc(it.platillo_nombre)}</span>
-              </div>
-              <div class="item-sub">${formatQty(it.cantidad)} unidad${Number(it.cantidad) === 1 ? '' : 'es'}${it.tiempo_preparacion_min ? ' · ' + esc(it.tiempo_preparacion_min) + ' min' : ''}</div>
-              <div class="pill-row">
-                ${it.exclusiones ? `<span class="pill pill-exclu">Sin: ${esc(it.exclusiones)}</span>` : ''}
-                ${it.item_notas ? `<span class="pill pill-nota">${esc(it.item_notas)}</span>` : ''}
-                ${it.extras_display ? `<span class="pill pill-nota">Extras: ${esc(it.extras_display)}</span>` : ''}
-              </div>
-              ${renderReceta(it.ingredientes_raw, it.cantidad, it.instrucciones_armado)}
-            </div>
-            <button
-              type="button"
-              class="btn-action ${isPrep ? 'btn-listo' : 'btn-prep'}"
-              data-action-url="${BASE}${KDS_ROUTE}/${isPrep ? 'marcarListo' : 'marcarPreparacion'}/${encodeURIComponent(it.item_id)}">
-              ${isPrep ? 'Listo' : 'Preparar'}
-            </button>
-          </div>
-        `).join('');
+        const itemIds = ped.items.map(it => it.item_id).join(',');
+        const itemCount = ped.items.length;
 
         return `${typeHeader}
-          <article class="kds-card ${urgent}${isPrep ? ' preparacion' : ''}">
+          <article class="kds-card ${urgent}${isPrep ? ' preparacion' : ''}" data-ped-key="${esc(key)}">
             <header class="card-header">
               <div class="card-main">
                 <div class="card-folio">${esc(ped.folio || 'Pedido')}</div>
@@ -891,9 +1074,46 @@
               </div>
               <span class="timer-badge ${timer.cls}" data-created="${esc(ped.created_at)}">${timer.label}</span>
             </header>
-            ${itemsHtml}
+            <div class="card-items-preview">${buildPreviewHtml(ped)}</div>
+            <div class="card-footer">
+              <span class="chip">${itemCount} platillo${itemCount === 1 ? '' : 's'}</span>
+              <span class="tap-hint">Toca para ver detalle</span>
+              <button
+                type="button"
+                class="btn-action ${isPrep ? 'btn-listo' : 'btn-prep'}"
+                data-bulk-ids="${esc(itemIds)}"
+                data-bulk-endpoint="${bulkEndpoint}">
+                ${bulkLabel}
+              </button>
+            </div>
           </article>`;
       }).join('');
+    }
+
+    function renderModalMeta(entry) {
+      return `<span class="chip chip-strong">${esc(ORDER_TYPE_LABELS[entry.tipo] || 'Pedido')}</span><span class="chip">${esc(entry.location)}</span>`;
+    }
+
+    function openModal(key) {
+      const entry = pedidoStore[key];
+      if (!entry) return;
+      modalKey = key;
+      els.modalTitle.textContent = entry.ped.folio || 'Pedido';
+      els.modalMeta.innerHTML = renderModalMeta(entry);
+      if (entry.ped.pedido_notas) {
+        els.modalNotas.hidden = false;
+        els.modalNotas.textContent = entry.ped.pedido_notas;
+      } else {
+        els.modalNotas.hidden = true;
+        els.modalNotas.textContent = '';
+      }
+      els.modalBody.innerHTML = buildItemsHtml(entry.ped, entry.isPrep);
+      els.modalBackdrop.classList.add('open');
+    }
+
+    function closeModal() {
+      modalKey = null;
+      els.modalBackdrop.classList.remove('open');
     }
 
     function renderQueue(items) {
@@ -907,6 +1127,7 @@
       const pendingItems = visibleItems.filter(it => it.item_estado === 'pendiente').length;
       const prepItems = visibleItems.filter(it => it.item_estado === 'en_preparacion').length;
 
+      pedidoStore = {};
       renderColumn(pendientes, 'col-pendiente', 'pendiente');
       renderColumn(preparacion, 'col-preparacion', 'en_preparacion');
 
@@ -914,6 +1135,14 @@
       els.prepCount.textContent = String(preparacion.length);
       els.pendingColCount.textContent = String(pendingItems);
       els.prepColCount.textContent = String(prepItems);
+
+      if (modalKey) {
+        if (pedidoStore[modalKey]) {
+          openModal(modalKey);
+        } else {
+          closeModal();
+        }
+      }
 
       const newIds = new Set(currentItems.map(i => i.item_id));
       const hasNew = [...newIds].some(id => !prevIds.has(id));
@@ -953,6 +1182,25 @@
       }
     }
 
+    async function marcarBulk(itemIds, endpoint, btn) {
+      const original = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = '...';
+      try {
+        for (const id of itemIds) {
+          const url = `${BASE}${KDS_ROUTE}/${endpoint}/${encodeURIComponent(id)}`;
+          const res = await fetch(url, { method: 'POST', credentials: 'same-origin' });
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+        }
+        await loadQueue({ silent: true });
+      } catch (e) {
+        console.error('marcarBulk:', e);
+        btn.disabled = false;
+        btn.textContent = original;
+        kdsToast('No se pudo actualizar el pedido');
+      }
+    }
+
     async function loadQueue(options = {}) {
       if (loading) return;
       loading = true;
@@ -983,9 +1231,30 @@
     });
 
     document.addEventListener('click', event => {
-      const btn = event.target.closest('[data-action-url]');
-      if (!btn) return;
-      marcar(btn.dataset.actionUrl, btn);
+      const actionBtn = event.target.closest('[data-action-url]');
+      if (actionBtn) {
+        marcar(actionBtn.dataset.actionUrl, actionBtn);
+        return;
+      }
+      const bulkBtn = event.target.closest('[data-bulk-ids]');
+      if (bulkBtn) {
+        marcarBulk(bulkBtn.dataset.bulkIds.split(','), bulkBtn.dataset.bulkEndpoint, bulkBtn);
+      }
+    });
+
+    els.grid.addEventListener('click', event => {
+      if (event.target.closest('[data-action-url]') || event.target.closest('[data-bulk-ids]')) return;
+      const card = event.target.closest('.kds-card');
+      if (!card) return;
+      openModal(card.dataset.pedKey);
+    });
+
+    els.modalClose.addEventListener('click', closeModal);
+    els.modalBackdrop.addEventListener('click', event => {
+      if (event.target === els.modalBackdrop) closeModal();
+    });
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && modalKey) closeModal();
     });
 
     els.sound.addEventListener('click', () => setSound(!soundEnabled));
