@@ -736,6 +736,17 @@ class RestConfigController extends BaseController
             }
         }
 
+        if (!$bloqueadoPorCarniHub && $lat !== null && $lng !== null) {
+            // Recalcula que puntos de referencia (universidades, plazas...) quedan "cerca"
+            // de este negocio ahora que se movio/confirmo su ubicacion. No debe tronar el
+            // guardado de config si la tabla aun no existe en este entorno (migracion 003).
+            try {
+                (new PuntoReferenciaModel())->recalcularParaRestaurante($restauranteId);
+            } catch (\Throwable $e) {
+                error_log('[RestConfigController::guardar] recalcularParaRestaurante: ' . $e->getMessage());
+            }
+        }
+
         // Migration-026 fields (may not exist on older installs — skip silently)
         try {
             $this->model->update($restauranteId, $modos);

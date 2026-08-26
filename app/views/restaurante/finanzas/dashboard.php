@@ -21,7 +21,6 @@ $metodoPagoLabel = static function (?string $metodo): string {
     'wallet' => 'Saldo Jungle',
     'app movil' => 'App movil',
     'app_movil' => 'App movil',
-    'social_cover' => 'Social Cover',
   ];
 
   return $labels[$key] ?? ucfirst(str_replace('_', ' ', $key ?: 'efectivo'));
@@ -34,7 +33,7 @@ $metodosVista = array_map(static function (array $m) use ($metodoPagoLabel): arr
 if (!$appMovilHabilitada) {
   $metodosVista = array_values(array_filter($metodosVista, static function (array $m): bool {
     $key = strtolower(trim((string)($m['metodo_pago'] ?? '')));
-    return !in_array($key, ['jungle_wallet','saldo_jungle','wallet','app movil','app_movil','social_cover'], true);
+    return !in_array($key, ['jungle_wallet','saldo_jungle','wallet','app movil','app_movil'], true);
   }));
 }
 

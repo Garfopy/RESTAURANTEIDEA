@@ -41,7 +41,7 @@ abstract class BaseController
     protected function redirectSegunRol(string $rol): void
     {
         match (true) {
-            $rol === 'superadmin'                                      => $this->redirect('restaurante/seleccionar'),
+            $rol === 'superadmin'                                      => $this->redirect('superadmin/dashboard'),
             $rol === 'admin_restaurante', $rol === 'comprador',
             $rol === 'admin_local'                                     => $this->redirect('restaurante/dashboard'),
             $rol === 'cocina'                                          => $this->redirect('rest-cocina/index'),

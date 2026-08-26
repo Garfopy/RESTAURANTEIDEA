@@ -180,6 +180,95 @@ class RestauranteModel extends BaseModel
         );
     }
 
+    /**
+     * Listado global para el panel de Superadmin (todos los negocios, con su empresa y plan).
+     * Requiere migrations/003_superadmin_universidades_planes.sql — si aun no corrio en este
+     * entorno, degrada a estado_plataforma/plan_nombre nulos en vez de tronar.
+     */
+    public function getAllParaSuperadmin(): array
+    {
+        $tienePlataforma = $this->columnExists('estado_plataforma') && $this->columnExists('plan_id');
+        $selectEstado = $tienePlataforma
+            ? "r.estado_plataforma, r.plan_id, p.nombre AS plan_nombre"
+            : "NULL AS estado_plataforma, NULL AS plan_id, NULL AS plan_nombre";
+        $joinPlan = $tienePlataforma ? "LEFT JOIN planes_negocio p ON p.id = r.plan_id" : '';
+        $orderEstado = $tienePlataforma ? "FIELD(r.estado_plataforma,'pendiente','activo','suspendido','baja'), " : '';
+
+        return $this->query(
+            "SELECT r.*, e.razon_social AS empresa_nombre, e.tipo_negocio, $selectEstado
+               FROM rest_restaurantes r
+          LEFT JOIN empresas e ON e.id = r.empresa_id
+               $joinPlan
+              ORDER BY $orderEstado e.razon_social ASC, r.nombre ASC"
+        );
+    }
+
+    /** KPIs globales para el dashboard de Superadmin. Degrada si migration 003 no ha corrido. */
+    public function getResumenPlataforma(): array
+    {
+        $tienePlataforma = $this->columnExists('estado_plataforma');
+
+        $porEstado = ['pendiente' => 0, 'activo' => 0, 'suspendido' => 0, 'baja' => 0];
+        if ($tienePlataforma) {
+            foreach ($this->query("SELECT estado_plataforma, COUNT(*) AS total FROM rest_restaurantes GROUP BY estado_plataforma") as $row) {
+                $porEstado[$row['estado_plataforma']] = (int)$row['total'];
+            }
+        } else {
+            $porEstado['activo'] = (int)$this->count('activo = 1');
+        }
+
+        $ventas = $this->queryOne(
+            "SELECT
+                COUNT(*) AS pedidos_totales,
+                COALESCE(SUM(total), 0) AS ventas_totales,
+                COALESCE(SUM(CASE WHEN created_at >= DATE_FORMAT(NOW(),'%Y-%m-01') THEN total ELSE 0 END), 0) AS ventas_mes
+             FROM rest_pedidos"
+        );
+
+        $usuariosNegocio = (int)$this->queryOne("SELECT COUNT(*) AS c FROM usuarios WHERE activo = 1")['c'];
+        $usuariosApp     = (int)$this->queryOne("SELECT COUNT(*) AS c FROM mobile_usuarios WHERE activo = 1")['c'];
+
+        $ranking = $this->query(
+            "SELECT r.id, r.nombre, COALESCE(SUM(p.total), 0) AS ventas
+               FROM rest_restaurantes r
+          LEFT JOIN rest_pedidos p ON p.restaurante_id = r.id
+           GROUP BY r.id, r.nombre
+           ORDER BY ventas DESC
+              LIMIT 5"
+        );
+
+        return [
+            'negocios_total'      => array_sum($porEstado),
+            'negocios_por_estado' => $porEstado,
+            'pedidos_totales'     => (int)$ventas['pedidos_totales'],
+            'ventas_totales'      => (float)$ventas['ventas_totales'],
+            'ventas_mes'          => (float)$ventas['ventas_mes'],
+            'usuarios_negocio'    => $usuariosNegocio,
+            'usuarios_app'        => $usuariosApp,
+            'ranking'             => $ranking,
+        ];
+    }
+
+    /** Solo Superadmin debe llamar esto (ver BaseController::requireSuperAdmin). */
+    public function setEstadoPlataforma(int $restauranteId, string $estado, ?int $planIdSiFaltaba = null): bool
+    {
+        if (!$this->columnExists('estado_plataforma')) return false;
+
+        $ok = $this->execute(
+            "UPDATE rest_restaurantes SET estado_plataforma = ? WHERE id = ?",
+            [$estado, $restauranteId]
+        );
+
+        if ($ok && $planIdSiFaltaba !== null && $this->columnExists('plan_id')) {
+            $this->execute(
+                "UPDATE rest_restaurantes SET plan_id = ? WHERE id = ? AND plan_id IS NULL",
+                [$planIdSiFaltaba, $restauranteId]
+            );
+        }
+
+        return $ok;
+    }
+
     public function getActiveByName(string $name): ?array
     {
         return $this->queryOne(

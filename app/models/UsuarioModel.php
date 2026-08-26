@@ -122,6 +122,42 @@ class UsuarioModel extends BaseModel
         return $this->insert($data);
     }
 
+    /**
+     * Listado global para el panel de Superadmin — todas las cuentas de todos los negocios
+     * (admin_restaurante, cajero, cocina, superadmin), con el nombre del negocio si aplica.
+     */
+    public function listadoParaSuperadmin(array $filtros = [], int $page = 1): array
+    {
+        $where  = ['1=1'];
+        $params = [];
+
+        if (!empty($filtros['restaurante_id'])) {
+            $where[]  = 'u.restaurante_id = ?';
+            $params[] = $filtros['restaurante_id'];
+        }
+        if (!empty($filtros['rol_slug'])) {
+            $where[]  = 'r.slug = ?';
+            $params[] = $filtros['rol_slug'];
+        }
+        if (!empty($filtros['buscar'])) {
+            $where[]  = '(u.nombre LIKE ? OR u.email LIKE ?)';
+            $params[] = '%' . $filtros['buscar'] . '%';
+            $params[] = '%' . $filtros['buscar'] . '%';
+        }
+
+        $sqlWhere = 'WHERE ' . implode(' AND ', $where);
+        $sql = "SELECT u.id, u.nombre, u.apellido_paterno, u.email, u.activo, u.created_at,
+                       r.slug AS rol_slug, r.nombre AS rol_nombre,
+                       rr.nombre AS restaurante_nombre
+                  FROM usuarios u
+                  JOIN roles r ON r.id = u.rol_id
+             LEFT JOIN rest_restaurantes rr ON rr.id = u.restaurante_id
+                  $sqlWhere
+              ORDER BY u.activo DESC, r.id, u.nombre";
+
+        return $this->paginate($sql, $params, $page);
+    }
+
     public function getConRol(int $id): ?array
     {
         return $this->queryOne(

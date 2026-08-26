@@ -149,10 +149,6 @@ if ($ctrlSlug === 'api' && $action !== 'index') {
     $action = array_shift($rest);
     $param  = $rest ? implode('/', $rest) : null;
 }
-if ($ctrlSlug === 'admin' && $action === 'social') {
-    $rest = array_slice($segments, 2);
-    $param = $rest ? implode('/', $rest) : null;
-}
 // ── Ruta raíz → landing AMARE ────────────────────────────────────────────────
 if ($path === '') {
     $ctrlSlug = 'landing';
@@ -165,6 +161,8 @@ $routes = [
     'legal'         => 'LegalController',
     // Auth (público)
     'auth'          => 'AuthController',
+    // Portal Superadmin (plataforma — ver plan-web-superadmin.md)
+    'superadmin'    => 'SuperadminController',
     // Portal admin del restaurante
     'restaurante'   => 'RestauranteController',
     'rest-config'   => 'RestConfigController',
@@ -242,7 +240,6 @@ $publicPaths = [
     'api/auth/login',
     'api/auth/token',
     'api/admin',
-    'admin/social',
     'api/legal',
     'api/legal/terminos',
     'api/admin/users',
@@ -293,7 +290,10 @@ if (strpos($_SERVER['REQUEST_URI'] ?? '', 'api/auth/token') !== false) {
 // ── Redirect root to correct portal ──────────────────────────────────────────
 if ($ctrlSlug === 'auth' && $action === 'index' && isset($_SESSION['usuario'])) {
     $rol = $_SESSION['usuario']['rol_slug'] ?? '';
-    if (in_array($rol, ['admin_local', 'superadmin'], true)) {
+    if ($rol === 'superadmin') {
+        header('Location: ' . BASE_URL . 'superadmin/dashboard'); exit;
+    }
+    if ($rol === 'admin_local') {
         header('Location: ' . BASE_URL . 'restaurante/seleccionar'); exit;
     }
     if ($rol === 'cocina') {

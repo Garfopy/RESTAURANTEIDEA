@@ -4,6 +4,13 @@ firebase/*.json
 firebase/*.key
 firebase/*.pem
 
+# ── Dumps de BD con datos reales (correos, hashes de password) ─────────────────
+# Este repo es PÚBLICO: nunca commitear un dump con INSERTs de produccion.
+# La referencia versionada del esquema es idactivo_cafeteq.schema.sql (solo estructura).
+idactivo_cafeteq.sql
+*-dump.sql
+*_dump.sql
+
 # ── Uploads de usuarios (imágenes, firmas, fotos) ──────────────────────────────
 public/uploads/**/*
 !public/uploads/**/.gitkeep

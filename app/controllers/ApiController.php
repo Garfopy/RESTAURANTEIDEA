@@ -2440,7 +2440,7 @@ class ApiController extends BaseController
         $id       = (isset($parts[1]) && ctype_digit((string)$parts[1])) ? (int)$parts[1] : null;
         $subAct   = $parts[2] ?? null;
 
-        if (in_array($resType, ['users', 'promo-catalog', 'promotions', 'social'], true)) {
+        if (in_array($resType, ['users', 'promo-catalog', 'promotions'], true)) {
             $restauranteMovilId = (int)($_SESSION['restaurante_activo_id'] ?? 0)
                 ?: (int)($this->adminRestauranteIdByEmpresa((int)($jwtUser['empresa_id'] ?? 0)) ?? 0);
             $this->requireAppMovilApi($restauranteMovilId);
@@ -2458,22 +2458,12 @@ class ApiController extends BaseController
             case 'promotions':
                 $this->adminPromotionsRouter($method, $id, $subAct, $jwtUser);
                 break;
-            case 'social':
-                $this->adminSocialRouter($method, $parts, $jwtUser);
-                break;
             case 'invoice-requests':
                 $this->adminInvoiceRequestsRouter($method, $id, $subAct, $jwtUser);
                 break;
             default:
                 $this->adminApiError('Recurso no encontrado: ' . ($resType ?? 'null'), 404);
         }
-    }
-
-    /** Alias /admin/social/{resource} */
-    public function social(?string $resource = null): void
-    {
-        $resource = trim((string)$resource, '/');
-        $this->admin('social' . ($resource !== '' ? '/' . $resource : ''));
     }
 
     /** GET|PUT /api/branches/{id}/config y /menu-items/{id}/modifiers */
@@ -3072,68 +3062,6 @@ class ApiController extends BaseController
     }
 
     // ── Admin: Promotions CRUD ───────────────────────────────────
-
-    private function adminSocialRouter(string $method, array $parts, array $jwtUser): void
-    {
-        $resource = $parts[1] ?? null;
-        if ($resource !== 'photos') {
-            $this->adminApiError('Ruta social no encontrada', 404);
-        }
-
-        $photoId = (isset($parts[2]) && ctype_digit((string)$parts[2])) ? (int)$parts[2] : null;
-        $subAction = $parts[3] ?? null;
-        $rol = (string)($jwtUser['rol'] ?? '');
-        $central = in_array($rol, ['admin', 'superadmin'], true);
-        $restauranteId = $central ? 0 : ((int)($_SESSION['restaurante_activo_id'] ?? 0) ?: (int)$this->adminRestauranteIdByEmpresa((int)($jwtUser['empresa_id'] ?? 0)));
-        if (!$central && $restauranteId <= 0) {
-            $this->adminApiError('No hay sucursal vinculada para este administrador.', 403);
-        }
-
-        $model = new RestSocialModeracionModel();
-        if ($method === 'GET' && $photoId === null) {
-            $status = (string)$this->get('status', 'pending');
-            $page = max(1, (int)$this->get('page', 1));
-            $perPage = min(100, max(1, (int)$this->get('per_page', 25)));
-            $search = trim((string)$this->get('search', ''));
-            $result = $model->gestionFotos($restauranteId, $status, $page, $perPage, $search, $central);
-            if (empty($result['available'])) {
-                $this->adminApiError('La cola de fotografias no esta disponible.', 404);
-            }
-            $this->adminApiOk('Fotografias obtenidas correctamente', [
-                'photos' => $result['photos'],
-                'pagination' => $result['pagination'],
-            ]);
-        }
-
-        if ($method === 'POST' && $photoId !== null && $subAction === 'decision') {
-            $body = json_decode(file_get_contents('php://input'), true) ?? [];
-            $decision = (string)($body['decision'] ?? '');
-            if ($decision === 'approved') {
-                $result = $model->aprobarFoto($photoId, $restauranteId, (int)($jwtUser['sub'] ?? 0), $central);
-            } elseif ($decision === 'rejected') {
-                $result = $model->rechazarFoto($photoId, $restauranteId, (string)($body['notes'] ?? ''), (int)($jwtUser['sub'] ?? 0), $central);
-            } else {
-                $this->adminApiError('Decision no valida.', 422);
-            }
-
-            if (($result['status'] ?? '') === 'validation') {
-                $this->adminApiError($result['message'] ?? 'Datos invalidos.', 422);
-            }
-            if (($result['status'] ?? '') === 'conflict') {
-                $this->adminApiError('Otro moderador ya decidio esta fotografia. Refresca la cola.', 409);
-            }
-            if (($result['status'] ?? '') === 'not_found') {
-                $this->adminApiError('Fotografia no encontrada o fuera de tu sucursal.', 404);
-            }
-            if (empty($result['ok'])) {
-                $this->adminApiError('No se pudo registrar la decision.', 500);
-            }
-
-            $this->adminApiOk('Decision registrada correctamente', ['status' => $result['status'] ?? $decision]);
-        }
-
-        $this->adminApiError('Metodo no permitido', 405);
-    }
 
     private function adminInvoiceRequestsRouter(string $method, ?int $id, ?string $subAction, array $jwtUser): void
     {
