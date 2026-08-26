@@ -142,14 +142,16 @@ class SuperadminController extends BaseController
             $insEmpresa->execute([$razonSocial, $adminEmail, $telefono ?: null]);
             $empresaId = (int)$db->lastInsertId();
 
+            $planId = (int)($db->query("SELECT id FROM planes_negocio WHERE activo=1 ORDER BY id ASC LIMIT 1")->fetchColumn() ?: 0) ?: null;
+
             $insRest = $db->prepare(
                 "INSERT INTO rest_restaurantes
-                    (empresa_id, comprador_id, nombre, slug, color_primario, color_secundario,
-                     descripcion, telefono, direccion, lat, lng, activo, created_at, app_movil_habilitada)
-                 VALUES (?, 0, ?, ?, '#A97C3F', '#2B1B12', ?, ?, ?, ?, ?, 1, NOW(), 1)"
+                    (empresa_id, plan_id, comprador_id, nombre, slug, color_primario, color_secundario,
+                     descripcion, telefono, direccion, lat, lng, activo, estado_plataforma, created_at, app_movil_habilitada)
+                 VALUES (?, ?, 0, ?, ?, '#A97C3F', '#2B1B12', ?, ?, ?, ?, ?, 1, 'activo', NOW(), 1)"
             );
             $insRest->execute([
-                $empresaId, $nombreNegocio, $slug,
+                $empresaId, $planId, $nombreNegocio, $slug,
                 $this->post('descripcion') ?: null, $telefono ?: null, $this->post('direccion') ?: null,
                 $lat, $lng,
             ]);
@@ -200,7 +202,9 @@ class SuperadminController extends BaseController
         }
 
         $nuevoEstado = $rest['activo'] ? 0 : 1;
-        $db->prepare("UPDATE rest_restaurantes SET activo = ? WHERE id = ?")->execute([$nuevoEstado, $restauranteId]);
+        $nuevoEstadoPlataforma = $nuevoEstado ? 'activo' : 'suspendido';
+        $db->prepare("UPDATE rest_restaurantes SET activo = ?, estado_plataforma = ? WHERE id = ?")
+           ->execute([$nuevoEstado, $nuevoEstadoPlataforma, $restauranteId]);
         $this->log($nuevoEstado ? 'Negocio reactivado' : 'Negocio suspendido', 'superadmin', $rest['nombre']);
         $this->flash('success', $rest['nombre'] . ($nuevoEstado ? ' reactivado.' : ' suspendido.'));
         $this->redirect('superadmin/negocios');
