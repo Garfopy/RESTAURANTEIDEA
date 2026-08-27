@@ -46,13 +46,13 @@ DELIMITER ;
 CALL ops_add_column(
   'rest_platillos',
   'requiere_preparacion',
-  '`requiere_preparacion` tinyint(1) NOT NULL DEFAULT 1 AFTER `tiempo_preparacion_min` COMMENT ''1: pasa por Cocina; 0: queda listo para entregar'''
+  '`requiere_preparacion` tinyint(1) NOT NULL DEFAULT 1 AFTER `tiempo_preparacion_min`'
 );
 
 CALL ops_add_column(
   'rest_platillos',
   'ingrediente_directo_cantidad',
-  '`ingrediente_directo_cantidad` decimal(10,3) NOT NULL DEFAULT 1.000 AFTER `ingrediente_directo_id` COMMENT ''Cantidad de inventario que descuenta una venta directa'''
+  '`ingrediente_directo_cantidad` decimal(10,3) NOT NULL DEFAULT 1.000 AFTER `ingrediente_directo_id`'
 );
 
 CALL ops_add_index(

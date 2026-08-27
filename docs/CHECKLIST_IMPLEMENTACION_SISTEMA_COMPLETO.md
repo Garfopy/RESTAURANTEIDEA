@@ -62,6 +62,7 @@ Este archivo se actualiza en cada entrega. Una tarea solo se marca como terminad
 
 - [x] Separar estado operativo y estado de pago.
 - [x] Crear migración compatible y sin renombrar campos consumidos por móvil.
+- [x] Ajustar `004_flujo_caja_cocina.sql` para phpMyAdmin quitando `COMMENT` dentro de SQL dinámico.
 - [x] Añadir `requiere_preparacion` a productos.
 - [x] Enviar ventas POS a Cocina cuando corresponda.
 - [x] Mantener productos inmediatos directamente como listos.
