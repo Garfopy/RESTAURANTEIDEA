@@ -135,7 +135,7 @@ Este archivo se actualiza en cada entrega. Una tarea solo se marca como terminad
 - [x] Garantizar movimientos idempotentes.
 - [ ] Implementar reversa o merma al cancelar después de preparar.
 - [ ] Reconciliar inventario de prueba.
-- [ ] Actualizar checklist, commit y push.
+- [x] Actualizar checklist, commit y push (`516639e`).
 
 ## Entrega 7 — Administración y Superadmin
 
@@ -167,10 +167,10 @@ Este archivo se actualiza en cada entrega. Una tarea solo se marca como terminad
 |---|---|---|---|
 | Diagnóstico | Publicado | `96ae3cb` | Plan, correcciones y checklist creados. |
 | 1. Integridad y seguridad | En progreso | `96ae3cb` | Detección de columnas corregida; diagnósticos retirados; CSRF y sesión reforzados. Falta prueba MySQL y transición de autenticación móvil. |
-| 2. Caja–Cocina–Entrega | Pendiente | — | — |
+| 2. Caja–Cocina–Entrega | Publicado, pendiente prueba MySQL | `516639e` | POS y app quedan en cola, Cocina solo prepara, Caja cobra/entrega, productos inmediatos quedan listos y la entrega descuenta inventario una sola vez. |
 | 3. Cocina UX | Pendiente | — | — |
 | 4. Caja UX | Pendiente | — | — |
 | 5. Crear platillo | Publicado, en progreso | `de12b45` | Alta simplificada, receta opcional, categoría en línea, validaciones, CSRF y diseño café accesible; faltan prueba visual y mejoras secundarias. |
-| 6. Inventario | Publicado, en progreso | `70a6dac` | Selector de consumo simplificado y vínculo unitario funcional; faltan alertas, reversas y pruebas integrales. |
+| 6. Inventario | Publicado, en progreso | `70a6dac`, `516639e` | Selector de consumo simplificado, vínculo unitario con cantidad por venta, e ingredientes apagables que ocultan platillos afectados; faltan reversas y pruebas integrales con MySQL. |
 | 7. Admin/Superadmin | Pendiente | — | — |
 | 8. Producción | Pendiente | — | — |
