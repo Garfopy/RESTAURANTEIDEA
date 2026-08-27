@@ -2,7 +2,7 @@
 
 **Rama de trabajo:** `feature/sistema-completo`  
 **Inicio:** 2026-08-26  
-**Última actualización:** 2026-08-26  
+**Última actualización:** 2026-08-27
 **Estado general:** En progreso
 
 Este archivo se actualiza en cada entrega. Una tarea solo se marca como terminada después de revisar el código y ejecutar las verificaciones aplicables.
@@ -60,17 +60,17 @@ Este archivo se actualiza en cada entrega. Una tarea solo se marca como terminad
 
 ## Entrega 2 — Flujo correcto Caja → Cocina → Entrega
 
-- [ ] Separar estado operativo y estado de pago.
-- [ ] Crear migración compatible y sin renombrar campos consumidos por móvil.
-- [ ] Añadir `requiere_preparacion` a productos.
-- [ ] Enviar ventas POS a Cocina cuando corresponda.
-- [ ] Mantener productos inmediatos directamente como listos.
-- [ ] Impedir entrega antes de `listo` en servidor y UI.
-- [ ] Quitar la responsabilidad de entrega de la pantalla de Cocina.
+- [x] Separar estado operativo y estado de pago.
+- [x] Crear migración compatible y sin renombrar campos consumidos por móvil.
+- [x] Añadir `requiere_preparacion` a productos.
+- [x] Enviar ventas POS a Cocina cuando corresponda.
+- [x] Mantener productos inmediatos directamente como listos.
+- [x] Impedir entrega antes de `listo` en servidor y UI.
+- [x] Quitar la responsabilidad de entrega de la pantalla de Cocina.
 - [ ] Crear bandejas de Caja: Por cobrar, En preparación, Listos y Entregados recientes.
 - [ ] Registrar eventos y cambios de estado auditables.
 - [ ] Probar doble clic, dos terminales y reintento por timeout.
-- [ ] Actualizar checklist, commit y push.
+- [x] Actualizar checklist, commit y push.
 
 ## Entrega 3 — KDS de Cocina minimalista y accesible
 
@@ -125,10 +125,14 @@ Este archivo se actualiza en cada entrega. Una tarea solo se marca como terminad
 - [x] Añadir búsqueda y selección rápida de ingredientes mostrando existencias.
 - [x] Adaptar automáticamente la unidad de la receta a la unidad principal del inventario.
 - [x] Hacer funcional `ingrediente_directo_id`: descontar una unidad por venta con compatibilidad por código.
-- [x] Mantener el descuento directo y por receta sin cambios de esquema ni contrato móvil.
+- [x] Permitir cantidad por venta en productos directos/bebidas con `ingrediente_directo_cantidad`.
+- [x] Permitir apagar/activar ingredientes y ocultar automáticamente los platillos afectados.
+- [x] Preguntar al dejar un ingrediente sin stock si también debe apagarse del menú.
+- [x] Bloquear en servidor la venta de platillos con ingredientes apagados.
+- [x] Mantener el descuento directo y por receta sin cambiar rutas ni contrato móvil.
 - [x] Validar este bloque con lint de 140 archivos PHP, sintaxis JavaScript y `git diff --check`.
-- [ ] Definir el momento único de descuento de inventario.
-- [ ] Garantizar movimientos idempotentes.
+- [x] Definir el momento único de descuento de inventario.
+- [x] Garantizar movimientos idempotentes.
 - [ ] Implementar reversa o merma al cancelar después de preparar.
 - [ ] Reconciliar inventario de prueba.
 - [ ] Actualizar checklist, commit y push.

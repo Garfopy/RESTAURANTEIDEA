@@ -26,6 +26,7 @@ class RestInventarioController extends BaseController
             $movRecientes = array_slice($resultado['movimientos'] ?? [], 0, 10);
         } catch (\Throwable $e) {}
 
+        $csrf             = $this->csrfToken();
         $pageTitle        = 'Ingredientes';
         $activeMenu       = 'rest_inventario';
 
@@ -179,7 +180,7 @@ class RestInventarioController extends BaseController
 
         $this->render('restaurante/inventario/index', compact(
             'ingredientes','alertas','productosCarnihub','empresaProveedorId','empresaProveedorNombre',
-            'movRecientes','flash','pageTitle','activeMenu','inactivos'
+            'movRecientes','flash','pageTitle','activeMenu','inactivos','csrf'
         ));
     }
 
@@ -319,7 +320,17 @@ class RestInventarioController extends BaseController
             $this->usuarioId()
         );
 
-        $this->flash('success', 'Movimiento registrado.');
+        $mensaje = 'Movimiento registrado.';
+        if ((int)$this->post('apagar_menu', 0) === 1 && in_array($tipo, ['salida', 'merma'], true)) {
+            $ing = $this->model->find($ingredienteId);
+            if ($ing && (int)($ing['restaurante_id'] ?? 0) === (int)$this->restauranteId()
+                && (float)($ing['stock'] ?? 0) <= 0) {
+                $this->model->update($ingredienteId, ['activo' => 0]);
+                $mensaje .= ' El ingrediente quedo apagado del menu hasta que lo reactives.';
+            }
+        }
+
+        $this->flash('success', $mensaje);
         $this->redirect('rest-inventario/index');
     }
 
@@ -338,6 +349,11 @@ class RestInventarioController extends BaseController
     {
         $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) &&
             strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+        if (!$this->isPost() || !$this->validarCsrf()) {
+            if ($isAjax) $this->json(['ok' => false, 'error' => 'Sesion vencida'], 403);
+            $this->flash('error', 'La sesion vencio. Vuelve a intentarlo.');
+            $this->redirect('rest-inventario/index');
+        }
 
         $restauranteId = $this->restauranteId();
         $ing = $this->model->find((int)$id);
@@ -357,8 +373,60 @@ class RestInventarioController extends BaseController
         $this->redirect('rest-inventario/index');
     }
 
+    public function disponibilidad(?string $id = null): void
+    {
+        $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) &&
+            strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+
+        if (!$this->isPost() || !$this->validarCsrf()) {
+            $msg = 'La sesion vencio. Vuelve a intentarlo.';
+            if ($isAjax) $this->json(['ok' => false, 'error' => $msg], 403);
+            $this->flash('error', $msg);
+            $this->redirect('rest-inventario/index');
+        }
+
+        $restauranteId = $this->restauranteId();
+        $ingredienteId = (int)$id;
+        $ing = $this->model->find($ingredienteId);
+
+        if (!$ing || (int)($ing['restaurante_id'] ?? 0) !== $restauranteId) {
+            $msg = 'Ingrediente no encontrado.';
+            if ($isAjax) $this->json(['ok' => false, 'error' => $msg], 404);
+            $this->flash('error', $msg);
+            $this->redirect('rest-inventario/index');
+        }
+
+        $activo = (int)$this->post('activo', 1) === 1 ? 1 : 0;
+        $this->model->update($ingredienteId, ['activo' => $activo]);
+        $afectados = $this->model->getPlatillosAfectadosPorIngrediente($restauranteId, $ingredienteId);
+        $total = count($afectados);
+        $nombre = (string)($ing['nombre'] ?? 'Ingrediente');
+        $msg = $activo
+            ? $nombre . ' esta disponible otra vez.'
+            : $nombre . ' fue apagado. ' . ($total > 0 ? $total . ' platillo(s) se ocultaran automaticamente.' : 'No hay platillos afectados.');
+
+        if ($isAjax) {
+            $this->json([
+                'ok' => true,
+                'activo' => $activo,
+                'message' => $msg,
+                'platillos_afectados' => array_map(static fn($row) => [
+                    'id' => (int)$row['id'],
+                    'nombre' => (string)$row['nombre'],
+                ], $afectados),
+            ]);
+        }
+
+        $this->flash('success', $msg);
+        $this->redirect('rest-inventario/index');
+    }
+
     public function reactivar(?string $id = null): void
     {
+        if (!$this->isPost() || !$this->validarCsrf()) {
+            $this->flash('error', 'La sesion vencio. Vuelve a intentarlo.');
+            $this->redirect('rest-inventario/index');
+        }
         $restauranteId = $this->restauranteId();
         $ing = $this->model->find((int)$id);
         if (!$ing || (int)($ing['restaurante_id'] ?? 0) !== $restauranteId) {

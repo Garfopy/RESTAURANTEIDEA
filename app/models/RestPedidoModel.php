@@ -173,12 +173,22 @@ class RestPedidoModel extends BaseModel
     {
         $menuModel   = new RestMenuModel();
         $flags       = $this->flagsModificadores($restauranteId);
+        $columnaPreparacion = $this->hasColumnInTable('rest_platillos', 'requiere_preparacion');
+        $requierePreparacion = false;
 
         foreach ($items as &$item) {
             $platillo = $menuModel->find((int)$item['platillo_id']);
             if (!$platillo || (int)$platillo['restaurante_id'] !== $restauranteId) {
                 throw new \InvalidArgumentException('Platillo no valido para este restaurante.');
             }
+            if (!$menuModel->platilloDisponibleParaVenta($restauranteId, (int)$item['platillo_id'])) {
+                $faltantes = $menuModel->ingredientesNoDisponiblesParaPlatillo($restauranteId, (int)$item['platillo_id']);
+                $nombres = implode(', ', array_column($faltantes, 'nombre'));
+                $detalle = $nombres !== '' ? ' Falta: ' . $nombres . '.' : '';
+                throw new \InvalidArgumentException('Este platillo no esta disponible en este momento.' . $detalle);
+            }
+            $item['_requiere_preparacion'] = !$columnaPreparacion || !empty($platillo['requiere_preparacion']);
+            $requierePreparacion = $requierePreparacion || $item['_requiere_preparacion'];
             $selecciones = []; $extraUnitario = 0.0; $exclusiones = []; $agrupadas = [];
             foreach ((array)($item['modificadores'] ?? []) as $seleccion) {
                 $modId = (int)($seleccion['modificador_id'] ?? 0);
@@ -212,8 +222,9 @@ class RestPedidoModel extends BaseModel
         unset($item);
 
         return [
-            'items'    => $items,
-            'subtotal' => round(array_sum(array_column($items, 'subtotal')), 2),
+            'items'                  => $items,
+            'subtotal'               => round(array_sum(array_column($items, 'subtotal')), 2),
+            'requiere_preparacion'   => $requierePreparacion,
         ];
     }
 
@@ -239,8 +250,20 @@ class RestPedidoModel extends BaseModel
             $preparados = $this->prepararItems($restauranteId, $items);
             $items      = $preparados['items'];
             $subtotal   = $preparados['subtotal'];
+            $requierePreparacion = !empty($preparados['requiere_preparacion']);
         } else {
             $subtotal = round(array_sum(array_column($items, 'subtotal')), 2);
+            $requierePreparacion = (bool)array_filter(
+                $items,
+                static fn($item) => !empty($item['_requiere_preparacion'])
+            );
+        }
+
+        // El pago y la preparación son estados distintos: un pedido pagado
+        // inicia pendiente si pasa por Cocina, o listo si todos sus productos
+        // son inmediatos. Los estados explícitos de cancelación se respetan.
+        if (!array_key_exists('estado', $data)) {
+            $data['estado'] = $requierePreparacion ? 'pendiente' : 'listo';
         }
 
         $transaccionPropia = !$this->db->inTransaction();
@@ -302,11 +325,25 @@ class RestPedidoModel extends BaseModel
             $this->execute("UPDATE rest_pedidos SET folio = ? WHERE id = ?", [$folio, $pedidoId]);
 
             foreach ($items as $item) {
-                $this->execute(
-                    "INSERT INTO rest_pedido_items (pedido_id, platillo_id, cantidad, precio_unit, subtotal, notas, exclusiones, extras)
-                     VALUES (?,?,?,?,?,?,?,?)",
-                    [$pedidoId, $item['platillo_id'], $item['cantidad'], $item['precio_unit'], $item['subtotal'], $item['notas'] ?? null, $item['exclusiones'] ?? null, $item['extras'] ?? null]
-                );
+                $itemValues = [
+                    $pedidoId, $item['platillo_id'], $item['cantidad'], $item['precio_unit'],
+                    $item['subtotal'], $item['notas'] ?? null, $item['exclusiones'] ?? null,
+                    $item['extras'] ?? null,
+                ];
+                if ($this->hasColumnInTable('rest_pedido_items', 'estado')) {
+                    $itemValues[] = !empty($item['_requiere_preparacion']) ? 'pendiente' : 'listo';
+                    $this->execute(
+                        "INSERT INTO rest_pedido_items (pedido_id, platillo_id, cantidad, precio_unit, subtotal, notas, exclusiones, extras, estado)
+                         VALUES (?,?,?,?,?,?,?,?,?)",
+                        $itemValues
+                    );
+                } else {
+                    $this->execute(
+                        "INSERT INTO rest_pedido_items (pedido_id, platillo_id, cantidad, precio_unit, subtotal, notas, exclusiones, extras)
+                         VALUES (?,?,?,?,?,?,?,?)",
+                        $itemValues
+                    );
+                }
                 $pedidoItemId = (int)$this->db->lastInsertId();
                 foreach ($item['selecciones_validadas'] ?? [] as $seleccion) {
                     $this->execute(
@@ -507,6 +544,21 @@ class RestPedidoModel extends BaseModel
     /** Cola de cocina: pedidos activos con sus items, sin JOIN a rest_mesas. */
     public function getColaCocina(int $restauranteId): array
     {
+        $filtrarPreparacion = $this->hasColumnInTable('rest_platillos', 'requiere_preparacion');
+        $pedidosConPreparacion = $filtrarPreparacion
+            ? "AND EXISTS (
+                   SELECT 1
+                   FROM rest_pedido_items pix
+                   JOIN rest_platillos plx ON plx.id = pix.platillo_id
+                   WHERE pix.pedido_id = p.id
+                     AND pix.estado <> 'cancelado'
+                     AND COALESCE(plx.requiere_preparacion, 1) = 1
+               )"
+            : '';
+        $soloItemsDePreparacion = $filtrarPreparacion
+            ? 'AND COALESCE(pl.requiere_preparacion, 1) = 1'
+            : '';
+
         $pedidos = $this->query(
             "SELECT p.id, p.folio, p.created_at, p.notas AS pedido_notas,
                     p.tipo_pedido, p.tipo_entrega, p.direccion_entrega,
@@ -514,6 +566,7 @@ class RestPedidoModel extends BaseModel
              FROM rest_pedidos p
              WHERE p.restaurante_id = ?
                AND p.estado IN ('pendiente','en_preparacion','listo')
+               {$pedidosConPreparacion}
              ORDER BY p.created_at ASC",
             [$restauranteId]
         );
@@ -524,6 +577,7 @@ class RestPedidoModel extends BaseModel
                  FROM rest_pedido_items pi
                  JOIN rest_platillos pl ON pl.id = pi.platillo_id
                  WHERE pi.pedido_id = ? AND pi.estado <> 'cancelado'
+                   {$soloItemsDePreparacion}
                  ORDER BY pi.id ASC",
                 [(int)$pedido['id']]
             );
@@ -685,6 +739,17 @@ class RestPedidoModel extends BaseModel
         return $this->execute(
             "UPDATE rest_pedido_items SET estado = ? WHERE id = ?",
             [$estado, $itemId]
+        );
+    }
+
+    public function marcarItemsEntregados(int $pedidoId): void
+    {
+        if (!$this->hasColumnInTable('rest_pedido_items', 'estado')) return;
+        $this->execute(
+            "UPDATE rest_pedido_items
+             SET estado = 'entregado'
+             WHERE pedido_id = ? AND estado = 'listo'",
+            [$pedidoId]
         );
     }
 

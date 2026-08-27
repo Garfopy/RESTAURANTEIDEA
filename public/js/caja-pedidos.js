@@ -37,6 +37,27 @@
     return (p.folio || '').toLowerCase().includes(q) || (p.cliente || '').toLowerCase().includes(q);
   }
 
+  function etiquetaEstado(estado) {
+    return ({
+      pendiente: 'En espera de Cocina',
+      en_preparacion: 'En preparación',
+      listo: 'Listo para entregar'
+    })[estado] || 'En proceso';
+  }
+
+  function configurarAccion(p, pagado) {
+    const btn = $('btnAccionPedido');
+    if (!pagado) {
+      btn.textContent = 'Cobrar ahora';
+      btn.disabled = false;
+      return;
+    }
+
+    const listo = p.estado === 'listo';
+    btn.textContent = listo ? 'Confirmar entrega' : 'Esperando a Cocina';
+    btn.disabled = !listo;
+  }
+
   function pintar() {
     pintarLista('listaPrepagados', datos.prepagados.filter(coincide), true);
     pintarLista('listaPorCobrar', datos.por_cobrar.filter(coincide), false);
@@ -67,7 +88,8 @@
       div.querySelector('.meta').textContent =
         p.items + ' producto(s) · ' + (p.tipo || '') +
         (p.pickup_at ? ' · recoge ' + p.pickup_at.substring(11, 16) : '') +
-        (pagado ? ' · pagado en la app' : ' · pendiente de cobro');
+        ' · ' + etiquetaEstado(p.estado) +
+        (pagado ? ' · pagado' : ' · pendiente de cobro');
 
       div.addEventListener('click', () => abrirPedido(p, pagado));
       cont.appendChild(div);
@@ -85,7 +107,7 @@
     $('pedTotal').textContent = pesos(p.total);
     $('pedItems').innerHTML = '<p class="sub">Cargando detalle…</p>';
     $('pedCobro').hidden = pagado;
-    $('btnAccionPedido').textContent = pagado ? 'Entregar' : 'Cobrar y entregar';
+    configurarAccion(p, pagado);
     $('pedRecibido').value = Number(p.total).toFixed(2);
     $('pedCambio').hidden = true;
 
@@ -100,6 +122,9 @@
       $('pedItems').innerHTML = '<div class="aviso aviso--error">No se pudo cargar el detalle.</div>';
       return;
     }
+
+    p.estado = r.pedido.estado;
+    configurarAccion(p, pagado);
 
     $('pedItems').innerHTML = '';
     r.pedido.items.forEach(i => {

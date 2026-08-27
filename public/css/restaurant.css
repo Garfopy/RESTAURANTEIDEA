@@ -1040,13 +1040,13 @@ body {
 .dish-unit-heading p { max-width: 680px; margin: 4px 0 16px; color: #76675c; font-size: .78rem; line-height: 1.45; }
 .dish-unit-picker {
   display: grid;
-  grid-template-columns: minmax(180px, .75fr) minmax(260px, 1.25fr);
+  grid-template-columns: minmax(180px, .8fr) minmax(240px, 1.1fr) minmax(130px, .45fr);
   gap: 12px;
-  max-width: 720px;
+  max-width: 860px;
 }
 .dish-unit-summary {
   display: grid;
-  max-width: 720px;
+  max-width: 860px;
   gap: 3px;
   padding: 13px 14px;
   border: 1px dashed #cebba9;

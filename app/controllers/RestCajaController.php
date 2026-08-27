@@ -519,6 +519,7 @@ class RestCajaController extends BaseController
 
             $preparados = $this->pedidoModel->prepararItems($this->restauranteId, $items);
             $subtotal   = $preparados['subtotal'];
+            $requierePreparacion = !empty($preparados['requiere_preparacion']);
 
             $desc     = $this->calcularDescuento($datos, $subtotal);
             $propina  = $this->propinaValida($datos['propina_mxn'] ?? 0, $subtotal);
@@ -536,7 +537,7 @@ class RestCajaController extends BaseController
             $cliente  = (array)($datos['cliente'] ?? []);
             $pedidoId = $this->pedidoModel->crear([
                 'restaurante_id'  => $this->restauranteId,
-                'estado'          => 'entregado',   // mostrador: se entrega en el acto
+                'estado'          => $requierePreparacion ? 'pendiente' : 'listo',
                 'pedido_origen'   => 'cajero',
                 'tipo_origen'     => 'caja',
                 'tipo_pedido'     => 'take_out',
@@ -580,10 +581,6 @@ class RestCajaController extends BaseController
             $this->json(['ok' => false, 'error' => 'No se pudo registrar la venta. Vuelve a intentar.'], 500);
             return;
         }
-
-        // Fuera de la transacción, igual que el resto del sistema: que falte
-        // una receta no debe deshacer un cobro que el cliente ya pagó.
-        $this->pedidoModel->descontarStockEntrega($pedidoId);
 
         $this->consumirAutorizacion();
         $this->log('Venta de mostrador', 'caja', 'Pedido ' . $pedidoId . ' total ' . $total);
@@ -730,6 +727,7 @@ class RestCajaController extends BaseController
                 'creado'   => $pedido['created_at'],
                 'pagado'   => !empty($pedido['pagado_at']),
                 'metodo'   => $pedido['metodo_pago'],
+                'origen'   => $pedido['pedido_origen'] ?: $pedido['tipo_origen'],
             ];
             if ($fila['pagado']) { $prepagados[] = $fila; } else { $porCobrar[] = $fila; }
         }
@@ -816,7 +814,6 @@ class RestCajaController extends BaseController
             $this->pedidoModel->tomarEnCaja((int)$pedido['id'], [
                 'turno_caja_id' => (int)$turno['id'],
                 'cajero_id'     => (int)$this->cajeroActivo(),
-                'estado'        => 'entregado',
                 'propina_mxn'   => $propina,
                 'total'         => $total,
                 'iva_mxn'       => $this->ivaContenido($total - $propina),
@@ -836,7 +833,6 @@ class RestCajaController extends BaseController
             return;
         }
 
-        $this->pedidoModel->descontarStockEntrega((int)$pedido['id']);
         $this->log('Cobro de pedido de app', 'caja', 'Pedido ' . $pedido['id']);
         $this->json([
             'ok'         => true,
@@ -864,6 +860,18 @@ class RestCajaController extends BaseController
         if ($pedido['estado'] === 'cancelado') {
             $this->json(['ok' => false, 'error' => 'Ese pedido está cancelado.'], 409);
         }
+        if ($pedido['estado'] !== 'listo') {
+            $this->json([
+                'ok' => false,
+                'error' => 'El pedido todavía no está listo. Cocina debe terminarlo antes de entregarlo.',
+            ], 409);
+        }
+        if (empty($pedido['pagado_at'])) {
+            $this->json([
+                'ok' => false,
+                'error' => 'Primero cobra el pedido y después confirma la entrega.',
+            ], 409);
+        }
 
         $db = Database::getInstance();
         $db->beginTransaction();
@@ -887,6 +895,7 @@ class RestCajaController extends BaseController
                 'cajero_id'     => (int)$this->cajeroActivo(),
                 'estado'        => 'entregado',
             ]);
+            $this->pedidoModel->marcarItemsEntregados((int)$pedido['id']);
 
             $db->commit();
         } catch (\Throwable $e) {
@@ -1306,6 +1315,7 @@ class RestCajaController extends BaseController
             'folio'      => $pedido['folio'],
             'total'      => (float)$pedido['total'],
             'cambio'     => $cambio,
+            'estado'     => $pedido['estado'] ?? null,
             'ticket_url' => BASE_URL . 'rest-caja/ticket/' . $pedido['id'],
         ];
     }

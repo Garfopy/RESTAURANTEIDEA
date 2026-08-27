@@ -67,17 +67,17 @@ class RestCocinaController extends BaseController
         $this->json(['ok' => true, 'estado' => $nuevoEstado]);
     }
 
-    /** POST — marca el pedido completo como entregado/recogido (sale de la cola). */
+    /**
+     * Ruta conservada para clientes anteriores. Cocina prepara; Caja es quien
+     * confirma la entrega y ejecuta el descuento final de inventario.
+     */
     public function entregarPedido(?string $id = null): void
     {
         $this->requireMutation();
-        $pedidoId = (int)$id;
-        $pedido = $this->model->getConItemsSinMesas($pedidoId, $this->restauranteId());
-        if (!$pedido) {
-            $this->json(['ok' => false, 'msg' => 'Pedido no encontrado'], 404);
-        }
-        $this->model->cambiarEstadoPedido($pedidoId, 'entregado');
-        $this->json(['ok' => true]);
+        $this->json([
+            'ok' => false,
+            'msg' => 'Cocina solo marca los productos como listos. La entrega se confirma en Caja.',
+        ], 409);
     }
 
     /** Toda mutacion del KDS exige POST y el token de la sesion de Cocina. */

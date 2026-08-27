@@ -66,6 +66,43 @@
   display:flex;gap:6px;
 }
 .inv-card-actions .btn { flex:1;justify-content:center;font-size:.78rem;padding:5px 8px; }
+.inv-toolbar {
+  display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;gap:12px;
+}
+.inv-toolbar-main {
+  display:flex;gap:8px;align-items:center;flex:1;flex-wrap:wrap;
+}
+.inv-searchbox { position:relative;flex:1;min-width:210px;max-width:360px; }
+.inv-status-strip {
+  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:16px;
+}
+.inv-status-card {
+  background:#fff;border:1px solid #E7D8C7;border-radius:8px;padding:12px 14px;
+}
+.inv-status-card span {
+  display:block;font-size:.72rem;color:#7C5F46;font-weight:700;text-transform:uppercase;letter-spacing:.04em;
+}
+.inv-status-card strong { display:block;margin-top:3px;font-size:1.1rem;color:#2B1B12; }
+.inv-impact-note {
+  margin-top:8px;font-size:.72rem;line-height:1.35;color:#7C5F46;background:#FFF8F1;
+  border:1px solid #E7D8C7;border-radius:8px;padding:7px 9px;
+}
+.inv-availability-btn {
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  border:1.5px solid #E7D8C7;background:#FFF8F1;color:#7C2D12;border-radius:8px;
+  padding:8px 10px;font-size:.78rem;font-weight:800;cursor:pointer;white-space:nowrap;
+}
+.inv-availability-btn.on { background:#F0FDF4;border-color:#86EFAC;color:#166534; }
+@media (max-width: 780px) {
+  .inv-toolbar { align-items:stretch;flex-direction:column; }
+  .inv-toolbar-main { width:100%; }
+  .inv-searchbox { max-width:none;width:100%; }
+  .inv-toolbar .btn, .inv-toolbar button { min-height:42px; }
+  .inv-toolbar > button { width:100%;justify-content:center; }
+  .inv-status-strip { grid-template-columns:1fr; }
+  .inv-card-actions { flex-direction:column; }
+  .inv-card-actions .btn, .inv-availability-btn { width:100%; }
+}
 
 /* Movements table */
 .mov-row { display:grid;grid-template-columns:90px 1fr 80px 90px 80px;gap:8px;
@@ -103,15 +140,34 @@
   </div>
   <div style="margin-top:10px;padding-top:10px;border-top:1px solid #BFDBFE">
     <strong>Alerta stock bajo:</strong> cuando el stock llega al mínimo que configures, aparece un aviso rojo. <br>
-    <strong>Descuento automático:</strong> cuando cocina inicia la preparación, los ingredientes de la receta se descuentan solos. <br>
+    <strong>Descuento automatico:</strong> cuando Caja confirma la entrega, los ingredientes se descuentan una sola vez. <br>
     <strong>Stock mínimo:</strong> edita el ingrediente y ajusta el campo "Stock mínimo" para configurar desde qué cantidad te alertamos.
   </div>
 </div>
 
+<?php
+$totalIngredientesActivos = count($ingredientes ?? []);
+$totalIngredientesApagados = count($inactivos ?? []);
+?>
+<div class="inv-status-strip" aria-label="Resumen de inventario">
+  <div class="inv-status-card">
+    <span>Ingredientes activos</span>
+    <strong><?= $totalIngredientesActivos ?></strong>
+  </div>
+  <div class="inv-status-card">
+    <span>Stock bajo</span>
+    <strong><?= count($alertas ?? []) ?></strong>
+  </div>
+  <div class="inv-status-card">
+    <span>Apagados del menu</span>
+    <strong><?= $totalIngredientesApagados ?></strong>
+  </div>
+</div>
+
 <!-- Barra de herramientas -->
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;gap:12px">
-  <div style="display:flex;gap:8px;align-items:center;flex:1">
-    <div style="position:relative;flex:1;max-width:320px">
+<div class="inv-toolbar">
+  <div class="inv-toolbar-main">
+    <div class="inv-searchbox">
       <svg width="16" height="16" fill="none" stroke="#9CA3AF" viewBox="0 0 24 24"
            style="position:absolute;left:10px;top:50%;transform:translateY(-50%);pointer-events:none">
         <circle cx="11" cy="11" r="8"/><path stroke-linecap="round" d="m21 21-4.35-4.35"/>
@@ -146,10 +202,15 @@
   $bajo  = $stock <= $min;
   $pct   = $min > 0 ? min(100, round($stock / ($min * 2) * 100)) : ($stock > 0 ? 100 : 0);
   $fillCls = $bajo ? 'low' : ($pct < 60 ? 'warn' : '');
+  $impacto = (int)($ing['platillos_afectados'] ?? 0);
+  $impactoNombres = trim((string)($ing['platillos_afectados_nombres'] ?? ''));
 ?>
 <div class="inv-card <?= $bajo ? 'bajo' : 'ok' ?>"
      id="inv-card-<?= $ing['id'] ?>"
      data-min="<?= $min ?>" data-unidad="<?= htmlspecialchars($ing['unidad_principal'], ENT_QUOTES) ?>"
+     data-nombre="<?= htmlspecialchars($ing['nombre'], ENT_QUOTES) ?>"
+     data-impacto="<?= $impacto ?>"
+     data-impacto-nombres="<?= htmlspecialchars($impactoNombres, ENT_QUOTES) ?>"
      data-search="<?= strtolower(htmlspecialchars($ing['nombre'] . ' ' . ($ing['categoria'] ?? ''), ENT_QUOTES)) ?>">
   <div class="inv-card-head">
     <div class="inv-card-name">
@@ -187,7 +248,16 @@
     <span id="inv-badge-<?= $ing['id'] ?>" class="badge <?= $bajo ? 'badge-red' : 'badge-green' ?>" style="font-size:.7rem">
       <?= $bajo ? 'Stock bajo' : 'OK' ?>
     </span>
+    <?php if ($impacto > 0): ?>
+    <span class="badge badge-amber" style="font-size:.7rem"><?= $impacto ?> platillo<?= $impacto !== 1 ? 's' : '' ?></span>
+    <?php endif; ?>
   </div>
+
+  <?php if ($impacto > 0): ?>
+  <div class="inv-impact-note" title="<?= htmlspecialchars($impactoNombres, ENT_QUOTES) ?>">
+    Apagar este ingrediente oculta: <?= htmlspecialchars(mb_strlen($impactoNombres) > 80 ? mb_substr($impactoNombres, 0, 80) . '...' : $impactoNombres) ?>
+  </div>
+  <?php endif; ?>
 
   <div class="inv-card-cost">
     Costo/u: <strong>$<?= number_format((float)$ing['costo_unitario'], 2) ?></strong>
@@ -201,13 +271,14 @@
             class="btn btn-primary" style="flex:1;justify-content:center;font-size:.82rem;padding:8px 12px">
       Modificar
     </button>
-    <button onclick="eliminarIngrediente(<?= (int)$ing['id'] ?>, '<?= htmlspecialchars(addslashes($ing['nombre']), ENT_QUOTES) ?>')"
-            class="btn btn-danger" title="Eliminar ingrediente"
-            style="padding:8px 10px;flex-shrink:0;background:#FEF2F2;color:#DC2626;border:1.5px solid #FECACA">
+    <button type="button"
+            onclick="cambiarDisponibilidadIngrediente(<?= (int)$ing['id'] ?>, 0)"
+            class="inv-availability-btn" title="Apagar ingrediente del menu">
       <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+              d="M18.364 5.636 5.636 18.364M5.636 5.636l12.728 12.728"/>
       </svg>
+      Apagar
     </button>
   </div>
 </div>
@@ -226,13 +297,13 @@
 <?php endif; ?>
 
 <?php if (!empty($inactivos)): ?>
-<!-- Papelera: ingredientes desactivados -->
+<!-- Ingredientes apagados del menu -->
 <details style="background:#FFF7ED;border:1.5px solid #FED7AA;border-radius:14px;padding:16px 20px;margin-bottom:24px">
   <summary style="cursor:pointer;font-size:.9rem;font-weight:600;color:#C2410C;list-style:none;display:flex;align-items:center;gap:8px">
     <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
     </svg>
-    Ingredientes eliminados (<?= count($inactivos) ?>) — clic para restaurar
+    Ingredientes apagados (<?= count($inactivos) ?>) - clic para revisar
   </summary>
   <div style="margin-top:14px;display:flex;flex-direction:column;gap:8px">
     <?php foreach ($inactivos as $ing): ?>
@@ -245,12 +316,20 @@
         <?php if (!empty($ing['categoria'])): ?>
           <span style="font-size:.72rem;color:#9CA3AF;margin-left:6px"><?= htmlspecialchars($ing['categoria']) ?></span>
         <?php endif; ?>
+        <?php if (!empty($ing['platillos_afectados'])): ?>
+          <span style="font-size:.72rem;color:#92400E;background:#FEF3C7;border:1px solid #FDE68A;padding:1px 6px;border-radius:6px;margin-left:6px">
+            <?= (int)$ing['platillos_afectados'] ?> platillo<?= (int)$ing['platillos_afectados'] !== 1 ? 's' : '' ?> oculto<?= (int)$ing['platillos_afectados'] !== 1 ? 's' : '' ?>
+          </span>
+        <?php endif; ?>
       </div>
-      <a href="<?= BASE_URL ?>rest-inventario/reactivar/<?= (int)$ing['id'] ?>"
-         onclick="return confirm('¿Restaurar el ingrediente \'<?= htmlspecialchars(addslashes($ing['nombre']), ENT_QUOTES) ?>\' al inventario?')"
-         style="font-size:.78rem;font-weight:600;color:#16A34A;background:#F0FDF4;border:1px solid #86EFAC;padding:5px 12px;border-radius:8px;text-decoration:none;white-space:nowrap">
-        ↩ Restaurar
-      </a>
+      <form method="POST" action="<?= BASE_URL ?>rest-inventario/reactivar/<?= (int)$ing['id'] ?>" style="margin:0"
+            onsubmit="return confirm('Restaurar el ingrediente <?= htmlspecialchars(addslashes($ing['nombre']), ENT_QUOTES) ?> al menu?')">
+        <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf, ENT_QUOTES) ?>">
+        <button type="submit"
+          style="font-size:.78rem;font-weight:600;color:#16A34A;background:#F0FDF4;border:1px solid #86EFAC;padding:7px 12px;border-radius:8px;white-space:nowrap;cursor:pointer">
+          Activar
+        </button>
+      </form>
     </div>
     <?php endforeach; ?>
   </div>
@@ -514,6 +593,7 @@ sort($ingCategorias);
             onsubmit="return prepararMovimiento()">
         <input type="hidden" name="ingrediente_id" id="modifIngId">
         <input type="hidden" name="cantidad" id="modifCantFinal">
+        <input type="hidden" name="apagar_menu" id="modifApagarMenu" value="0">
 
         <div class="form-group">
           <label class="form-label">Tipo de movimiento</label>
@@ -707,6 +787,9 @@ sort($ingCategorias);
 </div>
 
 <script>
+const INV_BASE = '<?= BASE_URL ?>';
+const INV_CSRF = '<?= htmlspecialchars($csrf, ENT_QUOTES) ?>';
+
 function rstModal(id) {
   document.getElementById(id).classList.toggle('open');
 }
@@ -1202,6 +1285,18 @@ function prepararMovimiento() {
     const fromU = document.getElementById('modifCantUnidad').value;
     document.getElementById('modifCantFinal').value = convUnidad(cant, fromU, modifIng.unidad_principal).toFixed(6);
   }
+  const apagarMenu = document.getElementById('modifApagarMenu');
+  if (apagarMenu) apagarMenu.value = '0';
+  const tipo = document.querySelector('.mtipo-radio:checked')?.value || 'entrada';
+  const cantidadFinal = parseFloat(document.getElementById('modifCantFinal').value) || 0;
+  const stockActual = parseFloat(modifIng?.stock || 0);
+  const stockFinal = ['salida', 'merma'].includes(tipo)
+    ? Math.max(0, stockActual - cantidadFinal)
+    : stockActual + cantidadFinal;
+  if (stockFinal <= 0 && ['salida', 'merma'].includes(tipo)) {
+    const ok = confirm('Este movimiento deja "' + (modifIng?.nombre || 'el ingrediente') + '" sin stock. Quieres apagarlo del menu para ocultar sus platillos hasta reactivarlo?');
+    if (ok && apagarMenu) apagarMenu.value = '1';
+  }
   return true;
 }
 
@@ -1229,6 +1324,40 @@ function eliminarIngrediente(id, nombre) {
 }
 
 // —— Polling de stock en tiempo real ——
+function cambiarDisponibilidadIngrediente(id, activo) {
+  const card = document.getElementById('inv-card-' + id);
+  const nombre = card?.dataset.nombre || 'este ingrediente';
+  const impacto = parseInt(card?.dataset.impacto || '0', 10);
+  const nombres = card?.dataset.impactoNombres || '';
+  let msg = activo
+    ? 'Activar "' + nombre + '" otra vez?'
+    : 'Apagar "' + nombre + '" del menu?';
+  if (!activo && impacto > 0) {
+    msg += '\nSe ocultaran ' + impacto + ' platillo(s): ' + nombres;
+  }
+  if (!confirm(msg)) return;
+
+  const body = new URLSearchParams();
+  body.set('_csrf', INV_CSRF);
+  body.set('activo', activo ? '1' : '0');
+
+  fetch(INV_BASE + 'rest-inventario/disponibilidad/' + id, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: {
+      'X-Requested-With': 'XMLHttpRequest',
+      'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
+    },
+    body: body.toString()
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (!data.ok) throw new Error(data.error || 'Error del servidor');
+    window.location.reload();
+  })
+  .catch(err => alert(err.message || 'No se pudo cambiar la disponibilidad. Intenta de nuevo.'));
+}
+
 (function startStockPolling() {
   const BASE = '<?= BASE_URL ?>';
 

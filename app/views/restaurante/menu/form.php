@@ -6,8 +6,9 @@ $alergenosList = ['Gluten', 'Lactosa', 'Mariscos', 'Frutos secos', 'Huevo', 'Soy
 $abrirInformacion = !empty($alergenosActivos) || !empty($platillo['contiene']);
 $abrirReceta = !empty($ingredientesReceta) || !empty($platillo['ingrediente_directo_id']);
 $modoInventario = !empty($platillo['ingrediente_directo_id'])
-    ? 'unit'
-    : (!empty($ingredientesReceta) ? 'recipe' : 'none');
+  ? 'unit'
+  : (!empty($ingredientesReceta) ? 'recipe' : 'none');
+$cantidadDirecta = max(0.001, (float)($platillo['ingrediente_directo_cantidad'] ?? 1));
 ob_start();
 ?>
 
@@ -142,6 +143,19 @@ ob_start();
             </div>
             <small class="dish-help">Ayuda a cocina y caja a estimar la espera.</small>
           </div>
+          <fieldset class="form-group dish-status-field">
+            <legend class="form-label">Flujo de preparación</legend>
+            <input type="hidden" name="requiere_preparacion" value="0">
+            <label class="dish-switch-row" for="inpRequierePreparacion">
+              <span>
+                <strong>Enviar a Cocina</strong>
+                <small>Desactívalo para botellas, piezas o productos listos para entregar.</small>
+              </span>
+              <input type="checkbox" name="requiere_preparacion" id="inpRequierePreparacion" value="1"
+                     <?= ($platillo['requiere_preparacion'] ?? 1) ? 'checked' : '' ?>>
+              <span class="dish-switch" aria-hidden="true"></span>
+            </label>
+          </fieldset>
         </div>
       </div>
     </details>
@@ -166,12 +180,12 @@ ob_start();
             <label class="dish-mode-card <?= empty($ingredientes) ? 'is-disabled' : '' ?>">
               <input type="radio" name="inventory_mode" value="recipe" <?= $modoInventario === 'recipe' ? 'checked' : '' ?>
                      <?= empty($ingredientes) ? 'disabled' : '' ?>>
-              <span><strong>Usar receta</strong><small>Varios ingredientes y cantidades</small></span>
+              <span><strong>Ingredientes de inventario</strong><small>Varios ingredientes y cantidades</small></span>
             </label>
             <label class="dish-mode-card <?= empty($ingredientes) ? 'is-disabled' : '' ?>">
               <input type="radio" name="inventory_mode" value="unit" <?= $modoInventario === 'unit' ? 'checked' : '' ?>
                      <?= empty($ingredientes) ? 'disabled' : '' ?>>
-              <span><strong>Producto por unidad</strong><small>Descontar 1 por cada venta</small></span>
+              <span><strong>Bebida o producto directo</strong><small>Descontar la cantidad que captures</small></span>
             </label>
           </div>
         </fieldset>
@@ -267,8 +281,8 @@ ob_start();
 
         <section id="inventoryUnitPanel" class="dish-inventory-panel" <?= $modoInventario !== 'unit' ? 'hidden' : '' ?> aria-labelledby="unitPanelTitle">
           <div class="dish-unit-heading">
-            <h3 id="unitPanelTitle">Producto que representa una venta</h3>
-            <p>Ideal para latas, botellas, bolsas, piezas o cualquier producto que controlas individualmente.</p>
+            <h3 id="unitPanelTitle">Producto o bebida por unidad</h3>
+            <p>Elige el producto de inventario y cuanta existencia se descuenta por cada venta.</p>
           </div>
           <div class="dish-unit-picker">
             <div class="form-group">
@@ -290,6 +304,12 @@ ob_start();
                   </option>
                 <?php endforeach; ?>
               </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="ingredienteDirectoCantidad">Cantidad por venta</label>
+              <input type="number" name="ingrediente_directo_cantidad" id="ingredienteDirectoCantidad"
+                     class="form-input" min="0.001" step="0.001" inputmode="decimal"
+                     value="<?= htmlspecialchars(number_format($cantidadDirecta, 3, '.', ''), ENT_QUOTES) ?>">
             </div>
           </div>
           <div id="directStockSummary" class="dish-unit-summary" role="status" aria-live="polite">
@@ -387,7 +407,10 @@ ob_start();
   const ingredientOptions = [...document.querySelectorAll('.dish-ingredient-option')];
   const directSearch = document.getElementById('directSearch');
   const directSelect = document.getElementById('ingredienteDirecto');
+  const directQuantity = document.getElementById('ingredienteDirectoCantidad');
   const directSummary = document.getElementById('directStockSummary');
+  const requiresPreparation = document.getElementById('inpRequierePreparacion');
+  let preparationWasChanged = false;
   let rowSequence = <?= count($ingredientesReceta) ?>;
 
   const syncRecipeEmptyState = () => {
@@ -498,13 +521,17 @@ ob_start();
     });
   };
 
-  const syncInventoryMode = () => {
+  const syncInventoryMode = (adaptPreparation = false) => {
     const mode = inventoryModes.find(radio => radio.checked)?.value || 'none';
     setPanelState(recipePanel, mode === 'recipe');
     setPanelState(unitPanel, mode === 'unit');
     if (directSelect) directSelect.required = mode === 'unit';
+    if (adaptPreparation && requiresPreparation && !preparationWasChanged) {
+      requiresPreparation.checked = mode !== 'unit';
+    }
   };
-  inventoryModes.forEach(radio => radio.addEventListener('change', syncInventoryMode));
+  inventoryModes.forEach(radio => radio.addEventListener('change', () => syncInventoryMode(true)));
+  requiresPreparation?.addEventListener('change', () => { preparationWasChanged = true; });
 
   const syncDirectSummary = () => {
     if (!directSelect || !directSummary) return;
@@ -516,15 +543,17 @@ ob_start();
     }
     const unit = selected.dataset.unit || 'unidad';
     const name = selected.dataset.name || selected.textContent.trim();
+    const qty = Math.max(0.001, Number(directQuantity?.value || 1));
     const stock = Number(selected.dataset.stock || 0).toLocaleString('es-MX', { maximumFractionDigits: 3 });
     const title = document.createElement('strong');
-    title.textContent = `Cada venta descontará 1 ${unit}`;
+    title.textContent = `Cada venta descontara ${qty.toLocaleString('es-MX', { maximumFractionDigits: 3 })} ${unit}`;
     const detail = document.createElement('span');
     detail.textContent = `de ${name}. Existencia actual: ${stock} ${unit}.`;
     directSummary.replaceChildren(title, detail);
     directSummary.classList.add('is-ready');
   };
   directSelect?.addEventListener('change', syncDirectSummary);
+  directQuantity?.addEventListener('input', syncDirectSummary);
   directSearch?.addEventListener('input', () => {
     const query = directSearch.value.trim().toLocaleLowerCase('es-MX');
     [...directSelect.options].forEach((option, index) => {
@@ -570,6 +599,9 @@ ob_start();
         ? 'Captura una cantidad mayor a cero para este ingrediente.'
         : '');
     });
+    directQuantity?.setCustomValidity(inventoryMode === 'unit' && Number(directQuantity.value) <= 0
+      ? 'Captura una cantidad mayor a cero por venta.'
+      : '');
     const selectedIngredients = inventoryMode === 'recipe'
       ? [...(list?.querySelectorAll('.dish-ingredient-select') || [])]
       .map(select => select.value)

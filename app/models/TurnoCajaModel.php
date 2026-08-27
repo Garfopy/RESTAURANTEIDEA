@@ -211,19 +211,28 @@ class TurnoCajaModel extends BaseModel
         return (int)$this->db->lastInsertId();
     }
 
-    // ── Pedidos de la app sin atender ────────────────────────────
+    // ── Pedidos activos que Caja debe cobrar o entregar ──────────
 
     public function pendientesApp(int $restauranteId): array
     {
         $placeholders = implode(',', array_fill(0, count(self::ESTADOS_FINALES), '?'));
         return $this->query(
             "SELECT p.id, p.folio, p.total, p.estado, p.cliente_nombre, p.comprador_telefono,
-                    p.tipo_pedido, p.pickup_at, p.pagado_at, p.created_at, p.metodo_pago,
-                    (SELECT COUNT(*) FROM rest_pedido_items pi WHERE pi.pedido_id = p.id) AS items
+                     p.tipo_pedido, p.pickup_at, p.pagado_at, p.created_at, p.metodo_pago,
+                     p.pedido_origen, p.tipo_origen, p.turno_caja_id,
+                     (SELECT COUNT(*) FROM rest_pedido_items pi WHERE pi.pedido_id = p.id) AS items
                FROM rest_pedidos p
               WHERE p.restaurante_id = ?
-                AND p.turno_caja_id IS NULL
                 AND p.estado NOT IN ($placeholders)
+                AND (
+                    LOWER(COALESCE(p.tipo_origen, '')) IN ('app', 'mobile', 'caja')
+                    OR LOWER(COALESCE(p.pedido_origen, '')) = 'cajero'
+                    OR (
+                        p.turno_caja_id IS NULL
+                        AND p.mesa_id IS NULL
+                        AND LOWER(COALESCE(p.tipo_origen, '')) NOT IN ('store', 'gift', 'regalo')
+                    )
+                )
               ORDER BY p.created_at ASC",
             array_merge([$restauranteId], self::ESTADOS_FINALES)
         );
@@ -233,8 +242,18 @@ class TurnoCajaModel extends BaseModel
     {
         $placeholders = implode(',', array_fill(0, count(self::ESTADOS_FINALES), '?'));
         $row = $this->queryOne(
-            "SELECT COUNT(*) AS c FROM rest_pedidos
-              WHERE restaurante_id = ? AND turno_caja_id IS NULL AND estado NOT IN ($placeholders)",
+            "SELECT COUNT(*) AS c FROM rest_pedidos p
+              WHERE p.restaurante_id = ?
+                AND p.estado NOT IN ($placeholders)
+                AND (
+                    LOWER(COALESCE(p.tipo_origen, '')) IN ('app', 'mobile', 'caja')
+                    OR LOWER(COALESCE(p.pedido_origen, '')) = 'cajero'
+                    OR (
+                        p.turno_caja_id IS NULL
+                        AND p.mesa_id IS NULL
+                        AND LOWER(COALESCE(p.tipo_origen, '')) NOT IN ('store', 'gift', 'regalo')
+                    )
+                )",
             array_merge([$restauranteId], self::ESTADOS_FINALES)
         );
         return (int)($row['c'] ?? 0);

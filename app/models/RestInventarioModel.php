@@ -3,6 +3,47 @@ class RestInventarioModel extends BaseModel
 {
     protected string $table = 'rest_ingredientes';
     private static ?array $columnCache = null;
+    private static array $tableCache = [];
+    private static array $genericColumnCache = [];
+
+    private function tableExists(string $table): bool
+    {
+        if (isset(self::$tableCache[$table])) {
+            return self::$tableCache[$table];
+        }
+
+        try {
+            $stmt = $this->db->prepare(
+                "SELECT COUNT(*) FROM information_schema.TABLES
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?"
+            );
+            $stmt->execute([$table]);
+            return self::$tableCache[$table] = (int)$stmt->fetchColumn() > 0;
+        } catch (\Throwable $e) {
+            return self::$tableCache[$table] = false;
+        }
+    }
+
+    private function columnExists(string $table, string $column): bool
+    {
+        $key = $table . '.' . $column;
+        if (array_key_exists($key, self::$genericColumnCache)) {
+            return self::$genericColumnCache[$key];
+        }
+
+        try {
+            $stmt = $this->db->prepare(
+                "SELECT COUNT(*) FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE()
+                   AND TABLE_NAME = ?
+                   AND COLUMN_NAME = ?"
+            );
+            $stmt->execute([$table, $column]);
+            return self::$genericColumnCache[$key] = (int)$stmt->fetchColumn() > 0;
+        } catch (\Throwable $e) {
+            return self::$genericColumnCache[$key] = false;
+        }
+    }
 
     private function getColumns(): array
     {
@@ -45,10 +86,24 @@ class RestInventarioModel extends BaseModel
     public function getByRestaurante(int $restauranteId, bool $soloActivos = false): array
     {
         $where = $soloActivos ? 'AND activo = 1' : '';
-        return $this->query(
-            "SELECT * FROM rest_ingredientes WHERE restaurante_id = ? $where ORDER BY nombre",
-            [$restauranteId]
-        );
+        try {
+            return $this->query(
+                "SELECT i.*,
+                        COALESCE(impacto.total_platillos, 0) AS platillos_afectados,
+                        impacto.platillos_nombres AS platillos_afectados_nombres
+                   FROM rest_ingredientes i
+                   LEFT JOIN ({$this->sqlImpactoPlatillosPorIngrediente()}) impacto
+                          ON impacto.ingrediente_id = i.id
+                  WHERE i.restaurante_id = ? $where
+                  ORDER BY i.activo DESC, i.nombre",
+                [$restauranteId]
+            );
+        } catch (\Throwable $e) {
+            return $this->query(
+                "SELECT * FROM rest_ingredientes WHERE restaurante_id = ? $where ORDER BY nombre",
+                [$restauranteId]
+            );
+        }
     }
 
     public function alertasStockBajo(int $restauranteId): array
@@ -253,9 +308,13 @@ class RestInventarioModel extends BaseModel
                 $this->ajustarStock((int)$extra['ingrediente_id'], -$descuento, 'salida', 'Extra de pedido restaurante', $ref, $restauranteId, $usuarioId);
             }
 
+            $cantidadDirectaSql = $this->columnExists('rest_platillos', 'ingrediente_directo_cantidad')
+                ? 'COALESCE(NULLIF(pl.ingrediente_directo_cantidad, 0), 1)'
+                : '1';
             $sinReceta = $this->query(
                 "SELECT pi.id AS pedido_item_id,
                         pi.cantidad AS cantidad_pedida,
+                        {$cantidadDirectaSql} AS cantidad_directa,
                         i.id        AS ingrediente_id,
                         i.nombre    AS ingrediente_nombre,
                         i.unidad_principal
@@ -292,7 +351,7 @@ class RestInventarioModel extends BaseModel
 
                 $this->ajustarStock(
                     (int) $item['ingrediente_id'],
-                    -(float) $item['cantidad_pedida'],
+                    -((float)$item['cantidad_pedida'] * (float)($item['cantidad_directa'] ?? 1)),
                     'salida',
                     'Consumo pedido restaurante',
                     'rest_pedido:' . $pedidoId,
@@ -407,8 +466,12 @@ class RestInventarioModel extends BaseModel
                 return;
             }
 
+            $cantidadDirectaSql = $this->columnExists('rest_platillos', 'ingrediente_directo_cantidad')
+                ? 'COALESCE(NULLIF(pl.ingrediente_directo_cantidad, 0), 1)'
+                : '1';
             $sinReceta = $this->queryOne(
-                "SELECT i.id AS ingrediente_id
+                "SELECT i.id AS ingrediente_id,
+                        {$cantidadDirectaSql} AS cantidad_directa
                  FROM rest_platillos pl
                  JOIN rest_ingredientes i
                       ON i.restaurante_id = ?
@@ -439,7 +502,7 @@ class RestInventarioModel extends BaseModel
             if ($sinReceta && !empty($sinReceta['ingrediente_id'])) {
                 $this->ajustarStock(
                     (int)$sinReceta['ingrediente_id'],
-                    -(float)$item['cantidad_pedida'],
+                    -((float)$item['cantidad_pedida'] * (float)($sinReceta['cantidad_directa'] ?? 1)),
                     'salida',
                     'Preparacion pedido #' . (int)$item['pedido_id'],
                     $ref,
@@ -492,8 +555,86 @@ class RestInventarioModel extends BaseModel
     public function getInactivos(int $restauranteId): array
     {
         return $this->query(
-            "SELECT * FROM rest_ingredientes WHERE restaurante_id = ? AND activo = 0 ORDER BY nombre",
+            "SELECT i.*,
+                    COALESCE(impacto.total_platillos, 0) AS platillos_afectados,
+                    impacto.platillos_nombres AS platillos_afectados_nombres
+               FROM rest_ingredientes i
+               LEFT JOIN ({$this->sqlImpactoPlatillosPorIngrediente()}) impacto
+                      ON impacto.ingrediente_id = i.id
+              WHERE i.restaurante_id = ? AND i.activo = 0
+              ORDER BY i.nombre",
             [$restauranteId]
         );
+    }
+
+    public function getPlatillosAfectadosPorIngrediente(int $restauranteId, int $ingredienteId): array
+    {
+        if (!$this->tableExists('rest_platillos')) {
+            return [];
+        }
+
+        $sources = [];
+        $params = [$restauranteId, $ingredienteId];
+        if ($this->tableExists('rest_recetas') && $this->tableExists('rest_receta_ingredientes')) {
+            $sources[] = "SELECT p.id, p.nombre
+                            FROM rest_platillos p
+                            JOIN rest_recetas r ON r.platillo_id = p.id
+                            JOIN rest_receta_ingredientes ri ON ri.receta_id = r.id
+                           WHERE p.restaurante_id = ?
+                             AND p.activo = 1
+                             AND ri.ingrediente_id = ?";
+        }
+        if ($this->columnExists('rest_platillos', 'ingrediente_directo_id')) {
+            $sources[] = "SELECT p.id, p.nombre
+                            FROM rest_platillos p
+                           WHERE p.restaurante_id = ?
+                             AND p.activo = 1
+                             AND p.ingrediente_directo_id = ?";
+        }
+
+        if (!$sources) {
+            return [];
+        }
+
+        $allParams = [];
+        foreach ($sources as $_source) {
+            $allParams = array_merge($allParams, $params);
+        }
+
+        return $this->query(
+            "SELECT DISTINCT x.id, x.nombre
+               FROM (" . implode(' UNION ALL ', $sources) . ") x
+              ORDER BY x.nombre",
+            $allParams
+        );
+    }
+
+    private function sqlImpactoPlatillosPorIngrediente(): string
+    {
+        $sources = [];
+        if ($this->tableExists('rest_platillos') && $this->tableExists('rest_recetas') && $this->tableExists('rest_receta_ingredientes')) {
+            $sources[] = "SELECT ri.ingrediente_id, p.id AS platillo_id, p.nombre
+                            FROM rest_platillos p
+                            JOIN rest_recetas r ON r.platillo_id = p.id
+                            JOIN rest_receta_ingredientes ri ON ri.receta_id = r.id
+                           WHERE p.activo = 1";
+        }
+        if ($this->tableExists('rest_platillos') && $this->columnExists('rest_platillos', 'ingrediente_directo_id')) {
+            $sources[] = "SELECT p.ingrediente_directo_id AS ingrediente_id, p.id AS platillo_id, p.nombre
+                            FROM rest_platillos p
+                           WHERE p.activo = 1
+                             AND p.ingrediente_directo_id IS NOT NULL";
+        }
+
+        if (!$sources) {
+            return "SELECT NULL AS ingrediente_id, 0 AS total_platillos, NULL AS platillos_nombres WHERE 1 = 0";
+        }
+
+        return "SELECT base.ingrediente_id,
+                       COUNT(DISTINCT base.platillo_id) AS total_platillos,
+                       GROUP_CONCAT(DISTINCT base.nombre ORDER BY base.nombre SEPARATOR ', ') AS platillos_nombres
+                  FROM (" . implode(' UNION ALL ', $sources) . ") base
+                 WHERE base.ingrediente_id IS NOT NULL
+                 GROUP BY base.ingrediente_id";
     }
 }

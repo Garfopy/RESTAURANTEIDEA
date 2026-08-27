@@ -157,6 +157,13 @@ $esMenuPrincipal = $menuPrincipalId > 0 && $menuPrincipalId === (int)$restaurant
             color:<?= $p['disponible'] ? '#166534' : '#991B1B' ?>">
             <?= $p['disponible'] ? 'Disponible' : 'No disponible' ?>
           </span>
+          <?php if (!empty($p['bloqueado_por_inventario'])): ?>
+          <span title="Falta: <?= htmlspecialchars((string)($p['ingredientes_no_disponibles'] ?? ''), ENT_QUOTES) ?>"
+                style="padding:2px 8px;border-radius:99px;font-size:.65rem;font-weight:700;
+                       background:#FFF7ED;color:#9A3412;border:1px solid #FED7AA">
+            Oculto por inventario
+          </span>
+          <?php endif; ?>
           <?php if ($p['tiempo_preparacion_min'] ?? 0): ?>
           <span style="font-size:.68rem;color:#9CA3AF">⏱ <?= (int)$p['tiempo_preparacion_min'] ?>min</span>
           <?php endif; ?>

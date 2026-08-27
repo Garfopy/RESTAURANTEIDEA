@@ -3,6 +3,28 @@ class RestMenuModel extends BaseModel
 {
     protected string $table = 'rest_platillos';
     private static array $columnCache = [];
+    private static array $tableCache = [];
+
+    private function tableExists(string $table): bool
+    {
+        if (array_key_exists($table, self::$tableCache)) {
+            return self::$tableCache[$table];
+        }
+        if (!preg_match('/^[a-zA-Z0-9_]+$/', $table)) {
+            return self::$tableCache[$table] = false;
+        }
+
+        try {
+            $stmt = $this->db->prepare(
+                "SELECT COUNT(*) FROM information_schema.TABLES
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?"
+            );
+            $stmt->execute([$table]);
+            return self::$tableCache[$table] = (int)$stmt->fetchColumn() > 0;
+        } catch (\Throwable $e) {
+            return self::$tableCache[$table] = false;
+        }
+    }
 
     private function tableColumnExists(string $table, string $column): bool
     {
@@ -92,7 +114,9 @@ class RestMenuModel extends BaseModel
                         SELECT 1 FROM rest_recetas r
                         JOIN rest_receta_ingredientes ri ON ri.receta_id = r.id
                         WHERE r.platillo_id = p.id
-                    ) THEN 1 ELSE 0 END AS tiene_receta
+                    ) THEN 1 ELSE 0 END AS tiene_receta,
+                    {$this->sqlPlatilloBloqueadoPorInventario()} AS bloqueado_por_inventario,
+                    {$this->sqlIngredientesNoDisponiblesResumen()} AS ingredientes_no_disponibles
              FROM rest_platillos p
              LEFT JOIN rest_categorias_menu c ON c.id = p.categoria_id
              WHERE p.restaurante_id = ? $where
@@ -108,9 +132,143 @@ class RestMenuModel extends BaseModel
              FROM rest_platillos p
              LEFT JOIN rest_categorias_menu c ON c.id = p.categoria_id
              WHERE p.restaurante_id = ? AND p.disponible = 1 AND p.activo = 1
+               {$this->sqlSoloPlatillosConInventarioDisponible()}
              ORDER BY c.orden, p.nombre",
             [$restauranteId]
         );
+    }
+
+    public function ingredientesNoDisponiblesParaPlatillo(int $restauranteId, int $platilloId): array
+    {
+        $sources = [];
+        $params = [];
+
+        if ($this->tableExists('rest_recetas') && $this->tableExists('rest_receta_ingredientes')) {
+            $sources[] = "SELECT ri.ingrediente_id
+                            FROM rest_platillos p
+                            JOIN rest_recetas r ON r.platillo_id = p.id
+                            JOIN rest_receta_ingredientes ri ON ri.receta_id = r.id
+                           WHERE p.id = ?
+                             AND p.restaurante_id = ?";
+            $params[] = $platilloId;
+            $params[] = $restauranteId;
+        }
+
+        if ($this->tableColumnExists('rest_platillos', 'ingrediente_directo_id')) {
+            $sources[] = "SELECT p.ingrediente_directo_id AS ingrediente_id
+                            FROM rest_platillos p
+                           WHERE p.id = ?
+                             AND p.restaurante_id = ?
+                             AND p.ingrediente_directo_id IS NOT NULL";
+            $params[] = $platilloId;
+            $params[] = $restauranteId;
+        }
+
+        if (!$sources || !$this->tableExists('rest_ingredientes')) {
+            return [];
+        }
+
+        return $this->query(
+            "SELECT DISTINCT i.id, i.nombre
+               FROM (" . implode(' UNION ALL ', $sources) . ") src
+               JOIN rest_ingredientes i ON i.id = src.ingrediente_id
+              WHERE COALESCE(i.activo, 1) = 0
+              ORDER BY i.nombre",
+            $params
+        );
+    }
+
+    public function platilloDisponibleParaVenta(int $restauranteId, int $platilloId): bool
+    {
+        $platillo = $this->find($platilloId);
+        if (!$platillo || (int)($platillo['restaurante_id'] ?? 0) !== $restauranteId) {
+            return false;
+        }
+        if (isset($platillo['activo']) && (int)$platillo['activo'] !== 1) {
+            return false;
+        }
+        if (isset($platillo['disponible']) && (int)$platillo['disponible'] !== 1) {
+            return false;
+        }
+        return !$this->ingredientesNoDisponiblesParaPlatillo($restauranteId, $platilloId);
+    }
+
+    private function sqlSoloPlatillosConInventarioDisponible(): string
+    {
+        $parts = [];
+        if ($this->tableExists('rest_recetas') && $this->tableExists('rest_receta_ingredientes') && $this->tableExists('rest_ingredientes')) {
+            $parts[] = "NOT EXISTS (
+                SELECT 1
+                  FROM rest_recetas r_inv
+                  JOIN rest_receta_ingredientes ri_inv ON ri_inv.receta_id = r_inv.id
+                  JOIN rest_ingredientes i_inv ON i_inv.id = ri_inv.ingrediente_id
+                 WHERE r_inv.platillo_id = p.id
+                   AND COALESCE(i_inv.activo, 1) = 0
+            )";
+        }
+        if ($this->tableColumnExists('rest_platillos', 'ingrediente_directo_id') && $this->tableExists('rest_ingredientes')) {
+            $parts[] = "(p.ingrediente_directo_id IS NULL OR EXISTS (
+                SELECT 1
+                  FROM rest_ingredientes i_dir
+                 WHERE i_dir.id = p.ingrediente_directo_id
+                   AND i_dir.restaurante_id = p.restaurante_id
+                   AND COALESCE(i_dir.activo, 1) = 1
+            ))";
+        }
+
+        return $parts ? ' AND ' . implode(' AND ', $parts) : '';
+    }
+
+    private function sqlPlatilloBloqueadoPorInventario(): string
+    {
+        $conditions = [];
+        if ($this->tableExists('rest_recetas') && $this->tableExists('rest_receta_ingredientes') && $this->tableExists('rest_ingredientes')) {
+            $conditions[] = "EXISTS (
+                SELECT 1
+                  FROM rest_recetas r_inv
+                  JOIN rest_receta_ingredientes ri_inv ON ri_inv.receta_id = r_inv.id
+                  JOIN rest_ingredientes i_inv ON i_inv.id = ri_inv.ingrediente_id
+                 WHERE r_inv.platillo_id = p.id
+                   AND COALESCE(i_inv.activo, 1) = 0
+            )";
+        }
+        if ($this->tableColumnExists('rest_platillos', 'ingrediente_directo_id') && $this->tableExists('rest_ingredientes')) {
+            $conditions[] = "(p.ingrediente_directo_id IS NOT NULL AND NOT EXISTS (
+                SELECT 1
+                  FROM rest_ingredientes i_dir
+                 WHERE i_dir.id = p.ingrediente_directo_id
+                   AND i_dir.restaurante_id = p.restaurante_id
+                   AND COALESCE(i_dir.activo, 1) = 1
+            ))";
+        }
+
+        return $conditions ? 'CASE WHEN ' . implode(' OR ', $conditions) . ' THEN 1 ELSE 0 END' : '0';
+    }
+
+    private function sqlIngredientesNoDisponiblesResumen(): string
+    {
+        $parts = [];
+        if ($this->tableExists('rest_recetas') && $this->tableExists('rest_receta_ingredientes') && $this->tableExists('rest_ingredientes')) {
+            $parts[] = "(SELECT GROUP_CONCAT(DISTINCT i_inv.nombre ORDER BY i_inv.nombre SEPARATOR ', ')
+                           FROM rest_recetas r_inv
+                           JOIN rest_receta_ingredientes ri_inv ON ri_inv.receta_id = r_inv.id
+                           JOIN rest_ingredientes i_inv ON i_inv.id = ri_inv.ingrediente_id
+                          WHERE r_inv.platillo_id = p.id
+                            AND COALESCE(i_inv.activo, 1) = 0)";
+        }
+        if ($this->tableColumnExists('rest_platillos', 'ingrediente_directo_id') && $this->tableExists('rest_ingredientes')) {
+            $parts[] = "(SELECT GROUP_CONCAT(DISTINCT i_dir.nombre ORDER BY i_dir.nombre SEPARATOR ', ')
+                           FROM rest_ingredientes i_dir
+                          WHERE i_dir.id = p.ingrediente_directo_id
+                            AND i_dir.restaurante_id = p.restaurante_id
+                            AND COALESCE(i_dir.activo, 1) = 0)";
+        }
+
+        if (!$parts) {
+            return 'NULL';
+        }
+
+        return 'CONCAT_WS(\', \', ' . implode(', ', $parts) . ')';
     }
 
     public function importarMenuDesdePrincipal(int $origenRestauranteId, int $destinoRestauranteId): array
@@ -225,7 +383,8 @@ class RestMenuModel extends BaseModel
     {
         $sourceColumns = [
             'codigo', 'es_armado', 'categoria_id', 'nombre', 'descripcion', 'alergenos', 'contiene',
-            'precio', 'imagen', 'tiempo_preparacion_min', 'disponible', 'activo', 'ingrediente_directo_id',
+            'precio', 'imagen', 'tiempo_preparacion_min', 'requiere_preparacion', 'disponible', 'activo',
+            'ingrediente_directo_id', 'ingrediente_directo_cantidad',
         ];
         $selectColumns = ['id'];
         foreach ($sourceColumns as $column) {
@@ -316,7 +475,11 @@ class RestMenuModel extends BaseModel
     private function menuPlatilloImportData(array $platillo, ?int $categoriaDestinoId, bool $nuevo): array
     {
         $data = [];
-        $copyColumns = ['codigo', 'es_armado', 'nombre', 'descripcion', 'alergenos', 'contiene', 'precio', 'imagen', 'tiempo_preparacion_min'];
+        $copyColumns = [
+            'codigo', 'es_armado', 'nombre', 'descripcion', 'alergenos', 'contiene',
+            'precio', 'imagen', 'tiempo_preparacion_min', 'requiere_preparacion',
+            'ingrediente_directo_cantidad',
+        ];
         foreach ($copyColumns as $column) {
             if ($this->tableColumnExists('rest_platillos', $column) && array_key_exists($column, $platillo)) {
                 $data[$column] = $platillo[$column];

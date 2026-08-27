@@ -1,12 +1,12 @@
 <?php
-$pageTitle = 'Pedidos de la app';
+$pageTitle = 'Pedidos y entregas';
 require __DIR__ . '/parts/head.php';
 $metodos = $cfg['metodos_pago'] ?? ['efectivo'];
 ?>
 
 <div class="contenido">
   <div style="display:flex;gap:12px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
-    <h2 style="margin:0">Pedidos de la app</h2>
+    <h2 style="margin:0">Pedidos y entregas</h2>
     <span class="sep" style="flex:1"></span>
     <input class="buscador" id="buscarPedido" type="search" placeholder="Buscar folio o cliente…" style="max-width:280px">
     <button class="chip" type="button" id="btnSonido" aria-pressed="true">🔔 Aviso sonoro</button>
@@ -16,13 +16,13 @@ $metodos = $cfg['metodos_pago'] ?? ['efectivo'];
   <div class="cols">
     <div class="tarjeta">
       <h3 style="margin-top:0;font-size:1rem">Ya pagados <span class="estado-badge ok" id="nPrepagados">0</span></h3>
-      <p class="sub" style="color:var(--txt-2);font-size:.82rem">Solo confirma la entrega.</p>
+      <p class="sub" style="color:var(--txt-2);font-size:.82rem">Entrega únicamente cuando Cocina marque el pedido como listo.</p>
       <div id="listaPrepagados"><div class="vacio">Cargando…</div></div>
     </div>
 
     <div class="tarjeta">
       <h3 style="margin-top:0;font-size:1rem">Por cobrar en caja <span class="estado-badge esp" id="nPorCobrar">0</span></h3>
-      <p class="sub" style="color:var(--txt-2);font-size:.82rem">El cliente eligió pagar al recoger.</p>
+      <p class="sub" style="color:var(--txt-2);font-size:.82rem">Cobra ahora; la preparación y la entrega siguen su propio estado.</p>
       <div id="listaPorCobrar"><div class="vacio">Cargando…</div></div>
     </div>
   </div>
@@ -56,7 +56,7 @@ $metodos = $cfg['metodos_pago'] ?? ['efectivo'];
 
     <div class="modal-acciones">
       <button class="btn" type="button" data-cerrar="modalPedido">Cerrar</button>
-      <button class="btn btn--ok" type="button" id="btnAccionPedido">Entregar</button>
+      <button class="btn btn--ok" type="button" id="btnAccionPedido">Continuar</button>
     </div>
   </div>
 </div>

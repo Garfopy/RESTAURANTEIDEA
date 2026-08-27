@@ -92,13 +92,18 @@ class RestPedidoController extends BaseController
             $this->redirect('rest-pedido/nuevo/' . ($this->post('mesa_id') ?? ''));
         }
 
-        $pedidoId = $this->model->crear([
-            'restaurante_id' => $restauranteId,
-            'mesa_id'        => $this->post('mesa_id') ?: null,
-            'visita_id'      => $this->post('visita_id') ?: null,
-            'mesero_id'      => $this->usuarioId(),
-            'notas'          => $this->post('notas'),
-        ], $items);
+        try {
+            $pedidoId = $this->model->crear([
+                'restaurante_id' => $restauranteId,
+                'mesa_id'        => $this->post('mesa_id') ?: null,
+                'visita_id'      => $this->post('visita_id') ?: null,
+                'mesero_id'      => $this->usuarioId(),
+                'notas'          => $this->post('notas'),
+            ], $items);
+        } catch (\InvalidArgumentException $e) {
+            $this->flash('error', $e->getMessage());
+            $this->redirect('rest-pedido/nuevo/' . ($this->post('mesa_id') ?? ''));
+        }
 
         $this->flash('success', 'Pedido creado.');
         $this->redirect('rest-pedido/detalle/' . $pedidoId);

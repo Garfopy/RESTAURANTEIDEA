@@ -27,7 +27,7 @@
   .kds-btn-iniciar { background: #F59E0B; color: #111827; }
   .kds-btn-listo { background: #10B981; color: #fff; }
   .kds-badge-listo { background: #065F46; color: #A7F3D0; font-size: .72rem; font-weight: 700; padding: 6px 10px; border-radius: 8px; }
-  .kds-entregar { margin-top: 4px; background: var(--cp); color: #fff; border: none; border-radius: 8px; padding: 10px; font-weight: 700; cursor: pointer; }
+  .kds-listo-entrega { margin-top: 4px; background: #064E3B; color: #A7F3D0; border: 1px solid #047857; border-radius: 8px; padding: 10px; font-size: .8rem; font-weight: 700; text-align: center; }
   .kds-empty { text-align: center; padding: 80px 20px; color: #6B7280; }
   .kds-notas { font-size: .74rem; color: #FCD34D; margin-top: 4px; }
 </style>
@@ -85,7 +85,7 @@
     <?php endforeach; ?>
 
     <?php if ($todosListo): ?>
-    <button class="kds-entregar" onclick="entregar(<?= (int)$ped['id'] ?>, this)">Entregar / recogido</button>
+    <div class="kds-listo-entrega">✓ Pedido listo · Caja confirma la entrega</div>
     <?php endif; ?>
   </div>
   <?php endforeach; ?>
@@ -123,16 +123,6 @@ async function avanzar(itemId, btn) {
   }
 }
 
-async function entregar(pedidoId, btn) {
-  btn.disabled = true;
-  try {
-    await postAction('rest-cocina/entregarPedido/' + pedidoId);
-    location.reload();
-  } catch (error) {
-    btn.disabled = false;
-    alert(error.message || 'No se pudo actualizar, intenta de nuevo.');
-  }
-}
 // Refresco automático — modelo simple de polling (v1)
 setTimeout(() => location.reload(), 20000);
 </script>

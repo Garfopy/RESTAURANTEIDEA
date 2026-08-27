@@ -185,6 +185,10 @@ class RestMenuController extends BaseController
         }
 
         // Alérgenos: array of checkbox values → comma-separated string
+        $ingredienteDirectoCantidad = $modoInventario === 'unit'
+            ? max(0.001, min(999999.999, (float)$this->post('ingrediente_directo_cantidad', 1)))
+            : 1.0;
+
         $alergenosArr = $this->post('alergenos', []);
         $alergenosPermitidos = ['Gluten', 'Lactosa', 'Mariscos', 'Frutos secos', 'Huevo', 'Soya', 'Cacahuate', 'Mostaza'];
         $alergenosStr = is_array($alergenosArr)
@@ -198,10 +202,12 @@ class RestMenuController extends BaseController
             'descripcion'            => trim((string)$this->post('descripcion', '')) ?: null,
             'precio'                 => $precio,
             'tiempo_preparacion_min' => min(127, max(1, (int)$this->post('tiempo_preparacion_min', 15))),
+            'requiere_preparacion'   => $this->post('requiere_preparacion', 0) == '1' ? 1 : 0,
             'disponible'             => $this->post('disponible', 0) == '1' ? 1 : 0,
             'alergenos'              => $alergenosStr ?: null,
             'contiene'               => trim((string)$this->post('contiene', '')) ?: null,
             'ingrediente_directo_id' => $ingredienteDirectoId ?: null,
+            'ingrediente_directo_cantidad' => $ingredienteDirectoCantidad,
         ];
 
         // Imagen del platillo (subida)
@@ -220,7 +226,11 @@ class RestMenuController extends BaseController
                 $this->model->update($id, array_diff_key($data, ['restaurante_id' => '']));
             } catch (\PDOException $e) {
                 // Fallback: si las columnas ingrediente_directo_id o imagen aún no existen (migración pendiente)
-                $safeData = array_diff_key($data, ['restaurante_id' => '', 'ingrediente_directo_id' => '', 'imagen' => '']);
+                $safeData = array_diff_key($data, [
+                    'restaurante_id' => '', 'ingrediente_directo_id' => '',
+                    'ingrediente_directo_cantidad' => '',
+                    'requiere_preparacion' => '', 'imagen' => '',
+                ]);
                 $this->model->update($id, $safeData);
             }
             $platilloId = $id;
@@ -228,7 +238,10 @@ class RestMenuController extends BaseController
             try {
                 $platilloId = $this->model->insert($data);
             } catch (\PDOException $e) {
-                $safeData = array_diff_key($data, ['ingrediente_directo_id' => '', 'imagen' => '']);
+                $safeData = array_diff_key($data, [
+                    'ingrediente_directo_id' => '', 'ingrediente_directo_cantidad' => '',
+                    'requiere_preparacion' => '', 'imagen' => '',
+                ]);
                 $platilloId = $this->model->insert($safeData);
             }
         }
