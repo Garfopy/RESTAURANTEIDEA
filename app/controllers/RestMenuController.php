@@ -186,7 +186,7 @@ class RestMenuController extends BaseController
 
         // Alérgenos: array of checkbox values → comma-separated string
         $ingredienteDirectoCantidad = $modoInventario === 'unit'
-            ? max(0.001, min(999999.999, (float)$this->post('ingrediente_directo_cantidad', 1)))
+            ? max(1, min(999999, (int)round((float)$this->post('ingrediente_directo_cantidad', 1))))
             : 1.0;
 
         $alergenosArr = $this->post('alergenos', []);
@@ -248,38 +248,26 @@ class RestMenuController extends BaseController
 
         // Guardar receta si vienen ingredientes
         $ingredientesIds  = $modoInventario === 'recipe' ? $this->post('ingrediente_id', []) : [];
-        $cantidades       = $this->post('cantidad', []);
-        $unidades         = $this->post('unidad', []);
         $ingredientesIds  = is_array($ingredientesIds) ? $ingredientesIds : [];
-        $cantidades       = is_array($cantidades) ? $cantidades : [];
-        $unidades         = is_array($unidades) ? $unidades : [];
         $tipoIngredienteStmt = \Database::getInstance()->prepare(
-            "SELECT tipo, unidad_principal FROM rest_ingredientes WHERE id=? AND restaurante_id=? AND activo=1 LIMIT 1"
+            "SELECT tipo FROM rest_ingredientes WHERE id=? AND restaurante_id=? AND activo=1 LIMIT 1"
         );
 
         $ings = [];
         $ingredientesAgregados = [];
-        $unidadesPermitidas = ['g', 'kg', 'mg', 'L', 'ml', 'mL', 'pza', 'caja', 'bolsa'];
-        foreach ($ingredientesIds as $k => $ingId) {
+        foreach ($ingredientesIds as $ingId) {
             if (!$ingId) continue;
             $ingId = (int)$ingId;
             if (isset($ingredientesAgregados[$ingId])) continue;
             $tipoIngredienteStmt->execute([$ingId, $restauranteId]);
             $ingredienteValido = $tipoIngredienteStmt->fetch(\PDO::FETCH_ASSOC);
-            $cantidad = (float)($cantidades[$k] ?? 0);
-            if (!$ingredienteValido || $cantidad <= 0) continue;
+            if (!$ingredienteValido) continue;
             $ingredientesAgregados[$ingId] = true;
             $tipoIngrediente = (string)($ingredienteValido['tipo'] ?? 'materia_prima');
-            $unidadPrincipal = trim((string)($ingredienteValido['unidad_principal'] ?? 'kg')) ?: 'kg';
-            $unidad = trim((string)($unidades[$k] ?? $unidadPrincipal));
-            if (!in_array($unidad, $unidadesPermitidas, true)
-                && strcasecmp($unidad, $unidadPrincipal) !== 0) {
-                $unidad = $unidadPrincipal;
-            }
             $ings[] = [
                 'ingrediente_id'  => $ingId,
-                'cantidad'        => $cantidad,
-                'unidad'          => mb_substr($unidad, 0, 20),
+                'cantidad'        => 1,
+                'unidad'          => 'pza',
                 'es_informativo'  => 0,
                 'tipo_componente' => $tipoIngrediente === 'guarnicion' ? 'guarnicion' : 'materia_prima',
                 'codigo_display'  => null,

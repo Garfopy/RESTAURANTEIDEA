@@ -93,6 +93,25 @@
   padding:8px 10px;font-size:.78rem;font-weight:800;cursor:pointer;white-space:nowrap;
 }
 .inv-availability-btn.on { background:#F0FDF4;border-color:#86EFAC;color:#166534; }
+.inv-off-section {
+  background:#FFF7ED;border:1.5px solid #FED7AA;border-radius:16px;
+  padding:16px;margin-bottom:24px;
+}
+.inv-off-header {
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  margin-bottom:12px;
+}
+.inv-off-header h2 { margin:0;color:#7C2D12;font-size:1rem; }
+.inv-off-header p { margin:3px 0 0;color:#9A6542;font-size:.8rem; }
+.inv-off-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px; }
+.inv-off-card {
+  display:grid;gap:9px;background:#fff;border:1px solid #FED7AA;border-radius:12px;
+  padding:12px;min-width:0;
+}
+.inv-off-name { color:#2B1B12;font-weight:800;font-size:.9rem;line-height:1.25; }
+.inv-off-meta { display:flex;gap:6px;flex-wrap:wrap;align-items:center; }
+.inv-off-actions { display:flex;gap:8px; }
+.inv-off-actions button { width:100%;min-height:38px; }
 @media (max-width: 780px) {
   .inv-toolbar { align-items:stretch;flex-direction:column; }
   .inv-toolbar-main { width:100%; }
@@ -102,6 +121,8 @@
   .inv-status-strip { grid-template-columns:1fr; }
   .inv-card-actions { flex-direction:column; }
   .inv-card-actions .btn, .inv-availability-btn { width:100%; }
+  .inv-off-header { align-items:flex-start;flex-direction:column; }
+  .inv-off-grid { grid-template-columns:1fr; }
 }
 
 /* Movements table */
@@ -200,6 +221,8 @@ $totalIngredientesApagados = count($inactivos ?? []);
   $stock = (float)$ing['stock'];
   $min   = (float)$ing['stock_minimo'];
   $bajo  = $stock <= $min;
+  $stockDisplay = number_format($stock, 0);
+  $minDisplay   = number_format($min, 0);
   $pct   = $min > 0 ? min(100, round($stock / ($min * 2) * 100)) : ($stock > 0 ? 100 : 0);
   $fillCls = $bajo ? 'low' : ($pct < 60 ? 'warn' : '');
   $impacto = (int)($ing['platillos_afectados'] ?? 0);
@@ -207,7 +230,7 @@ $totalIngredientesApagados = count($inactivos ?? []);
 ?>
 <div class="inv-card <?= $bajo ? 'bajo' : 'ok' ?>"
      id="inv-card-<?= $ing['id'] ?>"
-     data-min="<?= $min ?>" data-unidad="<?= htmlspecialchars($ing['unidad_principal'], ENT_QUOTES) ?>"
+     data-min="<?= $min ?>" data-unidad="pza"
      data-nombre="<?= htmlspecialchars($ing['nombre'], ENT_QUOTES) ?>"
      data-impacto="<?= $impacto ?>"
      data-impacto-nombres="<?= htmlspecialchars($impactoNombres, ENT_QUOTES) ?>"
@@ -228,14 +251,14 @@ $totalIngredientesApagados = count($inactivos ?? []);
 
   <div class="inv-stock-bar-wrap">
     <div class="inv-stock-label">
-      <span>Stock actual</span>
-      <strong id="inv-sv-<?= $ing['id'] ?>" style="color:<?= $bajo ? '#EF4444' : '#111827' ?>"><?= number_format($stock, 2) ?> <?= htmlspecialchars($ing['unidad_principal']) ?></strong>
+      <span>Disponibles</span>
+      <strong id="inv-sv-<?= $ing['id'] ?>" style="color:<?= $bajo ? '#EF4444' : '#111827' ?>"><?= $stockDisplay ?></strong>
     </div>
     <div class="inv-bar">
       <div class="inv-bar-fill <?= $fillCls ?>" id="inv-bar-<?= $ing['id'] ?>" style="width:<?= $pct ?>%"></div>
     </div>
     <?php if ($min > 0): ?>
-    <div style="font-size:.7rem;color:#9CA3AF;margin-top:3px">Mínimo: <?= number_format($min, 2) ?> <?= htmlspecialchars($ing['unidad_principal']) ?></div>
+    <div style="font-size:.7rem;color:#9CA3AF;margin-top:3px">Mínimo para alerta: <?= $minDisplay ?></div>
     <?php endif; ?>
   </div>
 
@@ -260,7 +283,7 @@ $totalIngredientesApagados = count($inactivos ?? []);
   <?php endif; ?>
 
   <div class="inv-card-cost">
-    Costo/u: <strong>$<?= number_format((float)$ing['costo_unitario'], 2) ?></strong>
+    Costo/pieza: <strong>$<?= number_format((float)$ing['costo_unitario'], 2) ?></strong>
     <?php if ((float)$ing['costo_unitario'] > 0 && $stock > 0): ?>
     &nbsp;·&nbsp; Valor stock actual: <strong>$<?= number_format($stock * (float)$ing['costo_unitario'], 2) ?></strong>
     <?php endif; ?>
@@ -298,42 +321,42 @@ $totalIngredientesApagados = count($inactivos ?? []);
 
 <?php if (!empty($inactivos)): ?>
 <!-- Ingredientes apagados del menu -->
-<details style="background:#FFF7ED;border:1.5px solid #FED7AA;border-radius:14px;padding:16px 20px;margin-bottom:24px">
-  <summary style="cursor:pointer;font-size:.9rem;font-weight:600;color:#C2410C;list-style:none;display:flex;align-items:center;gap:8px">
-    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-    </svg>
-    Ingredientes apagados (<?= count($inactivos) ?>) - clic para revisar
-  </summary>
-  <div style="margin-top:14px;display:flex;flex-direction:column;gap:8px">
+<section class="inv-off-section" aria-labelledby="inv-off-title">
+  <div class="inv-off-header">
+    <div>
+      <h2 id="inv-off-title">Ingredientes apagados</h2>
+      <p>Estos ingredientes no se venden por ahora; los platillos que los usan quedan ocultos.</p>
+    </div>
+    <span class="badge badge-amber"><?= count($inactivos) ?> apagado<?= count($inactivos) !== 1 ? 's' : '' ?></span>
+  </div>
+  <div class="inv-off-grid">
     <?php foreach ($inactivos as $ing): ?>
-    <div style="display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid #FED7AA;border-radius:10px;padding:10px 14px">
-      <div>
-        <span style="font-weight:600;font-size:.88rem;color:#374151"><?= htmlspecialchars($ing['nombre']) ?></span>
+    <article class="inv-off-card">
+      <div class="inv-off-name"><?= htmlspecialchars($ing['nombre']) ?></div>
+      <div class="inv-off-meta">
         <?php if (!empty($ing['proveedor_carnihub'])): ?>
-          <span style="font-size:.72rem;background:#EDE9FE;color:#6D28D9;padding:1px 6px;border-radius:6px;margin-left:6px">🔗 Proveedor</span>
+          <span class="badge badge-purple">Proveedor</span>
         <?php endif; ?>
         <?php if (!empty($ing['categoria'])): ?>
-          <span style="font-size:.72rem;color:#9CA3AF;margin-left:6px"><?= htmlspecialchars($ing['categoria']) ?></span>
+          <span class="badge badge-gray"><?= htmlspecialchars($ing['categoria']) ?></span>
         <?php endif; ?>
         <?php if (!empty($ing['platillos_afectados'])): ?>
-          <span style="font-size:.72rem;color:#92400E;background:#FEF3C7;border:1px solid #FDE68A;padding:1px 6px;border-radius:6px;margin-left:6px">
+          <span class="badge badge-amber" title="<?= htmlspecialchars((string)($ing['platillos_afectados_nombres'] ?? ''), ENT_QUOTES) ?>">
             <?= (int)$ing['platillos_afectados'] ?> platillo<?= (int)$ing['platillos_afectados'] !== 1 ? 's' : '' ?> oculto<?= (int)$ing['platillos_afectados'] !== 1 ? 's' : '' ?>
           </span>
         <?php endif; ?>
       </div>
-      <form method="POST" action="<?= BASE_URL ?>rest-inventario/reactivar/<?= (int)$ing['id'] ?>" style="margin:0"
+      <form class="inv-off-actions" method="POST" action="<?= BASE_URL ?>rest-inventario/reactivar/<?= (int)$ing['id'] ?>" style="margin:0"
             onsubmit="return confirm('Restaurar el ingrediente <?= htmlspecialchars(addslashes($ing['nombre']), ENT_QUOTES) ?> al menu?')">
         <input type="hidden" name="_csrf" value="<?= htmlspecialchars($csrf, ENT_QUOTES) ?>">
-        <button type="submit"
-          style="font-size:.78rem;font-weight:600;color:#16A34A;background:#F0FDF4;border:1px solid #86EFAC;padding:7px 12px;border-radius:8px;white-space:nowrap;cursor:pointer">
+        <button type="submit" class="inv-availability-btn on">
           Activar
         </button>
       </form>
-    </div>
+    </article>
     <?php endforeach; ?>
   </div>
-</details>
+</section>
 <?php endif; ?>
 
 <!-- Movimientos recientes -->
@@ -350,7 +373,7 @@ $totalIngredientesApagados = count($inactivos ?? []);
     <div>Fecha</div>
     <div>Ingrediente / Motivo</div>
     <div style="text-align:center">Tipo</div>
-    <div style="text-align:right">Cantidad</div>
+    <div style="text-align:right">Piezas</div>
     <div style="text-align:right">Stock final</div>
   </div>
   <?php
@@ -383,7 +406,6 @@ $totalIngredientesApagados = count($inactivos ?? []);
     </div>
     <div style="text-align:right;font-weight:600;font-size:.82rem;color:<?= in_array($m['tipo'],['entrada']) ? '#16A34A' : '#EF4444' ?>">
       <?= $delta ?><?= number_format(abs((float)$m['cantidad']), 2) ?>
-      <span style="font-size:.7rem;font-weight:400;color:#9CA3AF"><?= htmlspecialchars($m['unidad_principal'] ?? '') ?></span>
     </div>
     <div style="text-align:right;font-size:.82rem;color:#374151">
       <?= number_format((float)$m['stock_despues'], 2) ?>
@@ -430,9 +452,9 @@ sort($ingCategorias);
         <!-- Nombre + categoría -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
           <div class="form-group" style="grid-column:span 2">
-            <label class="form-label">Nombre del ingrediente *</label>
+            <label class="form-label">Producto o ingrediente *</label>
             <input type="text" name="nombre" id="ingNombre" class="form-input"
-                   placeholder="Ej: Jitomate, Carne de res, Aceite" required>
+                   placeholder="Ej: Jamón, Queso, Pan, Refresco" required>
           </div>
           <div class="form-group">
             <label class="form-label">Categoría
@@ -443,14 +465,9 @@ sort($ingCategorias);
                    placeholder="Ej: Lácteos, Carnes, Verduras">
           </div>
           <div class="form-group">
-            <label class="form-label">Unidad de medida</label>
-            <select name="unidad_principal" id="ingUnidad" class="form-select" onchange="calcCostos()">
-              <option value="paquete" selected>paquete</option>
-              <option value="pza">pza — pieza</option>
-              <option value="porción">porción</option>
-              <option value="caja">caja</option>
-              <option value="bolsa">bolsa</option>
-            </select>
+            <label class="form-label">Modo</label>
+            <input type="hidden" name="unidad_principal" id="ingUnidad" value="pza">
+            <div class="form-input" style="background:#FFF8F1;color:#6B442B;font-weight:800">Por piezas</div>
           </div>
         </div>
 
@@ -462,7 +479,7 @@ sort($ingCategorias);
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
             <div class="form-group" style="margin-bottom:0">
-              <label class="form-label">Costo por <span id="unidadLabel">paquete</span></label>
+              <label class="form-label">Costo por pieza</label>
               <div style="display:flex;align-items:center;gap:6px">
                 <span style="color:#6B7280;font-weight:600">$</span>
                 <input type="number" name="costo_unitario" id="ingCosto" class="form-input"
@@ -475,7 +492,7 @@ sort($ingCategorias);
               <div style="display:flex;align-items:center;gap:6px">
                 <input type="number" name="stock_minimo" id="ingMinimo" class="form-input"
                        value="0" min="0" step="0.001" placeholder="0.000">
-                <span id="unidadMinLabel" style="color:#9CA3AF;font-size:.8rem;white-space:nowrap">paquete</span>
+                <span id="unidadMinLabel" style="color:#9CA3AF;font-size:.8rem;white-space:nowrap">piezas</span>
               </div>
             </div>
           </div>
@@ -527,12 +544,11 @@ sort($ingCategorias);
                data-precio="<?= number_format((float)($pc['precio'] ?? 0), 4, '.', '') ?>"
                data-categoria="<?= htmlspecialchars(strtolower($pc['categoria'] ?? '')) ?>"
                onmouseover="this.style.background='#FAF5FF'" onmouseout="this.style.background=''"
-               onclick="seleccionarCarniHub(<?= $pc['id'] ?>, '<?= htmlspecialchars($pc['nombre'], ENT_QUOTES) ?>', '<?= htmlspecialchars($pc['unidad'] ?? 'kg', ENT_QUOTES) ?>', <?= (float)($pc['precio'] ?? 0) ?>, '<?= htmlspecialchars($pc['categoria'] ?? '', ENT_QUOTES) ?>', this)">
+               onclick="seleccionarCarniHub(<?= $pc['id'] ?>, '<?= htmlspecialchars($pc['nombre'], ENT_QUOTES) ?>', 'pza', <?= (float)($pc['precio'] ?? 0) ?>, '<?= htmlspecialchars($pc['categoria'] ?? '', ENT_QUOTES) ?>', this)">
             <div>
               <div style="font-weight:600;font-size:.875rem"><?= htmlspecialchars($pc['nombre']) ?></div>
               <div style="font-size:.73rem;color:#9CA3AF">
-                <?= htmlspecialchars($pc['unidad'] ?? '') ?>
-                <?php if (!empty($pc['categoria'])): ?> · <?= htmlspecialchars($pc['categoria']) ?><?php endif; ?>
+                <?php if (!empty($pc['categoria'])): ?><?= htmlspecialchars($pc['categoria']) ?><?php else: ?>Producto<?php endif; ?>
                 <?php if ((float)($pc['precio'] ?? 0) > 0): ?>
                   · $<?= number_format((float)$pc['precio'], 2) ?>
                 <?php endif; ?>
@@ -575,8 +591,8 @@ sort($ingCategorias);
       <div style="flex:1;min-width:0">
         <div class="rst-modal-title" id="modifNombre">Ingrediente</div>
         <div style="font-size:.78rem;color:#6B7280;margin-top:2px">
-          Stock: <strong id="modifStockActual">0</strong> <span id="modifUnidadPrincipal">kg</span>
-          &nbsp;·&nbsp; $<span id="modifCostoU">0.00</span>/<span id="modifUnidadCosto">kg</span>
+          Disponibles: <strong id="modifStockActual">0</strong>
+          &nbsp;·&nbsp; $<span id="modifCostoU">0.00</span>/pieza
         </div>
       </div>
       <button class="rst-modal-close" onclick="rstModal('modalModificar')">✕</button>
@@ -619,14 +635,13 @@ sort($ingCategorias);
         </div>
 
         <div class="form-group">
-          <label class="form-label">Cantidad</label>
+          <label class="form-label">Piezas</label>
           <div style="display:flex;gap:8px;align-items:center">
             <input type="number" id="modifCantInput" class="form-input" style="flex:2"
                    step="0.001" min="0.001" placeholder="0.000"
                    oninput="calcModifConversion()">
-            <select id="modifCantUnidad" class="form-select" style="flex:0 0 80px"
-                    onchange="calcModifConversion()">
-            </select>
+            <input type="hidden" id="modifCantUnidad" value="pza">
+            <span style="flex:0 0 auto;color:#7C5F46;font-weight:800">piezas</span>
           </div>
           <div id="modifConvPrev" style="display:none;margin-top:7px;padding:8px 12px;
                border-radius:8px;font-size:.8rem;line-height:1.6"></div>
@@ -667,19 +682,12 @@ sort($ingCategorias);
             <input type="text" name="categoria" id="modifEditCategoria" class="form-input" list="dlCatIng">
           </div>
           <div class="form-group" style="margin-bottom:0">
-            <label class="form-label">Unidad de medida</label>
-            <select name="unidad_principal" id="modifEditUnidad" class="form-select"
-                    onchange="document.getElementById('modifEditUnidadLabel').textContent=this.value;
-                              document.getElementById('modifEditUnidadWarn').style.display='block'">
-              <option value="paquete">paquete</option>
-              <option value="pza">pza — pieza</option>
-              <option value="porción">porción</option>
-              <option value="caja">caja</option>
-              <option value="bolsa">bolsa</option>
-            </select>
+            <label class="form-label">Modo</label>
+            <input type="hidden" name="unidad_principal" id="modifEditUnidad" value="pza">
+            <div class="form-input" style="background:#FFF8F1;color:#6B442B;font-weight:800">Por piezas</div>
           </div>
           <div class="form-group" style="margin-bottom:0">
-            <label class="form-label">Costo/<span id="modifEditUnidadLabel">kg</span></label>
+            <label class="form-label">Costo por pieza</label>
             <div style="display:flex;align-items:center;gap:6px">
               <span style="color:#6B7280;font-weight:600">$</span>
               <input type="number" name="costo_unitario" id="modifEditCosto" class="form-input"
@@ -738,12 +746,11 @@ sort($ingCategorias);
                           justify-content:space-between;align-items:center;cursor:pointer;transition:.1s"
                    onmouseover="if(!this.classList.contains('ch-sel'))this.style.background='#FAF5FF'"
                    onmouseout="if(!this.classList.contains('ch-sel'))this.style.background=''"
-                   onclick="seleccionarCarniHubEdit(<?= $pc['id'] ?>, '<?= htmlspecialchars($pc['nombre'], ENT_QUOTES) ?>', '<?= htmlspecialchars($pc['unidad'] ?? 'kg', ENT_QUOTES) ?>', <?= (float)($pc['precio'] ?? 0) ?>, '<?= htmlspecialchars($pc['categoria'] ?? '', ENT_QUOTES) ?>', this)">
+                   onclick="seleccionarCarniHubEdit(<?= $pc['id'] ?>, '<?= htmlspecialchars($pc['nombre'], ENT_QUOTES) ?>', 'pza', <?= (float)($pc['precio'] ?? 0) ?>, '<?= htmlspecialchars($pc['categoria'] ?? '', ENT_QUOTES) ?>', this)">
                 <div>
                   <div style="font-weight:600;font-size:.85rem"><?= htmlspecialchars($pc['nombre']) ?></div>
                   <div style="font-size:.72rem;color:#9CA3AF">
-                    <?= htmlspecialchars($pc['unidad'] ?? '') ?>
-                    <?php if (!empty($pc['categoria'])): ?> · <?= htmlspecialchars($pc['categoria']) ?><?php endif; ?>
+                    <?php if (!empty($pc['categoria'])): ?><?= htmlspecialchars($pc['categoria']) ?><?php else: ?>Producto<?php endif; ?>
                     <?php if ((float)($pc['precio'] ?? 0) > 0): ?>
                       · $<?= number_format((float)$pc['precio'], 2) ?>
                     <?php endif; ?>
@@ -770,11 +777,6 @@ sort($ingCategorias);
             </div>
             <?php endif; ?>
           </div>
-        </div>
-
-        <div id="modifEditUnidadWarn" style="display:none;background:#FEF3C7;border:1px solid #FDE68A;
-             border-radius:8px;padding:8px 12px;font-size:.75rem;color:#92400E;margin-bottom:12px">
-          ⚠️ Cambiar la unidad no convierte el stock existente.
         </div>
 
         <div class="rst-modal-footer">
@@ -837,17 +839,7 @@ async function syncPrecioCarniHub(productId, modo) {
     if (!data || !data.ok) return;
 
     const precio = parseFloat(data.precio || 0);
-    const unidad = (data.unidad || '').trim();
-
     if (modo === 'alta') {
-      if (unidad) {
-        const selUnidad = document.getElementById('ingUnidad');
-        if (selUnidad) {
-          let opt = [...selUnidad.options].find(o => o.value === unidad);
-          if (!opt) { opt = new Option(unidad, unidad); selUnidad.appendChild(opt); }
-          selUnidad.value = unidad;
-        }
-      }
       if (precio > 0) {
         const costo = document.getElementById('ingCosto');
         if (costo) {
@@ -861,16 +853,6 @@ async function syncPrecioCarniHub(productId, modo) {
       if (data.nombre) {
         const elNombre = document.getElementById('modifEditNombre');
         if (elNombre) elNombre.value = data.nombre;
-      }
-      if (unidad) {
-        const u = document.getElementById('modifEditUnidad');
-        if (u) {
-          let opt = [...u.options].find(o => o.value === unidad);
-          if (!opt) { opt = new Option(unidad, unidad); u.appendChild(opt); }
-          u.value = unidad;
-          const lbl = document.getElementById('modifEditUnidadLabel');
-          if (lbl) lbl.textContent = unidad;
-        }
       }
       if (precio > 0) {
         const costoEdit = document.getElementById('modifEditCosto');
@@ -890,13 +872,7 @@ function seleccionarCarniHub(id, nombre, unidad, precio, categoria = '', rowEl =
   // Auto-rellenar categoría del producto del proveedor
   const catInput = document.getElementById('ingCategoria');
   if (catInput && categoria) catInput.value = categoria;
-  // Propagar unidad del producto del proveedor al select de unidad
-  const selUnidad = document.getElementById('ingUnidad');
-  if (selUnidad && unidad) {
-    let opt = [...selUnidad.options].find(o => o.value === unidad);
-    if (!opt) { opt = new Option(unidad, unidad); selUnidad.appendChild(opt); }
-    selUnidad.value = unidad;
-  }
+  document.getElementById('ingUnidad').value = 'pza';
   const costoInput = document.getElementById('ingCosto');
   const precioNum = parseFloat(precio || 0);
   if (costoInput && precioNum > 0) {
@@ -945,9 +921,7 @@ function resetIngForm() {
 
 function calcCostos() {
   const costo  = parseFloat(document.getElementById('ingCosto').value) || 0;
-  const unidad = document.getElementById('ingUnidad').value;
-  document.getElementById('unidadLabel').textContent = unidad;
-  document.getElementById('unidadMinLabel').textContent = unidad;
+  const unidad = 'pieza';
   let items = [];
   if (costo > 0) {
     items = [`Por ${unidad}: <strong>$${costo.toFixed(2)}</strong>`];
@@ -963,17 +937,15 @@ let modifIngNombreActual = '';
 function abrirModificar(ing) {
   modifIng = ing;
   document.getElementById('modifNombre').textContent = ing.nombre;
-  document.getElementById('modifStockActual').textContent = parseFloat(ing.stock||0).toFixed(3);
-  document.getElementById('modifUnidadPrincipal').textContent = ing.unidad_principal;
+  document.getElementById('modifStockActual').textContent = Math.round(parseFloat(ing.stock||0)).toLocaleString('es-MX');
   document.getElementById('modifCostoU').textContent = parseFloat(ing.costo_unitario||0).toFixed(2);
-  document.getElementById('modifUnidadCosto').textContent = ing.unidad_principal;
 
   // Tab movimiento
   document.getElementById('modifIngId').value = ing.id;
   document.getElementById('modifCantInput').value = '';
   document.getElementById('modifCantFinal').value = '';
   document.getElementById('modifConvPrev').style.display = 'none';
-  setupModifUnidades(ing.unidad_principal);
+  setupModifUnidades();
   const firstMtipo = document.querySelector('.mtipo-lbl');
   if (firstMtipo) firstMtipo.click();
 
@@ -983,13 +955,7 @@ function abrirModificar(ing) {
   document.getElementById('modifEditCarnihubId').value = ing.carnihub_producto_id || '';
   document.getElementById('modifEditNombre').value = ing.nombre;
   document.getElementById('modifEditCategoria').value = ing.categoria || '';
-  const uSel = document.getElementById('modifEditUnidad');
-  let found = false;
-  for (let o of uSel.options) {
-    if (o.value === ing.unidad_principal) { o.selected = true; found = true; break; }
-  }
-  if (!found) { uSel.add(new Option(ing.unidad_principal, ing.unidad_principal, true, true)); }
-  document.getElementById('modifEditUnidadLabel').textContent = ing.unidad_principal;
+  document.getElementById('modifEditUnidad').value = 'pza';
   document.getElementById('modifEditCosto').value = ing.costo_unitario || 0;
   document.getElementById('modifEditMinimo').value = ing.stock_minimo || 0;
   document.getElementById('modifEditProveedor').value = ing.proveedor_nombre || '';
@@ -1025,8 +991,6 @@ function abrirModificar(ing) {
   }
   // Guardar nombre para re-aplicar al toggle a CH
   modifIngNombreActual = ing.nombre || '';
-  document.getElementById('modifEditUnidadWarn').style.display = 'none';
-
   switchModifTab('mov');
   document.getElementById('modalModificar').classList.add('open');
 }
@@ -1090,15 +1054,7 @@ function seleccionarCarniHubEdit(id, nombre, unidad, precio, categoria = '', row
   if (costo > 0) {
     document.getElementById('modifEditCosto').value = costo.toFixed(4);
   }
-  // Auto-rellenar unidad de medida del producto del proveedor
-  const selUnidad = document.getElementById('modifEditUnidad');
-  if (selUnidad && unidad) {
-    let opt = [...selUnidad.options].find(o => o.value === unidad);
-    if (!opt) { opt = new Option(unidad, unidad); selUnidad.appendChild(opt); }
-    selUnidad.value = unidad;
-    const lbl = document.getElementById('modifEditUnidadLabel');
-    if (lbl) lbl.textContent = unidad;
-  }
+  document.getElementById('modifEditUnidad').value = 'pza';
   // Auto-rellenar categoría del producto del proveedor
   const catEdit = document.getElementById('modifEditCategoria');
   if (catEdit && categoria) catEdit.value = categoria;
@@ -1119,7 +1075,6 @@ function aplicarBloqueoCarniHub(bloquear) {
   const banner   = document.getElementById('modifChBanner');
   const elNombre = document.getElementById('modifEditNombre');
   const elCosto  = document.getElementById('modifEditCosto');
-  const elUnidad = document.getElementById('modifEditUnidad');
   const btn      = document.getElementById('modifEditSubmitBtn');
   const bloqStyle = { background: '#F3F4F6', cursor: 'not-allowed', color: '#6B7280' };
 
@@ -1127,13 +1082,11 @@ function aplicarBloqueoCarniHub(bloquear) {
     if (banner)   banner.style.display = '';
     if (elNombre) { elNombre.readOnly = true; Object.assign(elNombre.style, bloqStyle); }
     if (elCosto)  { elCosto.readOnly  = true; Object.assign(elCosto.style,  bloqStyle); }
-    if (elUnidad) { elUnidad.disabled = true; Object.assign(elUnidad.style, bloqStyle); }
     if (btn) { btn.textContent = 'Sincronizado por el proveedor'; btn.style.background = '#5B21B6'; btn.style.borderColor = '#5B21B6'; }
   } else {
     if (banner)   banner.style.display = 'none';
     if (elNombre) { elNombre.readOnly = false; elNombre.style.background = ''; elNombre.style.cursor = ''; elNombre.style.color = ''; }
     if (elCosto)  { elCosto.readOnly  = false; elCosto.style.background  = ''; elCosto.style.cursor  = ''; elCosto.style.color  = ''; }
-    if (elUnidad) { elUnidad.disabled = false; elUnidad.style.background = ''; elUnidad.style.cursor = ''; elUnidad.style.color = ''; }
     if (btn) { btn.textContent = 'Guardar cambios'; btn.style.background = ''; btn.style.borderColor = ''; }
   }
 }
@@ -1218,40 +1171,14 @@ document.querySelectorAll('.mtipo-lbl').forEach(lbl => {
   });
 });
 
-function setupModifUnidades(mainUnit) {
-  const sel = document.getElementById('modifCantUnidad');
-  sel.innerHTML = '';
-  const grupos = {
-    'kg':['g','kg'],'g':['g','kg','mg'],'mg':['mg','g','kg'],
-    'L':['ml','L'],'l':['ml','L'],'ml':['ml','L'],'mL':['ml','L'],
-    'pza':['pza'],'caja':['caja'],'bolsa':['bolsa'],
-    'paquete':['paquete'],'porción':['porción'],'porcion':['porción'],
-  };
-  const units = grupos[mainUnit] || [mainUnit];
-  units.forEach(u => {
-    const opt = new Option(u, u);
-    if (u === mainUnit) opt.selected = true;
-    sel.appendChild(opt);
-  });
-}
-
-function convUnidad(q, desde, hasta) {
-  const d = desde.toLowerCase();
-  const h = hasta.toLowerCase();
-  if (d === h) return q;
-  const map = {
-    'g_kg':1e-3,'kg_g':1e3,'mg_g':1e-3,'g_mg':1e3,'mg_kg':1e-6,'kg_mg':1e6,
-    'ml_l':1e-3,'l_ml':1e3,
-  };
-  return q * (map[d+'_'+h] || 1);
+function setupModifUnidades() {
+  document.getElementById('modifCantUnidad').value = 'pza';
 }
 
 function calcModifConversion() {
   if (!modifIng) return;
   const cant = parseFloat(document.getElementById('modifCantInput').value) || 0;
-  const fromU = document.getElementById('modifCantUnidad').value;
-  const mainU = modifIng.unidad_principal;
-  const converted = convUnidad(cant, fromU, mainU);
+  const converted = cant;
   document.getElementById('modifCantFinal').value = converted.toFixed(6);
 
   const tipo = document.querySelector('.mtipo-radio:checked')?.value || 'entrada';
@@ -1262,11 +1189,8 @@ function calcModifConversion() {
   const prev = document.getElementById('modifConvPrev');
   if (cant > 0) {
     let html = '';
-    if (fromU.toLowerCase() !== mainU.toLowerCase()) {
-      html += `<strong>${cant} ${fromU}</strong> = <strong>${converted.toFixed(4)} ${mainU}</strong><br>`;
-    }
     const color = resta ? '#991B1B' : '#166534';
-    html += `Stock: ${stockActual.toFixed(3)} → <strong style="color:${color}">${stockNuevo.toFixed(3)} ${mainU}</strong>`;
+    html += `Disponibles: ${Math.round(stockActual).toLocaleString('es-MX')} → <strong style="color:${color}">${Math.round(stockNuevo).toLocaleString('es-MX')} piezas</strong>`;
     prev.innerHTML = html;
     prev.style.background = resta ? '#FEF2F2' : '#F0FDF4';
     prev.style.border = `1px solid ${resta ? '#FECACA' : '#BBF7D0'}`;
@@ -1282,8 +1206,7 @@ function prepararMovimiento() {
   if (cant <= 0) { alert('Ingresa una cantidad mayor a 0'); return false; }
   if (!document.querySelector('.mtipo-radio:checked')) { alert('Selecciona el tipo de movimiento'); return false; }
   if (!document.getElementById('modifCantFinal').value) {
-    const fromU = document.getElementById('modifCantUnidad').value;
-    document.getElementById('modifCantFinal').value = convUnidad(cant, fromU, modifIng.unidad_principal).toFixed(6);
+    document.getElementById('modifCantFinal').value = cant.toFixed(6);
   }
   const apagarMenu = document.getElementById('modifApagarMenu');
   if (apagarMenu) apagarMenu.value = '0';
@@ -1376,8 +1299,6 @@ function cambiarDisponibilidadIngrediente(id, activo) {
           ? Math.min(100, Math.round(i.stock / (min * 2) * 100))
           : (i.stock > 0 ? 100 : 0);
         const fillCls = bajo ? 'low' : (pct < 60 ? 'warn' : '');
-        const unidad  = card.dataset.unidad || '';
-
         // Clase del card
         card.classList.toggle('bajo',  bajo);
         card.classList.toggle('ok',   !bajo);
@@ -1385,7 +1306,7 @@ function cambiarDisponibilidadIngrediente(id, activo) {
         // Valor de stock
         const sv = document.getElementById('inv-sv-' + i.id);
         if (sv) {
-          sv.textContent = i.stock.toLocaleString('es-MX', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' ' + unidad;
+          sv.textContent = i.stock.toLocaleString('es-MX', {maximumFractionDigits:0});
           sv.style.color = bajo ? '#EF4444' : '#111827';
         }
 

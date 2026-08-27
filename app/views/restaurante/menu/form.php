@@ -180,12 +180,12 @@ ob_start();
             <label class="dish-mode-card <?= empty($ingredientes) ? 'is-disabled' : '' ?>">
               <input type="radio" name="inventory_mode" value="recipe" <?= $modoInventario === 'recipe' ? 'checked' : '' ?>
                      <?= empty($ingredientes) ? 'disabled' : '' ?>>
-              <span><strong>Ingredientes de inventario</strong><small>Varios ingredientes y cantidades</small></span>
+              <span><strong>Ingredientes</strong><small>Solo marca lo que lleva</small></span>
             </label>
             <label class="dish-mode-card <?= empty($ingredientes) ? 'is-disabled' : '' ?>">
               <input type="radio" name="inventory_mode" value="unit" <?= $modoInventario === 'unit' ? 'checked' : '' ?>
                      <?= empty($ingredientes) ? 'disabled' : '' ?>>
-              <span><strong>Bebida o producto directo</strong><small>Descontar la cantidad que captures</small></span>
+              <span><strong>Producto por unidad</strong><small>Refrescos, papas o piezas</small></span>
             </label>
           </div>
         </fieldset>
@@ -198,12 +198,8 @@ ob_start();
           </div>
         <?php else: ?>
         <section id="inventoryRecipePanel" class="dish-inventory-panel" <?= $modoInventario !== 'recipe' ? 'hidden' : '' ?> aria-labelledby="recipePanelTitle">
+          <input type="hidden" name="porciones_base" value="1">
           <div class="dish-form-grid">
-            <div class="form-group">
-              <label class="form-label" for="inpPorciones">Porciones que rinde la receta</label>
-              <input type="number" name="porciones_base" id="inpPorciones" min="1" max="127"
-                     class="form-input" value="<?= (int)($platillo['receta']['porciones_base'] ?? 1) ?>">
-            </div>
             <div class="form-group dish-field--wide">
               <label class="form-label" for="inpNotas">Nota breve para cocina</label>
               <input type="text" name="receta_notas" id="inpNotas" maxlength="255" class="form-input"
@@ -215,22 +211,22 @@ ob_start();
           <div class="dish-recipe-heading">
             <div>
               <h3 id="recipePanelTitle">Ingredientes de la receta</h3>
-              <p>Indica cuánto se consume para el total de porciones.</p>
+              <p>Toca cada ingrediente que lleva el platillo. Sin kilos, gramos ni medidas.</p>
             </div>
-            <button type="button" class="btn btn-outline btn-sm" id="addIngredientButton">+ Renglón vacío</button>
+            <button type="button" class="btn btn-outline btn-sm" id="addIngredientButton">+ Elegir manualmente</button>
           </div>
 
           <div class="dish-ingredient-picker">
             <label class="form-label" for="ingredientQuickSearch">Agregar rápidamente desde inventario</label>
-            <input type="search" id="ingredientQuickSearch" class="form-input" placeholder="Buscar café, leche, pan…" autocomplete="off">
+            <input type="search" id="ingredientQuickSearch" class="form-input" placeholder="Buscar pan, queso, jamón…" autocomplete="off">
             <div id="ingredientCatalog" class="dish-ingredient-catalog">
               <?php foreach ($ingredientes as $ingrediente): ?>
               <button type="button" class="dish-ingredient-option"
                       data-id="<?= (int)$ingrediente['id'] ?>"
-                      data-unit="<?= htmlspecialchars($ingrediente['unidad_principal'], ENT_QUOTES) ?>"
-                      data-search="<?= htmlspecialchars(mb_strtolower((string)$ingrediente['nombre'] . ' ' . (string)$ingrediente['unidad_principal']), ENT_QUOTES) ?>">
+                      data-unit="pza"
+                      data-search="<?= htmlspecialchars(mb_strtolower((string)$ingrediente['nombre']), ENT_QUOTES) ?>">
                 <span><?= htmlspecialchars($ingrediente['nombre']) ?></span>
-                <small><?= number_format((float)($ingrediente['stock'] ?? 0), 2) ?> <?= htmlspecialchars($ingrediente['unidad_principal']) ?> disponibles</small>
+                <small><?= number_format((float)($ingrediente['stock'] ?? 0), 0) ?> disponibles</small>
               </button>
               <?php endforeach; ?>
             </div>
@@ -239,35 +235,23 @@ ob_start();
 
           <div id="ingredientes-lista" class="dish-recipe-list" aria-live="polite">
             <?php foreach ($ingredientesReceta as $indice => $ingredienteReceta): ?>
-              <div class="dish-recipe-row">
+              <div class="dish-recipe-row dish-recipe-row--simple">
                 <div class="form-group">
                   <label class="form-label" for="ingrediente-<?= $indice ?>">Ingrediente</label>
                   <select name="ingrediente_id[]" id="ingrediente-<?= $indice ?>" class="form-select dish-ingredient-select">
                     <option value="">Seleccionar ingrediente</option>
                     <?php foreach ($ingredientes as $ingrediente): ?>
                       <option value="<?= (int)$ingrediente['id'] ?>"
-                              data-unidad="<?= htmlspecialchars($ingrediente['unidad_principal'], ENT_QUOTES) ?>"
+                              data-unidad="pza"
                               data-stock="<?= (float)($ingrediente['stock'] ?? 0) ?>"
                         <?= (int)$ingredienteReceta['ingrediente_id'] === (int)$ingrediente['id'] ? 'selected' : '' ?>>
-                        <?= htmlspecialchars($ingrediente['nombre']) ?> · <?= number_format((float)($ingrediente['stock'] ?? 0), 2) ?> <?= htmlspecialchars($ingrediente['unidad_principal']) ?>
+                        <?= htmlspecialchars($ingrediente['nombre']) ?>
                       </option>
                     <?php endforeach; ?>
                   </select>
                 </div>
-                <div class="form-group">
-                  <label class="form-label" for="cantidad-<?= $indice ?>">Cantidad</label>
-                  <input type="number" name="cantidad[]" id="cantidad-<?= $indice ?>" min="0.001" step="0.001"
-                         inputmode="decimal" class="form-input"
-                         value="<?= htmlspecialchars((string)$ingredienteReceta['cantidad'], ENT_QUOTES) ?>">
-                </div>
-                <div class="form-group">
-                  <label class="form-label" for="unidad-<?= $indice ?>">Unidad</label>
-                  <select name="unidad[]" id="unidad-<?= $indice ?>" class="form-select dish-unit-select">
-                    <?php foreach (['g', 'kg', 'mg', 'L', 'ml', 'mL', 'pza', 'caja', 'bolsa'] as $unidad): ?>
-                      <option value="<?= $unidad ?>" <?= ($ingredienteReceta['unidad'] ?? '') === $unidad ? 'selected' : '' ?>><?= $unidad ?></option>
-                    <?php endforeach; ?>
-                  </select>
-                </div>
+                <input type="hidden" name="cantidad[]" value="1">
+                <input type="hidden" name="unidad[]" value="pza">
                 <button type="button" class="dish-remove-row" aria-label="Quitar ingrediente">Quitar</button>
               </div>
             <?php endforeach; ?>
@@ -282,7 +266,7 @@ ob_start();
         <section id="inventoryUnitPanel" class="dish-inventory-panel" <?= $modoInventario !== 'unit' ? 'hidden' : '' ?> aria-labelledby="unitPanelTitle">
           <div class="dish-unit-heading">
             <h3 id="unitPanelTitle">Producto o bebida por unidad</h3>
-            <p>Elige el producto de inventario y cuanta existencia se descuenta por cada venta.</p>
+            <p>Para bebidas, papas o productos listos: cada venta descuenta piezas.</p>
           </div>
           <div class="dish-unit-picker">
             <div class="form-group">
@@ -295,21 +279,21 @@ ob_start();
                 <option value="">Selecciona un producto</option>
                 <?php foreach ($ingredientes as $ingrediente): ?>
                   <option value="<?= (int)$ingrediente['id'] ?>"
-                          data-unit="<?= htmlspecialchars($ingrediente['unidad_principal'], ENT_QUOTES) ?>"
+                          data-unit="pza"
                           data-stock="<?= (float)($ingrediente['stock'] ?? 0) ?>"
                           data-name="<?= htmlspecialchars($ingrediente['nombre'], ENT_QUOTES) ?>"
-                          data-search="<?= htmlspecialchars(mb_strtolower((string)$ingrediente['nombre'] . ' ' . (string)$ingrediente['unidad_principal']), ENT_QUOTES) ?>"
+                          data-search="<?= htmlspecialchars(mb_strtolower((string)$ingrediente['nombre']), ENT_QUOTES) ?>"
                     <?= (int)($platillo['ingrediente_directo_id'] ?? 0) === (int)$ingrediente['id'] ? 'selected' : '' ?>>
-                    <?= htmlspecialchars($ingrediente['nombre']) ?> · <?= number_format((float)($ingrediente['stock'] ?? 0), 2) ?> <?= htmlspecialchars($ingrediente['unidad_principal']) ?>
+                    <?= htmlspecialchars($ingrediente['nombre']) ?> · <?= number_format((float)($ingrediente['stock'] ?? 0), 0) ?> disponibles
                   </option>
                 <?php endforeach; ?>
               </select>
             </div>
             <div class="form-group">
-              <label class="form-label" for="ingredienteDirectoCantidad">Cantidad por venta</label>
+              <label class="form-label" for="ingredienteDirectoCantidad">Piezas por venta</label>
               <input type="number" name="ingrediente_directo_cantidad" id="ingredienteDirectoCantidad"
-                     class="form-input" min="0.001" step="0.001" inputmode="decimal"
-                     value="<?= htmlspecialchars(number_format($cantidadDirecta, 3, '.', ''), ENT_QUOTES) ?>">
+                     class="form-input" min="1" step="1" inputmode="numeric"
+                     value="<?= htmlspecialchars((string)max(1, (int)round($cantidadDirecta)), ENT_QUOTES) ?>">
             </div>
           </div>
           <div id="directStockSummary" class="dish-unit-summary" role="status" aria-live="polite">
@@ -360,32 +344,22 @@ ob_start();
 </main>
 
 <template id="ingredientRowTemplate">
-  <div class="dish-recipe-row">
+  <div class="dish-recipe-row dish-recipe-row--simple">
     <div class="form-group">
       <label class="form-label">Ingrediente</label>
       <select name="ingrediente_id[]" class="form-select dish-ingredient-select">
         <option value="">Seleccionar ingrediente</option>
         <?php foreach ($ingredientes as $ingrediente): ?>
           <option value="<?= (int)$ingrediente['id'] ?>"
-                  data-unidad="<?= htmlspecialchars($ingrediente['unidad_principal'], ENT_QUOTES) ?>"
+                  data-unidad="pza"
                   data-stock="<?= (float)($ingrediente['stock'] ?? 0) ?>">
-            <?= htmlspecialchars($ingrediente['nombre']) ?> · <?= number_format((float)($ingrediente['stock'] ?? 0), 2) ?> <?= htmlspecialchars($ingrediente['unidad_principal']) ?>
+            <?= htmlspecialchars($ingrediente['nombre']) ?>
           </option>
         <?php endforeach; ?>
       </select>
     </div>
-    <div class="form-group">
-      <label class="form-label">Cantidad</label>
-      <input type="number" name="cantidad[]" min="0.001" step="0.001" inputmode="decimal" class="form-input" placeholder="0.000">
-    </div>
-    <div class="form-group">
-      <label class="form-label">Unidad</label>
-      <select name="unidad[]" class="form-select dish-unit-select">
-        <?php foreach (['g', 'kg', 'mg', 'L', 'ml', 'mL', 'pza', 'caja', 'bolsa'] as $unidad): ?>
-          <option value="<?= $unidad ?>"><?= $unidad ?></option>
-        <?php endforeach; ?>
-      </select>
-    </div>
+    <input type="hidden" name="cantidad[]" value="1">
+    <input type="hidden" name="unidad[]" value="pza">
     <button type="button" class="dish-remove-row" aria-label="Quitar ingrediente">Quitar</button>
   </div>
 </template>
@@ -437,17 +411,8 @@ ob_start();
       label.htmlFor = id;
     });
     const ingredient = row.querySelector('.dish-ingredient-select');
-    const unit = row.querySelector('.dish-unit-select');
     ingredient?.addEventListener('change', () => {
       ingredient.setCustomValidity('');
-      const selectedUnit = ingredient.selectedOptions[0]?.dataset.unidad;
-      if (!selectedUnit || !unit) return;
-      let matchingOption = [...unit.options].find(option => option.value.toLowerCase() === selectedUnit.toLowerCase());
-      if (!matchingOption) {
-        matchingOption = new Option(selectedUnit, selectedUnit);
-        unit.add(matchingOption);
-      }
-      if (matchingOption) unit.value = matchingOption.value;
     });
     row.querySelector('.dish-remove-row')?.addEventListener('click', () => {
       row.remove();
@@ -461,7 +426,7 @@ ob_start();
     if (existing) {
       existing.closest('.dish-recipe-row')?.classList.add('is-highlighted');
       setTimeout(() => existing.closest('.dish-recipe-row')?.classList.remove('is-highlighted'), 900);
-      existing.closest('.dish-recipe-row')?.querySelector('input[name="cantidad[]"]')?.focus();
+      existing.focus();
       return;
     }
     const row = template.content.firstElementChild.cloneNode(true);
@@ -471,13 +436,10 @@ ob_start();
       const select = row.querySelector('.dish-ingredient-select');
       select.value = String(ingredientId);
       select.dispatchEvent(new Event('change'));
-      if (['pza', 'pieza', 'unidad', 'caja', 'bolsa'].includes(String(mainUnit).toLowerCase())) {
-        row.querySelector('input[name="cantidad[]"]').value = '1';
-      }
     }
     syncRecipeEmptyState();
     (ingredientId !== ''
-      ? row.querySelector('input[name="cantidad[]"]')
+      ? row.querySelector('.dish-ingredient-select')
       : row.querySelector('select'))?.focus();
   };
 
@@ -541,14 +503,13 @@ ob_start();
       directSummary.classList.remove('is-ready');
       return;
     }
-    const unit = selected.dataset.unit || 'unidad';
     const name = selected.dataset.name || selected.textContent.trim();
-    const qty = Math.max(0.001, Number(directQuantity?.value || 1));
-    const stock = Number(selected.dataset.stock || 0).toLocaleString('es-MX', { maximumFractionDigits: 3 });
+    const qty = Math.max(1, Math.round(Number(directQuantity?.value || 1)));
+    const stock = Number(selected.dataset.stock || 0).toLocaleString('es-MX', { maximumFractionDigits: 0 });
     const title = document.createElement('strong');
-    title.textContent = `Cada venta descontara ${qty.toLocaleString('es-MX', { maximumFractionDigits: 3 })} ${unit}`;
+    title.textContent = `Cada venta descuenta ${qty.toLocaleString('es-MX')} pieza${qty === 1 ? '' : 's'}`;
     const detail = document.createElement('span');
-    detail.textContent = `de ${name}. Existencia actual: ${stock} ${unit}.`;
+    detail.textContent = `de ${name}. Disponibles ahora: ${stock}.`;
     directSummary.replaceChildren(title, detail);
     directSummary.classList.add('is-ready');
   };
@@ -592,15 +553,8 @@ ob_start();
     priceError.textContent = Number(price.value) > 0 ? '' : 'El precio debe ser mayor a cero.';
 
     const inventoryMode = inventoryModes.find(radio => radio.checked)?.value || 'none';
-    list?.querySelectorAll('.dish-recipe-row').forEach(row => {
-      const ingredient = row.querySelector('.dish-ingredient-select');
-      const quantity = row.querySelector('input[name="cantidad[]"]');
-      quantity.setCustomValidity(inventoryMode === 'recipe' && ingredient.value && Number(quantity.value) <= 0
-        ? 'Captura una cantidad mayor a cero para este ingrediente.'
-        : '');
-    });
-    directQuantity?.setCustomValidity(inventoryMode === 'unit' && Number(directQuantity.value) <= 0
-      ? 'Captura una cantidad mayor a cero por venta.'
+    directQuantity?.setCustomValidity(inventoryMode === 'unit' && Math.round(Number(directQuantity.value)) <= 0
+      ? 'Captura una o más piezas por venta.'
       : '');
     const selectedIngredients = inventoryMode === 'recipe'
       ? [...(list?.querySelectorAll('.dish-ingredient-select') || [])]

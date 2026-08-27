@@ -195,7 +195,12 @@ class RestInventarioController extends BaseController
         $costoPosteado   = (float)$this->post('costo_unitario', 0);
         $precioRemoto    = 0.0;
 
-        // Si viene de CarniHub, resolver nombre y unidad
+        // Operacion simplificada: todo el inventario del restaurante se maneja
+        // como piezas/unidades visibles para caja, cocina y administracion.
+        $unidad = 'pza';
+
+        // Si viene de CarniHub, resolver nombre y precio; la unidad local se
+        // mantiene como pza para evitar kg/g/ml en la operacion diaria.
         if ($esCarnihub && $carnihubProdId) {
             if (!defined('RESTAURANTE_STANDALONE') || !RESTAURANTE_STANDALONE) {
                 // Instalación B2B: la tabla 'productos' existe localmente
@@ -204,12 +209,10 @@ class RestInventarioController extends BaseController
                 $stmt->execute([$carnihubProdId]);
                 $prod   = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
                 $nombre = $prod['nombre'] ?? $this->post('nombre', '');
-                $unidad = $prod['presentacion'] ?? $this->post('unidad_principal', 'kg');
                 $precioRemoto = (float)($prod['precio_base'] ?? 0);
             } else {
-                // Standalone: nombre y unidad vienen del formulario (JS los llena al seleccionar)
+                // Standalone: nombre viene del formulario (JS lo llena al seleccionar)
                 $nombre = trim($this->post('nombre', ''));
-                $unidad = $this->post('unidad_principal', 'kg');
 
                 try {
                     require_once ROOT_PATH . '/app/services/CarniHubApiService.php';
@@ -222,7 +225,6 @@ class RestInventarioController extends BaseController
             }
         } else {
             $nombre = trim($this->post('nombre', ''));
-            $unidad = $this->post('unidad_principal', 'kg');
         }
 
         $stockMinimo = $esCarnihub

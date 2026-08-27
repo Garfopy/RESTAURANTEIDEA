@@ -1006,8 +1006,8 @@ body {
 .dish-ingredient-picker > .form-input { max-width: 460px; }
 .dish-ingredient-catalog {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 7px;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 9px;
   max-height: 218px;
   margin-top: 10px;
   padding-right: 4px;
@@ -1016,7 +1016,7 @@ body {
 .dish-ingredient-option {
   display: grid;
   min-width: 0;
-  min-height: 52px;
+  min-height: 58px;
   align-content: center;
   gap: 2px;
   padding: 9px 11px;
@@ -1076,6 +1076,10 @@ body {
   border: 1px solid #e6d9ce;
   border-radius: 12px;
   background: #fff;
+}
+.dish-recipe-row--simple {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
 }
 .dish-recipe-row .form-group { margin: 0; }
 .dish-remove-row {
@@ -1163,6 +1167,7 @@ body {
   .dish-unit-picker { grid-template-columns: 1fr; }
   .dish-mode-card > span { min-height: 64px; }
   .dish-recipe-row { grid-template-columns: minmax(0, 1fr) minmax(90px, .55fr); }
+  .dish-recipe-row--simple { grid-template-columns: minmax(0, 1fr); }
   .dish-recipe-row .form-group:first-child { grid-column: 1 / -1; }
   .dish-remove-row { grid-column: 1 / -1; }
   .dish-form-actions { position: static; align-items: stretch; flex-direction: column; }

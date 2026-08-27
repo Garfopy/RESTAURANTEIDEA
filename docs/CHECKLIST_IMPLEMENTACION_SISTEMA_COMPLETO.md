@@ -123,11 +123,13 @@ Este archivo se actualiza en cada entrega. Una tarea solo se marca como terminad
 
 - [ ] Detectar productos sin receta o con cantidades cero.
 - [x] Crear selector simple: sin descuento, receta o producto por unidad.
-- [x] Añadir búsqueda y selección rápida de ingredientes mostrando existencias.
-- [x] Adaptar automáticamente la unidad de la receta a la unidad principal del inventario.
+- [x] Añadir búsqueda y selección rápida de ingredientes mostrando existencias simples.
+- [x] Simplificar recetas a selección de ingredientes sin kg, gramos ni unidades visibles.
+- [x] Forzar inventario operativo por piezas para ingredientes, bebidas y productos directos.
 - [x] Hacer funcional `ingrediente_directo_id`: descontar una unidad por venta con compatibilidad por código.
 - [x] Permitir cantidad por venta en productos directos/bebidas con `ingrediente_directo_cantidad`.
 - [x] Permitir apagar/activar ingredientes y ocultar automáticamente los platillos afectados.
+- [x] Reordenar ingredientes apagados en tarjetas visibles y fáciles de reactivar.
 - [x] Preguntar al dejar un ingrediente sin stock si también debe apagarse del menú.
 - [x] Bloquear en servidor la venta de platillos con ingredientes apagados.
 - [x] Mantener el descuento directo y por receta sin cambiar rutas ni contrato móvil.
